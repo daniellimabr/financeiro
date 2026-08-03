@@ -17,7 +17,7 @@ Financeiro v3/
 │   ├── architecture/
 │   │   ├── OVERVIEW.md             # arquitetura/infra/lógica proposta
 │   │   └── adr/
-│   │       ├── ADR-001-stack.md    # proposta de stack (aguardando aprovação)
+│   │       ├── ADR-001-stack.md    # stack aprovada em 2026-08-03
 │   │       └── ADR-002-plugins.md  # plugins ativados/desativados e por quê
 │   ├── prd/                        # PRDs por funcionalidade (vazio na Fase 0)
 │   ├── sprints/                    # planos e relatórios de sprint (vazio na Fase 0)
@@ -39,7 +39,7 @@ Financeiro v3/
 
 ## O que ainda não existe
 
-`backend/`, `frontend/`, `docker-compose.yml`, `.env.example`, `DESIGN.md` — só serão criados a partir da Sprint 1, após aprovação do ADR-001. `DESIGN.md` especificamente será gerado pelo fluxo `new-work` do Impeccable quando o primeiro trabalho visual começar (ver [ADR-002](architecture/adr/ADR-002-plugins.md)).
+`backend/`, `frontend/`, `docker-compose.yml`, `.env.example`, `DESIGN.md` — ADR-001 já aprovado; esses diretórios/arquivos são criados a partir da Sprint 1. `DESIGN.md` especificamente será gerado pelo fluxo `new-work` do Impeccable quando o primeiro trabalho visual começar (ver [ADR-002](architecture/adr/ADR-002-plugins.md)).
 
 ## Convenção
 

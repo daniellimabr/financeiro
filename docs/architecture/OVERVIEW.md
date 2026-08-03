@@ -1,6 +1,6 @@
 # Arquitetura — Visão Geral
 
-> Stack abaixo reflete a proposta de [ADR-001](adr/ADR-001-stack.md), ainda **aguardando aprovação do CEO**. Este doc será atualizado a cada mudança estrutural relevante (regra de doc viva).
+> Stack abaixo reflete [ADR-001](adr/ADR-001-stack.md), **aprovado pelo CEO em 2026-08-03**. Este doc será atualizado a cada mudança estrutural relevante (regra de doc viva).
 
 ## Visão de alto nível
 

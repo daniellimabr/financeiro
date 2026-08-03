@@ -24,7 +24,7 @@ E1 → E8 (import pode rodar assim que houver schema) → E4 (categorias/ativos 
 ## Primeiras 3 sprints propostas
 
 ### Sprint 1 — Fundação técnica (E1)
-- Aprovar ADR-001 (stack).
+- ADR-001 (stack) já aprovado em 2026-08-03.
 - Scaffold do backend FastAPI + SQLAlchemy/Alembic + estrutura de testes (pytest).
 - Scaffold do frontend React/Vite + estrutura de testes (Vitest).
 - Login via Google OAuth (fluxo completo, sessão JWT em cookie httpOnly).

@@ -33,7 +33,7 @@ CEO: idealiza, aprova planos, valida entregas. CTO (Claude Code): planeja, arqui
 | Modelos | Sonnet: planejamento/arquitetura/implementação/revisão. Haiku: docs, commits, Graphify, formatação |
 | Reaproveitamento do v1 | Só categorias/subcategorias + memória de classificação (dados, não código) |
 
-Stack de backend/frontend/DB/ORM/deploy: ver ADR-001 (proposta, aguardando aprovação do CEO).
+Stack de backend/frontend/DB/ORM/deploy: ver [ADR-001](docs/architecture/adr/ADR-001-stack.md) — aprovado em 2026-08-03.
 
 ## Política de autonomia (resumo — ver prompt de bootstrap para texto completo)
 

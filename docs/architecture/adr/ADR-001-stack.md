@@ -1,6 +1,6 @@
 # ADR-001: Stack tecnológica do Financeiro v2
 
-- **Status:** proposto — aguardando aprovação do CEO
+- **Status:** aprovado
 - **Data:** 2026-08-03
 
 ## Contexto
