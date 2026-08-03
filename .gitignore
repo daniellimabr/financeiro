@@ -1,0 +1,46 @@
+# Secrets — NUNCA versionar
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+secrets/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+build/
+.next/
+coverage/
+
+# Banco de dados local / dumps
+*.sqlite3
+*.db
+*.sql.gz
+/db-data/
+
+# Ferramentas
+graphify-out/
+.impeccable/
+*.log
+
+# Editor / SO
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# Claude Code (memória/sessão local, não é doc viva)
+.remember/
+.claude/settings.local.json
+.venv-ssh/
