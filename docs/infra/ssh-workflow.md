@@ -95,3 +95,30 @@ A VM de dev roda um clone do repositório. O fluxo de edição é:
   [CLAUDE.md](../../CLAUDE.md). Esta regra não muda.
 - Chave privada e host nunca em texto no repo — sempre via variável de ambiente ou arquivo
   fora do controle de versão.
+
+## Autenticação do `git push`/`git pull` para o GitHub (diferente do SSH das VMs)
+
+O remote `origin` usa **HTTPS**, não SSH — esse tráfego não passa pela restrição de rede que
+motivou o wrapper paramiko (ver seção acima), então não precisa dele.
+
+A autenticação é feita pelo **Git Credential Manager** (`credential.helper=manager`,
+configuração global do Windows) usando um **fine-grained Personal Access Token (PAT)**
+escopado só ao repo `daniellimabr/financeiro` (permissão `Contents: Read and write`,
+validade de até 1 ano). O GCM está configurado para nunca cair no fluxo OAuth/browser para
+`github.com`:
+
+```
+git config --global credential.https://github.com.gitHubAuthModes pat
+```
+
+Com isso, uma vez que o PAT é registrado (ação manual do CEO, feita uma única vez no
+terminal dele — nunca via comando montado pelo Claude, já que o token não pode aparecer em
+texto em nenhum comando), o GCM cacheia a credencial no Windows Credential Manager e todo
+`git push`/`git pull` subsequente roda sem prompt, inclusive os executados pelo Claude.
+
+**Se o prompt de browser voltar a aparecer:**
+1. Confirmar que a config acima ainda está ativa: `git config --get
+   credential.https://github.com.gitHubAuthModes` (deve retornar `pat`).
+2. Se estiver ativa mesmo assim, o PAT provavelmente expirou — o CEO precisa gerar um novo
+   em `github.com/settings/personal-access-tokens/new` (mesmo escopo) e rodar
+   `git-credential-manager github login --pat <novo-token>` no terminal dele.
