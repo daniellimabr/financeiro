@@ -1,10 +1,16 @@
-# Wrapper obrigatório para SSH na VM Oracle Cloud a partir de um venv Python.
-# Política corporativa: nenhum SSH deve ser executado fora de um venv.
-# Uso: .\scripts\ssh-vm.ps1 [comando remoto opcional]
-#   .\scripts\ssh-vm.ps1                  -> abre sessão interativa
-#   .\scripts\ssh-vm.ps1 "systemctl status financeiro-api"
+# Wrapper obrigatório para acesso às VMs (dev/prod) a partir de um venv Python.
+# Política corporativa: nenhum acesso remoto deve ser executado fora de um venv, e o
+# cliente SSH é paramiko (Python puro) — nunca o binário ssh.exe do sistema.
+# Uso: .\scripts\ssh-vm.ps1 <dev|prod> [comando remoto opcional]
+#   .\scripts\ssh-vm.ps1 dev                          -> sessão interativa na VM de dev
+#   .\scripts\ssh-vm.ps1 dev "docker compose up -d"    -> comando remoto na VM de dev
+#   .\scripts\ssh-vm.ps1 prod "systemctl status api"   -> exige aprovação prévia do CEO
 
 param(
+    [Parameter(Mandatory = $true, Position = 0)]
+    [ValidateSet("dev", "prod")]
+    [string]$Target,
+
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$RemoteCommand
 )
@@ -21,16 +27,15 @@ if (-not (Test-Path $VenvPath)) {
 $ActivateScript = Join-Path $VenvPath "Scripts\Activate.ps1"
 & $ActivateScript
 
-if (-not (Test-Path "env:FINANCEIRO_VM_HOST")) {
-    Write-Error "Defina a variável de ambiente FINANCEIRO_VM_HOST (ex.: usuario@ip-da-vm) antes de usar este script."
-    exit 1
-}
+$RequirementsFile = Join-Path $PSScriptRoot "requirements-ssh.txt"
+pip install --quiet -r $RequirementsFile
 
-$VmHost = $env:FINANCEIRO_VM_HOST
-$KeyPath = if ($env:FINANCEIRO_VM_KEY) { $env:FINANCEIRO_VM_KEY } else { "$HOME\.ssh\financeiro_vm_key" }
+$SshVmScript = Join-Path $PSScriptRoot "ssh_vm.py"
 
 if ($RemoteCommand.Count -gt 0) {
-    ssh -i $KeyPath $VmHost -- $($RemoteCommand -join " ")
+    python $SshVmScript $Target $($RemoteCommand -join " ")
 } else {
-    ssh -i $KeyPath $VmHost
+    python $SshVmScript $Target
 }
+
+exit $LASTEXITCODE

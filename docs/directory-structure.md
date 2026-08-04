@@ -33,7 +33,9 @@ Financeiro v3/
 │   ├── SPRINT-plan-template.md
 │   └── SPRINT-report-template.md
 ├── scripts/
-│   └── ssh-vm.ps1                  # wrapper de SSH via venv Python
+│   ├── ssh-vm.ps1                  # wrapper PowerShell: venv + paramiko, alvo dev|prod
+│   ├── ssh_vm.py                   # cliente SSH paramiko (dev: livre; prod: aprovação)
+│   └── requirements-ssh.txt        # dependências do venv de SSH (paramiko)
 └── .claude/                        # config local do Claude Code (agentes/hooks do projeto)
 ```
 

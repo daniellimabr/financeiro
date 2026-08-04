@@ -22,8 +22,8 @@ CEO: idealiza, aprova planos, valida entregas. CTO (Claude Code): planeja, arqui
 
 | Tema | Decisão |
 |---|---|
-| Infra | Oracle Cloud VM Free Tier; banco no mesmo servidor |
-| SSH | Sempre a partir de venv Python — ver [docs/infra/ssh-workflow.md](docs/infra/ssh-workflow.md) |
+| Infra | Oracle Cloud VM Free Tier; banco no mesmo servidor (prod). + instância separada de **dev** (Oracle Free Tier) desde 2026-08-04 — Docker/WSL2 bloqueados no notebook corporativo, então o ambiente de desenvolvimento roda numa VM própria, sem dados reais |
+| SSH | Sempre a partir de venv Python, via **paramiko** (não o binário `ssh.exe`) — ver [docs/infra/ssh-workflow.md](docs/infra/ssh-workflow.md). VM de **dev**: Claude executa livremente. VM de **prod**: aprovação do CEO por comando, como sempre |
 | Sync Pluggy | Manual (botão); rotina agendada é backlog futuro |
 | Categorização | Regras + memória de revisões do usuário. Sem LLM na pipeline |
 | Dashboards | Leitura direta/agregação simples. Sem tempo real, sem cache complexo |
@@ -37,8 +37,8 @@ Stack de backend/frontend/DB/ORM/deploy: ver [ADR-001](docs/architecture/adr/ADR
 
 ## Política de autonomia (resumo — ver prompt de bootstrap para texto completo)
 
-- **Faço sem pedir:** editar repo local, commits/branches de feature, testes/lint/migrations locais, atualizar docs vivos, instalar deps de dev.
-- **Proponho e aguardo OK:** merge/push para `main`, deploy ou SSH na VM, mudança de stack/ADR aprovado, ações com custo ou credenciais reais, exclusão de dados/migrations destrutivas, novo plugin não listado.
+- **Faço sem pedir:** editar repo local, commits/push/branches em `main` (autorizado pelo CEO em 2026-08-04 — controle do código do projeto, incluindo `main`, é do CTO), testes/lint/migrations locais, atualizar docs vivos, instalar deps de dev, comandos SSH na VM de **dev** (via `scripts/ssh_vm.py`/`ssh-vm.ps1`, paramiko).
+- **Proponho e aguardo OK:** deploy ou SSH na VM de **produção**, mudança de stack/ADR aprovado, ações com custo ou credenciais reais (inclui provisionar VMs), exclusão de dados/migrations destrutivas, novo plugin não listado.
 - **Nunca faço:** deploy sem relatório de sprint aprovado, commit de secrets, reabrir decisões da tabela acima sem solicitação.
 
 ## Fluxo por sprint
