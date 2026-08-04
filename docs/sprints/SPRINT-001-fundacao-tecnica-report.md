@@ -24,7 +24,7 @@ Sprint 1 entregou a base técnica da aplicação: VM de desenvolvimento funciona
 | 9 | Frontend: login + página protegida + tratamento 401; rodar `/impeccable audit` | **Feito** | LoginPage com botão "Entrar com Google", ProtectedPage mostra nome/e-mail, App.tsx renderização condicional login/protected/loading; auditoria: score 19/20, única correção necessária: `<html lang="en">` → `lang="pt-BR"` (corrigido em index.html) |
 | 10 | Docker Compose (postgres, api, frontend, caddy) | **Feito** | `docker-compose.yml` com 4 serviços, healthchecks, build stages multi-stage para frontend (Vite + nginx:1.27-alpine), Caddyfile roteamento /auth/* e /health para api, resto para frontend |
 | 11 | Pre-commit (ruff, eslint, detect-secrets + baseline) | **Feito** | `.pre-commit-config.yaml` instalado localmente, `.secrets.baseline` gerado, pre-commit install ativo em `.git/hooks/pre-commit` |
-| 12 | CI (`.github/workflows/ci.yml`: pytest+ruff backend, vitest+eslint frontend) | **Feito** | Arquivo criado e pusheado; GitHub Actions criado; resultado em tempo real do GitHub não confirmado in loco pelo CTO |
+| 12 | CI (`.github/workflows/ci.yml`: pytest+ruff backend, vitest+eslint frontend) | **Feito** | Confirmado rodando e verde no GitHub Actions (run [30943852049](https://github.com/daniellimabr/financeiro/actions/runs/30943852049), ambos os jobs `success`); primeira versão do workflow tinha um YAML inválido (`DATABASE_URL: sqlite:///:memory:` sem aspas quebrava o parser) que foi corrigido durante a sprint |
 | 13 | Atualizar `directory-structure.md` e `OVERVIEW.md` | **Feito** | directory-structure.md: adicionados backend/, frontend/, docker-compose.yml, Caddyfile, .env.example, .pre-commit-config.yaml, .secrets.baseline, .github/workflows/ci.yml; OVERVIEW.md: VM de dev registrada como permanente, Docker Compose detalhado, fluxo git-sync, topologia Caddy |
 | 14 | Relatório de sprint | **Feito** | Este arquivo |
 
@@ -116,6 +116,8 @@ $ npm run build      → tsc -b && vite build — build de produção concluído
 
 5. **Migration reversível:** Alembic 0001 estruturado com `upgrade()` e `downgrade()` funcional — permite rollback seguro em futuro.
 
+6. **CI quebrado no primeiro push:** o workflow inicial tinha `DATABASE_URL: sqlite:///:memory:` sem aspas, o que o YAML interpreta como um mapeamento aninhado (dois-pontos não escapados) — GitHub Actions falhava antes de sequer agendar um job. Corrigido citando o valor. Placeholders de teste (`JWT_SECRET_KEY`, `GOOGLE_CLIENT_SECRET` no CI) também foram barrados pelo detect-secrets (falso positivo esperado) e marcados com `# pragma: allowlist secret`.
+
 ## Critérios de aceite do PRD — verificação item a item
 
 | Critério | Atendido? | Evidência |
@@ -124,7 +126,7 @@ $ npm run build      → tsc -b && vite build — build de produção concluído
 | **2. Sem autenticação, rota protegida retorna 401** | **Sim** | `curl http://localhost:8080/auth/me` sem cookie retornou `401 Unauthorized`; testes automatizados (test_auth_endpoints.py::test_auth_me_without_cookie) confirmam |
 | **3. Login Google end-to-end, página protegida com nome/email** | **Não** | Bloqueado — CEO ainda não criou credenciais Google (tarefa 3 do plano); código de endpoint `/auth/google/callback`, dependency JWT, frontend LoginPage + ProtectedPage + renderização condicional estão 100% prontos e testados com Google mockado via monkeypatch |
 | **4. JWT expirado/inválido → 401** | **Sim** | Testes unitários (test_jwt.py::test_decode_jwt_expired, test_decode_jwt_invalid_signature) e integração (test_auth_endpoints.py com cookie inválido) passando; tratamento no frontend (401 → redirect para LoginPage) testado em App.test.tsx |
-| **5. CI roda em push/PR — lint e testes automaticamente** | **Sim** | `.github/workflows/ci.yml` criado com jobs backend (ruff check+format, pytest) e frontend (eslint, prettier, tsc, vitest); arquivo pusheado para main; resultado em tempo real do GitHub Actions não confirmado in loco, mas CI está funcional (supramente verificável via ações do GitHub) |
+| **5. CI roda em push/PR — lint e testes automaticamente** | **Sim** | Confirmado via API do GitHub: run [30943852049](https://github.com/daniellimabr/financeiro/actions/runs/30943852049) `completed`/`success`, jobs `Backend (ruff + pytest)` e `Frontend (eslint + vitest)` ambos `success` |
 | **6. Pre-commit bloqueia secret (detect-secrets)** | **Sim** | `.pre-commit-config.yaml` com detect-secrets + hook instalado localmente (`pre-commit install`); `.secrets.baseline` gerado para evitar falsos positivos; hook ativo em `.git/hooks/pre-commit` |
 
 ## Documentação atualizada
