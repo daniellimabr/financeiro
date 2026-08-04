@@ -116,9 +116,30 @@ terminal dele — nunca via comando montado pelo Claude, já que o token não po
 texto em nenhum comando), o GCM cacheia a credencial no Windows Credential Manager e todo
 `git push`/`git pull` subsequente roda sem prompt, inclusive os executados pelo Claude.
 
+Para registrar o PAT, usar o subcomando do git (não o binário standalone — este último não
+está no PATH do PowerShell, só no Git Bash):
+```
+git credential-manager github login --pat SEU_TOKEN
+```
+
+**Importante — o remote tem o usuário fixado na URL:**
+```
+origin  https://daniellimabr@github.com/daniellimabr/financeiro.git
+```
+Isso é necessário porque o Windows Credential Manager deste notebook guarda **múltiplas
+identidades do GitHub** (`daniellimabr`, e outras de uso pessoal/QA não relacionadas a este
+projeto). Sem o usuário fixo na URL, o GCM fica ambíguo sobre qual credencial usar num
+`git push`; na prática ele escolhia uma sem permissão de escrita neste repo, levava 403 do
+GitHub e iniciava um novo login via browser para tentar resolver — foi exatamente o que
+aconteceu em 2026-08-04 mesmo com `gitHubAuthModes=pat` configurado (fetch/dry-run
+funcionavam, só o push real disparava o browser). Fixar `daniellimabr@` na URL do remote
+eliminou a ambiguidade. **Não remover esse usuário da URL do remote.**
+
 **Se o prompt de browser voltar a aparecer:**
-1. Confirmar que a config acima ainda está ativa: `git config --get
+1. Confirmar que o remote ainda tem o usuário fixado: `git remote -v` deve mostrar
+   `https://daniellimabr@github.com/...`.
+2. Confirmar que a config de auth mode ainda está ativa: `git config --get
    credential.https://github.com.gitHubAuthModes` (deve retornar `pat`).
-2. Se estiver ativa mesmo assim, o PAT provavelmente expirou — o CEO precisa gerar um novo
-   em `github.com/settings/personal-access-tokens/new` (mesmo escopo) e rodar
-   `git-credential-manager github login --pat <novo-token>` no terminal dele.
+3. Se ambos estiverem ok mesmo assim, o PAT provavelmente expirou — o CEO precisa gerar um
+   novo em `github.com/settings/personal-access-tokens/new` (mesmo escopo) e rodar
+   `git credential-manager github login --pat <novo-token>` no terminal dele.
