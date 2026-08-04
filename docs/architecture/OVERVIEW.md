@@ -74,14 +74,19 @@ Toda tabela transacional tem `user_id` obrigatório; toda query de aplicação f
 - **Pre-commit:** ruff, eslint, detect-secrets (baseline) — executado local antes de push
 - **CI:** GitHub Actions — jobs `backend` (ruff check/format, pytest) e `frontend` (eslint, prettier, tsc, vitest) — roda em push/PR para `main`
 
-## Pendências (Sprint 1)
+## Acesso externo à VM de dev — DNS e checklist de portas
 
-Bloqueios que impedem validação end-to-end total:
+A VM de dev é acessada por `http://financeirov2.duckdns.org:8080` (domínio gratuito DuckDNS apontando para `163.176.0.135`), **não pelo IP puro**: o Google rejeita IP como redirect URI OAuth ("é preciso usar um domínio... com TLD válido"). `OAUTH_REDIRECT_BASE_URL` no `.env` da VM usa esse domínio.
 
-1. **CEO:** abertura da porta 8080 na security list da VM de dev (Oracle Cloud Console) — sem isso, preview web não acessível de fora da VM
-2. **CEO:** criação de projeto Google Cloud Console + credenciais OAuth + tela de consentimento com redirect URI `http://163.176.0.135:8080/auth/google/callback` — sem isso, login real não testável (código de auth está pronto com mocks, mas validação no navegador pendente)
+Abrir uma porta nova nesta VM (ou na futura VM de prod, se a mesma imagem Oracle Ubuntu for usada) exige checar **três camadas**, não só uma — Sprint 1 caiu nas três:
 
-Consequência: tarefas 6, 7, 9 do plano de Sprint 1 têm código+testes prontos, mas validação end-to-end em navegador ainda pendente (depende de (1) e (2) acima).
+1. **Security List da VCN** — a VCN `vcn-financeiro` tem duas Security Lists (uma para subnet privada, outra "Default"); a instância pública usa a "Default". Regra de ingress precisa estar na lista certa.
+2. **`iptables` da própria VM** — a imagem Ubuntu da Oracle já vem com um `REJECT` padrão (`icmp-host-prohibited`) para tudo que não é porta 22 (`chain INPUT`, ver `sudo iptables -L INPUT -n`). Precisa de um `ACCEPT tcp --dport <porta> -m state --state NEW` **antes** da regra de reject (`iptables -I INPUT <posição> ...`). A imagem já vem com `iptables-persistent`/`netfilter-persistent` instalado — depois de adicionar a regra, rodar `sudo netfilter-persistent save` para sobreviver a reboot (feito para a porta 8080 nesta sprint).
+3. **Redirect URI do Google (se aplicável)** — exige domínio com TLD, não aceita IP puro.
+
+## Pendências
+
+Nenhum bloqueio de Sprint 1 restante — porta 8080 e credenciais Google resolvidas e login validado end-to-end pelo CEO. Ver [SPRINT-001-fundacao-tecnica-report.md](../sprints/SPRINT-001-fundacao-tecnica-report.md) para detalhe completo.
 
 ## Referências
 
