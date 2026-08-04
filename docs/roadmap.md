@@ -6,7 +6,7 @@ Fases em épicos, derivados do escopo funcional do bootstrap. PRDs individuais s
 
 | # | Épico | Escopo funcional relacionado |
 |---|---|---|
-| E1 | Fundação técnica | Setup de repo, stack (ADR-001), auth Google OAuth, deploy inicial na VM |
+| E1 | Fundação técnica ✅ | Setup de repo, stack (ADR-001), auth Google OAuth, deploy inicial na VM — concluído na Sprint 1 (2026-08-04) |
 | E2 | Integração Pluggy | Extratos, cartão de crédito, investimentos; setup técnico (item 8) |
 | E3 | Categorização | Regras + memória de revisão manual; associação despesa↔ativo (item 2) |
 | E4 | Gestão de dados mestres | Categorias/subcategorias/natureza (item 10); ativos/passivos (item 9) |
@@ -23,13 +23,13 @@ E1 → E8 (import pode rodar assim que houver schema) → E4 (categorias/ativos 
 
 ## Primeiras 3 sprints propostas
 
-### Sprint 1 — Fundação técnica (E1)
+### Sprint 1 — Fundação técnica (E1) ✅ concluída em 2026-08-04
 - ADR-001 (stack) já aprovado em 2026-08-03.
 - Scaffold do backend FastAPI + SQLAlchemy/Alembic + estrutura de testes (pytest).
 - Scaffold do frontend React/Vite + estrutura de testes (Vitest).
-- Login via Google OAuth (fluxo completo, sessão JWT em cookie httpOnly).
-- Docker Compose local (api + postgres) funcionando; pre-commit com ruff/eslint/detect-secrets.
-- **Não inclui:** deploy na VM ainda (fica para o fim da Sprint 1 ou início da Sprint 2, após aprovação do CEO).
+- Login via Google OAuth (fluxo completo, sessão JWT em cookie httpOnly) — validado end-to-end pelo CEO.
+- Docker Compose rodando na VM de dev; pre-commit com ruff/eslint/detect-secrets; CI no GitHub Actions.
+- Relatório: [SPRINT-001-fundacao-tecnica-report.md](sprints/SPRINT-001-fundacao-tecnica-report.md) (aprovado pelo CEO em 2026-08-04).
 
 ### Sprint 2 — Dados mestres + migração legado (E4, E8)
 - Schema de categorias/subcategorias/natureza + CRUD (item 10).

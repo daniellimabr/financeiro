@@ -3,10 +3,11 @@
 - **Plano:** [SPRINT-001-fundacao-tecnica-plan.md](./SPRINT-001-fundacao-tecnica-plan.md)
 - **PRD:** [PRD-001-fundacao-tecnica](../prd/PRD-001-fundacao-tecnica.md)
 - **Data do relatório:** 2026-08-04
+- **Status:** aprovado pelo CEO em 2026-08-04
 
 ## Resumo
 
-Sprint 1 entregou a base técnica da aplicação: VM de desenvolvimento funcional (Docker Compose com 4 serviços — postgres, API FastAPI, frontend React, Caddy reverse-proxy), autenticação Google OAuth com JWT em cookie httpOnly, tabela `users` via Alembic, testes automatizados (pytest backend 95% cobertura, Vitest frontend), e esteira de qualidade (pre-commit local + CI no GitHub Actions). Código pronto para produção em segurança; bloqueadores são exclusivamente infraestruturais (portas/credenciais Google), não técnicos.
+Sprint 1 entregou a base técnica da aplicação: VM de desenvolvimento funcional (Docker Compose com 4 serviços — postgres, API FastAPI, frontend React, Caddy reverse-proxy), autenticação Google OAuth com JWT em cookie httpOnly, tabela `users` via Alembic, testes automatizados (pytest backend 95% cobertura, Vitest frontend), e esteira de qualidade (pre-commit local + CI no GitHub Actions). Login Google validado end-to-end pelo CEO no navegador. Os 6 critérios de aceite do PRD-001 estão confirmados; épico E1 fechado.
 
 ## Itens do plano vs. entregue
 
