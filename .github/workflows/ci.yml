@@ -31,10 +31,10 @@ jobs:
       - name: Pytest
         run: pytest
         env:
-          DATABASE_URL: sqlite:///:memory:
-          JWT_SECRET_KEY: ci-test-secret-key-not-used-in-prod
+          DATABASE_URL: "sqlite:///:memory:"
+          JWT_SECRET_KEY: ci-test-secret-key-not-used-in-prod  # pragma: allowlist secret
           GOOGLE_CLIENT_ID: ci-test-client-id
-          GOOGLE_CLIENT_SECRET: ci-test-client-secret
+          GOOGLE_CLIENT_SECRET: ci-test-client-secret  # pragma: allowlist secret
 
   frontend:
     name: Frontend (eslint + vitest)
