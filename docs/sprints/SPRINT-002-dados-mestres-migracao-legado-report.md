@@ -3,6 +3,7 @@
 - **Plano:** [SPRINT-002-dados-mestres-migracao-legado-plan.md](./SPRINT-002-dados-mestres-migracao-legado-plan.md)
 - **PRD:** [PRD-002-dados-mestres-migracao-legado](../prd/PRD-002-dados-mestres-migracao-legado.md)
 - **Data do relatório:** 2026-08-06
+- **Status:** aprovado pelo CEO em 2026-08-06
 
 ## Resumo
 
