@@ -31,7 +31,7 @@ Financeiro v3/
 │   │   ├── SPRINT-001-fundacao-tecnica-plan.md       # Plano Sprint 1 (2026-08-04)
 │   │   ├── SPRINT-001-fundacao-tecnica-report.md     # Relatório Sprint 1 (2026-08-04)
 │   │   ├── SPRINT-002-dados-mestres-migracao-legado-plan.md    # Plano Sprint 2 (2026-08-05)
-│   │   └── SPRINT-002-dados-mestres-migracao-legado-report.md  # Relatório Sprint 2 (2026-08-05)
+│   │   └── SPRINT-002-dados-mestres-migracao-legado-report.md  # Relatório Sprint 2 (2026-08-06)
 │   ├── roadmap.md                  # épicos + 3 primeiras sprints propostas
 │   ├── directory-structure.md      # este arquivo — atualizado em Sprint 2
 │   ├── infra/

@@ -36,9 +36,9 @@ Uma VM Oracle Free Tier (163.176.0.135, Ubuntu 24.04.4 LTS) roda tudo via Docker
 | `caddy`    | `caddy:2-alpine`     | 80   | Reverse proxy, rota única entrada porta `$DEV_PREVIEW_PORT` do host |
 
 **Roteamento Caddy:**
-- `/auth/*` → `api:8000`
-- `/health` → `api:8000`
+- `/auth/*`, `/health`, `/category-groups*`, `/subcategories*`, `/assets*`, `/liabilities*` → `api:8000`
 - `/*` (resto) → `frontend:80`
+- Toda rota nova de API precisa ser adicionada ao matcher `@api` do [Caddyfile](../../Caddyfile) — esquecer isso faz a rota cair no frontend (SPA) e devolver 200 em vez do 401/404 esperado da API. Bug real da Sprint 2, descoberto só na validação end-to-end pós-deploy; adicionar ao checklist de Definition of Done ao criar endpoints novos.
 
 **Healthchecks:** postgres e api têm healthchecks Docker; frontend/caddy derivam do estado dos dependentes.
 
@@ -47,6 +47,7 @@ Uma VM Oracle Free Tier (163.176.0.135, Ubuntu 24.04.4 LTS) roda tudo via Docker
 2. `git push` para `main` (autorizado sem aprovação prévia)
 3. Na VM de dev: `git pull` + `docker compose up -d --build`
 4. Logs: `docker compose logs -f api` ou similar
+5. **Se o `Caddyfile` mudou:** `docker compose up -d --build` sozinho não recarrega o Caddy — é um arquivo montado como volume (`./Caddyfile:/etc/caddy/Caddyfile:ro`), não faz parte da imagem, então o compose não detecta mudança nele. Precisa de `docker compose restart caddy` explícito (aprendido na Sprint 2).
 
 ## Componentes
 

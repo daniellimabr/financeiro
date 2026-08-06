@@ -9,7 +9,7 @@ Fases em épicos, derivados do escopo funcional do bootstrap. PRDs individuais s
 | E1 | Fundação técnica ✅ | Setup de repo, stack (ADR-001), auth Google OAuth, deploy inicial na VM — concluído na Sprint 1 (2026-08-04) |
 | E2 | Integração Pluggy | Extratos, cartão de crédito, investimentos; setup técnico (item 8) |
 | E3 | Categorização | Regras + memória de revisão manual; associação despesa↔ativo (item 2) |
-| E4 | Gestão de dados mestres | Categorias/subcategorias/natureza (item 10); ativos/passivos (item 9) |
+| E4 | Gestão de dados mestres ✅ | Categorias/subcategorias/natureza (item 10); ativos/passivos (item 9) — concluído na Sprint 2 (2026-08-06) |
 | E5 | Dashboards core | Receita/despesa/saldo/patrimônio com drill-down; filtros ano/mês (itens 3, 7) |
 | E6 | Dashboards analíticos | Despesas por natureza; despesas por ativo; patrimônio e evolução de investimentos (itens 4, 5, 6) |
 | E7 | Conta e perfil | Perfil de usuário, logout, multiusuário (item 11) |
@@ -31,11 +31,12 @@ E1 → E8 (import pode rodar assim que houver schema) → E4 (categorias/ativos 
 - Docker Compose rodando na VM de dev; pre-commit com ruff/eslint/detect-secrets; CI no GitHub Actions.
 - Relatório: [SPRINT-001-fundacao-tecnica-report.md](sprints/SPRINT-001-fundacao-tecnica-report.md) (aprovado pelo CEO em 2026-08-04).
 
-### Sprint 2 — Dados mestres + migração legado (E4, E8)
+### Sprint 2 — Dados mestres + migração legado (E4, E8) ✅ concluída em 2026-08-06
 - Schema de categorias/subcategorias/natureza + CRUD (item 10).
-- Script de import do legado (categorias + memória de classificação) — formato conforme [docs/migration/legacy-data.md](migration/legacy-data.md), ajustado quando os dados chegarem.
-- Schema e CRUD de ativos/passivos (item 9), incluindo baixa por venda.
-- Testes unitários das regras de negócio dessas entidades.
+- Script de import do legado (categorias) — 15 grupos / 51 pares confirmados pelo CEO, importados com sucesso na VM de dev. Memória de classificação segue pendente (arquivo do CEO ainda não entregue).
+- Schema e CRUD de ativos/passivos (item 9), incluindo baixa por venda e quitação de passivo, ambos idempotentes.
+- 51 testes novos (unit + integração), 97% de cobertura nos módulos novos.
+- Relatório: [SPRINT-002-dados-mestres-migracao-legado-report.md](sprints/SPRINT-002-dados-mestres-migracao-legado-report.md).
 
 ### Sprint 3 — Integração Pluggy + categorização automática (E2, E3)
 - Setup técnico: credenciais Pluggy, seleção de contas, corte de histórico, data de competência de receita (item 8).
