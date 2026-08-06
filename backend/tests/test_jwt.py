@@ -26,7 +26,11 @@ def test_decode_expired_token_raises():
 
 def test_decode_token_with_invalid_signature_raises():
     token = create_access_token(user_id=42)
-    tampered = token[:-1] + ("a" if token[-1] != "a" else "b")
+    # Corrompe vários caracteres da assinatura, não só o último: mudar um único
+    # caractere final do base64url às vezes decodifica para os mesmos bytes
+    # (o último grupo de 6 bits pode ter bits de padding não significativos),
+    # o que tornava esse teste esporadicamente flaky (visto na CI da Sprint 2).
+    tampered = token[:-8] + ("x" * 8 if token[-8:] != "x" * 8 else "y" * 8)
 
     with pytest.raises(pyjwt.PyJWTError):
         decode_access_token(tampered)
