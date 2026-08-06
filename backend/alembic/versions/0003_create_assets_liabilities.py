@@ -22,6 +22,17 @@ asset_status_enum = sa.Enum("ativo", "baixado", name="asset_status")
 liability_tipo_enum = sa.Enum("financiamento", "outro", name="liability_tipo")
 liability_status_enum = sa.Enum("ativo", "quitado", name="liability_status")
 
+asset_tipo_enum_no_create = sa.Enum(
+    "imovel", "veiculo", "outro", name="asset_tipo", create_type=False
+)
+asset_status_enum_no_create = sa.Enum("ativo", "baixado", name="asset_status", create_type=False)
+liability_tipo_enum_no_create = sa.Enum(
+    "financiamento", "outro", name="liability_tipo", create_type=False
+)
+liability_status_enum_no_create = sa.Enum(
+    "ativo", "quitado", name="liability_status", create_type=False
+)
+
 
 def upgrade() -> None:
     bind = op.get_bind()
@@ -35,10 +46,10 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("nome", sa.String(length=255), nullable=False),
-        sa.Column("tipo", asset_tipo_enum, nullable=False),
+        sa.Column("tipo", asset_tipo_enum_no_create, nullable=False),
         sa.Column("valor_atual", sa.Numeric(14, 2), nullable=False),
         sa.Column("data_aquisicao", sa.Date(), nullable=False),
-        sa.Column("status", asset_status_enum, nullable=False, server_default="ativo"),
+        sa.Column("status", asset_status_enum_no_create, nullable=False, server_default="ativo"),
         sa.Column("data_venda", sa.Date(), nullable=True),
         sa.Column("valor_venda", sa.Numeric(14, 2), nullable=True),
         sa.Column(
@@ -55,10 +66,12 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("nome", sa.String(length=255), nullable=False),
-        sa.Column("tipo", liability_tipo_enum, nullable=False),
+        sa.Column("tipo", liability_tipo_enum_no_create, nullable=False),
         sa.Column("valor_total", sa.Numeric(14, 2), nullable=False),
         sa.Column("saldo_devedor", sa.Numeric(14, 2), nullable=False),
-        sa.Column("status", liability_status_enum, nullable=False, server_default="ativo"),
+        sa.Column(
+            "status", liability_status_enum_no_create, nullable=False, server_default="ativo"
+        ),
         sa.Column("data_quitacao", sa.Date(), nullable=True),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False

@@ -18,6 +18,9 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 natureza_enum = sa.Enum("fixa", "variavel", "eventual", name="natureza")
+natureza_enum_no_create = sa.Enum(
+    "fixa", "variavel", "eventual", name="natureza", create_type=False
+)
 
 
 def upgrade() -> None:
@@ -41,7 +44,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("group_id", sa.Integer(), sa.ForeignKey("category_groups.id"), nullable=False),
         sa.Column("nome", sa.String(length=255), nullable=False),
-        sa.Column("natureza", natureza_enum, nullable=True),
+        sa.Column("natureza", natureza_enum_no_create, nullable=True),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
         ),
