@@ -9,6 +9,7 @@ Create Date: 2026-08-05
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
@@ -17,8 +18,8 @@ down_revision: str | None = "0001"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-natureza_enum = sa.Enum("fixa", "variavel", "eventual", name="natureza")
-natureza_enum_no_create = sa.Enum(
+natureza_enum = postgresql.ENUM("fixa", "variavel", "eventual", name="natureza")
+natureza_enum_no_create = postgresql.ENUM(
     "fixa", "variavel", "eventual", name="natureza", create_type=False
 )
 

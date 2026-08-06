@@ -9,6 +9,7 @@ Create Date: 2026-08-05
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
@@ -17,19 +18,21 @@ down_revision: str | None = "0002"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-asset_tipo_enum = sa.Enum("imovel", "veiculo", "outro", name="asset_tipo")
-asset_status_enum = sa.Enum("ativo", "baixado", name="asset_status")
-liability_tipo_enum = sa.Enum("financiamento", "outro", name="liability_tipo")
-liability_status_enum = sa.Enum("ativo", "quitado", name="liability_status")
+asset_tipo_enum = postgresql.ENUM("imovel", "veiculo", "outro", name="asset_tipo")
+asset_status_enum = postgresql.ENUM("ativo", "baixado", name="asset_status")
+liability_tipo_enum = postgresql.ENUM("financiamento", "outro", name="liability_tipo")
+liability_status_enum = postgresql.ENUM("ativo", "quitado", name="liability_status")
 
-asset_tipo_enum_no_create = sa.Enum(
+asset_tipo_enum_no_create = postgresql.ENUM(
     "imovel", "veiculo", "outro", name="asset_tipo", create_type=False
 )
-asset_status_enum_no_create = sa.Enum("ativo", "baixado", name="asset_status", create_type=False)
-liability_tipo_enum_no_create = sa.Enum(
+asset_status_enum_no_create = postgresql.ENUM(
+    "ativo", "baixado", name="asset_status", create_type=False
+)
+liability_tipo_enum_no_create = postgresql.ENUM(
     "financiamento", "outro", name="liability_tipo", create_type=False
 )
-liability_status_enum_no_create = sa.Enum(
+liability_status_enum_no_create = postgresql.ENUM(
     "ativo", "quitado", name="liability_status", create_type=False
 )
 
