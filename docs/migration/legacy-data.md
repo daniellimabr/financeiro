@@ -61,7 +61,10 @@ Veículos,Multas
 Veículos,Seguro veículo
 ```
 
-- 16 grupos, 50 pares grupo/subcategoria.
+- 15 grupos, 51 pares grupo/subcategoria (contagem verificada na Sprint 2 ao rodar
+  o import real; a versão anterior desta linha dizia "16 grupos, 50 pares" —
+  divergência da contagem em prosa vs. a lista abaixo, não da lista em si, que
+  permanece a fonte confirmada pelo CEO).
 - `natureza` (fixa/variável/eventual — escopo funcional #10) **não veio associada a este lote**: é um eixo independente da categoria e será atribuído por regra própria (ex.: `Moradia/Aluguel` tende a `fixa`, `Lazer/Viagens` tende a `eventual`, mas isso é configurável por transação/categoria, não fixo no seed).
 - Detalhe do modelo de dados do v1 (visível em `sugestoes_engine.py`, ver seção 3): categoria é armazenada como string única `"Grupo/Subcategoria"` (ex.: `"Alimentação/Supermercado"`) em vez de duas colunas separadas. Considerar essa convenção (ou uma equivalente com FK) no schema do v2 — decisão de schema para o ADR/PRD de E4, não travada aqui.
 - Import gera registros únicos por par (grupo, subcategoria); duplicatas são mescladas, não sobrescritas silenciosamente (log de conflitos).

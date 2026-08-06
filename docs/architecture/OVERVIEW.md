@@ -1,6 +1,6 @@
 # Arquitetura — Visão Geral
 
-> Stack abaixo reflete [ADR-001](adr/ADR-001-stack.md), **aprovado pelo CEO em 2026-08-03**. Este doc é atualizado a cada mudança estrutural relevante (regra de doc viva). **Atualizado em 2026-08-04 após Sprint 1** — a arquitetura proposta agora é realidade.
+> Stack abaixo reflete [ADR-001](adr/ADR-001-stack.md), **aprovado pelo CEO em 2026-08-03**. Este doc é atualizado a cada mudança estrutural relevante (regra de doc viva). **Atualizado em 2026-08-05 após Sprint 2** — dados mestres (categorias/subcategorias, ativos/passivos) e import do legado entraram em produção.
 
 ## Visão de alto nível
 
@@ -50,8 +50,8 @@ Uma VM Oracle Free Tier (163.176.0.135, Ubuntu 24.04.4 LTS) roda tudo via Docker
 
 ## Componentes
 
-- **API (FastAPI):** autenticação (Google OAuth via Authlib), endpoints de sync Pluggy (futuro), CRUD de categorias/ativos/passivos (futuro), endpoints de agregação para dashboards (futuro). Lógica de negócio (categorização por regras+memória, competência de receita, cálculo de patrimônio) vive aqui, testada via pytest com ≥80% cobertura. Estrutura: `app/main.py`, `app/config.py`, `app/db.py`, `app/models/`, `app/auth/`, `tests/`.
-- **Banco (PostgreSQL):** schema relacional — `users` (tabela criada em Sprint 1), futuras contas, transações, categorias/subcategorias, natureza de custo, ativos/passivos, memória de categorização, agregações pré-calculadas. Migrations via Alembic reversíveis.
+- **API (FastAPI):** autenticação (Google OAuth via Authlib), CRUD de categorias/subcategorias e ativos/passivos (Sprint 2), endpoints de sync Pluggy (futuro), endpoints de agregação para dashboards (futuro). Lógica de negócio (categorização por regras+memória, competência de receita, cálculo de patrimônio) vive aqui, testada via pytest com ≥80% cobertura (97% nos módulos da Sprint 2). Estrutura: `app/main.py`, `app/config.py`, `app/db.py`, `app/models/`, `app/schemas/`, `app/auth/`, `app/categories/`, `app/assets/`, `app/liabilities/`, `app/exceptions.py`, `tests/`.
+- **Banco (PostgreSQL):** schema relacional — `users` (Sprint 1); `category_groups`/`subcategories` (globais, sem `user_id` — dado mestre do sistema) e `assets`/`liabilities` (isolados por `user_id`), criados na Sprint 2; futuras contas, transações, memória de categorização, agregações pré-calculadas. Migrations via Alembic reversíveis (`0001` users, `0002` categorias, `0003` ativos/passivos).
 - **Frontend (React/Vite):** dashboards com drill-down (futuro), telas de setup (futuro), gestão de categorias/ativos/passivos (futuro), login Google, perfil/logout (futuro). Data-fetching via TanStack Query. Estrutura: `src/pages/`, `src/api/`, `src/hooks/`, `tests/`.
 - **Integração Pluggy:** chamada síncrona disparada por botão "sincronizar" no frontend (futuro); sem job agendado nesta fase.
 
@@ -66,9 +66,17 @@ Uma VM Oracle Free Tier (163.176.0.135, Ubuntu 24.04.4 LTS) roda tudo via Docker
 
 Toda tabela transacional tem `user_id` obrigatório; toda query de aplicação filtra por usuário autenticado (nunca por sessão implícita). Memória de categorização compartilhada é a única exceção, e apenas para o mapeamento descrição-padrão→categoria, nunca para valores/descrições brutas — ver [docs/migration/legacy-data.md](../migration/legacy-data.md).
 
-## Qualidade (Sprint 1)
+## Dados mestres (Sprint 2)
 
-- **Testes backend:** pytest com ≥95% cobertura em código de auth (unit: JWT válido/expirado/assinatura inválida, criação/atualização de usuário; integração: `/auth/me` com/sem cookie, `/auth/google/callback` com Google mockado, `/health`)
+- **Categorias/subcategorias:** `category_groups` (`nome` único, case-insensitive) e `subcategories` (FK `group_id`, `nome` único dentro do grupo, `natureza` opcional: `fixa`/`variavel`/`eventual`). Dado global do sistema — sem `user_id`, editável por qualquer usuário autenticado (aceitável para os 2 usuários da família; revisitar se crescer). Endpoints: `GET/POST /category-groups`, `GET/PUT/DELETE /category-groups/{id}`, `GET/POST /subcategories` (filtro opcional `?group_id=`), `GET/PUT/DELETE /subcategories/{id}`. Módulo: `app/categories/` (`service.py`, `router.py`).
+- **Ativos/passivos:** `assets` (`tipo`: `imovel`/`veiculo`/`outro`; `status`: `ativo`/`baixado`) e `liabilities` (`tipo`: `financiamento`/`outro`; `status`: `ativo`/`quitado`), ambos com `user_id` obrigatório e isolados por usuário via `get_current_user`. Baixa de ativo (`POST /assets/{id}/sell`, exige `valor_venda`+`data_venda`) e quitação de passivo (`POST /liabilities/{id}/settle`) são idempotentes — uma segunda tentativa retorna 400. CRUD completo em `GET/POST /assets`, `GET/PUT/DELETE /assets/{id}` (e equivalente `/liabilities`). Módulos: `app/assets/`, `app/liabilities/`.
+- **Erros de domínio:** `app/exceptions.py` define `DuplicateNameError`/`NotFoundError`/`InvalidStateError`, convertidos pelos routers em 400/404/400 respectivamente.
+- **Import do legado:** `backend/scripts/import_legacy_categories.py` lê `backend/scripts/data/legacy_categories.csv` (fixture versionada — não é dado sensível) e faz upsert por par (grupo, subcategoria); duplicata não sobrescreve, só loga conflito. Rodado contra o CSV real na VM de dev na Sprint 2: 15 grupos e 51 subcategorias importados, 0 conflitos (a contagem "16 grupos/50 pares" em versões antigas de [legacy-data.md](../migration/legacy-data.md) estava incorreta na prosa, não na lista — corrigido).
+- **Frontend de gestão dessas entidades:** fora de escopo da Sprint 2 (decisão registrada em PRD-002), fica para quando E5/E6/E3 exigirem uma tela real.
+
+## Qualidade (Sprint 1 + Sprint 2)
+
+- **Testes backend:** pytest com ≥95% cobertura em código de auth (Sprint 1: unit JWT válido/expirado/assinatura inválida, criação/atualização de usuário; integração `/auth/me`, `/auth/google/callback` mockado, `/health`) e 97% de cobertura nos módulos de dados mestres (Sprint 2: unit de regras de negócio — nome único, `natureza` inválida, idempotência de sell/settle, merge do import; integração de CRUD, 401/404, isolamento `user_id` entre dois usuários, import contra fixture CSV)
 - **Testes frontend:** Vitest + Testing Library (renderização condicional, tratamento de 401, mock fetch)
 - **Lint:** ruff (Python), eslint (TypeScript) — suíte 100% verde
 - **Pre-commit:** ruff, eslint, detect-secrets (baseline) — executado local antes de push
