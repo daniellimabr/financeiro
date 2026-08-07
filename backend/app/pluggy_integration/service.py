@@ -1,0 +1,194 @@
+from datetime import UTC, date, datetime
+from decimal import Decimal
+
+from sqlalchemy.orm import Session
+
+from app.config import settings
+from app.exceptions import InvalidStateError, NotFoundError
+from app.models.pluggy import (
+    PluggyAccount,
+    PluggyAccountTipo,
+    PluggyItem,
+    PluggyItemStatus,
+    PluggyTransaction,
+    PluggyTransactionStatus,
+    PluggyTransactionTipo,
+)
+from app.pluggy_integration.client import PluggyClient
+
+NOT_SYNCABLE_STATUSES = {
+    PluggyItemStatus.updating,
+    PluggyItemStatus.login_error,
+    PluggyItemStatus.error,
+    PluggyItemStatus.waiting_user_input,
+}
+
+
+def create_connect_token(client: PluggyClient, *, item_id: str | None = None) -> str:
+    return client.create_connect_token(item_id=item_id)
+
+
+def register_item(
+    db: Session, client: PluggyClient, user_id: int, pluggy_item_id: str
+) -> PluggyItem:
+    existing = (
+        db.query(PluggyItem).filter(PluggyItem.pluggy_item_id == pluggy_item_id).one_or_none()
+    )
+    if existing is not None:
+        return existing
+
+    raw = client.get_item(pluggy_item_id)
+    item = PluggyItem(
+        user_id=user_id,
+        pluggy_item_id=pluggy_item_id,
+        connector_id=raw["connector"]["id"],
+        connector_name=raw["connector"]["name"],
+        status=_map_item_status(raw["status"]),
+        status_detail=raw.get("statusDetail"),
+        cutoff_date=settings.pluggy_sync_cutoff_date,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def list_items(db: Session, user_id: int) -> list[PluggyItem]:
+    return (
+        db.query(PluggyItem)
+        .filter(PluggyItem.user_id == user_id)
+        .order_by(PluggyItem.created_at)
+        .all()
+    )
+
+
+def get_item(db: Session, user_id: int, item_id: int) -> PluggyItem:
+    item = (
+        db.query(PluggyItem)
+        .filter(PluggyItem.id == item_id, PluggyItem.user_id == user_id)
+        .one_or_none()
+    )
+    if item is None:
+        raise NotFoundError(f"Item Pluggy {item_id} não encontrado")
+    return item
+
+
+def list_accounts(db: Session, user_id: int) -> list[PluggyAccount]:
+    return (
+        db.query(PluggyAccount)
+        .filter(PluggyAccount.user_id == user_id)
+        .order_by(PluggyAccount.nome)
+        .all()
+    )
+
+
+def list_transactions(db: Session, user_id: int) -> list[PluggyTransaction]:
+    return (
+        db.query(PluggyTransaction)
+        .filter(PluggyTransaction.user_id == user_id)
+        .order_by(PluggyTransaction.data.desc())
+        .all()
+    )
+
+
+def sync_item(db: Session, client: PluggyClient, user_id: int, item_id: int) -> PluggyItem:
+    item = get_item(db, user_id, item_id)
+
+    raw_item = client.get_item(item.pluggy_item_id)
+    item.status = _map_item_status(raw_item["status"])
+    item.status_detail = raw_item.get("statusDetail")
+
+    if item.status in NOT_SYNCABLE_STATUSES:
+        db.commit()
+        db.refresh(item)
+        raise InvalidStateError(
+            f"Item {item_id} está em status '{item.status}' e não pode ser sincronizado"
+        )
+
+    accounts_raw = client.get_accounts(item.pluggy_item_id)
+    for account_raw in accounts_raw:
+        account = _upsert_account(db, item, account_raw)
+        transactions_raw = client.get_transactions(account_raw["id"], from_date=item.cutoff_date)
+        for tx_raw in transactions_raw:
+            tx_date = _parse_date(tx_raw["date"])
+            if tx_date < item.cutoff_date:
+                continue
+            _upsert_transaction(db, account, tx_raw, tx_date)
+
+    item.last_synced_at = datetime.now(UTC)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def _upsert_account(db: Session, item: PluggyItem, raw: dict) -> PluggyAccount:
+    account = (
+        db.query(PluggyAccount).filter(PluggyAccount.pluggy_account_id == raw["id"]).one_or_none()
+    )
+    if account is None:
+        account = PluggyAccount(item_id=item.id, user_id=item.user_id, pluggy_account_id=raw["id"])
+        db.add(account)
+
+    account.tipo = _map_account_tipo(raw)
+    account.nome = raw.get("name") or raw.get("marketingName") or ""
+    account.numero_mascarado = raw.get("number")
+    account.saldo = Decimal(str(raw["balance"]))
+    account.moeda = raw.get("currencyCode", "BRL")
+    db.flush()
+    return account
+
+
+def _upsert_transaction(
+    db: Session, account: PluggyAccount, raw: dict, tx_date: date
+) -> PluggyTransaction:
+    tx = (
+        db.query(PluggyTransaction)
+        .filter(PluggyTransaction.pluggy_transaction_id == raw["id"])
+        .one_or_none()
+    )
+    if tx is None:
+        tx = PluggyTransaction(
+            account_id=account.id,
+            user_id=account.user_id,
+            pluggy_transaction_id=raw["id"],
+        )
+        db.add(tx)
+
+    tx.descricao = raw.get("description", "")
+    tx.valor = Decimal(str(raw["amount"]))
+    tx.tipo = _map_transaction_tipo(raw["type"])
+    tx.data = tx_date
+    tx.categoria_pluggy = raw.get("category")
+    tx.status = _map_transaction_status(raw.get("status", "POSTED"))
+    db.flush()
+    return tx
+
+
+def _map_item_status(raw: str) -> PluggyItemStatus:
+    return PluggyItemStatus(raw.lower())
+
+
+def _map_account_tipo(raw: dict) -> PluggyAccountTipo:
+    subtype = (raw.get("subtype") or "").upper()
+    tipo = (raw.get("type") or "").upper()
+    if tipo == "CREDIT":
+        return PluggyAccountTipo.cartao_credito
+    if subtype == "SAVINGS_ACCOUNT":
+        return PluggyAccountTipo.poupanca
+    if subtype == "CHECKING_ACCOUNT":
+        return PluggyAccountTipo.corrente
+    return PluggyAccountTipo.investimento
+
+
+def _map_transaction_tipo(raw: str) -> PluggyTransactionTipo:
+    return PluggyTransactionTipo.debito if raw.upper() == "DEBIT" else PluggyTransactionTipo.credito
+
+
+def _map_transaction_status(raw: str) -> PluggyTransactionStatus:
+    if raw.upper() == "PENDING":
+        return PluggyTransactionStatus.pendente
+    return PluggyTransactionStatus.efetivada
+
+
+def _parse_date(raw: str) -> date:
+    return datetime.fromisoformat(raw.replace("Z", "+00:00")).date()

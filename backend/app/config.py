@@ -1,3 +1,5 @@
+from datetime import date
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +19,11 @@ class Settings(BaseSettings):
     frontend_login_path: str = "/login"
 
     cookie_secure: bool = False
+
+    pluggy_client_id: str = ""
+    pluggy_client_secret: str = ""
+    pluggy_base_url: str = "https://api.pluggy.ai"
+    pluggy_sync_cutoff_date: date = date(2026, 1, 1)
 
 
 settings = Settings()

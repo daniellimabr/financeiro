@@ -32,7 +32,7 @@ recomeçar a taxonomia do zero.
     sessão de planejamento, fica para quando E5/E6/E3 exigirem uma tela real.
   - Import da memória de classificação do v1 (mapeamento descrição→categoria) —
     arquivo ainda não entregue pelo CEO; entra junto com o design da tabela de
-    regras em E3 (Sprint 3).
+    regras em E3 (Sprint 4).
   - Tabela de regras de categorização (memória) — pertence a E3, não a este PRD.
   - Financiamento parcelado (parcelas, taxa de juros, vínculo passivo↔ativo
     financiado) — schema simples primeiro, aprofundar se E6 exigir.

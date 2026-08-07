@@ -1,6 +1,6 @@
 # Arquitetura — Visão Geral
 
-> Stack abaixo reflete [ADR-001](adr/ADR-001-stack.md), **aprovado pelo CEO em 2026-08-03**. Este doc é atualizado a cada mudança estrutural relevante (regra de doc viva). **Atualizado em 2026-08-05 após Sprint 2** — dados mestres (categorias/subcategorias, ativos/passivos) e import do legado entraram em produção.
+> Stack abaixo reflete [ADR-001](adr/ADR-001-stack.md), **aprovado pelo CEO em 2026-08-03**. Este doc é atualizado a cada mudança estrutural relevante (regra de doc viva). **Atualizado em 2026-08-07 após Sprint 3** — integração Pluggy (contas e transações bancárias, sync manual) implementada; fecha o épico E2.
 
 ## Visão de alto nível
 
@@ -36,7 +36,7 @@ Uma VM Oracle Free Tier (163.176.0.135, Ubuntu 24.04.4 LTS) roda tudo via Docker
 | `caddy`    | `caddy:2-alpine`     | 80   | Reverse proxy, rota única entrada porta `$DEV_PREVIEW_PORT` do host |
 
 **Roteamento Caddy:**
-- `/auth/*`, `/health`, `/category-groups*`, `/subcategories*`, `/assets*`, `/liabilities*` → `api:8000`
+- `/auth/*`, `/health`, `/category-groups*`, `/subcategories*`, `/assets*`, `/liabilities*`, `/pluggy*` → `api:8000`
 - `/*` (resto) → `frontend:80`
 - Toda rota nova de API precisa ser adicionada ao matcher `@api` do [Caddyfile](../../Caddyfile) — esquecer isso faz a rota cair no frontend (SPA) e devolver 200 em vez do 401/404 esperado da API. Bug real da Sprint 2, descoberto só na validação end-to-end pós-deploy; adicionar ao checklist de Definition of Done ao criar endpoints novos.
 
@@ -51,10 +51,10 @@ Uma VM Oracle Free Tier (163.176.0.135, Ubuntu 24.04.4 LTS) roda tudo via Docker
 
 ## Componentes
 
-- **API (FastAPI):** autenticação (Google OAuth via Authlib), CRUD de categorias/subcategorias e ativos/passivos (Sprint 2), endpoints de sync Pluggy (futuro), endpoints de agregação para dashboards (futuro). Lógica de negócio (categorização por regras+memória, competência de receita, cálculo de patrimônio) vive aqui, testada via pytest com ≥80% cobertura (97% nos módulos da Sprint 2). Estrutura: `app/main.py`, `app/config.py`, `app/db.py`, `app/models/`, `app/schemas/`, `app/auth/`, `app/categories/`, `app/assets/`, `app/liabilities/`, `app/exceptions.py`, `tests/`.
-- **Banco (PostgreSQL):** schema relacional — `users` (Sprint 1); `category_groups`/`subcategories` (globais, sem `user_id` — dado mestre do sistema) e `assets`/`liabilities` (isolados por `user_id`), criados na Sprint 2; futuras contas, transações, memória de categorização, agregações pré-calculadas. Migrations via Alembic reversíveis (`0001` users, `0002` categorias, `0003` ativos/passivos).
-- **Frontend (React/Vite):** dashboards com drill-down (futuro), telas de setup (futuro), gestão de categorias/ativos/passivos (futuro), login Google, perfil/logout (futuro). Data-fetching via TanStack Query. Estrutura: `src/pages/`, `src/api/`, `src/hooks/`, `tests/`.
-- **Integração Pluggy:** chamada síncrona disparada por botão "sincronizar" no frontend (futuro); sem job agendado nesta fase.
+- **API (FastAPI):** autenticação (Google OAuth via Authlib), CRUD de categorias/subcategorias e ativos/passivos (Sprint 2), integração Pluggy — connect token, registro e sync manual de contas/transações (Sprint 3), endpoints de agregação para dashboards (futuro). Lógica de negócio (categorização por regras+memória, competência de receita, cálculo de patrimônio) vive aqui, testada via pytest com ≥80% cobertura (98% nos módulos da Sprint 3). Estrutura: `app/main.py`, `app/config.py`, `app/db.py`, `app/models/`, `app/schemas/`, `app/auth/`, `app/categories/`, `app/assets/`, `app/liabilities/`, `app/pluggy_integration/`, `app/exceptions.py`, `tests/`.
+- **Banco (PostgreSQL):** schema relacional — `users` (Sprint 1); `category_groups`/`subcategories` (globais, sem `user_id` — dado mestre do sistema) e `assets`/`liabilities` (isolados por `user_id`), criados na Sprint 2; `pluggy_items`/`pluggy_accounts`/`pluggy_transactions` (isolados por `user_id`, upsert idempotente por id externo da Pluggy), criados na Sprint 3; futura memória de categorização, agregações pré-calculadas. Migrations via Alembic reversíveis (`0001` users, `0002` categorias, `0003` ativos/passivos, `0004` Pluggy).
+- **Frontend (React/Vite):** dashboards com drill-down (futuro), telas de setup (futuro), gestão de categorias/ativos/passivos (futuro), login Google, perfil/logout (futuro), conexão de conta bancária e listagem de transações Pluggy (Sprint 3, abas em `ProtectedPage`). Data-fetching via TanStack Query. Estrutura: `src/pages/`, `src/api/`, `src/hooks/`, `src/pluggy/`, `tests/`.
+- **Integração Pluggy:** módulo `app/pluggy_integration/` (`client.py`, `service.py`, `router.py`). `PluggyClient` autentica via API key (client id/secret), cacheada em memória do processo (~1.8h de TTL, sem persistir em banco). Sync é síncrono, disparado por botão "sincronizar" no frontend por item conectado — sem job agendado/webhook nesta fase (decisão fixa do projeto). `cutoff_date` por item (default `settings.pluggy_sync_cutoff_date`, `2026-01-01`) filtra histórico trazido. Transações sincronizadas chegam sem categoria (`subcategory_id` e `data_competencia` nulos) — categorização é E3 (Sprint 4).
 
 ## Autenticação (Sprint 1)
 
@@ -75,10 +75,18 @@ Toda tabela transacional tem `user_id` obrigatório; toda query de aplicação f
 - **Import do legado:** `backend/scripts/import_legacy_categories.py` lê `backend/scripts/data/legacy_categories.csv` (fixture versionada — não é dado sensível) e faz upsert por par (grupo, subcategoria); duplicata não sobrescreve, só loga conflito. Rodado contra o CSV real na VM de dev na Sprint 2: 15 grupos e 51 subcategorias importados, 0 conflitos (a contagem "16 grupos/50 pares" em versões antigas de [legacy-data.md](../migration/legacy-data.md) estava incorreta na prosa, não na lista — corrigido).
 - **Frontend de gestão dessas entidades:** fora de escopo da Sprint 2 (decisão registrada em PRD-002), fica para quando E5/E6/E3 exigirem uma tela real.
 
-## Qualidade (Sprint 1 + Sprint 2)
+## Integração Pluggy (Sprint 3)
 
-- **Testes backend:** pytest com ≥95% cobertura em código de auth (Sprint 1: unit JWT válido/expirado/assinatura inválida, criação/atualização de usuário; integração `/auth/me`, `/auth/google/callback` mockado, `/health`) e 97% de cobertura nos módulos de dados mestres (Sprint 2: unit de regras de negócio — nome único, `natureza` inválida, idempotência de sell/settle, merge do import; integração de CRUD, 401/404, isolamento `user_id` entre dois usuários, import contra fixture CSV)
-- **Testes frontend:** Vitest + Testing Library (renderização condicional, tratamento de 401, mock fetch)
+- **Tabelas:** `pluggy_items` (`user_id`, `pluggy_item_id` único, `connector_id`/`connector_name`, `status` enum — `updating`/`updated`/`login_error`/`waiting_user_input`/`outdated`/`error`, `cutoff_date`, `last_synced_at`); `pluggy_accounts` (`item_id`, `user_id` denormalizado, `pluggy_account_id` único, `tipo` enum — `corrente`/`poupanca`/`cartao_credito`/`investimento`, `saldo`); `pluggy_transactions` (`account_id`, `user_id` denormalizado, `pluggy_transaction_id` único — chave de idempotência, `valor`, `tipo` débito/crédito, `data`, `data_competencia` e `subcategory_id` nulos nesta sprint, `categoria_pluggy` só informativo, `status` pendente/efetivada).
+- **Endpoints:** `POST /pluggy/connect-token` (gera token do widget), `GET/POST /pluggy/items` (lista/registra item — upsert idempotente por `pluggy_item_id`), `POST /pluggy/items/{id}/sync` (busca contas+transações reais, upsert idempotente por id externo; item em `updating`/`login_error`/`error`/`waiting_user_input` retorna 400 e não grava nada), `GET /pluggy/accounts`, `GET /pluggy/transactions`. Todos isolados por `user_id` via `get_current_user`, mesmo padrão de `assets`/`liabilities`.
+- **Frontend:** `ConnectAccountPage` (botão "Conectar conta bancária" abre o widget Pluggy Connect via `src/pluggy/loadPluggyConnect.ts`, que injeta o script do CDN sob demanda; `onSuccess` do widget chama `POST /pluggy/items`) e `TransactionsPage` (lista transações sincronizadas, com botão "Sincronizar" por item conectado). Ambas acessíveis por abas em `ProtectedPage.tsx`.
+- **Validação manual do sandbox:** `backend/scripts/pluggy_sandbox_smoke.py` (não roda em CI) — testa auth/connect-token e, opcionalmente, sync de um item real já conectado. Credenciais `PLUGGY_CLIENT_ID`/`PLUGGY_CLIENT_SECRET` (sandbox, fornecidas pelo CEO) configuradas manualmente no `.env` da VM de dev, nunca commitadas.
+- **Fora de escopo desta sprint:** categorização (regras+memória, E3/Sprint 4), sync agendado/webhooks, UI dedicada de reconexão — ver [PRD-003](../prd/PRD-003-integracao-pluggy.md).
+
+## Qualidade (Sprint 1 + Sprint 2 + Sprint 3)
+
+- **Testes backend:** pytest com ≥95% cobertura em código de auth (Sprint 1: unit JWT válido/expirado/assinatura inválida, criação/atualização de usuário; integração `/auth/me`, `/auth/google/callback` mockado, `/health`), 97% nos módulos de dados mestres (Sprint 2: unit de regras de negócio — nome único, `natureza` inválida, idempotência de sell/settle, merge do import; integração de CRUD, 401/404, isolamento `user_id` entre dois usuários, import contra fixture CSV) e 98% nos módulos Pluggy (Sprint 3: cliente HTTP via `httpx.MockTransport` — cache/refetch de API key, paginação, erro propagado; service com client fake — upsert idempotente, transição pendente→efetivada, corte por `cutoff_date`, item não-sincronizável não grava nada; integração dos endpoints `/pluggy/*` — 401, isolamento entre usuários, 400/404)
+- **Testes frontend:** Vitest + Testing Library (renderização condicional, tratamento de 401, mock fetch, widget Pluggy Connect mockado via `window.PluggyConnect`)
 - **Lint:** ruff (Python), eslint (TypeScript) — suíte 100% verde
 - **Pre-commit:** ruff, eslint, detect-secrets (baseline) — executado local antes de push
 - **CI:** GitHub Actions — jobs `backend` (ruff check/format, pytest) e `frontend` (eslint, prettier, tsc, vitest) — roda em push/PR para `main`

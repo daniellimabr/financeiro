@@ -38,14 +38,27 @@ E1 → E8 (import pode rodar assim que houver schema) → E4 (categorias/ativos 
 - 51 testes novos (unit + integração), 97% de cobertura nos módulos novos.
 - Relatório: [SPRINT-002-dados-mestres-migracao-legado-report.md](sprints/SPRINT-002-dados-mestres-migracao-legado-report.md).
 
-### Sprint 3 — Integração Pluggy + categorização automática (E2, E3)
-- Setup técnico: credenciais Pluggy, seleção de contas, corte de histórico, data de competência de receita (item 8).
-- Sync manual (botão) trazendo extratos/cartão/investimentos.
-- Motor de categorização por regras + memória (sem LLM), com fallback para revisão manual.
-- Associação despesa↔ativo.
-- Testes unitários da lógica de categorização e de competência de receita (meta ≥80%).
+### Sprint 3 — Integração Pluggy (E2)
+- Setup técnico: credenciais Pluggy, corte de histórico por item (item 8; data de competência de receita fica como campo no schema, cálculo automático adiado para E3/E5).
+- Conexão de conta via widget Pluggy Connect + sync manual (botão) trazendo extratos/cartão/investimentos.
+- UI mínima: conectar conta, listar transações sincronizadas (sem categorização).
+- Testes automatizados (meta ≥80%), sem depender de credenciais/rede real no CI; validação real contra sandbox feita manualmente.
+- PRD: [PRD-003-integracao-pluggy.md](prd/PRD-003-integracao-pluggy.md). Plano: [SPRINT-003-integracao-pluggy-plan.md](sprints/SPRINT-003-integracao-pluggy-plan.md).
 
-Sprints seguintes (E5, E6, E7) serão detalhadas ao final da Sprint 3, quando houver dados reais fluindo para validar os dashboards.
+**Decisão da sessão de planejamento (2026-08-07):** E2 e E3 foram divididas em
+sprints separadas — E2+E3 juntas eram grandes demais para uma sessão de
+execução (credenciais externas + widget de terceiro + novo domínio de dados
+de um lado; motor de regras+memória multi-camada do outro). E3 só faz sentido
+calibrar contra transações reais, que só existem depois de E2 concluída.
+
+### Sprint 4 — Categorização automática (E3)
+- Motor de categorização por regras + memória (sem LLM), com fallback para revisão manual (fila de pendências, nunca auto-confirma).
+- Associação despesa↔ativo.
+- Import da memória de classificação do v1 (E8, se o CEO já tiver entregue o arquivo) — entra junto com o design da tabela de regras.
+- Testes unitários da lógica de categorização e de competência de receita (meta ≥80%).
+- A planejar em sessão futura, depois que a Sprint 3 estiver validada e houver transações reais sincronizadas.
+
+Sprints seguintes (E5, E6, E7) serão detalhadas ao final da Sprint 4, quando houver dados reais categorizados para validar os dashboards.
 
 ## Registro de reavaliações futuras
 
