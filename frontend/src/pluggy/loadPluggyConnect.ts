@@ -22,7 +22,7 @@ declare global {
   }
 }
 
-const SCRIPT_URL = "https://cdn.pluggy.ai/pluggy-connect/v2.9.0/pluggy-connect.js";
+const SCRIPT_URL = "https://cdn.pluggy.ai/pluggy-connect/latest/pluggy-connect.js";
 const SCRIPT_ID = "pluggy-connect-sdk";
 
 export function loadPluggyConnect(): Promise<void> {
