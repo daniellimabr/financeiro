@@ -2,23 +2,27 @@
 
 - **Plano:** [SPRINT-003-integracao-pluggy-plan.md](./SPRINT-003-integracao-pluggy-plan.md)
 - **PRD:** [PRD-003-integracao-pluggy](../prd/PRD-003-integracao-pluggy.md)
-- **Data do relatório:** 2026-08-07
-- **Status:** aguardando validação ponta a ponta e aprovação do CEO
+- **Data do relatório:** 2026-08-07, atualizado em 2026-08-08 após deploy e validação real
+- **Status:** validado ponta a ponta na VM de dev com contas reais do sandbox — aguardando aprovação do CEO
 
 ## Resumo
 
-Sprint 3 entregou a integração Pluggy completa no código: modelos +
-migration para `pluggy_items`/`pluggy_accounts`/`pluggy_transactions`,
-cliente HTTP com API key cacheada em memória, service com as regras de
-negócio (upsert idempotente, corte por `cutoff_date`, bloqueio de sync em
-status inválido), endpoints `/pluggy/*` isolados por usuário, e UI mínima no
-frontend (conectar conta via widget Pluggy Connect + listagem de
-transações com sincronização por botão). 40 testes novos (31 backend + 9
-frontend), 98-100% de cobertura nos módulos novos. Commit `f953c49` já
-pushado para `main`. **Deploy na VM de dev e validação ponta a ponta contra
-o sandbox real ainda não foram feitos nesta sessão** — dependem de dados que
-só o CEO tem (ver "Pendências" abaixo). Fecha o épico E2 assim que a
-validação for concluída.
+Sprint 3 entregou a integração Pluggy completa: modelos + migration para
+`pluggy_items`/`pluggy_accounts`/`pluggy_transactions`, cliente HTTP com API
+key cacheada em memória, service com as regras de negócio (upsert
+idempotente, corte por `cutoff_date`, bloqueio de sync em status inválido),
+endpoints `/pluggy/*` isolados por usuário, e UI mínima no frontend
+(conectar conta via widget Pluggy Connect + listagem de transações com
+sincronização por botão). 40 testes novos (31 backend + 9 frontend), 98-100%
+de cobertura nos módulos novos. Commit `f953c49` pushado em 2026-08-07;
+quatro commits de correção adicionais em 2026-08-08 (ver "Bugs encontrados
+no deploy real" abaixo).
+
+**Deploy na VM de dev concluído e validado ponta a ponta em 2026-08-08**: o
+CEO conectou 2 contas reais no sandbox (Itaú e XP) pelo widget, sincronizou
+as duas, e a gravação no banco foi conferida diretamente (556 transações no
+item 1, 386 no item 2, zero violações do critério `subcategory_id`/
+`data_competencia` sempre `NULL`). Fecha o épico E2.
 
 ## Itens do plano vs. entregue
 
@@ -35,7 +39,7 @@ validação for concluída.
 | 9 | Testes Vitest | **Feito** | `pluggy.test.ts`, `ConnectAccountPage.test.tsx` (widget mockado), `TransactionsPage.test.tsx` |
 | 10 | Caddyfile + conferir Dockerfile/compose | **Feito** | `/pluggy*` adicionado ao matcher `@api`; Dockerfiles copiam diretórios inteiros (`app`, `scripts`, frontend `.`) — nenhuma mudança extra necessária |
 | 11 | Script `pluggy_sandbox_smoke.py` | **Feito** | `backend/scripts/pluggy_sandbox_smoke.py` — não roda em CI |
-| 12 | Deploy na VM de dev + validação ponta a ponta | **Feito (parcial)** | Código deployado e `pluggy_sandbox_smoke.py` validou auth + connect-token contra o sandbox real. Falta só a validação manual pelo navegador (widget → conectar conta → sincronizar) — ver "Pendências" |
+| 12 | Deploy na VM de dev + validação ponta a ponta | **Feito** | Deployado, 2 contas reais conectadas e sincronizadas (556 + 386 transações gravadas). 4 bugs encontrados e corrigidos no processo — ver seção dedicada abaixo |
 | 13 | Atualizar docs vivos | **Feito** | `OVERVIEW.md`, `directory-structure.md` |
 | 14 | Relatório de sprint | **Feito** | Este arquivo |
 
@@ -64,12 +68,17 @@ Test Files  4 passed (4)
 ```
 
 Cobertura de lógica de negócio nos módulos novos da Sprint 3: **98-100%**
-(meta ≥80%, hard gate). Suíte rodada localmente (venv `backend/.venv` e
-`frontend/node_modules`); **CI do GitHub Actions não conferido diretamente
-nesta sessão** por falta de acesso ao `gh` CLI neste ambiente — recomendo o
-CEO conferir a run do commit `f953c49` em
-[actions](https://github.com/daniellimabr/financeiro/actions) antes de
-aprovar.
+(meta ≥80%, hard gate). Suíte completa (82 testes, não só os módulos Pluggy)
+re-rodada localmente em 2026-08-08 após as correções pós-deploy, 100%
+verde, 98% de cobertura total. **CI do GitHub Actions não conferido via
+`gh` CLI** diretamente (indisponível neste ambiente) — para os commits
+`87af0f0` em diante, o job `build-and-push` só publica imagem no GHCR se
+`backend`+`frontend` passarem primeiro (gate via `needs:`), e o deploy só
+funcionou porque as imagens existiam — evidência indireta de que o CI
+passou nesses commits. O commit original `f953c49` (antes dessa mudança de
+CI) não teve a run conferida diretamente nesta sessão; recomendo o CEO
+checar em [actions](https://github.com/daniellimabr/financeiro/actions)
+antes da aprovação final, por completude.
 
 ## Lint/formatter
 
@@ -111,16 +120,16 @@ Detect secrets...........................................................Passed
 
 | Critério | Atendido? | Evidência |
 |---|---|---|
-| 1. `POST /pluggy/connect-token` retorna token válido (mockado em teste) | **Sim** (mockado); sandbox real pendente | `test_connect_token_returns_token`; validação real fica para a etapa de deploy |
+| 1. `POST /pluggy/connect-token` retorna token válido (mockado em teste) | **Sim** | `test_connect_token_returns_token` (mock) + validado contra o sandbox real via `pluggy_sandbox_smoke.py` e via widget real no navegador em 2026-08-08 |
 | 2. `POST /pluggy/items` cria item vinculado ao usuário; reenvio não duplica | **Sim** | `test_register_item_twice_does_not_duplicate` (unit), `test_register_item_then_resend_does_not_duplicate` (integração) |
 | 3. Sync de item `updated` cria/atualiza contas+transações; corte por `cutoff_date`; segunda chamada não duplica | **Sim** | `test_sync_item_creates_accounts_and_transactions`, `test_sync_item_excludes_transactions_before_cutoff_date`, `test_sync_item_twice_does_not_duplicate_accounts_or_transactions` |
 | 4. Item `updating`/`login_error` no sync → 400, nada gravado | **Sim** | `test_sync_item_with_non_syncable_status_raises_and_writes_nothing` (parametrizado com 4 status), `test_sync_item_with_updating_status_returns_400_and_writes_nothing` |
 | 5. Usuário A não vê items/contas/transações do usuário B | **Sim** | `test_list_accounts_and_transactions_isolated_by_user`, `test_user_does_not_see_other_users_items_accounts_transactions` |
 | 6. `subcategory_id` e `data_competencia` sempre `NULL` no sync | **Sim** | Verificado em `test_sync_item_creates_accounts_and_transactions`; nunca escritos pelo `service.py` (campos não populados no upsert) |
-| 7. Widget abre, conta aparece na lista, transações aparecem após "Sincronizar" | **Parcial** | Fluxo completo testado com widget/API mockados (`ConnectAccountPage.test.tsx`, `TransactionsPage.test.tsx`); validação real no sandbox/navegador pendente de deploy |
+| 7. Widget abre, conta aparece na lista, transações aparecem após "Sincronizar" | **Sim** | Testado com mocks (`ConnectAccountPage.test.tsx`, `TransactionsPage.test.tsx`) e validado de ponta a ponta no navegador real em 2026-08-08: CEO conectou Itaú e XP, sincronizou, 556+386 transações gravadas (confirmado via query direta no banco) |
 | 8. `/pluggy/*` sem cookie → 401 | **Sim** | `test_items_accounts_transactions_without_cookie_return_401`, `test_connect_token_without_cookie_returns_401` |
-| 9. CI com cobertura ≥80%, sem depender de rede/credenciais reais | **Sim (local)** | 98-100% local, todos os testes usam `httpx.MockTransport`/client fake — CI não conferido diretamente (ver "Evidência de testes") |
-| 10. Caddyfile roteia `/pluggy/*` para a API | **Sim (código)**; validação na VM pendente | `/pluggy*` no matcher `@api`; confirmação via `curl` real fica para o deploy |
+| 9. CI com cobertura ≥80%, sem depender de rede/credenciais reais | **Sim (local)** | 98-100% local, todos os testes usam `httpx.MockTransport`/client fake — CI não conferido diretamente via `gh` (ver "Evidência de testes") |
+| 10. Caddyfile roteia `/pluggy/*` para a API | **Sim** | `/pluggy*` no matcher `@api`; confirmado por tráfego real (widget → connect-token → sync, tudo via `http://financeirov2.duckdns.org:8080`) em 2026-08-08 |
 
 ## Documentação atualizada
 
@@ -138,31 +147,62 @@ Detect secrets...........................................................Passed
   na sessão de planejamento (divisão de E2/E3 em Sprints 3/4); não
   retocados nesta sessão de execução.
 
+## Bugs encontrados no deploy real (2026-08-08) e correções
+
+Nenhum destes apareceu nos testes automatizados (que usam mocks) — só ao
+rodar de verdade contra a VM e a API real da Pluggy. Todos corrigidos no
+mesmo dia, cada um com commit, teste atualizado e CI verde antes do
+próximo passo:
+
+1. **VM de dev travava por horas em `docker compose up -d --build`** — 1GB
+   RAM sem swap, compilando `pip`/`npm` enquanto os containers antigos
+   ainda rodavam. Corrigido movendo o build pro CI (GHCR, `build-and-push`
+   job) — VM só faz `pull`. Commit `87af0f0`.
+2. **Página em branco** — Caddy roteava `/assets*` (rota da API pra
+   entidade "Ativos") por cima dos arquivos estáticos do build do Vite, que
+   por padrão também usa `/assets/`. Corrigido movendo a saída do build pro
+   `/static/` (`vite.config.ts`, `assetsDir`). Commit `c9e3c1a`.
+3. **Widget Pluggy Connect não abria (404)** — URL do CDN tinha versão
+   fixa (`v2.9.0`) que não existe mais. Trocado pelo alias `latest` que a
+   própria Pluggy documenta. Commit `5eac75f`.
+4. **Sync retornava 500** — `client.py` chamava `GET /transactions`
+   (paginação por página), endpoint deprecado pela Pluggy que já responde
+   `410 Gone`. Migrado pra `GET /v2/transactions` (cursor). Commit
+   `97288d1`.
+5. **Sync ainda quebrava (400 Bad Request)** — mesmo após migrar pro v2, os
+   parâmetros `pageSize`/`from` usados não existem nessa versão (confirmado
+   empiricamente contra o sandbox real: a doc pública da Pluggy diverge da
+   API de fato). Corrigido removendo `pageSize` e renomeando `from` para
+   `dateFrom`. Commit `6924ca3`.
+6. **Bug estrutural no `ssh-vm.ps1`** (achado durante a investigação do
+   #5, ao tentar rodar uma query SQL remota) — o PowerShell re-tokenizava o
+   comando remoto ao repassá-lo pro `python.exe` sem aspas, derrubando
+   aspas internas de qualquer comando com SQL ou strings com espaço.
+   Corrigido passando o comando via variável de ambiente em vez de
+   argumento de CLI. Faz parte do commit `97288d1`.
+
+**Lição registrada para sessões futuras:** o CEO pediu explicitamente para
+parar de ser quem descobre esse tipo de bug clicando na UI — deploys
+futuros devem incluir verificação automatizada (checar se os assets
+referenciados no HTML respondem 200 do serviço certo, validar URLs de CDN
+de terceiros, rodar `pluggy_sandbox_smoke.py` com um `item_id` real contra
+a API de verdade) antes de pedir validação manual ao CEO.
+
 ## Pendências e próximos passos sugeridos
 
-1. **Deploy na VM de dev — feito em sessão posterior (2026-08-07/08).**
-   `scripts/vm-config.local.ps1` (gitignored) foi criado para carregar
-   HOST/PORT automaticamente, eliminando a necessidade de exportar
-   variáveis por sessão. Durante o processo, dois builds `docker compose up
-   -d --build` na própria VM travaram por horas (VM de 1GB RAM sem swap,
-   sobrecarregada compilando `pip`/`npm` simultaneamente aos containers já
-   rodando). Solução adotada: mover o build para o CI (GitHub Actions, job
-   `build-and-push` publica em `ghcr.io/daniellimabr/financeiro-{api,
-   frontend}` a cada push em `main`, pacotes públicos) — a VM passou a só
-   fazer `docker compose pull` + `up -d`, sem compilar nada. Ver
-   [OVERVIEW.md](../architecture/OVERVIEW.md) e
-   [ssh-workflow.md](../infra/ssh-workflow.md).
-2. **Credenciais reais do sandbox Pluggy** — configuradas pelo CEO
-   diretamente no `.env` da VM de dev.
-3. **`pluggy_sandbox_smoke.py` rodado com sucesso** contra o sandbox real
-   (auth + connect-token OK). Falta ainda a validação manual completa no
-   navegador (conectar conta sandbox → ver item na lista → sincronizar →
-   ver transações), fechando os critérios de aceite 1, 7 e 10 — depende do
-   CEO.
-4. **CI do GitHub Actions** — confirmar a run do commit `f953c49` (testes)
-   antes de aprovar a sprint; a run do commit `87af0f0` (mudança de CI/
-   deploy) já confirmada verde pelo CEO.
-5. Sprint 4 (E3 — categorização por regras + memória) está desbloqueada
-   assim que a validação manual acima confirmar transações reais fluindo;
-   segue também aguardando o arquivo de memória de classificação do v1 do
-   CEO (E8, não bloqueia o início de E3).
+1. **Deploy + validação ponta a ponta: concluídos** (ver acima). Épico E2
+   fechado.
+2. **CI do GitHub Actions** — commit `f953c49` (o commit original da
+   Sprint 3, antes das correções de deploy) não teve a run conferida
+   diretamente nesta sessão por falta de `gh` CLI; recomendo checar em
+   [actions](https://github.com/daniellimabr/financeiro/actions) antes da
+   aprovação final, por completude.
+3. Sprint 4 (E3 — categorização por regras + memória) está desbloqueada
+   agora que transações reais estão fluindo; segue aguardando o arquivo de
+   memória de classificação do v1 do CEO (E8, não bloqueia o início de E3).
+4. **Débito técnico não bloqueante:** os critérios de aceite 2-5 e 8-9
+   (dedupe, isolamento por usuário, bloqueio por status inválido) seguem
+   validados só por teste mockado, nunca exercitados contra o sandbox real
+   nesta sprint — risco baixo (lógica pura, sem dependência de
+   comportamento específico da API externa), mas vale ter em mente se
+   surgir bug equivalente aos 1-7 acima.
