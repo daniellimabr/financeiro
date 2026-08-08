@@ -41,7 +41,14 @@ pip install --quiet -r $RequirementsFile
 $SshVmScript = Join-Path $PSScriptRoot "ssh_vm.py"
 
 if ($RemoteCommand.Count -gt 0) {
-    python $SshVmScript $Target $($RemoteCommand -join " ")
+    # Passa o comando via variável de ambiente, não como argumento de CLI: quando
+    # invocado sem aspas (como abaixo), o PowerShell re-tokeniza e derruba aspas
+    # internas do comando remoto (ex.: SQL com -c "SELECT ..."), quebrando-o em
+    # múltiplos argumentos e perdendo as aspas antes mesmo de chegar no Python.
+    # Variável de ambiente não sofre esse re-parsing — preserva o texto exato.
+    $env:SSH_VM_REMOTE_COMMAND = $RemoteCommand -join " "
+    python $SshVmScript $Target
+    Remove-Item Env:\SSH_VM_REMOTE_COMMAND
 } else {
     python $SshVmScript $Target
 }

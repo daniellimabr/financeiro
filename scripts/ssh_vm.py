@@ -101,7 +101,9 @@ def main() -> None:
         sys.exit(2)
 
     target = sys.argv[1]
-    command = " ".join(sys.argv[2:])
+    # Comando remoto chega via env var, não argv — ver comentário em ssh-vm.ps1
+    # sobre o PowerShell derrubar aspas internas ao passar como argumento de CLI.
+    command = os.environ.get("SSH_VM_REMOTE_COMMAND", "") or " ".join(sys.argv[2:])
 
     if target == "prod":
         print(

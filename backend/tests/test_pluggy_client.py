@@ -58,13 +58,17 @@ def test_get_transactions_paginates_until_last_page():
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/auth":
             return httpx.Response(200, json={"apiKey": "key-1"})  # pragma: allowlist secret
-        page = int(request.url.params["page"])
-        if page == 1:
+        assert request.url.path == "/v2/transactions"
+        if "after" not in request.url.params:
             return httpx.Response(
                 200,
-                json={"results": [{"id": "tx-1"}, {"id": "tx-2"}], "totalPages": 2},
+                json={
+                    "results": [{"id": "tx-1"}, {"id": "tx-2"}],
+                    "next": "?accountId=account-1&after=cursor-abc",
+                },
             )
-        return httpx.Response(200, json={"results": [{"id": "tx-3"}], "totalPages": 2})
+        assert request.url.params["after"] == "cursor-abc"
+        return httpx.Response(200, json={"results": [{"id": "tx-3"}], "next": None})
 
     client = _make_client(handler)
 

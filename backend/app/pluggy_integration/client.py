@@ -1,5 +1,6 @@
 import time
 from datetime import date
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 
@@ -68,15 +69,20 @@ class PluggyClient:
     def get_transactions(
         self, pluggy_account_id: str, *, from_date: date | None = None
     ) -> list[dict]:
+        # GET /transactions (paginação por página) está deprecado pela Pluggy e já
+        # retorna 410 Gone — usa /v2/transactions, paginação por cursor (`next`/`after`).
         transactions: list[dict] = []
-        page = 1
+        params: dict = {"accountId": pluggy_account_id, "pageSize": PAGE_SIZE}
+        if from_date is not None:
+            params["from"] = from_date.isoformat()
         while True:
-            params: dict = {"accountId": pluggy_account_id, "page": page, "pageSize": PAGE_SIZE}
-            if from_date is not None:
-                params["from"] = from_date.isoformat()
-            data = self._request("GET", "/transactions", params=params).json()
+            data = self._request("GET", "/v2/transactions", params=params).json()
             transactions.extend(data["results"])
-            if page >= data.get("totalPages", 1):
+            next_query = data.get("next")
+            if not next_query:
                 break
-            page += 1
+            after = parse_qs(urlparse(next_query).query).get("after", [None])[0]
+            if not after:
+                break
+            params = {**params, "after": after}
         return transactions
