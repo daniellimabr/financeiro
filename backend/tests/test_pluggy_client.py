@@ -59,13 +59,12 @@ def test_get_transactions_paginates_until_last_page():
         if request.url.path == "/auth":
             return httpx.Response(200, json={"apiKey": "key-1"})  # pragma: allowlist secret
         assert request.url.path == "/v2/transactions"
+        assert "pageSize" not in request.url.params
         if "after" not in request.url.params:
+            assert request.url.params["dateFrom"] == "2026-01-01"
             return httpx.Response(
                 200,
-                json={
-                    "results": [{"id": "tx-1"}, {"id": "tx-2"}],
-                    "next": "?accountId=account-1&after=cursor-abc",
-                },
+                json={"results": [{"id": "tx-1"}, {"id": "tx-2"}], "next": "cursor-abc"},
             )
         assert request.url.params["after"] == "cursor-abc"
         return httpx.Response(200, json={"results": [{"id": "tx-3"}], "next": None})
@@ -75,6 +74,26 @@ def test_get_transactions_paginates_until_last_page():
     transactions = client.get_transactions("account-1", from_date=date(2026, 1, 1))
 
     assert [t["id"] for t in transactions] == ["tx-1", "tx-2", "tx-3"]
+
+    def handler_query_string_next(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/auth":
+            return httpx.Response(200, json={"apiKey": "key-1"})  # pragma: allowlist secret
+        if "after" not in request.url.params:
+            return httpx.Response(
+                200,
+                json={
+                    "results": [{"id": "tx-1"}],
+                    "next": "?accountId=account-1&after=cursor-xyz",
+                },
+            )
+        assert request.url.params["after"] == "cursor-xyz"
+        return httpx.Response(200, json={"results": [{"id": "tx-2"}], "next": None})
+
+    client = _make_client(handler_query_string_next)
+
+    transactions = client.get_transactions("account-1")
+
+    assert [t["id"] for t in transactions] == ["tx-1", "tx-2"]
 
 
 def test_http_error_propagates():

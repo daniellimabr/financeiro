@@ -5,7 +5,6 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 
 API_KEY_TTL_SECONDS = 60 * 60 * 1.8  # api key da Pluggy expira em ~2h; renova com folga
-PAGE_SIZE = 500
 
 
 class PluggyClient:
@@ -71,18 +70,21 @@ class PluggyClient:
     ) -> list[dict]:
         # GET /transactions (paginação por página) está deprecado pela Pluggy e já
         # retorna 410 Gone — usa /v2/transactions, paginação por cursor (`next`/`after`).
+        # v2 não aceita `pageSize` nem `from` (rejeita com 400) — o filtro de data é
+        # `dateFrom`, e o tamanho de página é fixo (confirmado empiricamente contra o
+        # sandbox real; a doc pública da Pluggy diverge da API de fato em ambos os pontos).
         transactions: list[dict] = []
-        params: dict = {"accountId": pluggy_account_id, "pageSize": PAGE_SIZE}
+        params: dict = {"accountId": pluggy_account_id}
         if from_date is not None:
-            params["from"] = from_date.isoformat()
+            params["dateFrom"] = from_date.isoformat()
         while True:
             data = self._request("GET", "/v2/transactions", params=params).json()
             transactions.extend(data["results"])
-            next_query = data.get("next")
-            if not next_query:
+            next_value = data.get("next")
+            if not next_value:
                 break
-            after = parse_qs(urlparse(next_query).query).get("after", [None])[0]
-            if not after:
-                break
+            # `next` já foi observado como cursor puro; trata também o formato de
+            # query string (`?accountId=...&after=...`) citado na doc, por segurança.
+            after = parse_qs(urlparse(next_value).query).get("after", [None])[0] or next_value
             params = {**params, "after": after}
         return transactions
