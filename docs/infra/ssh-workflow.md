@@ -44,16 +44,16 @@ mesmo que o mesmo script (`ssh_vm.py`) seja usado para os dois alvos.
 Script wrapper: [scripts/ssh-vm.ps1](../../scripts/ssh-vm.ps1) (PowerShell, chama
 [scripts/ssh_vm.py](../../scripts/ssh_vm.py) por baixo).
 
+**Config de HOST/PORT (uma vez só, não por sessão):** copie
+[scripts/vm-config.local.ps1.example](../../scripts/vm-config.local.ps1.example) para
+`scripts/vm-config.local.ps1` e preencha os valores reais. Esse arquivo está no
+`.gitignore` e é carregado automaticamente pelo `ssh-vm.ps1` a cada execução — não é
+preciso re-exportar `$env:FINANCEIRO_*_VM_*` a cada sessão do PowerShell nem repetir
+host/porta a cada deploy. A chave privada já usa um path default
+(`~/.ssh/financeiro_<alvo>_vm_key`); uma vez presente no disco, também não precisa ser
+redigitada.
+
 ```powershell
-# Variáveis de ambiente necessárias (definir uma vez por sessão do PowerShell, nunca commitar):
-$env:FINANCEIRO_DEV_VM_HOST  = "ip-publico-da-vm-dev"
-$env:FINANCEIRO_DEV_VM_KEY   = "$HOME\.ssh\financeiro_dev_vm_key"     # opcional, tem default
-$env:FINANCEIRO_DEV_VM_PORT  = "2222"                                 # porta custom definida no provisionamento
-
-$env:FINANCEIRO_PROD_VM_HOST = "dominio-de-producao"
-$env:FINANCEIRO_PROD_VM_KEY  = "$HOME\.ssh\financeiro_prod_vm_key"    # opcional, tem default
-$env:FINANCEIRO_PROD_VM_PORT = "2222"
-
 # Sessão interativa
 .\scripts\ssh-vm.ps1 dev
 .\scripts\ssh-vm.ps1 prod
@@ -64,12 +64,14 @@ $env:FINANCEIRO_PROD_VM_PORT = "2222"
 ```
 
 O script:
-1. Cria (se não existir) um venv dedicado em `.venv-ssh/` na raiz do repo.
-2. Ativa o venv e garante `paramiko` instalado (`pip install -r
+1. Carrega `scripts/vm-config.local.ps1` se existir (host/porta).
+2. Cria (se não existir) um venv dedicado em `.venv-ssh/` na raiz do repo.
+3. Ativa o venv e garante `paramiko` instalado (`pip install -r
    scripts/requirements-ssh.txt`).
-3. Chama `python scripts/ssh_vm.py <dev|prod> [comando]`, que abre a conexão via paramiko.
+4. Chama `python scripts/ssh_vm.py <dev|prod> [comando]`, que abre a conexão via paramiko.
 
-`.venv-ssh/` está no `.gitignore` — nunca deve ser versionado.
+`.venv-ssh/` e `scripts/vm-config.local.ps1` estão no `.gitignore` — nunca devem ser
+versionados.
 
 ## Sincronização de código com a VM de dev
 
@@ -134,6 +136,27 @@ GitHub e iniciava um novo login via browser para tentar resolver — foi exatame
 aconteceu em 2026-08-04 mesmo com `gitHubAuthModes=pat` configurado (fetch/dry-run
 funcionavam, só o push real disparava o browser). Fixar `daniellimabr@` na URL do remote
 eliminou a ambiguidade. **Não remover esse usuário da URL do remote.**
+
+## Login da VM de dev no GitHub Container Registry (GHCR)
+
+Desde a Sprint 3, o CI builda e publica as imagens `api`/`frontend` no GHCR
+(`ghcr.io/daniellimabr/financeiro-{api,frontend}:latest`) — a VM só faz
+`docker compose pull`, não builda mais nada localmente (ver
+[OVERVIEW.md](../architecture/OVERVIEW.md)). Como o pacote é privado, a VM
+precisa estar autenticada.
+
+**Feito uma única vez, manualmente pelo CEO, direto na VM** — nunca via
+comando montado pelo Claude, mesmo princípio do PAT do git push acima:
+
+1. Gerar um **fine-grained Personal Access Token** em
+   `github.com/settings/personal-access-tokens/new`, escopado só ao repo
+   `daniellimabr/financeiro`, permissão `Packages: Read-only`.
+2. Sessão interativa na VM: `.\scripts\ssh-vm.ps1 dev`
+3. Na VM: `echo SEU_TOKEN | docker login ghcr.io -u daniellimabr --password-stdin`
+
+O Docker guarda a credencial em `~/.docker/config.json` na própria VM — não
+precisa repetir a cada deploy. Se o PAT expirar, repetir o passo 3 com um
+token novo.
 
 **Se o prompt de browser voltar a aparecer:**
 1. Confirmar que o remote ainda tem o usuário fixado: `git remote -v` deve mostrar

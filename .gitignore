@@ -46,3 +46,6 @@ Thumbs.db
 .remember/
 .claude/settings.local.json
 .venv-ssh/
+
+# Config local de acesso às VMs (host/porta) — nunca versionar
+scripts/vm-config.local.ps1

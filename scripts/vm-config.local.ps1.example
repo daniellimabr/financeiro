@@ -1,0 +1,13 @@
+# Copie este arquivo para vm-config.local.ps1 (mesma pasta) e preencha os valores
+# reais. vm-config.local.ps1 está no .gitignore — nunca é versionado.
+# ssh-vm.ps1 carrega esse arquivo automaticamente a cada execução, então HOST/PORT
+# não precisam ser re-exportados por sessão. Ver docs/infra/ssh-workflow.md.
+
+$env:FINANCEIRO_DEV_VM_HOST = "ip-publico-da-vm-dev"
+$env:FINANCEIRO_DEV_VM_PORT = "2222"
+# $env:FINANCEIRO_DEV_VM_KEY  = "$HOME\.ssh\financeiro_dev_vm_key"  # já é o default, só setar se for outro caminho
+
+# Descomente e preencha se/quando for operar a VM de prod (todo comando nela
+# ainda exige aprovação explícita do CEO, este arquivo só evita redigitar o host):
+# $env:FINANCEIRO_PROD_VM_HOST = "dominio-de-producao"
+# $env:FINANCEIRO_PROD_VM_PORT = "2222"

@@ -19,6 +19,14 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $VenvPath = Join-Path $RepoRoot ".venv-ssh"
 
+# Config local opcional (fora do controle de versão) com HOST/PORT das VMs,
+# para não precisar re-exportar $env:FINANCEIRO_*_VM_* a cada sessão/chamada.
+# Ver docs/infra/ssh-workflow.md.
+$LocalConfig = Join-Path $PSScriptRoot "vm-config.local.ps1"
+if (Test-Path $LocalConfig) {
+    & $LocalConfig
+}
+
 if (-not (Test-Path $VenvPath)) {
     Write-Host "Criando venv dedicado para operações SSH em $VenvPath ..."
     python -m venv $VenvPath
