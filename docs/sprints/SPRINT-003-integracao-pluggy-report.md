@@ -35,7 +35,7 @@ validação for concluída.
 | 9 | Testes Vitest | **Feito** | `pluggy.test.ts`, `ConnectAccountPage.test.tsx` (widget mockado), `TransactionsPage.test.tsx` |
 | 10 | Caddyfile + conferir Dockerfile/compose | **Feito** | `/pluggy*` adicionado ao matcher `@api`; Dockerfiles copiam diretórios inteiros (`app`, `scripts`, frontend `.`) — nenhuma mudança extra necessária |
 | 11 | Script `pluggy_sandbox_smoke.py` | **Feito** | `backend/scripts/pluggy_sandbox_smoke.py` — não roda em CI |
-| 12 | Deploy na VM de dev + validação ponta a ponta | **Não feito** | Falta: credenciais SSH da VM de dev (`FINANCEIRO_DEV_VM_*`) nesta sessão e credenciais reais do sandbox Pluggy no `.env` remoto — ambas dependem do CEO. Ver "Pendências" |
+| 12 | Deploy na VM de dev + validação ponta a ponta | **Feito (parcial)** | Código deployado e `pluggy_sandbox_smoke.py` validou auth + connect-token contra o sandbox real. Falta só a validação manual pelo navegador (widget → conectar conta → sincronizar) — ver "Pendências" |
 | 13 | Atualizar docs vivos | **Feito** | `OVERVIEW.md`, `directory-structure.md` |
 | 14 | Relatório de sprint | **Feito** | Este arquivo |
 
@@ -140,25 +140,29 @@ Detect secrets...........................................................Passed
 
 ## Pendências e próximos passos sugeridos
 
-1. **Deploy na VM de dev** — esta sessão não tinha as variáveis
-   `FINANCEIRO_DEV_VM_HOST`/`PORT`/`KEY` no ambiente (são definidas por
-   sessão do PowerShell, nunca commitadas). Para eu rodar o deploy
-   (`git pull` + `docker compose up -d --build` + `docker compose restart
-   caddy`, tudo na VM de **dev**, sem necessidade de aprovação por comando),
-   preciso que o CEO exporte essas variáveis numa sessão e me peça para
-   continuar, ou rode o deploy diretamente.
-2. **Credenciais reais do sandbox Pluggy** — precisam ser configuradas
-   manualmente pelo CEO no `.env` da VM de dev (`PLUGGY_CLIENT_ID`/
-   `PLUGGY_CLIENT_SECRET`) antes da validação ponta a ponta. Nunca devem
-   passar por comando montado por mim.
-3. **Após 1 e 2**, rodar `python scripts/pluggy_sandbox_smoke.py` na VM (via
-   `docker compose exec api ...`) para validar auth/connect-token contra o
-   sandbox real, depois validação manual completa no navegador (conectar
-   conta sandbox → ver item na lista → sincronizar → ver transações),
-   fechando os critérios de aceite 1, 7 e 10.
-4. **CI do GitHub Actions** — confirmar a run do commit `f953c49` antes de
-   aprovar a sprint.
+1. **Deploy na VM de dev — feito em sessão posterior (2026-08-07/08).**
+   `scripts/vm-config.local.ps1` (gitignored) foi criado para carregar
+   HOST/PORT automaticamente, eliminando a necessidade de exportar
+   variáveis por sessão. Durante o processo, dois builds `docker compose up
+   -d --build` na própria VM travaram por horas (VM de 1GB RAM sem swap,
+   sobrecarregada compilando `pip`/`npm` simultaneamente aos containers já
+   rodando). Solução adotada: mover o build para o CI (GitHub Actions, job
+   `build-and-push` publica em `ghcr.io/daniellimabr/financeiro-{api,
+   frontend}` a cada push em `main`, pacotes públicos) — a VM passou a só
+   fazer `docker compose pull` + `up -d`, sem compilar nada. Ver
+   [OVERVIEW.md](../architecture/OVERVIEW.md) e
+   [ssh-workflow.md](../infra/ssh-workflow.md).
+2. **Credenciais reais do sandbox Pluggy** — configuradas pelo CEO
+   diretamente no `.env` da VM de dev.
+3. **`pluggy_sandbox_smoke.py` rodado com sucesso** contra o sandbox real
+   (auth + connect-token OK). Falta ainda a validação manual completa no
+   navegador (conectar conta sandbox → ver item na lista → sincronizar →
+   ver transações), fechando os critérios de aceite 1, 7 e 10 — depende do
+   CEO.
+4. **CI do GitHub Actions** — confirmar a run do commit `f953c49` (testes)
+   antes de aprovar a sprint; a run do commit `87af0f0` (mudança de CI/
+   deploy) já confirmada verde pelo CEO.
 5. Sprint 4 (E3 — categorização por regras + memória) está desbloqueada
-   assim que a validação acima confirmar transações reais fluindo; segue
-   também aguardando o arquivo de memória de classificação do v1 do CEO
-   (E8, não bloqueia o início de E3).
+   assim que a validação manual acima confirmar transações reais fluindo;
+   segue também aguardando o arquivo de memória de classificação do v1 do
+   CEO (E8, não bloqueia o início de E3).
