@@ -7,7 +7,7 @@ Fases em épicos, derivados do escopo funcional do bootstrap. PRDs individuais s
 | # | Épico | Escopo funcional relacionado |
 |---|---|---|
 | E1 | Fundação técnica ✅ | Setup de repo, stack (ADR-001), auth Google OAuth, deploy inicial na VM — concluído na Sprint 1 (2026-08-04) |
-| E2 | Integração Pluggy | Extratos, cartão de crédito, investimentos; setup técnico (item 8) |
+| E2 | Integração Pluggy ✅ | Extratos, cartão de crédito, investimentos; setup técnico (item 8) — concluído na Sprint 3 (2026-08-08) |
 | E3 | Categorização | Regras + memória de revisão manual; associação despesa↔ativo (item 2) |
 | E4 | Gestão de dados mestres ✅ | Categorias/subcategorias/natureza (item 10); ativos/passivos (item 9) — concluído na Sprint 2 (2026-08-06) |
 | E5 | Dashboards core | Receita/despesa/saldo/patrimônio com drill-down; filtros ano/mês (itens 3, 7) |
@@ -43,7 +43,7 @@ E1 → E8 (import pode rodar assim que houver schema) → E4 (categorias/ativos 
 - Conexão de conta via widget Pluggy Connect + sync manual (botão) trazendo extratos/cartão/investimentos.
 - UI mínima: conectar conta, listar transações sincronizadas (sem categorização).
 - Testes automatizados (meta ≥80%), sem depender de credenciais/rede real no CI; validação real contra sandbox feita manualmente.
-- PRD: [PRD-003-integracao-pluggy.md](prd/PRD-003-integracao-pluggy.md). Plano: [SPRINT-003-integracao-pluggy-plan.md](sprints/SPRINT-003-integracao-pluggy-plan.md).
+- PRD: [PRD-003-integracao-pluggy.md](prd/PRD-003-integracao-pluggy.md). Plano: [SPRINT-003-integracao-pluggy-plan.md](sprints/SPRINT-003-integracao-pluggy-plan.md). Relatório: [SPRINT-003-integracao-pluggy-report.md](sprints/SPRINT-003-integracao-pluggy-report.md) — aprovado pelo CEO em 2026-08-08.
 
 **Decisão da sessão de planejamento (2026-08-07):** E2 e E3 foram divididas em
 sprints separadas — E2+E3 juntas eram grandes demais para uma sessão de
@@ -56,7 +56,7 @@ calibrar contra transações reais, que só existem depois de E2 concluída.
 - Associação despesa↔ativo.
 - Import da memória de classificação do v1 (E8, se o CEO já tiver entregue o arquivo) — entra junto com o design da tabela de regras.
 - Testes unitários da lógica de categorização e de competência de receita (meta ≥80%).
-- A planejar em sessão futura, depois que a Sprint 3 estiver validada e houver transações reais sincronizadas.
+- Desbloqueada: Sprint 3 validada e aprovada em 2026-08-08, com transações reais sincronizadas (556+386 de 2 contas sandbox). A planejar em sessão futura.
 
 Sprints seguintes (E5, E6, E7) serão detalhadas ao final da Sprint 4, quando houver dados reais categorizados para validar os dashboards.
 

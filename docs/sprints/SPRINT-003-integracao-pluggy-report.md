@@ -3,7 +3,7 @@
 - **Plano:** [SPRINT-003-integracao-pluggy-plan.md](./SPRINT-003-integracao-pluggy-plan.md)
 - **PRD:** [PRD-003-integracao-pluggy](../prd/PRD-003-integracao-pluggy.md)
 - **Data do relatório:** 2026-08-07, atualizado em 2026-08-08 após deploy e validação real
-- **Status:** validado ponta a ponta na VM de dev com contas reais do sandbox — aguardando aprovação do CEO
+- **Status:** aprovado pelo CEO em 2026-08-08
 
 ## Resumo
 
