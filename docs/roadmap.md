@@ -59,7 +59,15 @@ calibrar contra transações reais, que só existem depois de E2 concluída.
 - Desbloqueada: Sprint 3 validada e aprovada em 2026-08-08, com transações reais sincronizadas (556+386 de 2 contas sandbox).
 - PRD: [PRD-004-categorizacao-automatica.md](prd/PRD-004-categorizacao-automatica.md). Plano: [SPRINT-004-categorizacao-automatica-plan.md](sprints/SPRINT-004-categorizacao-automatica-plan.md). Relatório: [SPRINT-004-categorizacao-automatica-report.md](sprints/SPRINT-004-categorizacao-automatica-report.md) — aprovado pelo CEO em 2026-08-14, validação manual da qualidade das sugestões confirmada (99% das categorizações sugeridas corretas).
 
-Sprints seguintes (E5, E6, E7) serão detalhadas ao final da Sprint 4, quando houver dados reais categorizados para validar os dashboards.
+### Sprint 5 — Dashboards core (E5)
+- Cálculo de `data_competencia` em `pluggy_transactions` (campo existia desde a Sprint 3, nunca populado) — igual a `data`, calculado no sync.
+- Exclusão de transferências internas (pagamento de fatura de cartão) dos totais agregados, via nova coluna `category_groups.excluir_de_totais`.
+- Endpoints de agregação (`app/dashboards/`): `GET /dashboards/summary` (receita/despesa/saldo/patrimônio), `/por-categoria`, `/por-meio-pagamento` — filtráveis por ano/mês, isolados por usuário.
+- Frontend: aba Dashboards com filtro ano/mês e drill-down Receita/Despesa → Categoria → Meio de pagamento → Linha de extrato (funil definido em PRODUCT.md), gráficos via Recharts.
+- Primeira sprint com trabalho visual real: gera `DESIGN.md` via fluxo `new-work` do Impeccable e roda `/impeccable audit` antes de fechar, conforme já sinalizado em ADR-002-plugins.md.
+- PRD: [PRD-005-dashboards-core.md](prd/PRD-005-dashboards-core.md). Plano: [SPRINT-005-dashboards-core-plan.md](sprints/SPRINT-005-dashboards-core-plan.md).
+
+Sprints seguintes (E6, E7) serão detalhadas quando E5 estiver concluída e validada.
 
 ## Registro de reavaliações futuras
 
