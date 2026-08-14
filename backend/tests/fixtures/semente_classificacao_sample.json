@@ -1,0 +1,8 @@
+{
+  "gerado_em": "2026-08-02",
+  "origem": "test-fixture",
+  "regras": [
+    {"padrao_descricao": "PAG*IFOOD*", "categoria": "Alimentação/Comer fora", "origem": "sistema"},
+    {"padrao_descricao": "Loja Desconhecida", "categoria": "Categoria Inexistente/Sub Inexistente", "origem": "sistema"}
+  ]
+}

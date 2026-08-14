@@ -1,4 +1,5 @@
 from app.models.asset import Asset
+from app.models.categorization import CategorizationRule
 from app.models.category import CategoryGroup, Subcategory
 from app.models.liability import Liability
 from app.models.pluggy import PluggyAccount, PluggyItem, PluggyTransaction
@@ -6,6 +7,7 @@ from app.models.user import User
 
 __all__ = [
     "Asset",
+    "CategorizationRule",
     "CategoryGroup",
     "Liability",
     "PluggyAccount",

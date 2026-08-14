@@ -1,0 +1,2017 @@
+{
+  "gerado_em": "2026-08-02",
+  "origem": "data/financeiro.db",
+  "taxonomia": [
+    {
+      "grupo": "Alimentação",
+      "nome": "Comer fora",
+      "tipo": "gasto",
+      "fixo_variavel": "variavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Alimentação",
+      "nome": "Supermercado",
+      "tipo": "gasto",
+      "fixo_variavel": "variavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Compras",
+      "nome": "Eletrônicos",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Compras",
+      "nome": "Miudezas e diversos",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Compras",
+      "nome": "Móveis",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Compras",
+      "nome": "Outras",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Compras",
+      "nome": "Presentes",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Compras",
+      "nome": "Roupas",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Comunicação",
+      "nome": "Assinaturas",
+      "tipo": "gasto",
+      "fixo_variavel": "fixo",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Comunicação",
+      "nome": "Celular",
+      "tipo": "gasto",
+      "fixo_variavel": "fixo",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Doações",
+      "nome": "Doações",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Educação",
+      "nome": "Cursos",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Educação",
+      "nome": "Eventos",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Educação",
+      "nome": "Livros",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Empréstimos",
+      "nome": "Empréstimos Concedidos",
+      "tipo": "transferencia",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Impostos e taxas",
+      "nome": "Impostos e taxas",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Lazer",
+      "nome": "Ingressos",
+      "tipo": "gasto",
+      "fixo_variavel": "aleatorio",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Lazer",
+      "nome": "Pelada",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Lazer",
+      "nome": "viagens",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Moradia",
+      "nome": "Aluguel",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Moradia",
+      "nome": "Condomínio",
+      "tipo": "gasto",
+      "fixo_variavel": "fixo",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Moradia",
+      "nome": "Energia",
+      "tipo": "gasto",
+      "fixo_variavel": "fixo",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Moradia",
+      "nome": "Financiamento imóvel",
+      "tipo": "gasto",
+      "fixo_variavel": "fixo",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Moradia",
+      "nome": "Gás",
+      "tipo": "gasto",
+      "fixo_variavel": "fixo",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Moradia",
+      "nome": "Internet",
+      "tipo": "gasto",
+      "fixo_variavel": "fixo",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Pets",
+      "nome": "Pets",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Receitas",
+      "nome": "Descontos",
+      "tipo": "receita",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Receitas",
+      "nome": "Estornos",
+      "tipo": "receita",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Receitas",
+      "nome": "Outras",
+      "tipo": "receita",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Receitas",
+      "nome": "Recebimento de empréstimos",
+      "tipo": "receita",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Receitas",
+      "nome": "Reembolsos",
+      "tipo": "receita",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Receitas",
+      "nome": "Rendimentos de investimentos",
+      "tipo": "receita",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Receitas",
+      "nome": "Salário",
+      "tipo": "receita",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Receitas",
+      "nome": "Venda de ativos",
+      "tipo": "receita",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Saúde",
+      "nome": "Academia",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Saúde",
+      "nome": "Consultas e exames",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Saúde",
+      "nome": "Cuidados Pessoais",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Saúde",
+      "nome": "Farmácia",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Saúde",
+      "nome": "Plano de saúde",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Saúde",
+      "nome": "Suplementos",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Seguros não-veiculares",
+      "nome": "Seguros não-veiculares",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Transferência interna",
+      "nome": "Pagamento de Fatura",
+      "tipo": "transferencia",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Transferência interna",
+      "nome": "Transferência interna",
+      "tipo": "transferencia",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Veículos",
+      "nome": "Apps de transporte",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Veículos",
+      "nome": "Combustível",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Veículos",
+      "nome": "Estacionamento e pedágio",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Veículos",
+      "nome": "Financiamento veículo",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Veículos",
+      "nome": "Impostos veículo (IPVA e licenciamento)",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Veículos",
+      "nome": "Manutenção veículo",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Veículos",
+      "nome": "Multas",
+      "tipo": "gasto",
+      "fixo_variavel": "nao_aplicavel",
+      "escopo": "global"
+    },
+    {
+      "grupo": "Veículos",
+      "nome": "Seguro veículo",
+      "tipo": "gasto",
+      "fixo_variavel": "fixo",
+      "escopo": "global"
+    }
+  ],
+  "natureza_override": [],
+  "categorias_ocultas": [],
+  "regras": [
+    {
+      "padrao_descricao": "Airbnb * Hmetd5t3ky",
+      "categoria": "Lazer/viagens",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Ajuste a crédito",
+      "categoria": "Receitas/Reembolsos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Amazon BR",
+      "categoria": "Compras/Eletrônicos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Amazonprimebr",
+      "categoria": "Comunicação/Assinaturas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Anthropic* Claude Sub",
+      "categoria": "Comunicação/Assinaturas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Aplicação RDB",
+      "categoria": "Transferência interna/Transferência interna",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Azul Seguros 1/10",
+      "categoria": "Veículos/Seguro veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Azul Seguros 10/10",
+      "categoria": "Veículos/Seguro veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Azul Seguros 2/10",
+      "categoria": "Veículos/Seguro veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Azul Seguros 3/10",
+      "categoria": "Veículos/Seguro veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Azul Seguros 4/10",
+      "categoria": "Veículos/Seguro veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Azul Seguros 5/10",
+      "categoria": "Veículos/Seguro veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Azul Seguros 6/10",
+      "categoria": "Veículos/Seguro veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Azul Seguros 7/10",
+      "categoria": "Veículos/Seguro veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Azul Seguros 8/10",
+      "categoria": "Veículos/Seguro veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Azul Seguros 9/10",
+      "categoria": "Veículos/Seguro veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Braseiro da Gavea",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "CINTIA ISMERIO",
+      "categoria": "Receitas/Reembolsos",
+      "origem": "usuario"
+    },
+    {
+      "padrao_descricao": "Chimarron Churrascari",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Claude.Ai Subscription",
+      "categoria": "Comunicação/Assinaturas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito 25034990Everaldo",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito 30495480Eustaquio",
+      "categoria": "Alimentação/Supermercado",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito 51857632Danilo",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito 61.841.954 CELIA LUCIA AL",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito A FORMIGUINHA",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito AEROPORTO DE CONGONHAS",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito AEROPORTO GALEAO T2",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito ALCIONE DA SILVA",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito ALL FORNO ALIMENTOS E",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito ANGELONI SUPER LOJA 14",
+      "categoria": "Alimentação/Supermercado",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito ARMAZEM SILVEIRA",
+      "categoria": "Alimentação/Supermercado",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito AUTO POSTO ESTRELA",
+      "categoria": "Veículos/Combustível",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito AlexAndrews",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito BAR E LANCHES VL",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito BASHA BY CHEF NIC",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito BENDITO BOTECO",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito BETTER COMERCIO DE ALI",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito BR MANIA",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito BRASA E DRI",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito BRASA E DRINK",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito BRASA E DRINKS",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito BancaMix",
+      "categoria": "Compras/Miudezas e diversos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito CACULA RIO DAS OS",
+      "categoria": "Compras/Miudezas e diversos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito CEA MODAS S.A.",
+      "categoria": "Compras/Roupas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito CONVENIENCIA TREVO",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito COPA BAMBINO S PIZZARIA",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito CP *AMIGAO 46 RIO OSTR",
+      "categoria": "Compras/Miudezas e diversos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito DISTRIBUIDORA DE BEBID",
+      "categoria": "Alimentação/Supermercado",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito DLKNET *AC BARRA DE SA",
+      "categoria": "Compras/Miudezas e diversos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito ECOPONTE FPAY",
+      "categoria": "Veículos/Estacionamento e pedágio",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito EE SANTO COMERCIO VAREJ",
+      "categoria": "Alimentação/Supermercado",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito ELIONILDO SILVA BARRETO B",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito ESTAPAR AERO GALE",
+      "categoria": "Veículos/Estacionamento e pedágio",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito Estacionamento",
+      "categoria": "Veículos/Estacionamento e pedágio",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito FAMILIA LORENZI PAES A",
+      "categoria": "Alimentação/Supermercado",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito FARMACIA DO LEME",
+      "categoria": "Saúde/Farmácia",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito FARMACIA TREVO JOSE DA",
+      "categoria": "Saúde/Farmácia",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito FIRST CLASS",
+      "categoria": "Compras/Roupas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito FLORIANOPOLIS",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito FrangrillAssados",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito GIRAFFAS",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito GRUPO MADERO",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito HELP DRINK",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito HIRA IZAKAYA",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito HORTIFRUTI RIO DA",
+      "categoria": "Alimentação/Supermercado",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito HotDogOceanic",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito Hutierrytavaresda",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito IFD*TOTEM MACAHE BURGU",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito JB FISIO LTDA",
+      "categoria": "Saúde/Consultas e exames",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito JIM.COM 64500255 JONAS DA",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito JIM.COM 65362711 BELLA LU",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito KFC SH SC SHOPPING VIL",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito LA MAFIA BURGUER",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito LANCHONETE PATROPI",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito LANCHONETE ROUTE 206",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito LATICINIOS ITAIPU",
+      "categoria": "Alimentação/Supermercado",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito MACIEIRA E DIAS DROGAR",
+      "categoria": "Saúde/Farmácia",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito MASSAS CASTEL LL",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito MERCADO DE FABRICA",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito MINI KALZONE ANGELONI",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito MINIMERCADO NOELI",
+      "categoria": "Alimentação/Supermercado",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito MP*ALCIONEDASILV",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito MP*BISCOITOSDELI",
+      "categoria": "Alimentação/Supermercado",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito MP*CAFEDAPRAIA",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito MP*CALDODECANA",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito MP*DATERRAHORTIF",
+      "categoria": "Alimentação/Supermercado",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito MP*MARCELOLANCHE",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito MP*MARCOS",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito MP*PADARIAWALKIR",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito MamunAlmouazenKib",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito NEVES E NEVES COM",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito NOSSA CASA 2",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito NOVO MERCADO E PADARIA",
+      "categoria": "Alimentação/Supermercado",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito NUTRI GRAOS CONTORNO",
+      "categoria": "Alimentação/Supermercado",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito OutsideFloripa",
+      "categoria": "Lazer/viagens",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito PADARIA E RESTAUR",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito PADARIA WALKIRIA",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito PANIFICACAO ATLANTICA",
+      "categoria": "Alimentação/Supermercado",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito PAPELARIA MARQUES",
+      "categoria": "Compras/Miudezas e diversos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito PARADA DAS COXINHAS",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito PASTEL DA TIA REGINA",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito PASTELARIA DO MARCELO",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito PINBALL",
+      "categoria": "Lazer/viagens",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito PINEAPPLE CAFE",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito PISTA 3 AUTO PIST",
+      "categoria": "Veículos/Estacionamento e pedágio",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito PISTA 4 AUTO PIST",
+      "categoria": "Veículos/Estacionamento e pedágio",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito PIZZARIA E AMERIC",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito POSTO DE GASOLINA",
+      "categoria": "Veículos/Combustível",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito POSTO MUCCELIN",
+      "categoria": "Veículos/Combustível",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito POSTO SOUTO BAHIA II LT",
+      "categoria": "Veículos/Combustível",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito Padaria",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito PyramidsEsfiha",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito RAIA3995",
+      "categoria": "Saúde/Farmácia",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito REDE MULTI MARKET",
+      "categoria": "Alimentação/Supermercado",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito REDE RIO ADMINISTRACAO",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito REST O BRASILEIRAO",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito RO2 RIO DAS OSTRAS",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito RODOPORTO OASIS",
+      "categoria": "Veículos/Combustível",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito RODOVIARIA DO RIO DE JA",
+      "categoria": "Impostos e taxas/Impostos e taxas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito SABORES DA FAMILIA",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito SALAO ORIMAR BARBEAR",
+      "categoria": "Saúde/Cuidados Pessoais",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito SAN LORENZO GELATERI",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito SANTOS DUMONT",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito SHELL",
+      "categoria": "Veículos/Combustível",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito SPITFIRE PIZZA",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito SPOLETO RIO DAS OSTRAS",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito STAR MAIS",
+      "categoria": "Alimentação/Supermercado",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito ShoppingPlaza",
+      "categoria": "Veículos/Estacionamento e pedágio",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito Syscashtycket",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito TABACARIA AGUIAR",
+      "categoria": "Compras/Miudezas e diversos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito TATU FILMES LTDA",
+      "categoria": "Lazer/viagens",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito TREMBAO BARRA DELI",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito TUDO DEZ",
+      "categoria": "Compras/Miudezas e diversos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito TimeOut",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito VR SPL RESTAURANT",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito ZIG",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito ZIG* *ZIGPAY",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito ZINGA BAR",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito ZP*PADARIA JARDIM MARI",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra débito calidushotdogueri",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Compra no débito|NETFLIX.COM",
+      "categoria": "Comunicação/Assinaturas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Costaazul Pneus 1/3",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Costaazul Pneus 2/3",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Costaazul Pneus 3/3",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Crédito de \"MERCADOLIVRE*LETDECOR\"",
+      "categoria": "Receitas/Reembolsos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Desconto de antecipação de pagamento de NuPay",
+      "categoria": "Receitas/Descontos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Dl *Uberrides",
+      "categoria": "Veículos/Apps de transporte",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Dl*Uberrides",
+      "categoria": "Veículos/Apps de transporte",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Dm *Spotify",
+      "categoria": "Comunicação/Assinaturas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Dm*Spotify",
+      "categoria": "Comunicação/Assinaturas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Débito automático CLARO CELULAR 47174",
+      "categoria": "Comunicação/Celular",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Débito automático DA CLARO CELULAR 47174",
+      "categoria": "Comunicação/Celular",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Débito automático DA REC FED 12963764",
+      "categoria": "Impostos e taxas/Impostos e taxas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Débito automático DA REC FED 12963764782",
+      "categoria": "Impostos e taxas/Impostos e taxas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Ec *Melimais",
+      "categoria": "Comunicação/Assinaturas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Encerramento de dívida",
+      "categoria": "Receitas/Estornos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Entrada GRPQA LTDA",
+      "categoria": "Receitas/Reembolsos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Entrada REND PAGO APLIC AUT APR",
+      "categoria": "Receitas/Rendimentos de investimentos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Estorno de juros da dívida encerrada",
+      "categoria": "Receitas/Estornos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Estorno de pagamento de transferência NuPay",
+      "categoria": "Receitas/Estornos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Felipe de Castro Barbosa",
+      "categoria": "Lazer/Pelada",
+      "origem": "usuario"
+    },
+    {
+      "padrao_descricao": "Fira Circuit",
+      "categoria": "Lazer/viagens",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Google One",
+      "categoria": "Comunicação/Assinaturas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Google Youtube Videos",
+      "categoria": "Compras/Eletrônicos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "H-tech 3/5",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "IOF de compra internacional",
+      "categoria": "Impostos e taxas/Impostos e taxas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "IOF de volta de Anthropic* Claude Sub",
+      "categoria": "Receitas/Estornos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "IOF de volta de Claude.Ai Subscription",
+      "categoria": "Receitas/Estornos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "IOF gerado por compra em moeda estrangeira",
+      "categoria": "Impostos e taxas/Impostos e taxas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "ISMERIO DE O LIMA",
+      "categoria": "Transferência interna/Transferência interna",
+      "origem": "usuario"
+    },
+    {
+      "padrao_descricao": "Ifd*Ifood Club",
+      "categoria": "Comunicação/Assinaturas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Ifood Club",
+      "categoria": "Comunicação/Assinaturas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Iglesias Food Company",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "usuario"
+    },
+    {
+      "padrao_descricao": "Ismerio de Oliveira Lima",
+      "categoria": "Transferência interna/Transferência interna",
+      "origem": "usuario"
+    },
+    {
+      "padrao_descricao": "Ita Air*Yqk6nk4610552 1/6",
+      "categoria": "Lazer/viagens",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Ita Air*Yqk6nk4610552 2/6",
+      "categoria": "Lazer/viagens",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Ita Air*Yqk6nk4610552 3/6",
+      "categoria": "Lazer/viagens",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Ita Air*Yqk6nk4610552 4/6",
+      "categoria": "Lazer/viagens",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Ita Air*Yqk6nk4610552 5/6",
+      "categoria": "Lazer/viagens",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "JIM.COM* 26228837 WES 4/5",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "JIM.COM* 26228837 WES 5/5",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Jim.Com* 26228837 Wes 1/5",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Jim.Com* 26228837 Wes 2/5",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "LOJA REDPLAY 11/12",
+      "categoria": "Comunicação/Assinaturas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "LOJA REDPLAY 12/12",
+      "categoria": "Comunicação/Assinaturas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Loja Redplay 10/12",
+      "categoria": "Comunicação/Assinaturas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Loja Redplay 6/12",
+      "categoria": "Comunicação/Assinaturas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Loja Redplay 7/12",
+      "categoria": "Comunicação/Assinaturas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Loja Redplay 8/12",
+      "categoria": "Comunicação/Assinaturas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Loja Redplay 9/12",
+      "categoria": "Comunicação/Assinaturas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "MERCADO*MERCADOLIVRE 10/12",
+      "categoria": "Compras/Eletrônicos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "MERCADO*MERCADOLIVRE 11/12",
+      "categoria": "Compras/Eletrônicos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "MERCADOLIVRE*14PRODUT 10/10",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "MERCADOLIVRE*14PRODUT 5/10",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "MERCADOLIVRE*14PRODUT 6/10",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "MERCADOLIVRE*14PRODUT 7/10",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "MERCADOLIVRE*14PRODUT 8/10",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "MERCADOLIVRE*14PRODUT 9/10",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercado*Mercadolivre 5/12",
+      "categoria": "Compras/Eletrônicos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercado*Mercadolivre 6/12",
+      "categoria": "Compras/Eletrônicos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercado*Mercadolivre 7/12",
+      "categoria": "Compras/Eletrônicos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercado*Mercadolivre 8/12",
+      "categoria": "Compras/Eletrônicos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercado*Mercadolivre 9/12",
+      "categoria": "Compras/Eletrônicos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercadolivre*14produt",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercadolivre*14produt 1/10",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercadolivre*14produt 2/10",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercadolivre*14produt 3/10",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercadolivre*14produt 4/10",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercadolivre*4produto 3/6",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercadolivre*4produto 4/6",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercadolivre*4produto 5/6",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercadolivre*4produto 6/6",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercadolivre*Letdecor",
+      "categoria": "Compras/Móveis",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercadolivre*Letdecor 1/6",
+      "categoria": "Compras/Móveis",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercadolivre*Letdecor 2/6",
+      "categoria": "Compras/Móveis",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercadolivre*Letdecor 3/6",
+      "categoria": "Compras/Móveis",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercadolivre*Letdecor 4/6",
+      "categoria": "Compras/Móveis",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercadolivre*Letdecor 5/6",
+      "categoria": "Compras/Móveis",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mercadolivre*Letdecor 6/6",
+      "categoria": "Compras/Móveis",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Mp *Melimais",
+      "categoria": "Comunicação/Assinaturas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "NU PAGAMENTOS S/A",
+      "categoria": "Transferência interna/Pagamento de Fatura",
+      "origem": "usuario"
+    },
+    {
+      "padrao_descricao": "Netflix Entretenimento",
+      "categoria": "Comunicação/Assinaturas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Netflix.Com",
+      "categoria": "Comunicação/Assinaturas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code 46.493.933 PEDRO DIAS",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code AMAZON.COM.BR",
+      "categoria": "Compras/Presentes",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code Adriano Matheus Triches Martins da Silva",
+      "categoria": "Saúde/Cuidados Pessoais",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code DECOLAR COM LTDA",
+      "categoria": "Lazer/viagens",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code DETRAN RJ",
+      "categoria": "Veículos/Impostos veículo (IPVA e licenciamento)",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code ENEL DISTRIBUICAO RIO",
+      "categoria": "Moradia/Energia",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code GIGA MAIS FIBRA",
+      "categoria": "Moradia/Internet",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code IATA INTERNATIONAL AIR TRANSPORT ASSOCIATION",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code IFOOD.COM AGENCIA DE RESTAURANTES ONLINE S.A.",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code INGRESSO COM",
+      "categoria": "Lazer/viagens",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code Izabella Martins Sacramento",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code JHONATAN DE SALES SOUSA",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code Josiane Rosario Dos Santos Candido",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code MAGALUPAY",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code MATERIAL DE CONSTRUCAO VILLAGE",
+      "categoria": "Compras/Miudezas e diversos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code MUNICIPIO DE RIO DAS OSTRAS",
+      "categoria": "Impostos e taxas/Impostos e taxas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code Outlet de Passagens",
+      "categoria": "Veículos/Apps de transporte",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code PAGSEGURO INTERNATIONAL",
+      "categoria": "Compras/Eletrônicos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code PAULO HENRIQUE PEREIRA 75833468949",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code PJBANK",
+      "categoria": "Moradia/Condomínio",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code SANTO DOG",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code SEFAZ RJ - SECRETARIA DE ESTADO DE FAZENDA DO RJ",
+      "categoria": "Veículos/Impostos veículo (IPVA e licenciamento)",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code SHPP BRASIL INSTITUICAO DE PAG",
+      "categoria": "Compras/Roupas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code SPITFIRE PIZZA",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code TELEFONICA BRAS",
+      "categoria": "Moradia/Internet",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code TUNA PAGAMENTOS",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de Pix QR Code VINDI PAGAMENTOS ONLINE",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de boleto CEG RIO",
+      "categoria": "Moradia/Gás",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de boleto GIGA MAIS FIBRA",
+      "categoria": "Moradia/Internet",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de boleto GIGA MAIS FIBRA TELECOMUNICACOES S.A",
+      "categoria": "Moradia/Internet",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de boleto PAG BOLETO NU PAGAMENTO",
+      "categoria": "Transferência interna/Pagamento de Fatura",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de boleto PJBANK PAGAMENTOS S.A.",
+      "categoria": "Moradia/Condomínio",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de boleto SEFAZ-RJ DARJ",
+      "categoria": "Veículos/Impostos veículo (IPVA e licenciamento)",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento de fatura",
+      "categoria": "Transferência interna/Pagamento de Fatura",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pagamento recebido",
+      "categoria": "Transferência interna/Pagamento de Fatura",
+      "origem": "usuario"
+    },
+    {
+      "padrao_descricao": "Pix Automático TELEFONICA BRASIL S.A.",
+      "categoria": "Moradia/Internet",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix devolvido Gleigan do Nascimento Barbosa",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix devolvido Márlon Ismério De Oliveira Lima",
+      "categoria": "Empréstimos/Empréstimos Concedidos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix enviado 26.228.837 WESLEY DE CASTRO ALVES",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix enviado 60.083.471 ERICK NUNES BARBOSA",
+      "categoria": "Saúde/Cuidados Pessoais",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix enviado ADRIANO MARTINS DA SILVA",
+      "categoria": "Saúde/Cuidados Pessoais",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix enviado ANA BEATRIZ DOS SANTOS DE PAULA MEDEIROS PONTES",
+      "categoria": "Empréstimos/Empréstimos Concedidos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix enviado CARLOS ADRIANO GOMES DO ROSARIO",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix enviado CEFAS LEVI CAMPANO LIMA",
+      "categoria": "Veículos/Financiamento veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix enviado Daniel da Silva",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix enviado Evellyn Thalia Alves Rodrigues",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix enviado FH OLIVEIRA SERVICOS DE ENGENHARIA",
+      "categoria": "Moradia/Gás",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix enviado G N BARBOSA LOGISTICA E TRANSPORTE LTDA",
+      "categoria": "Lazer/viagens",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix enviado HUGO SERGIO LATINI CAMPOS",
+      "categoria": "Empréstimos/Empréstimos Concedidos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix enviado Leandro Pinheiro Ferreira de Lima",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix enviado MARIA TEREZA NATAL MARTINS",
+      "categoria": "Moradia/Condomínio",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix enviado Márlon Ismério De Oliveira Lima",
+      "categoria": "Empréstimos/Empréstimos Concedidos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix enviado ROBSON SILVA DE LIMA",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix enviado ROGERIO JORGE JUNIOR",
+      "categoria": "Receitas/Reembolsos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix enviado Ronaldo Jorge Baptista",
+      "categoria": "Alimentação/Supermercado",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix enviado SAMUEL BASTOS JUNIOR",
+      "categoria": "Saúde/Cuidados Pessoais",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix enviado WILSON DA ROCHA DE AMORIM",
+      "categoria": "Transferência interna/Transferência interna",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix recebido ANA BEATRIZ DOS SANTOS DE PAULA MEDEIROS PONTES",
+      "categoria": "Receitas/Recebimento de empréstimos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix recebido BRUNO RAFAEL DE SIQUEIRA SOUSA",
+      "categoria": "Receitas/Reembolsos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix recebido DENIS HENRIQUE CRUZ PINHEIRO",
+      "categoria": "Receitas/Reembolsos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix recebido Gleigan do Nascimento Barbosa",
+      "categoria": "Compras/Outras",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix recebido ISABELA MACHADO LANZA E SILVA",
+      "categoria": "Receitas/Reembolsos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix recebido LINANDRO MARQUES CORREA PINHEIRO",
+      "categoria": "Receitas/Reembolsos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix recebido LONIS BLAM MARCOLINO MARTINS",
+      "categoria": "Receitas/Reembolsos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix recebido PIX TRANSF ANA BEA06/03",
+      "categoria": "Receitas/Reembolsos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix recebido ROGERIO JORGE JUNIOR",
+      "categoria": "Receitas/Reembolsos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix recebido SABINO & IGLESIAS RESTAURANTE E PIZZARIA LTDA",
+      "categoria": "Transferência interna/Transferência interna",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix recebido SAMUEL BASTOS JUNIOR",
+      "categoria": "Receitas/Reembolsos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix recebido WILSON DA ROCHA DE AMORIM",
+      "categoria": "Transferência interna/Transferência interna",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Pix recebido YELUM SEGUROS S A",
+      "categoria": "Receitas/Reembolsos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Rendimentos REND PAGO APLIC AUT MAIS",
+      "categoria": "Receitas/Rendimentos de investimentos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Resgate RDB",
+      "categoria": "Transferência interna/Transferência interna",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Ronaldo Jorge Baptista",
+      "categoria": "Alimentação/Supermercado",
+      "origem": "usuario"
+    },
+    {
+      "padrao_descricao": "Salário GRPQA LTDA",
+      "categoria": "Receitas/Salário",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Smart Fit Fs",
+      "categoria": "Saúde/Academia",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Super",
+      "categoria": "Alimentação/Supermercado",
+      "origem": "usuario"
+    },
+    {
+      "padrao_descricao": "Tera",
+      "categoria": "Educação/Cursos",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Tokio Marine*Auto01d12",
+      "categoria": "Veículos/Seguro veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Tokio Marine*Auto02d12",
+      "categoria": "Veículos/Seguro veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Tokio Marine*Auto08d12",
+      "categoria": "Veículos/Seguro veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Tokio Marine*Auto09d12",
+      "categoria": "Veículos/Seguro veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Tokio Marine*Auto10d12",
+      "categoria": "Veículos/Seguro veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Tokio Marine*Auto11d12",
+      "categoria": "Veículos/Seguro veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Tokio Marine*Auto12d12",
+      "categoria": "Veículos/Seguro veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Transferência enviada|26.228.837 Wesley de Castro Alves",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Transferência enviada|LONIS BLAM MARCOLINO MARTINS",
+      "categoria": "Compras/Roupas",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Uber Uber *Trip Help.U",
+      "categoria": "Veículos/Apps de transporte",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Uber* Trip",
+      "categoria": "Veículos/Apps de transporte",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Urubutique",
+      "categoria": "Compras/Presentes",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Whoosh Br Al*Patinetes",
+      "categoria": "Veículos/Apps de transporte",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Www-Casasbahia-Com-Br 10/10",
+      "categoria": "Compras/Móveis",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Www-Casasbahia-Com-Br 8/10",
+      "categoria": "Compras/Móveis",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Www-Casasbahia-Com-Br 9/10",
+      "categoria": "Compras/Móveis",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Yamalagos 1/6",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Yamalagos 2/6",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Yamalagos 3/3",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Yamalagos 3/6",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Yamalagos 4/6",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Yamalagos 5/6",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Yamalagos 6/6",
+      "categoria": "Veículos/Manutenção veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Youse Auto*2782-20/24",
+      "categoria": "Veículos/Seguro veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "Youse Auto*2782-21/24",
+      "categoria": "Veículos/Seguro veículo",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "eSIM de Viagem - 5GB",
+      "categoria": "Comunicação/Celular",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "iFood",
+      "categoria": "Alimentação/Comer fora",
+      "origem": "sistema"
+    },
+    {
+      "padrao_descricao": "ita air*YQK6NK4610552 6/6",
+      "categoria": "Lazer/viagens",
+      "origem": "sistema"
+    }
+  ],
+  "estatisticas": {
+    "taxonomia": 51,
+    "natureza_override": 0,
+    "categorias_ocultas": 0,
+    "regras": 328,
+    "por_origem": {
+      "sistema": 319,
+      "usuario": 9
+    }
+  }
+}

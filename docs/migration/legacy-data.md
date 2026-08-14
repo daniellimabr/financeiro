@@ -114,5 +114,5 @@ O CEO compartilhou `sugestoes_engine.py` do v1 para dar contexto de calibração
 ## Pendências
 
 - Lista de categorias/subcategorias: **recebida e confirmada** (seção 1).
-- Memória de classificação (mapeamento descrição→categoria real do usuário): ainda não recebida — o exemplo da seção 2 continua sendo placeholder até a entrega.
-- Decidir em qual sprint o script de import é implementado (proposta em [docs/roadmap.md](../roadmap.md)) e revisar o PRD de E3 (categorização) contra as notas da seção 3 antes de travar o design da engine.
+- Memória de classificação (mapeamento descrição→categoria real do usuário): **recebida e importada** na Sprint 4 — arquivo `semente-classificacao.json` (328 regras), entregue pelo CEO, importado via `backend/scripts/import_legacy_categorization_rules.py` para a tabela `categorization_rules`, atribuído à conta do CEO (memória privada, não seed global — ver [PRD-004](../prd/PRD-004-categorizacao-automatica.md) §Regras de negócio). O exemplo da seção 2 acima permanece ilustrativo; o formato real usa `categoria` como string única `"Grupo/Subcategoria"` em vez de colunas separadas (ver seção 3), resolvida pelo script contra a taxonomia já importada.
+- Motor de sugestão da Sprint 4 implementa só as camadas 1 (match exato: regra ou histórico confirmado) e 2 (similaridade `difflib >= 0.86`) da referência da seção 3 — camadas 3 (herança entre usuários), 4 (token distintivo/IDF) e 5 (léxico PT-BR) ficam adiadas até haver volume real suficiente para calibrar.

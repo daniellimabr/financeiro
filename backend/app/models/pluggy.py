@@ -8,6 +8,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     func,
@@ -41,6 +42,11 @@ class PluggyTransactionTipo(enum.StrEnum):
 class PluggyTransactionStatus(enum.StrEnum):
     pendente = "pendente"
     efetivada = "efetivada"
+
+
+class PluggyTransactionCategorizacaoStatus(enum.StrEnum):
+    pendente = "pendente"
+    confirmada = "confirmada"
 
 
 class PluggyItem(Base):
@@ -94,7 +100,14 @@ class PluggyAccount(Base):
 
 class PluggyTransaction(Base):
     __tablename__ = "pluggy_transactions"
-    __table_args__ = (Index("ix_pluggy_transactions_account_id_data", "account_id", "data"),)
+    __table_args__ = (
+        Index("ix_pluggy_transactions_account_id_data", "account_id", "data"),
+        Index(
+            "ix_pluggy_transactions_user_id_categorizacao_status",
+            "user_id",
+            "categorizacao_status",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     account_id: Mapped[int] = mapped_column(ForeignKey("pluggy_accounts.id"), nullable=False)
@@ -114,6 +127,21 @@ class PluggyTransaction(Base):
     status: Mapped[PluggyTransactionStatus] = mapped_column(
         Enum(PluggyTransactionStatus, name="pluggy_transaction_status"), nullable=False
     )
+    categorizacao_status: Mapped[PluggyTransactionCategorizacaoStatus] = mapped_column(
+        Enum(PluggyTransactionCategorizacaoStatus, name="pluggy_transaction_categorizacao_status"),
+        nullable=False,
+        default=PluggyTransactionCategorizacaoStatus.pendente,
+    )
+    subcategoria_sugerida_id: Mapped[int | None] = mapped_column(
+        ForeignKey("subcategories.id"), nullable=True
+    )
+    sugestao_confianca: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    sugestao_fonte_tipo: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    sugestao_fonte_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sugestao_score: Mapped[Decimal | None] = mapped_column(Numeric(4, 3), nullable=True)
+    asset_id: Mapped[int | None] = mapped_column(ForeignKey("assets.id"), nullable=True)
+    asset_sugerido_id: Mapped[int | None] = mapped_column(ForeignKey("assets.id"), nullable=True)
+    asset_sugestao_confianca: Mapped[str | None] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
