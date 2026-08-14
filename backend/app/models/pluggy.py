@@ -107,6 +107,11 @@ class PluggyTransaction(Base):
             "user_id",
             "categorizacao_status",
         ),
+        Index(
+            "ix_pluggy_transactions_user_id_data_competencia",
+            "user_id",
+            "data_competencia",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

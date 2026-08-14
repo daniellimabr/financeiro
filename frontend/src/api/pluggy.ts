@@ -77,6 +77,26 @@ export function fetchPluggyAccounts(): Promise<PluggyAccount[]> {
   return apiFetch<PluggyAccount[]>("/pluggy/accounts");
 }
 
-export function fetchPluggyTransactions(): Promise<PluggyTransaction[]> {
-  return apiFetch<PluggyTransaction[]>("/pluggy/transactions");
+export interface PluggyTransactionFilters {
+  ano?: number;
+  mes?: number;
+  subcategoryId?: number;
+  accountTipo?: string;
+  competencia?: boolean;
+}
+
+export function fetchPluggyTransactions(
+  filters: PluggyTransactionFilters = {}
+): Promise<PluggyTransaction[]> {
+  const params = new URLSearchParams();
+  if (filters.ano !== undefined) params.set("ano", String(filters.ano));
+  if (filters.mes !== undefined) params.set("mes", String(filters.mes));
+  if (filters.subcategoryId !== undefined) {
+    params.set("subcategory_id", String(filters.subcategoryId));
+  }
+  if (filters.accountTipo !== undefined) params.set("account_tipo", filters.accountTipo);
+  if (filters.competencia) params.set("competencia", "true");
+
+  const query = params.toString();
+  return apiFetch<PluggyTransaction[]>(`/pluggy/transactions${query ? `?${query}` : ""}`);
 }

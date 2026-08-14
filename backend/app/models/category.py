@@ -1,10 +1,15 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
+
+# Sentinel usado nos filtros de categoria dos endpoints de dashboards e de
+# listagem de transações para representar "sem subcategoria atribuída". IDs
+# reais de subcategory são autoincrement a partir de 1, então 0 nunca colide.
+SEM_CATEGORIA_ID = 0
 
 
 class Natureza(enum.StrEnum):
@@ -18,6 +23,7 @@ class CategoryGroup(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nome: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    excluir_de_totais: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

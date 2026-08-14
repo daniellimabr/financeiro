@@ -1,10 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { fetchPluggyTransactions } from "../api/pluggy";
+import { fetchPluggyTransactions, type PluggyTransactionFilters } from "../api/pluggy";
 
-export function usePluggyTransactions() {
+export function usePluggyTransactions(
+  filters: PluggyTransactionFilters = {},
+  options: { enabled?: boolean } = {}
+) {
   return useQuery({
-    queryKey: ["pluggyTransactions"],
-    queryFn: fetchPluggyTransactions,
+    queryKey: [
+      "pluggyTransactions",
+      filters.ano,
+      filters.mes,
+      filters.subcategoryId,
+      filters.accountTipo,
+      filters.competencia,
+    ],
+    queryFn: () => fetchPluggyTransactions(filters),
+    enabled: options.enabled ?? true,
   });
 }

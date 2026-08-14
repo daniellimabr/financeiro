@@ -1,10 +1,12 @@
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.exceptions import InvalidStateError, NotFoundError
+from app.models.category import SEM_CATEGORIA_ID
 from app.models.pluggy import (
     PluggyAccount,
     PluggyAccountTipo,
@@ -82,13 +84,32 @@ def list_accounts(db: Session, user_id: int) -> list[PluggyAccount]:
     )
 
 
-def list_transactions(db: Session, user_id: int) -> list[PluggyTransaction]:
-    return (
-        db.query(PluggyTransaction)
-        .filter(PluggyTransaction.user_id == user_id)
-        .order_by(PluggyTransaction.data.desc())
-        .all()
-    )
+def list_transactions(
+    db: Session,
+    user_id: int,
+    *,
+    ano: int | None = None,
+    mes: int | None = None,
+    subcategory_id: int | None = None,
+    account_tipo: PluggyAccountTipo | None = None,
+    competencia: bool = False,
+) -> list[PluggyTransaction]:
+    query = db.query(PluggyTransaction).filter(PluggyTransaction.user_id == user_id)
+
+    data_field = PluggyTransaction.data_competencia if competencia else PluggyTransaction.data
+    if ano is not None:
+        query = query.filter(func.extract("year", data_field) == ano)
+    if mes is not None:
+        query = query.filter(func.extract("month", data_field) == mes)
+    if subcategory_id is not None:
+        if subcategory_id == SEM_CATEGORIA_ID:
+            query = query.filter(PluggyTransaction.subcategory_id.is_(None))
+        else:
+            query = query.filter(PluggyTransaction.subcategory_id == subcategory_id)
+    if account_tipo is not None:
+        query = query.join(PluggyAccount).filter(PluggyAccount.tipo == account_tipo)
+
+    return query.order_by(PluggyTransaction.data.desc()).all()
 
 
 def sync_item(db: Session, client: PluggyClient, user_id: int, item_id: int) -> PluggyItem:
@@ -158,6 +179,7 @@ def _upsert_transaction(
     tx.valor = Decimal(str(raw["amount"]))
     tx.tipo = _map_transaction_tipo(raw["type"])
     tx.data = tx_date
+    tx.data_competencia = tx_date
     tx.categoria_pluggy = raw.get("category")
     tx.status = _map_transaction_status(raw.get("status", "POSTED"))
     db.flush()

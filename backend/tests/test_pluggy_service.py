@@ -127,8 +127,24 @@ def test_sync_item_creates_accounts_and_transactions(db_session, user):
     assert len(transactions) == 1
     assert transactions[0].user_id == user.id
     assert transactions[0].subcategory_id is None
-    assert transactions[0].data_competencia is None
+    assert transactions[0].data_competencia == date(2026, 1, 15)
     assert transactions[0].valor == Decimal("-50.25")
+
+
+def test_sync_item_writes_data_competencia_equal_to_data_on_resync(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[_account_raw()],
+        transactions_by_account={"acc-ext-1": [_transaction_raw()]},
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+
+    service.sync_item(db_session, client, user.id, item.id)
+    service.sync_item(db_session, client, user.id, item.id)
+
+    transactions = service.list_transactions(db_session, user.id)
+    assert len(transactions) == 1
+    assert transactions[0].data_competencia == transactions[0].data
 
 
 def test_sync_item_twice_does_not_duplicate_accounts_or_transactions(db_session, user):

@@ -1,5 +1,18 @@
+from datetime import date
+from decimal import Decimal
+
 from app.auth.jwt import COOKIE_NAME, create_access_token
 from app.main import app
+from app.models.category import CategoryGroup, Subcategory
+from app.models.pluggy import (
+    PluggyAccount,
+    PluggyAccountTipo,
+    PluggyItem,
+    PluggyItemStatus,
+    PluggyTransaction,
+    PluggyTransactionStatus,
+    PluggyTransactionTipo,
+)
 from app.models.user import User
 from app.pluggy_integration.router import get_pluggy_client
 
@@ -197,3 +210,192 @@ def test_user_does_not_see_other_users_items_accounts_transactions(client, db_se
     assert client.get("/pluggy/items").json() == []
     assert client.get("/pluggy/accounts").json() == []
     assert client.get("/pluggy/transactions").json() == []
+
+
+def _subcategory(db_session, nome="Mercado"):
+    group = CategoryGroup(nome=f"Grupo {nome}")
+    db_session.add(group)
+    db_session.flush()
+    subcategory = Subcategory(group_id=group.id, nome=nome)
+    db_session.add(subcategory)
+    db_session.commit()
+    db_session.refresh(subcategory)
+    return subcategory
+
+
+def _transaction(
+    db_session,
+    user,
+    *,
+    account_tipo=PluggyAccountTipo.corrente,
+    valor="-10.00",
+    tipo=PluggyTransactionTipo.debito,
+    data=date(2026, 1, 15),
+    data_competencia=None,
+    subcategory_id=None,
+):
+    item = PluggyItem(
+        user_id=user.id,
+        pluggy_item_id=f"item-{user.id}-{valor}-{data}-{account_tipo}",
+        connector_id=1,
+        connector_name="Banco Fake",
+        status=PluggyItemStatus.updated,
+        cutoff_date=date(2026, 1, 1),
+    )
+    db_session.add(item)
+    db_session.flush()
+    account = PluggyAccount(
+        item_id=item.id,
+        user_id=user.id,
+        pluggy_account_id=f"acc-{user.id}-{valor}-{data}-{account_tipo}",
+        tipo=account_tipo,
+        nome="Conta",
+        saldo=Decimal("0"),
+    )
+    db_session.add(account)
+    db_session.flush()
+    tx = PluggyTransaction(
+        account_id=account.id,
+        user_id=user.id,
+        pluggy_transaction_id=f"tx-{user.id}-{valor}-{data}-{account_tipo}",
+        descricao="Transacao",
+        valor=Decimal(valor),
+        tipo=tipo,
+        data=data,
+        data_competencia=data_competencia if data_competencia is not None else data,
+        subcategory_id=subcategory_id,
+        status=PluggyTransactionStatus.efetivada,
+    )
+    db_session.add(tx)
+    db_session.commit()
+    db_session.refresh(tx)
+    return tx
+
+
+def test_list_transactions_without_filters_returns_everything(client, db_session):
+    user = _authenticate(client, db_session)
+    _transaction(db_session, user, valor="-10.00", data=date(2026, 1, 15))
+    _transaction(db_session, user, valor="-20.00", data=date(2026, 2, 1))
+
+    response = client.get("/pluggy/transactions")
+
+    assert response.status_code == 200
+    assert len(response.json()) == 2
+
+
+def test_list_transactions_filters_by_ano_and_mes(client, db_session):
+    user = _authenticate(client, db_session)
+    _transaction(db_session, user, valor="-10.00", data=date(2026, 1, 31))
+    _transaction(db_session, user, valor="-20.00", data=date(2026, 2, 1))
+
+    response = client.get("/pluggy/transactions", params={"ano": 2026, "mes": 1})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert Decimal(body[0]["valor"]) == Decimal("-10.00")
+
+
+def test_list_transactions_filters_by_subcategory_id(client, db_session):
+    user = _authenticate(client, db_session)
+    sub = _subcategory(db_session)
+    _transaction(db_session, user, valor="-10.00", subcategory_id=sub.id)
+    _transaction(db_session, user, valor="-20.00", subcategory_id=None)
+
+    response = client.get("/pluggy/transactions", params={"subcategory_id": sub.id})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert Decimal(body[0]["valor"]) == Decimal("-10.00")
+
+
+def test_list_transactions_filters_by_subcategory_id_zero_returns_uncategorized(client, db_session):
+    user = _authenticate(client, db_session)
+    sub = _subcategory(db_session)
+    _transaction(db_session, user, valor="-10.00", subcategory_id=sub.id)
+    _transaction(db_session, user, valor="-20.00", subcategory_id=None)
+
+    response = client.get("/pluggy/transactions", params={"subcategory_id": 0})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert Decimal(body[0]["valor"]) == Decimal("-20.00")
+
+
+def test_list_transactions_filters_by_account_tipo(client, db_session):
+    user = _authenticate(client, db_session)
+    _transaction(db_session, user, valor="-10.00", account_tipo=PluggyAccountTipo.corrente)
+    _transaction(db_session, user, valor="120.00", account_tipo=PluggyAccountTipo.cartao_credito)
+
+    response = client.get("/pluggy/transactions", params={"account_tipo": "cartao_credito"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert Decimal(body[0]["valor"]) == Decimal("120.00")
+
+
+def test_list_transactions_filters_by_competencia_flag(client, db_session):
+    user = _authenticate(client, db_session)
+    _transaction(
+        db_session,
+        user,
+        valor="-10.00",
+        data=date(2026, 1, 31),
+        data_competencia=date(2026, 2, 1),
+    )
+
+    by_data = client.get("/pluggy/transactions", params={"ano": 2026, "mes": 1}).json()
+    by_competencia = client.get(
+        "/pluggy/transactions", params={"ano": 2026, "mes": 1, "competencia": True}
+    ).json()
+    by_competencia_february = client.get(
+        "/pluggy/transactions", params={"ano": 2026, "mes": 2, "competencia": True}
+    ).json()
+
+    assert len(by_data) == 1
+    assert len(by_competencia) == 0
+    assert len(by_competencia_february) == 1
+
+
+def test_list_transactions_combined_filters_isolated_by_user(client, db_session):
+    user = _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    sub = _subcategory(db_session)
+    _transaction(
+        db_session,
+        user,
+        valor="-10.00",
+        data=date(2026, 1, 15),
+        subcategory_id=sub.id,
+        account_tipo=PluggyAccountTipo.corrente,
+    )
+
+    other = User(google_sub="google-2", email="b@example.com", name="Bob")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    _transaction(
+        db_session,
+        other,
+        valor="-999.00",
+        data=date(2026, 1, 15),
+        subcategory_id=sub.id,
+        account_tipo=PluggyAccountTipo.corrente,
+    )
+
+    response = client.get(
+        "/pluggy/transactions",
+        params={
+            "ano": 2026,
+            "mes": 1,
+            "subcategory_id": sub.id,
+            "account_tipo": "corrente",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert Decimal(body[0]["valor"]) == Decimal("-10.00")
