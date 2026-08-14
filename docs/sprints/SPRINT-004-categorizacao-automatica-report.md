@@ -2,6 +2,7 @@
 
 - **Plano:** [SPRINT-004-categorizacao-automatica-plan.md](./SPRINT-004-categorizacao-automatica-plan.md)
 - **Data do relatório:** 2026-08-14
+- **Status:** aprovado pelo CEO em 2026-08-14 — validação manual na VM de dev confirmou ~99% das categorias sugeridas corretas
 
 ## Resumo
 
@@ -149,18 +150,32 @@ commit real.
 Uma sessão de execução completa (implementação + testes + deploy real +
 relatório), em linha com o padrão das Sprints 2 e 3.
 
-## Pendências e próximos passos sugeridos
+## Validação manual do CEO (2026-08-14)
 
-- **Validação manual final no navegador pelo CEO** — as checagens desta
-  sessão foram feitas via chamadas HTTP diretas (curl) e consultas SQL na
-  VM de dev, não clique real na UI; recomendo o CEO abrir
-  `http://financeirov2.duckdns.org:8080`, entrar na aba "Categorizar" e
-  confirmar pelo menos uma transação real antes de considerar a sprint
-  aprovada, mesmo taxa de sugestão sendo o próximo ponto de calibração.
+CEO abriu `http://financeirov2.duckdns.org:8080`, revisou a fila de
+categorização na VM de dev e reportou **~99% das sugestões corretas**.
+Confirmou manualmente algumas transações do extrato que ainda não tinham
+categoria. Verificado no banco real após as confirmações:
+
+- As 5 transações confirmadas pelo CEO gravaram `subcategory_id` real e
+  `categorizacao_status='confirmada'` (não ficou preso em rascunho/sugestão).
+- Duas delas (parcelas de uma mesma compra, ex. "Mag*Magalu-Magazine Lu
+  9/10"/"10/10") já voltaram na listagem seguinte com
+  `sugestao_fonte_tipo='historico_exato'` apontando para a parcela irmã
+  confirmada minutos antes — evidência real, não só de teste automatizado,
+  de que a camada de histórico próprio (camada 1b) se realimenta a cada
+  confirmação, sem esperar o próximo import de regras.
+
+**Sprint aprovada pelo CEO em 2026-08-14.**
+
+## Próximos passos sugeridos
+
 - **Taxa de sugestão fora das 258 regras importadas** pode ficar baixa até o
   usuário confirmar mais transações manualmente (a camada de histórico
   próprio só cresce com uso) — esperado, não é regressão; já registrado como
-  risco no plano.
+  risco no plano. O comportamento observado na validação (parcelas se
+  autoalimentando via histórico exato) é um indício positivo de que essa
+  camada vai crescer rápido com o uso normal do CEO.
 - **Heurística de sugestão de ativo** ("contains" simples) é nova, sem
   precedente do v1 — vale observar na prática se gera falsos
   positivos/negativos ao usar a fila de revisão.
