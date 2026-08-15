@@ -1,6 +1,6 @@
 # Arquitetura — Visão Geral
 
-> Stack abaixo reflete [ADR-001](adr/ADR-001-stack.md), **aprovado pelo CEO em 2026-08-03**. Este doc é atualizado a cada mudança estrutural relevante (regra de doc viva). **Atualizado em 2026-08-15 após Sprint 9** — cards Ativos/Passivos/Saldo no Dashboard, `liability_id` espelhando `asset_id`, funil sem nível "meio de pagamento" (ícone por linha), tabelas ordenáveis, tooltip nos gráficos de tendência. E6 (Dashboards analíticos) fechado. Ver seção própria abaixo.
+> Stack abaixo reflete [ADR-001](adr/ADR-001-stack.md), **aprovado pelo CEO em 2026-08-03**. Este doc é atualizado a cada mudança estrutural relevante (regra de doc viva). **Atualizado em 2026-08-15 após Sprint 9 + revisão pós-entrega** — cards Ativos/Passivos/Saldo no Dashboard, `liability_id` espelhando `asset_id`, funil sem nível "meio de pagamento" (ícone ao lado do valor) mas com um novo nível Categoria>Tipo (cores distintas por nível), tabelas ordenáveis (incl. %), tooltip nos gráficos, saldo de cartão mostrando fatura atual + limite entre parênteses. E6 (Dashboards analíticos) fechado. Ver seção própria abaixo.
 
 ## Visão de alto nível
 
@@ -55,8 +55,8 @@ Pré-requisito único, feito uma vez: a VM precisa estar autenticada no GHCR (`d
 ## Componentes
 
 - **API (FastAPI):** autenticação (Google OAuth via Authlib), CRUD de categorias/subcategorias e ativos/passivos (Sprint 2), integração Pluggy — connect token, registro e sync manual de contas/transações (Sprint 3), categorização automática por regras+memória e associação despesa↔ativo (Sprint 4), endpoints de agregação para dashboards (Sprint 5). Lógica de negócio (categorização, competência de receita, cálculo de patrimônio) vive aqui, testada via pytest com ≥80% cobertura (100% nos módulos novos da Sprint 5). Estrutura: `app/main.py`, `app/config.py`, `app/db.py`, `app/models/`, `app/schemas/`, `app/auth/`, `app/categories/`, `app/assets/`, `app/liabilities/`, `app/pluggy_integration/`, `app/categorization/`, `app/dashboards/`, `app/exceptions.py`, `tests/`.
-- **Banco (PostgreSQL):** schema relacional — `users` (Sprint 1); `category_groups`/`subcategories` (globais, sem `user_id` — dado mestre do sistema) e `assets`/`liabilities` (isolados por `user_id`), criados na Sprint 2; `pluggy_items`/`pluggy_accounts`/`pluggy_transactions` (isolados por `user_id`, upsert idempotente por id externo da Pluggy), criados na Sprint 3; `categorization_rules` (memória de classificação por usuário) e 9 colunas novas em `pluggy_transactions` (sugestão de categoria/ativo + `categorizacao_status`), criados na Sprint 4; `category_groups.excluir_de_totais` (flag para excluir "Transferência interna" das agregações) e backfill de `data_competencia` em `pluggy_transactions`, criados na Sprint 5; `apelido`/`sync_enabled` em `pluggy_accounts` e `descricao_usuario`/`descricao_sugerida`/`descricao_sugestao_origem_id` em `pluggy_transactions`, criados na Sprint 7; `liability_id`/`liability_sugerido_id`/`liability_sugestao_confianca` em `pluggy_transactions`, espelhando `asset_id`, criados na Sprint 9. Sem tabelas pré-calculadas — dashboards agregam por consulta direta (decisão fixa do projeto). Migrations via Alembic reversíveis (`0001` users, `0002` categorias, `0003` ativos/passivos, `0004` Pluggy, `0005` categorization_rules, `0006` campos de categorização/ativo em pluggy_transactions, `0007` excluir_de_totais + backfill de competência, `0008` apelido/sync_enabled + descrição editável, `0009` liability_id em pluggy_transactions).
-- **Frontend (React/Vite):** dashboards com filtro ano/mês, cards Receita/Despesa/Saldo/Ativos/Passivos/Patrimônio com sparkline, drill-down em sanfona Receita/Despesa → Categoria → lista de transações (nível "meio de pagamento" removido na Sprint 9, vira ícone por linha), drill-downs de Ativos (toggle despesa/receita)/Passivos (só despesa)/Saldo por conta (snapshot atual), tabelas ordenáveis por coluna, tooltip nos gráficos de tendência, gráficos via Recharts (Sprint 5, primeira tela com identidade visual real — ver [DESIGN.md](../../DESIGN.md)), telas de setup (futuro), gestão de categorias/passivos pela UI (futuro — CRUD de ativos já existe desde a Sprint 8), login Google, perfil/logout (futuro), conexão de conta bancária e listagem de transações Pluggy (Sprint 3), fila de revisão de categorização (Sprint 4) — abas em `ProtectedPage`. Data-fetching via TanStack Query. Estrutura: `src/pages/`, `src/api/`, `src/hooks/`, `src/components/`, `src/pluggy/`, `tests/`.
+- **Banco (PostgreSQL):** schema relacional — `users` (Sprint 1); `category_groups`/`subcategories` (globais, sem `user_id` — dado mestre do sistema) e `assets`/`liabilities` (isolados por `user_id`), criados na Sprint 2; `pluggy_items`/`pluggy_accounts`/`pluggy_transactions` (isolados por `user_id`, upsert idempotente por id externo da Pluggy), criados na Sprint 3; `categorization_rules` (memória de classificação por usuário) e 9 colunas novas em `pluggy_transactions` (sugestão de categoria/ativo + `categorizacao_status`), criados na Sprint 4; `category_groups.excluir_de_totais` (flag para excluir "Transferência interna" das agregações) e backfill de `data_competencia` em `pluggy_transactions`, criados na Sprint 5; `apelido`/`sync_enabled` em `pluggy_accounts` e `descricao_usuario`/`descricao_sugerida`/`descricao_sugestao_origem_id` em `pluggy_transactions`, criados na Sprint 7; `liability_id`/`liability_sugerido_id`/`liability_sugestao_confianca` em `pluggy_transactions`, espelhando `asset_id`, criados na Sprint 9; `limite_credito`/`fatura_vencimento` em `pluggy_accounts` (lidos de `creditData` da Pluggy, antes descartado), criados na revisão pós-entrega da Sprint 9. Sem tabelas pré-calculadas — dashboards agregam por consulta direta (decisão fixa do projeto). Migrations via Alembic reversíveis (`0001` users, `0002` categorias, `0003` ativos/passivos, `0004` Pluggy, `0005` categorization_rules, `0006` campos de categorização/ativo em pluggy_transactions, `0007` excluir_de_totais + backfill de competência, `0008` apelido/sync_enabled + descrição editável, `0009` liability_id em pluggy_transactions, `0010` limite_credito/fatura_vencimento em pluggy_accounts).
+- **Frontend (React/Vite):** dashboards com filtro ano/mês, cards Receita/Despesa/Saldo/Ativos/Passivos/Patrimônio com sparkline, drill-down em sanfona Receita/Despesa → Categoria (grupo) → Tipo (subcategoria) → lista de transações (nível "meio de pagamento" removido na Sprint 9, vira ícone ao lado do valor; nível Categoria>Tipo adicionado na revisão pós-entrega, com cores distintas por nível), drill-downs de Ativos (toggle despesa/receita)/Passivos (só despesa)/Saldo por conta (snapshot atual, fatura+limite para cartão de crédito), tabelas ordenáveis por coluna (incl. %), tooltip nos gráficos de tendência/sparkline, eixo X por trimestre, gráficos via Recharts (Sprint 5, primeira tela com identidade visual real — ver [DESIGN.md](../../DESIGN.md)), telas de setup (futuro), gestão de categorias/passivos pela UI (futuro — CRUD de ativos já existe desde a Sprint 8), login Google, perfil/logout (futuro), conexão de conta bancária e listagem de transações Pluggy (Sprint 3), fila de revisão de categorização (Sprint 4) — abas em `ProtectedPage`. Data-fetching via TanStack Query. Estrutura: `src/pages/`, `src/api/`, `src/hooks/`, `src/components/`, `src/pluggy/`, `tests/`.
 - **Integração Pluggy:** módulo `app/pluggy_integration/` (`client.py`, `service.py`, `router.py`). `PluggyClient` autentica via API key (client id/secret), cacheada em memória do processo (~1.8h de TTL, sem persistir em banco). Sync é síncrono, disparado por botão "sincronizar" no frontend por item conectado — sem job agendado/webhook nesta fase (decisão fixa do projeto). `cutoff_date` por item (default `settings.pluggy_sync_cutoff_date`, `2026-01-01`) filtra histórico trazido. Transações sincronizadas chegam sem categoria confirmada (`subcategory_id` nulo) e sem `data_competencia` — a Sprint 4 adiciona sugestão automática, mas a confirmação continua manual.
 
 ## Autenticação (Sprint 1)
@@ -300,21 +300,14 @@ real).
   `tx.account`, então `list_transactions` ganhou `joinedload(
   PluggyTransaction.account)` — sem isso seria N+1 real (uma query de
   conta por transação da página).
-- **Frontend — funil sem nível "meio de pagamento":** `CategoriaAccordion`
-  em `DashboardsPage.tsx` expande categoria direto para
-  `TransacoesPanel` (lista de transações) — o nível intermediário
-  `MeioPagamentoAccordion` foi removido inteiro, junto do `DashChart`
-  (gráfico de barras redundante acima de cada lista — a barra de
-  preenchimento por linha já bastava). Meio de pagamento passa a aparecer
-  como `AccountTipoIcon` (SVG inline, `aria-hidden`, decorativo) por linha
-  da tabela de transações. Percentual na linha de extrato agora é
-  calculado contra o total da **categoria** (antes era contra o total do
-  meio de pagamento, nível que deixou de existir). Reverte uma decisão até
-  então tratada como fechada em PRD-005/006 — decisão explícita do CEO na
-  sessão de planejamento desta sprint. `useDashboardByMeioPagamento.ts`
-  removido (órfão pós-refactor); `GET /dashboards/por-meio-pagamento`
-  segue existindo no backend (não removido, só sem consumidor no frontend
-  hoje).
+- **Frontend — funil sem nível "meio de pagamento":** meio de pagamento
+  deixa de ser um nível do funil e passa a aparecer como
+  `AccountTipoIcon` (SVG inline, `aria-hidden`, decorativo) dentro da
+  célula Valor de cada linha de transação. Reverte uma decisão até então
+  tratada como fechada em PRD-005/006 — decisão explícita do CEO na sessão
+  de planejamento desta sprint. `useDashboardByMeioPagamento.ts` removido
+  (órfão pós-refactor); `GET /dashboards/por-meio-pagamento` segue
+  existindo no backend (não removido, só sem consumidor no frontend hoje).
 - **Frontend — cards Ativos/Passivos/Saldo:** ao lado de
   Receita/Despesa/Saldo/Patrimônio já existentes. "Ativos" abre
   `AtivosAccordion` reaproveitando `useAssetGastos`/`useAssetGastosTendencia`
@@ -329,26 +322,89 @@ real).
   que duplicavam o primeiro e agora precisam do segundo em 3+ lugares —
   mesmo gatilho de duplicação que motivou a extração de `PeriodFilter` na
   Sprint 8), `AccountTipoIcon.tsx` (4 SVGs inline), `useTableSort.ts`
-  (hook genérico de ordenação por coluna, sem precedente). `TrendChart`
-  ganha tooltip (Recharts `<Tooltip>`) e eixo X com
-  `interval="preserveStartEnd"`/`minTickGap` (antes sem tooltip, todos os
-  ticks visíveis). `AssetsPage.tsx` refatorada pra usar os componentes
-  compartilhados — testes existentes passam sem mudança de assertion
-  (refactor puro, mesmo padrão da extração de `PeriodFilter`).
-- **QA visual (`scripts/browser-check/check-sprint9.mjs`, novo):** só
-  leitura (sem mutação, sem cleanup necessário) — cards Ativos (com
-  toggle)/Passivos (sem toggle)/Saldo, funil de categoria expandindo
-  direto pra transações com ícone por linha, ordenação por coluna;
-  confirmado contra dado real da VM de dev sem erros de console.
-  `check-sanfona.mjs` (Sprint 6) removido — testava exatamente o nível
-  "meio de pagamento" que esta sprint eliminou.
+  (hook genérico de ordenação por coluna, sem precedente). `AssetsPage.tsx`
+  refatorada pra usar os componentes compartilhados — testes existentes
+  passam sem mudança de assertion (refactor puro, mesmo padrão da
+  extração de `PeriodFilter`).
+
+### Revisão pós-entrega (mesma sessão, feedback do CEO)
+
+CEO deu feedback ao ver o resultado real, antes de aprovar a sprint —
+mesmo padrão da revisão de escopo da Sprint 8.
+
+- **Funil de Despesa/Receita ganha um nível — Categoria > Tipo >
+  Transação:** `GrupoAccordion` (novo, nível Categoria — agrupa por
+  `CategoryGroup`) e `SubcategoriaAccordion` (novo, nível Tipo — agrupa
+  por `Subcategory` dentro do grupo expandido) substituem o
+  `CategoriaAccordion` de nível único da entrega inicial. Calculado
+  inteiramente no frontend a partir do `GET /dashboards/por-categoria` já
+  existente (cada linha já vem com `group_id`/`group_nome` junto do
+  `subcategory_id`) — soma por grupo é só agregar client-side pelas linhas
+  que compartilham `group_id`, sem endpoint novo. Percentual em cada nível
+  é contra o total do nível acima (Categoria contra o total geral do tipo,
+  Tipo contra o total da Categoria, transação contra o total do Tipo).
+- **Paleta categórica nova (`frontend/src/utils/categoryColors.ts`):** 8
+  matizes (`--cat-1`..`--cat-8` em `index.css`, light+dark), validados via
+  skill `dataviz` (`scripts/validate_palette.js`) contra a superfície real
+  do app — ΔE CVD adjacente ≥8.4, normal-vision ≥19.3 em ambos os modos.
+  Categoria recebe cor por índice do `id` em ordem crescente entre **todos**
+  os grupos do catálogo (`GET /category-groups`, não escopado ao período)
+  — identidade estável, nunca por ranking do período (a mesma categoria
+  não muda de cor mês a mês). Acima de 8 grupos (catálogo real do CEO tem
+  mais, herdado do import do legado), o índice faz módulo 8 — grupos
+  extras **compartilham** cor com um grupo anterior, aceito conscientemente
+  em vez de um "Outros" cinza (risco documentado no PRD-009/roadmap). Tipo
+  deriva um tint `color-mix(in oklch, <cor-do-grupo> <85|65|45|25>%,
+  var(--surface))` — mistura com o token de superfície do próprio tema,
+  então adapta claro/escuro automaticamente sem duplicar valores.
+- **Ícone de meio de pagamento move pra dentro da célula Valor** (antes
+  coluna própria à esquerda da tabela) — `.valor-cell` (flex, ícone +
+  valor). Coluna % também vira `SortableHeader`.
+- **Tooltip e eixo X:** `CardSparkline` (sparkline dos cards) ganha
+  `<Tooltip>` — não tinha nenhum antes, só o `TrendChart` (drill-downs)
+  tinha. `TrendChart` troca `interval="preserveStartEnd"` por um
+  `tickFormatter` que só rotula os meses de início de trimestre (jan/abr/
+  jul/out, `mes % 3 === 1`) — o ponto de dado continua mensal, só o rótulo
+  do eixo fica mais enxuto; a legenda no tooltip mantém o mês exato.
+- **Saldo de cartão de crédito — investigação de payload real:** inspeção
+  do JSON bruto de `GET /accounts` (Pluggy, via `PluggyClient` chamado
+  direto no container da API) para o cartão real do CEO confirmou
+  `balance` = `creditData.disaggregatedCreditLimits[].usedAmount` (dívida
+  total), **não** o limite — reafirma o achado da Sprint 5, que já estava
+  correto (a leitura do CEO de que a tela mostrava "limite" não batia com
+  o payload). O card "Saldo" passa a mostrar, para cartão de crédito, a
+  soma dos débitos da conta numa janela auto-contida
+  `(fatura_vencimento - 1 mês, fatura_vencimento]` — aproximação da
+  fatura atual não paga, já que a Pluggy retornou `balanceCloseDate: null`
+  no payload real e o client atual não chama nenhum endpoint de bill/
+  invoice — com o limite de crédito (`creditData.creditLimit`) entre
+  parênteses. Sem `fatura_vencimento` conhecido (conector não trouxe
+  `creditData`), cai de volta pro saldo bruto (comportamento anterior).
+  **Migration `0010`:** `limite_credito`/`fatura_vencimento` novos em
+  `pluggy_accounts`, persistidos em `_upsert_account` a partir de
+  `creditData.creditLimit`/`creditData.balanceDueDate` — campos que já
+  chegavam no payload do sync e eram descartados. `_calcula_patrimonio`
+  (cálculo de patrimônio) **não muda** — continua usando o `saldo` bruto
+  da conta, comportamento validado desde a Sprint 5; só a exibição no
+  card "Saldo" passa a usar a fatura calculada.
+- **QA visual (`scripts/browser-check/check-sprint9.mjs`):** script da
+  entrega inicial testava o funil de nível único; atualizado pra expandir
+  Categoria e depois Tipo antes de chegar na tabela, e passou a validar o
+  ícone dentro de `.valor-cell`, a coluna % ordenável e o limite de
+  crédito (`.amt-detail`) no card do cartão. Confirmado contra dado real
+  da VM de dev sem erros de console, incluindo o resync do item Pluggy
+  real do CEO pra popular `limite_credito`/`fatura_vencimento` antes da
+  validação. `check-sanfona.mjs` (Sprint 6) segue removido — testava
+  exatamente o nível "meio de pagamento" que esta sprint eliminou (não o
+  agrupamento Categoria/Tipo, que é um nível diferente).
 - **Nenhuma tabela nova.** `liabilities` (Sprint 2) e `pluggy_transactions`
-  (Sprint 3+) reaproveitados; só a migration `0009` acima.
+  (Sprint 3+) reaproveitados; migrations `0009` (liability) e `0010`
+  (creditData) acima.
 
 ## Qualidade (Sprint 1 → Sprint 9)
 
-- **Testes backend:** 271 testes, 98% cobertura total. Auth (Sprint 1), dados mestres (Sprint 2, 97%), Pluggy (Sprint 3, 98%), categorização (Sprint 4, paginação/filtro ano-mes pós-Sprint 6) — ver histórico nos relatórios de sprint. Dashboards (Sprint 5+6, 100% em `app/dashboards/`): período vazio, período só com "Transferência interna" (totais zerados), misto débito/crédito, sinal do saldo de `cartao_credito` na fórmula de patrimônio, ativos/passivos inativos excluídos, borda de mês (`data_competencia` no limite entre meses), soma de `/por-categoria` batendo com `/summary`, isolamento entre usuários; tendência terminando no mês filtrado (não no calendário), mês sem transação aparecendo zerado, tendência por categoria com bucket "Não categorizado", percentual somando 100% (menos arredondamento) e retornando `0` com denominador zero. Categorização/Pluggy (Sprint 7, 99%): filtro status/tipo em todas as combinações, bulk-confirm parcial (linha inválida não bloqueia as demais), `set_category` em transação já confirmada, propagação de descrição (match normalizado + mesma categoria, isolamento por usuário, "primeira grava, segunda não sobrescreve"), `sync_item`/`sync_items` pulando conta com `sync_enabled=False`, `apelido` preservado em resync. Gestão de Ativos (Sprint 8, 100% em `app/assets/` e `app/dashboards/`): `get_por_ativo` filtrando por `tipo` (período vazio, ativo sem transação vinculada, isolamento), `get_tendencia_por_ativo` zero-preenchendo meses sem transação e isolado por `tipo`/usuário, filtro `asset_id`/`tipo` em `/pluggy/transactions` combinados com outros filtros, `delete_asset` desassociando transações vinculadas em vez de falhar. Ativos/Passivos no Dashboard (Sprint 9, 100% em `app/dashboards/`): `suggest_liability` (substring, isolamento, sem match), `set_transaction_liability` (sets/clears, 404 cross-user), `delete_liability` desassociando (crítico, mirror de `delete_asset`), `get_por_passivo`/`get_tendencia_por_passivo` (nunca soma crédito, zero-preenchida, isolamento), `get_saldo_por_conta` (apelido→nome, isolamento), `summary.ativos`/`summary.passivos` batendo com a mesma base de `patrimonio`, filtro `liability_id` combinado com outros filtros, `account_tipo` na resposta de `/pluggy/transactions`.
-- **Testes frontend:** 68 testes (Vitest + Testing Library) — renderização condicional, tratamento de 401, mock fetch, widget Pluggy Connect mockado. Dashboards (Sprint 5+6): cards a partir de dado mockado, refetch ao trocar filtro ano/mês, sparkline a partir de tendência mockada, refetch ao trocar seletor de período histórico, sanfona expandindo múltiplos níveis sem esconder os anteriores (e mantendo duas categorias expandidas ao mesmo tempo), percentual exibido em cada nível, estado vazio. Categorização (Sprint 7): filtro tipo/status disparando refetch, seleção em lote + "Aprovar marcadas" chamando bulk-confirm, edição de descrição + propagação chamando o endpoint certo, aceitar sugestão de descrição. Gestão de Contas (Sprint 7): apelido/sync_enabled salvos via PUT, diálogo de sincronização unificada pré-selecionado a partir de `sync_enabled` e confirmando com os `item_ids` corretos, fluxo de conexão via widget Pluggy Connect. Gestão de Ativos (Sprint 8): listar ativos/baixados, criar/editar/vender (idempotência refletindo o 400 do backend)/excluir, drill-down abrindo fora do card mostrando total+transações, toggle despesa/receita refazendo as chamadas com o `tipo` selecionado, sparkline no card quando há dado de tendência; `PeriodFilter` isolado disparando `onChange` ao trocar mês/ano. Ativos/Passivos no Dashboard (Sprint 9): cards Ativos (com toggle)/Passivos (sem toggle) abrindo o drill-down correto, card Saldo ignorando o filtro ano/mês, funil de categoria expandindo direto pra transações sem nível intermediário, ícone de meio de pagamento por linha, ordenação por coluna (clique no cabeçalho, alterna asc/desc), `CardSparkline`/`TrendChart`/`useTableSort` isolados; `AssetsPage.test.tsx` sem mudança de assertion pós-refactor.
+- **Testes backend:** 278 testes, 98% cobertura total. Auth (Sprint 1), dados mestres (Sprint 2, 97%), Pluggy (Sprint 3, 98%), categorização (Sprint 4, paginação/filtro ano-mes pós-Sprint 6) — ver histórico nos relatórios de sprint. Dashboards (Sprint 5+6, 100% em `app/dashboards/`): período vazio, período só com "Transferência interna" (totais zerados), misto débito/crédito, sinal do saldo de `cartao_credito` na fórmula de patrimônio, ativos/passivos inativos excluídos, borda de mês (`data_competencia` no limite entre meses), soma de `/por-categoria` batendo com `/summary`, isolamento entre usuários; tendência terminando no mês filtrado (não no calendário), mês sem transação aparecendo zerado, tendência por categoria com bucket "Não categorizado", percentual somando 100% (menos arredondamento) e retornando `0` com denominador zero. Categorização/Pluggy (Sprint 7, 99%): filtro status/tipo em todas as combinações, bulk-confirm parcial (linha inválida não bloqueia as demais), `set_category` em transação já confirmada, propagação de descrição (match normalizado + mesma categoria, isolamento por usuário, "primeira grava, segunda não sobrescreve"), `sync_item`/`sync_items` pulando conta com `sync_enabled=False`, `apelido` preservado em resync. Gestão de Ativos (Sprint 8, 100% em `app/assets/` e `app/dashboards/`): `get_por_ativo` filtrando por `tipo` (período vazio, ativo sem transação vinculada, isolamento), `get_tendencia_por_ativo` zero-preenchendo meses sem transação e isolado por `tipo`/usuário, filtro `asset_id`/`tipo` em `/pluggy/transactions` combinados com outros filtros, `delete_asset` desassociando transações vinculadas em vez de falhar. Ativos/Passivos no Dashboard (Sprint 9, 100% em `app/dashboards/`): `suggest_liability` (substring, isolamento, sem match), `set_transaction_liability` (sets/clears, 404 cross-user), `delete_liability` desassociando (crítico, mirror de `delete_asset`), `get_por_passivo`/`get_tendencia_por_passivo` (nunca soma crédito, zero-preenchida, isolamento), `get_saldo_por_conta` (apelido→nome, isolamento), `summary.ativos`/`summary.passivos` batendo com a mesma base de `patrimonio`, filtro `liability_id` combinado com outros filtros, `account_tipo` na resposta de `/pluggy/transactions`. Revisão pós-entrega: `_upsert_account` persistindo/deixando `None` os campos de `creditData`, `get_saldo_por_conta` de cartão somando a janela da fatura (limite, exclui fora da janela, nunca soma crédito, cai pro saldo bruto sem `fatura_vencimento`), `_subtract_month` (rollover de ano, clamp de dia).
+- **Testes frontend:** 77 testes (Vitest + Testing Library) — renderização condicional, tratamento de 401, mock fetch, widget Pluggy Connect mockado. Dashboards (Sprint 5+6): cards a partir de dado mockado, refetch ao trocar filtro ano/mês, sparkline a partir de tendência mockada, refetch ao trocar seletor de período histórico, sanfona expandindo múltiplos níveis sem esconder os anteriores (e mantendo duas categorias expandidas ao mesmo tempo), percentual exibido em cada nível, estado vazio. Categorização (Sprint 7): filtro tipo/status disparando refetch, seleção em lote + "Aprovar marcadas" chamando bulk-confirm, edição de descrição + propagação chamando o endpoint certo, aceitar sugestão de descrição. Gestão de Contas (Sprint 7): apelido/sync_enabled salvos via PUT, diálogo de sincronização unificada pré-selecionado a partir de `sync_enabled` e confirmando com os `item_ids` corretos, fluxo de conexão via widget Pluggy Connect. Gestão de Ativos (Sprint 8): listar ativos/baixados, criar/editar/vender (idempotência refletindo o 400 do backend)/excluir, drill-down abrindo fora do card mostrando total+transações, toggle despesa/receita refazendo as chamadas com o `tipo` selecionado, sparkline no card quando há dado de tendência; `PeriodFilter` isolado disparando `onChange` ao trocar mês/ano. Ativos/Passivos no Dashboard (Sprint 9): cards Ativos (com toggle)/Passivos (sem toggle) abrindo o drill-down correto, card Saldo ignorando o filtro ano/mês, ícone de meio de pagamento por linha, ordenação por coluna (clique no cabeçalho, alterna asc/desc), `CardSparkline`/`TrendChart`/`useTableSort` isolados; `AssetsPage.test.tsx` sem mudança de assertion pós-refactor. Revisão pós-entrega: funil Categoria>Tipo>Transação (sanfona nos dois níveis, percentual em cada nível contra o total do nível acima), ícone dentro da célula Valor, coluna % ordenável, limite de crédito entre parênteses no card do cartão, `categoryColors.test.ts` isolado (atribuição estável por id, wrap após 8 grupos, fallback neutro, tint por grupo).
 - **Lint:** ruff (Python), eslint (TypeScript) — suíte 100% verde
 - **Pre-commit:** ruff, eslint, detect-secrets (baseline) — executado local antes de push
 - **CI:** GitHub Actions — jobs `backend` (ruff check/format, pytest) e `frontend` (eslint, prettier, tsc, vitest) — roda em push/PR para `main`

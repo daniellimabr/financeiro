@@ -42,16 +42,24 @@ as tabelas de transação por coluna.
   - Clicar em "Saldo" abre drill-down de saldo por conta — sempre o
     snapshot atual, **ignora o filtro de período** (mesmo padrão conceitual
     do card "Patrimônio", rotulado "atual"; não há histórico de saldo no
-    schema). Novo `GET /dashboards/saldo-por-conta`, sem parâmetros.
+    schema). Novo `GET /dashboards/saldo-por-conta`, sem parâmetros. Conta
+    de cartão de crédito mostra a soma da fatura atual não paga, com o
+    limite de crédito entre parênteses — **revisado após a entrega
+    inicial** (ver nota abaixo).
   - Tooltip (hover) nos gráficos de tendência e sparkline.
-  - Eixo X reduzido/simplificado nos gráficos de tendência.
+  - Eixo X reduzido/simplificado nos gráficos de tendência — **revisado
+    após a entrega inicial**: rotula só os meses de início de trimestre.
   - Remoção do gráfico de barras redundante acima de cada lista do
     drill-down (mantém só a lista com barra de preenchimento).
-  - Remoção do nível "meio de pagamento" do funil — categoria expande
-    direto para a lista de transações; o meio de pagamento passa a
-    aparecer como um ícone por linha (SVG inline, sem biblioteca nova).
+  - Remoção do nível "meio de pagamento" do funil — o meio de pagamento
+    passa a aparecer como um ícone por linha (SVG inline, sem biblioteca
+    nova), ao lado do valor — **revisado após a entrega inicial**: em vez
+    de categoria expandir direto para a lista de transações, o funil
+    ganhou um nível de agrupamento — Categoria (grupo) > Tipo
+    (subcategoria) > Transação — com cores distintas por Categoria e por
+    Tipo (ver nota abaixo).
   - Ordenação por coluna (clique no cabeçalho) nas tabelas de transação do
-    Dashboard.
+    Dashboard, incluindo a coluna % — **revisado após a entrega inicial**.
   - Extração de `CardSparkline`/`TrendChart` compartilhados
     (`DashboardsPage`/`AssetsPage` duplicavam o primeiro; o segundo passa a
     ser necessário em 3+ lugares) — mesmo gatilho de duplicação que já
@@ -66,6 +74,31 @@ as tabelas de transação por coluna.
   - Qualquer biblioteca de ícones nova — decisão do CEO nesta sessão de
     planejamento (SVG inline, sem dependência nova de frontend).
   - Toggle despesa/receita no drill-down de Passivos — só despesa.
+  - Endpoint de fatura/bill da Pluggy — não usado pelo client atual; a
+    soma da fatura atual (revisão pós-entrega) é aproximada a partir das
+    próprias `pluggy_transactions`, não de um dado de fatura importado.
+
+> **Nota de revisão (2026-08-15, mesma sessão de execução):** o CEO deu
+> feedback ao ver o resultado real da entrega inicial, antes de aprovar a
+> sprint. Mudanças: (1) o funil de Despesa/Receita ganhou o nível
+> Categoria > Tipo (em vez de expandir direto pra transação) — calculado
+> no frontend a partir do `GET /dashboards/por-categoria` já existente,
+> sem endpoint novo; (2) Categoria e Tipo ganharam cores distintas (paleta
+> categórica validada via skill `dataviz`), corrigindo o funil que usava
+> uma única cor despesa/receita para todas as linhas; (3) o ícone de meio
+> de pagamento passou a ficar dentro da célula Valor, não numa coluna
+> própria; (4) a coluna % das tabelas de transação também ficou ordenável;
+> (5) `CardSparkline` ganhou tooltip e o eixo X do `TrendChart` passou a
+> rotular só trimestres; (6) investigação do payload real da Pluggy
+> (`creditData`) confirmou que `balance` já representa a dívida do cartão
+> (achado da Sprint 5, correto — não o limite, como o CEO havia
+> percebido), mas o card "Saldo" passou a mostrar a soma dos itens da
+> fatura atual não paga (aproximada por uma janela mensal ancorada no
+> vencimento, já que a Pluggy não expõe fechamento de fatura nem endpoint
+> de bill) com o limite de crédito entre parênteses (migration `0010`,
+> novo `limite_credito`/`fatura_vencimento` em `pluggy_accounts`). Os
+> itens marcados acima foram implementados já revisados; Critérios de
+> aceite e Regras de negócio abaixo refletem o escopo final.
 
 ## Critérios de aceite
 
@@ -95,20 +128,26 @@ as tabelas de transação por coluna.
    `liability_id`/`liability_sugerido_id`, então o passivo é excluído e as
    transações são desassociadas (`NULL`), nunca excluídas — mesmo
    comportamento de `delete_asset` (Sprint 8).
-8. Dado o funil de Dashboards aberto numa categoria, então expande direto
-   para a lista de transações (sem nível "meio de pagamento"
-   intermediário); cada linha mostra um ícone do meio de pagamento.
+8. Dado o funil de Despesa/Receita aberto, então expande em dois níveis —
+   Categoria (grupo) e, dentro dela, Tipo (subcategoria) — antes de chegar
+   na lista de transações (sem nível "meio de pagamento" intermediário);
+   cada linha de transação mostra um ícone do meio de pagamento ao lado do
+   valor; Categoria e Tipo têm cores visualmente distintas entre si.
 9. Dado uma tabela de transações no Dashboard, quando o usuário clica num
-   cabeçalho de coluna, então a tabela reordena por aquela coluna
-   (asc/desc alternando a cada clique).
+   cabeçalho de coluna (incluindo a coluna %), então a tabela reordena por
+   aquela coluna (asc/desc alternando a cada clique).
 10. Dado qualquer gráfico de tendência/sparkline, quando o usuário passa o
-    mouse sobre um ponto, então um tooltip mostra o valor exato.
-11. Dado dois usuários diferentes, quando cada um consulta os endpoints
+    mouse sobre um ponto, então um tooltip mostra o valor exato; o eixo X
+    do gráfico de tendência rotula só os meses de início de trimestre.
+11. Dado o card "Saldo" com uma conta de cartão de crédito, então mostra a
+    soma dos itens não pagos da fatura atual (não o saldo bruto da conta)
+    com o limite de crédito entre parênteses.
+12. Dado dois usuários diferentes, quando cada um consulta os endpoints
     novos (`por-passivo`, `saldo-por-conta`, filtro `liability_id`), então
     nunca vê dado do outro usuário.
-12. Dado qualquer requisição às rotas novas sem cookie de sessão válido,
+13. Dado qualquer requisição às rotas novas sem cookie de sessão válido,
     então recebo 401.
-13. Dado o CI, quando a suíte roda, então os testes novos (backend +
+14. Dado o CI, quando a suíte roda, então os testes novos (backend +
     frontend) passam com cobertura ≥80% nos módulos tocados.
 
 ## Regras de negócio
@@ -117,18 +156,30 @@ as tabelas de transação por coluna.
   `tipo`** — sempre despesa (`tipo=debito` interno, nunca configurável),
   diferente de `/por-ativo` que aceita o toggle desde a Sprint 8.
 - `GET /dashboards/saldo-por-conta` não aceita `ano`/`mes` — é sempre
-  snapshot atual (`PluggyAccount.saldo`), mesmo padrão conceitual do
-  campo `patrimonio` em `/dashboards/summary` (rotulado "atual" na UI).
+  snapshot atual, mesmo padrão conceitual do campo `patrimonio` em
+  `/dashboards/summary` (rotulado "atual" na UI). Para conta corrente/
+  poupança/investimento, o valor é `PluggyAccount.saldo`; para cartão de
+  crédito com `fatura_vencimento` conhecido, é a soma dos débitos da
+  conta na janela `(fatura_vencimento - 1 mês, fatura_vencimento]`
+  (aproximação da fatura atual não paga — a Pluggy não expõe fechamento
+  de fatura nem endpoint de bill separado); sem `fatura_vencimento`
+  (conector não trouxe `creditData`), cai de volta pro saldo bruto.
 - `ativos`/`passivos` em `/dashboards/summary` usam o mesmo filtro
   `status=ativo` que `_calcula_patrimonio` já usa internamente — não uma
   soma de todos os itens (incluindo baixados/quitados).
 - Excluir um passivo (`DELETE /liabilities/{id}`) nunca exclui transações
   — só desassocia (`liability_id`/`liability_sugerido_id` voltam a
   `NULL`), mesma regra de `delete_asset`.
-- Percentual no nível "linha de extrato" (após a remoção do nível meio de
-  pagamento) passa a ser calculado contra o total da **categoria**, não
-  mais contra o total do meio de pagamento (que deixou de ser um nível do
-  funil).
+- Percentual em cada nível do funil de Despesa/Receita é sempre contra o
+  total do nível imediatamente acima: Categoria (grupo) contra o total
+  geral do tipo (débito/crédito) no período; Tipo (subcategoria) contra o
+  total da Categoria que o contém; linha de extrato contra o total do
+  Tipo. Nenhum nível usa mais o total do meio de pagamento (que deixou de
+  ser um nível do funil).
+- Cor de Categoria e Tipo é atribuída por **identidade** (id do grupo/
+  subcategoria em ordem estável), nunca por ranking do período — a mesma
+  categoria mantém a mesma cor independente do filtro ano/mês ou de
+  quantos itens aparecem naquele mês.
 - Ícone de meio de pagamento por linha é decorativo (SVG inline,
   `aria-hidden`), não substitui nenhuma informação textual já disponível.
 
@@ -138,6 +189,12 @@ as tabelas de transação por coluna.
   (FK `liabilities.id`, nullable), `liability_sugestao_confianca`
   (string, nullable) em `pluggy_transactions` — mesmo padrão simples das
   colunas de `asset_id` (migration `0006`), sem enum, sem índice novo.
+- Migration `0010` (reversível, revisão pós-entrega): `limite_credito`
+  (Numeric, nullable), `fatura_vencimento` (Date, nullable) em
+  `pluggy_accounts` — lidos de `creditData.creditLimit`/
+  `creditData.balanceDueDate` no payload da Pluggy (já chegava no sync,
+  antes descartado); `NULL` para conta que não é cartão de crédito ou cujo
+  conector não retornou `creditData`.
 - Nenhuma tabela nova. `assets`/`liabilities` (Sprint 2) e
   `pluggy_accounts`/`pluggy_transactions` (Sprint 3+) são reaproveitados.
 

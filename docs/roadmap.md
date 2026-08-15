@@ -191,14 +191,36 @@ abre drilldown de despesas por passivo (novo `/dashboards/por-passivo`,
 sem toggle receita); clicar em "Saldo" abre drilldown de saldo por conta
 **sempre no snapshot atual, ignora o filtro de período** (mesmo padrão
 conceitual do card Patrimônio; sem histórico de saldo no schema, mesma
-limitação já documentada nas Sprints 5/6); tooltip no hover dos gráficos
-de tendência; eixo X reduzido; remoção do gráfico de barras redundante
-acima de cada lista; remoção do nível "meio de pagamento" do funil —
-categoria expande direto pra lista de transações, meio de pagamento vira
-ícone SVG inline por linha (reverte uma decisão até então tratada como
-fechada em PRD-005/006, decisão explícita do CEO na sessão de
-planejamento); ordenação por coluna (clique no cabeçalho) nas tabelas de
-transação do Dashboard.
+limitação já documentada nas Sprints 5/6); remoção do gráfico de barras
+redundante acima de cada lista; remoção do nível "meio de pagamento" do
+funil — meio de pagamento vira ícone SVG inline por linha, ao lado do
+valor (reverte uma decisão até então tratada como fechada em
+PRD-005/006, decisão explícita do CEO na sessão de planejamento);
+ordenação por coluna (clique no cabeçalho, incluindo a coluna %) nas
+tabelas de transação do Dashboard.
+
+**Revisão pós-entrega (mesma sessão, feedback do CEO ao ver o resultado
+real):** o funil de Despesa/Receita ganhou um nível de agrupamento que
+não estava no plano original — Categoria (`CategoryGroup`) > Tipo
+(`Subcategory`) > Transação, em vez de expandir direto de categoria pra
+transação. Calculado inteiramente no frontend a partir do mesmo `GET
+/dashboards/por-categoria` (sem endpoint novo) — soma por grupo é só
+agregar os `subcategory_id` que compartilham `group_id`. Categoria e Tipo
+ganharam cores distintas (paleta categórica de 8 matizes, validada via
+skill `dataviz` contra a superfície real do app; Tipo deriva um tint
+`color-mix()` da cor do grupo pai) — antes todas as linhas usavam a mesma
+cor despesa/receita. Tooltip nos gráficos de tendência/sparkline
+(`CardSparkline` ganhou um também) e eixo X do `TrendChart` passou a
+rotular só os meses de início de trimestre (o ponto de dado continua
+mensal). Saldo de cartão de crédito: investigação do payload real da
+Pluggy confirmou que `balance` já representa a dívida (achado da Sprint
+5, correto — a leitura inicial do CEO de que mostrava "limite" não batia
+com o payload), mas o card "Saldo" passou a mostrar a soma dos itens não
+pagos da fatura atual (janela auto-contida entre o vencimento anterior e
+o próximo — a Pluggy não expõe fechamento de fatura nem endpoint de
+bill) com o limite de crédito entre parênteses (migration `0010`:
+`limite_credito`/`fatura_vencimento` em `pluggy_accounts`, lidos do
+`creditData` do payload, antes descartado).
 
 **Schema:** `liability_id`/`liability_sugerido_id`/
 `liability_sugestao_confianca` novos em `pluggy_transactions` (migration
@@ -220,12 +242,16 @@ Pydantic v2 `from_attributes` trata como atributo comum), com eager-load
 (`joinedload`) em `list_transactions` pra evitar N+1 — toda linha do
 funil passou a acessar `tx.account`.
 
-231 testes backend novos nesta sprint (271 no total, 98% cobertura) + 13
-testes frontend novos (68 no total). QA visual real
-(`scripts/browser-check/check-sprint9.mjs`, novo) contra dado real da VM
-de dev confirmou os 3 drilldowns novos, ícone por linha e ordenação sem
-erros de console; `check-sanfona.mjs` (Sprint 6) removido — testava
-exatamente o nível "meio de pagamento" que esta sprint eliminou.
+239 testes backend novos nesta sprint, incluindo a revisão (278 no total,
+98% cobertura) + 22 testes frontend novos (77 no total, incluindo
+`categoryColors.test.ts` novo). QA visual real
+(`scripts/browser-check/check-sprint9.mjs`, novo, atualizado depois pra
+cobrir os 3 níveis da revisão) contra dado real da VM de dev confirmou os
+3 drilldowns novos, o funil Categoria>Tipo>Transação com cores distintas,
+ícone ao lado do valor, ordenação (incl. %) e o limite de crédito entre
+parênteses no card do cartão, tudo sem erros de console;
+`check-sanfona.mjs` (Sprint 6) removido — testava exatamente o nível
+"meio de pagamento" que esta sprint eliminou.
 
 PRD: [PRD-009-dashboards-ativos-passivos.md](prd/PRD-009-dashboards-ativos-passivos.md).
 Plano: [SPRINT-009-dashboards-ativos-passivos-plan.md](sprints/SPRINT-009-dashboards-ativos-passivos-plan.md).

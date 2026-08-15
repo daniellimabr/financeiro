@@ -76,7 +76,7 @@ Financeiro v3/
 │   │   │   ├── category.py         # CategoryGroup (+excluir_de_totais na Sprint 5), Subcategory, enum Natureza, SEM_CATEGORIA_ID (Sprint 2)
 │   │   │   ├── asset.py            # Asset, enums AssetTipo/AssetStatus (Sprint 2)
 │   │   │   ├── liability.py        # Liability, enums LiabilityTipo/LiabilityStatus (Sprint 2)
-│   │   │   ├── pluggy.py           # PluggyItem/Account/Transaction + enums (Sprint 3; +9 colunas de categorização/ativo na Sprint 4; +apelido/sync_enabled em Account, +descricao_usuario/sugerida/origem_id em Transaction na Sprint 7; +liability_id/liability_sugerido_id/liability_sugestao_confianca, +@property account_tipo na Sprint 9)
+│   │   │   ├── pluggy.py           # PluggyItem/Account/Transaction + enums (Sprint 3; +9 colunas de categorização/ativo na Sprint 4; +apelido/sync_enabled em Account, +descricao_usuario/sugerida/origem_id em Transaction na Sprint 7; +liability_id/liability_sugerido_id/liability_sugestao_confianca, +@property account_tipo na Sprint 9; +limite_credito/fatura_vencimento em Account na revisão pós-entrega da Sprint 9)
 │   │   │   └── categorization.py   # CategorizationRule — memória de mapeamento padrão→subcategoria (Sprint 4)
 │   │   ├── schemas/
 │   │   │   ├── user.py
@@ -85,7 +85,7 @@ Financeiro v3/
 │   │   │   ├── liability.py        # LiabilityIn/Out (Sprint 2)
 │   │   │   ├── pluggy.py           # ConnectToken*, PluggyItem/Account/TransactionOut (Sprint 3); PluggyAccountUpdateIn, SyncItemsIn/Out (Sprint 7); PluggyTransactionOut +account_tipo (Sprint 9)
 │   │   │   ├── categorization.py   # TransactionOut/TransactionsPageOut, CategoryIn, AssetAssociationIn, BulkConfirmIn/Out, DescriptionUpdateIn/Out (Sprint 4, renomeado/estendido na Sprint 7); +liability_id/liability_sugerido_id/liability_sugestao_confianca, LiabilityAssociationIn (Sprint 9)
-│   │   │   └── dashboards.py       # SummaryOut, CategoriaTotalOut/MeioPagamentoTotalOut+percentual (Sprint 5), TendenciaMesOut/TendenciaCategoriaOut (Sprint 6); AtivoTotalOut/TendenciaAtivoOut (Sprint 8); SummaryOut +ativos/passivos, PassivoTotalOut/TendenciaPassivoOut/SaldoContaOut (Sprint 9)
+│   │   │   └── dashboards.py       # SummaryOut, CategoriaTotalOut/MeioPagamentoTotalOut+percentual (Sprint 5), TendenciaMesOut/TendenciaCategoriaOut (Sprint 6); AtivoTotalOut/TendenciaAtivoOut (Sprint 8); SummaryOut +ativos/passivos, PassivoTotalOut/TendenciaPassivoOut/SaldoContaOut (Sprint 9); SaldoContaOut +limite_credito (revisão pós-entrega da Sprint 9)
 │   │   ├── auth/
 │   │   │   ├── jwt.py              # geração/validação JWT via PyJWT
 │   │   │   ├── google.py           # integração Authlib com Google OAuth
@@ -103,7 +103,7 @@ Financeiro v3/
 │   │   │   └── router.py
 │   │   ├── pluggy_integration/     # integração Pluggy — connect token, sync manual (Sprint 3)
 │   │   │   ├── client.py           # PluggyClient — auth por API key cacheada, get_item/accounts/transactions
-│   │   │   ├── service.py          # register_item, sync_item, list_items/accounts/transactions; update_account, sync_items (Sprint 7); filtro liability_id, joinedload(account) em list_transactions p/ account_tipo sem N+1 (Sprint 9)
+│   │   │   ├── service.py          # register_item, sync_item, list_items/accounts/transactions; update_account, sync_items (Sprint 7); filtro liability_id, joinedload(account) em list_transactions p/ account_tipo sem N+1 (Sprint 9); _upsert_account persiste limite_credito/fatura_vencimento de creditData (revisão pós-entrega da Sprint 9)
 │   │   │   └── router.py           # rotas /pluggy/*; PUT /pluggy/accounts/{id}, POST /pluggy/sync (Sprint 7); filtro liability_id (Sprint 9)
 │   │   ├── categorization/         # motor de categorização por regras+memória, sem LLM (Sprint 4)
 │   │   │   ├── normalize.py        # normalize_description — NFKD/ASCII/minúsculas, prefixo de canal, números isolados
@@ -111,7 +111,7 @@ Financeiro v3/
 │   │   │   ├── service.py          # list_transactions (status/tipo/ano/mes/paginado, renomeado de list_pending_transactions na Sprint 7), set_category, bulk_confirm, set_transaction_asset, update_description/confirm_description_suggestion/dismiss_description_suggestion (Sprint 7); set_transaction_liability, sugestão de passivo em _apply_suggestions (Sprint 9)
 │   │   │   └── router.py           # rotas /categorization/transactions/* (renomeadas de /pending/* na Sprint 7); PUT .../liability (Sprint 9)
 │   │   └── dashboards/             # agregação para dashboards — sem LLM, sem cache (Sprint 5)
-│   │       ├── service.py          # get_summary, get_por_categoria/get_por_meio_pagamento (+percentual), get_tendencia/get_tendencia_por_categoria (Sprint 6); get_por_ativo/get_tendencia_por_ativo (Sprint 8); _calcula_patrimonio refatorado com helper _ativos_e_passivos (reuso), get_summary +ativos/passivos, get_por_passivo/get_tendencia_por_passivo (mirror de ativo, sempre débito), get_saldo_por_conta (snapshot atual, sem período) (Sprint 9)
+│   │       ├── service.py          # get_summary, get_por_categoria/get_por_meio_pagamento (+percentual), get_tendencia/get_tendencia_por_categoria (Sprint 6); get_por_ativo/get_tendencia_por_ativo (Sprint 8); _calcula_patrimonio refatorado com helper _ativos_e_passivos (reuso), get_summary +ativos/passivos, get_por_passivo/get_tendencia_por_passivo (mirror de ativo, sempre débito), get_saldo_por_conta (snapshot atual, sem período) (Sprint 9); get_saldo_por_conta de cartão de crédito passa a somar a fatura atual (_fatura_atual/_subtract_month, janela vencimento anterior→próximo) em vez do saldo bruto (revisão pós-entrega da Sprint 9)
 │   │       └── router.py           # rotas /dashboards/* (+tendencia, por-categoria/tendencia na Sprint 6; +por-ativo/tendencia na Sprint 8; +por-passivo/tendencia, saldo-por-conta na Sprint 9)
 │   ├── scripts/
 │   │   ├── import_legacy_categories.py  # import CSV grupo,subcategoria — upsert, loga conflito (Sprint 2)
@@ -133,14 +133,14 @@ Financeiro v3/
 │   │   ├── test_liability_endpoints.py  # CRUD, isolamento user_id, settle (Sprint 2)
 │   │   ├── test_import_legacy_categories.py  # merge de duplicata, log de conflito (Sprint 2)
 │   │   ├── test_pluggy_client.py        # cache/refetch de API key, paginação, erro propagado (Sprint 3)
-│   │   ├── test_pluggy_service.py       # upsert idempotente, cutoff_date, status não-sincronizável (Sprint 3); apelido preservado em resync, sync_enabled pulando conta, update_account/sync_items (Sprint 7)
+│   │   ├── test_pluggy_service.py       # upsert idempotente, cutoff_date, status não-sincronizável (Sprint 3); apelido preservado em resync, sync_enabled pulando conta, update_account/sync_items (Sprint 7); creditData persistido/ausente (revisão pós-entrega da Sprint 9)
 │   │   ├── test_pluggy_endpoints.py     # 401/404/400, isolamento user_id (Sprint 3); PUT /accounts/{id}, POST /sync (Sprint 7); filtro asset_id (Sprint 8); filtro liability_id, account_tipo na resposta (Sprint 9)
 │   │   ├── test_categorization_normalize.py    # acentos, prefixos de canal, token numérico vs. alfanumérico (Sprint 4)
 │   │   ├── test_categorization_engine.py       # precedência de camadas, fronteira 0.86, isolamento por usuário (Sprint 4); suggest_liability — substring, isolamento, sem match (Sprint 9)
 │   │   ├── test_categorization_service.py      # invariante "nunca auto-confirma", reedição, 404 cross-user (Sprint 4); paginação, filtro ano/mes (pós-Sprint 6); filtro status/tipo, bulk_confirm parcial, propagação de descrição (Sprint 7); set_transaction_liability — sets/clears, 404 cross-user (Sprint 9)
 │   │   ├── test_categorization_endpoints.py    # 401, isolamento, confirmar/editar via API (Sprint 4); paginação, filtro ano/mes (pós-Sprint 6); rotas /transactions/*, bulk-confirm, descrição (Sprint 7); PUT .../liability (Sprint 9)
 │   │   ├── test_import_legacy_categorization_rules.py  # conflito, idempotência, categoria não resolvida, abort sem usuário (Sprint 4)
-│   │   ├── test_dashboards_service.py   # período vazio, só-transferência, misto, sinal do cartão, borda de mês (Sprint 5); tendência terminando no mês filtrado, percentual somando 100%/denominador zero (Sprint 6); get_por_ativo/get_tendencia_por_ativo (Sprint 8); summary ativos/passivos batendo com patrimonio, get_por_passivo/get_tendencia_por_passivo (nunca soma crédito), get_saldo_por_conta (apelido→nome, isolamento) (Sprint 9)
+│   │   ├── test_dashboards_service.py   # período vazio, só-transferência, misto, sinal do cartão, borda de mês (Sprint 5); tendência terminando no mês filtrado, percentual somando 100%/denominador zero (Sprint 6); get_por_ativo/get_tendencia_por_ativo (Sprint 8); summary ativos/passivos batendo com patrimonio, get_por_passivo/get_tendencia_por_passivo (nunca soma crédito), get_saldo_por_conta (apelido→nome, isolamento) (Sprint 9); get_saldo_por_conta de cartão somando a fatura da janela/caindo pro saldo bruto sem fatura_vencimento, _subtract_month (rollover de ano, overflow de dia) (revisão pós-entrega da Sprint 9)
 │   │   ├── test_dashboards_endpoints.py # 401, isolamento entre usuários nos 5 endpoints (Sprint 5+6); por-ativo/tendencia (Sprint 8); por-passivo/tendencia, saldo-por-conta (Sprint 9)
 │   │   └── fixtures/
 │   │       ├── legacy_categories_sample.csv           # fixture pequena p/ teste de import (Sprint 2)
@@ -155,7 +155,8 @@ Financeiro v3/
 │           ├── 0006_add_categorization_and_asset_fields_to_pluggy_transactions.py  # 9 colunas novas (Sprint 4)
 │           ├── 0007_dashboards_transferencia_flag_e_competencia.py  # excluir_de_totais + backfill data_competencia + índice (Sprint 5)
 │           ├── 0008_categorizacao_gestao_contas.py  # apelido/sync_enabled em pluggy_accounts, descricao_usuario/sugerida/origem_id em pluggy_transactions, seed subcategoria Aluguel (Sprint 7)
-│           └── 0009_add_liability_fields_to_pluggy_transactions.py  # liability_id/liability_sugerido_id/liability_sugestao_confianca em pluggy_transactions, mirror de asset_id (Sprint 9)
+│           ├── 0009_add_liability_fields_to_pluggy_transactions.py  # liability_id/liability_sugerido_id/liability_sugestao_confianca em pluggy_transactions, mirror de asset_id (Sprint 9)
+│           └── 0010_add_credit_data_to_pluggy_accounts.py  # limite_credito/fatura_vencimento em pluggy_accounts, lidos de creditData (Sprint 9, revisão pós-entrega)
 ├── frontend/                       # React 19 + Vite + TypeScript (Sprint 1)
 │   ├── package.json                # dependências frontend (React, TanStack Query, ESLint, Prettier, Vitest)
 │   ├── tsconfig.json
@@ -167,7 +168,8 @@ Financeiro v3/
 │   │   ├── App.tsx                 # componente raiz (renderização condicional login/protected/loading)
 │   │   ├── main.tsx
 │   │   ├── utils/
-│   │   │   └── format.ts           # formatCurrency, extraído de DashboardsPage.tsx (Sprint 7)
+│   │   │   ├── format.ts           # formatCurrency, extraído de DashboardsPage.tsx (Sprint 7)
+│   │   │   └── categoryColors.ts   # paleta categórica p/ Categoria (grupo) e Tipo (subcategoria) no funil — atribuição por id estável, nunca por ranking; Tipo deriva um color-mix() do grupo pai (Sprint 9, revisão pós-entrega)
 │   │   ├── api/
 │   │   │   ├── client.ts           # fetch wrapper com credentials:"include"
 │   │   │   ├── auth.ts             # chamadas /auth/me
@@ -180,8 +182,8 @@ Financeiro v3/
 │   │   │   └── loadPluggyConnect.ts  # injeta o script do widget Pluggy Connect sob demanda (Sprint 3)
 │   │   ├── components/
 │   │   │   ├── PeriodFilter.tsx      # seletor ano/mês reutilizável (Sprint 8, extraído de DashboardsPage/CategorizationReviewPage)
-│   │   │   ├── CardSparkline.tsx     # sparkline de card (Sprint 9, extraído de DashboardsPage/AssetsPage — duplicavam)
-│   │   │   ├── TrendChart.tsx        # gráfico de tendência com tooltip + eixo X reduzido (Sprint 9, extraído de AssetTrendChart em AssetsPage)
+│   │   │   ├── CardSparkline.tsx     # sparkline de card (Sprint 9, extraído de DashboardsPage/AssetsPage — duplicavam); ganha tooltip (revisão pós-entrega)
+│   │   │   ├── TrendChart.tsx        # gráfico de tendência com tooltip + eixo X reduzido (Sprint 9, extraído de AssetTrendChart em AssetsPage); eixo X rotulado só nos meses de início de trimestre (revisão pós-entrega)
 │   │   │   └── AccountTipoIcon.tsx   # ícone SVG inline por tipo de conta, decorativo (Sprint 9, substitui o nível "meio de pagamento" do funil)
 │   │   ├── hooks/
 │   │   │   ├── useCurrentUser.ts   # TanStack Query hook para sessão do usuário
@@ -219,7 +221,7 @@ Financeiro v3/
 │   │   └── pages/
 │   │       ├── LoginPage.tsx       # botão "Entrar com Google" (link para /auth/google/login)
 │   │       ├── ProtectedPage.tsx   # nome/e-mail do usuário + abas Início/Dashboards/Categorizar/Gestão de contas/Ativos (Sprint 5; aba Transações removida e Conectar conta renomeada na Sprint 7; aba Ativos na Sprint 8)
-│   │       ├── DashboardsPage.tsx  # filtro ano/mês, cards com sparkline, funil de drill-down em sanfona + Recharts (Sprint 5, sanfona/tendência/percentual na Sprint 6); cards Ativos/Passivos/Saldo clicáveis, funil de categoria expande direto pra transações (nível "meio de pagamento" removido, vira AccountTipoIcon por linha), tabelas ordenáveis por coluna (Sprint 9)
+│   │       ├── DashboardsPage.tsx  # filtro ano/mês, cards com sparkline, funil de drill-down em sanfona + Recharts (Sprint 5, sanfona/tendência/percentual na Sprint 6); cards Ativos/Passivos/Saldo clicáveis, funil de categoria expande direto pra transações (nível "meio de pagamento" removido, vira AccountTipoIcon por linha), tabelas ordenáveis por coluna (Sprint 9); funil de Despesa/Receita ganha um nível — Categoria (`GrupoAccordion`) > Tipo (`SubcategoriaAccordion`) > Transação — com cores via `categoryColors.ts`, ícone dentro da célula Valor, coluna % ordenável (revisão pós-entrega da Sprint 9)
 │   │       ├── AccountManagementPage.tsx  # Gestão de Contas — lista contas conectadas, apelido/sync_enabled editáveis, diálogo "Sincronizar MeuPluggy" com pré-seleção (Sprint 7, renomeado de ConnectAccountPage.tsx)
 │   │       ├── CategorizationReviewPage.tsx  # listagem única de transações (substitui TransactionsPage) — filtro tipo/status, lote, categoria editável em confirmada, descrição inline + propagação (Sprint 4; paginação pós-Sprint 6; rework completo na Sprint 7)
 │   │       └── AssetsPage.tsx      # Gestão de Ativos — grid de cards ativos/baixados, CRUD (criar/editar/vender/deletar), toggle despesa/receita, sparkline por card, drill-down (painel fora do card, gráfico de histórico + transações) por ativo, filtro período (Sprint 8; refatorada na Sprint 9 pra reaproveitar CardSparkline/TrendChart compartilhados, sem mudança de comportamento)
@@ -236,7 +238,7 @@ Financeiro v3/
 │       ├── check-categorizacao.mjs # filtro + paginação + tempo real do fluxo de confirmar (pós-Sprint 6)
 │       ├── check-sprint7.mjs       # filtro tipo/status, seleção em lote, descrição editável, Gestão de Contas — apelido, diálogo de sync (Sprint 7; achou bug real de overflow desktop)
 │       ├── check-ativos.mjs        # grid de cards, criar ativo, drill-down fora do card, toggle despesa/receita, desktop+mobile screenshots (Sprint 8)
-│       └── check-sprint9.mjs       # cards Ativos (toggle)/Passivos (sem toggle)/Saldo, funil de categoria direto pra transações com ícone por linha + ordenação, só leitura (Sprint 9; substitui check-sanfona.mjs, removido — testava o nível "meio de pagamento" eliminado)
+│       └── check-sprint9.mjs       # cards Ativos (toggle)/Passivos (sem toggle)/Saldo (limite entre parênteses), funil Categoria>Tipo>Transação com ícone ao lado do valor + ordenação (incl. %), só leitura (Sprint 9; substitui check-sanfona.mjs, removido — testava o nível "meio de pagamento" eliminado; atualizado na revisão pós-entrega pro funil de 3 níveis)
 ├── .github/
 │   └── workflows/
 │       └── ci.yml                  # GitHub Actions: pytest+ruff (backend), vitest+eslint+tsc (frontend) (Sprint 1)
