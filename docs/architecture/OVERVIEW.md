@@ -571,9 +571,23 @@ na prática pós-Sprint 9 (não coberta por PRD anterior) — ver
   ver [ssh-workflow.md](../infra/ssh-workflow.md)), não é possível rodar
   o app completo fora da VM de dev. `scripts/browser-check/check-categorizacao.mjs`
   foi atualizado (abre o combobox, filtra por digitação, seleciona por
-  teclado, mede tempo de abertura, verifica o badge) e está pronto pra
-  rodar contra a fila real assim que houver token — ver relatório da
-  Sprint 11 para o plano de follow-up.
+  teclado, mede tempo de abertura, verifica o indicador de status) e
+  está pronto pra rodar contra a fila real assim que houver token — ver
+  relatório da Sprint 11 para o plano de follow-up.
+- **Revisão pós-implementação (mesmo dia, feedback do CEO antes da
+  aprovação do relatório):** badge de texto de status virou `StatusIcon`
+  (ícone SVG — relógio pendente / check confirmada, distinguidos por
+  forma e não só cor), coluna bem mais estreita; ordem das colunas da
+  tabela de Categorização mudou para Status/Data/Descrição/Categoria/
+  Ativo/Valor (Valor por último, alinhado à direita); `cat-review-table`
+  ganhou densidade maior (padding de célula reduzido) e larguras
+  dedicadas por coluna — mais espaço para Descrição/Categoria (texto
+  livre e "grupo / subcategoria" respectivamente), menos para
+  Status/Data/Ativo, que são curtos por natureza; `.dash-page`
+  (compartilhada por todas as 5 telas) passou de `max-width: 1440px`
+  para `1800px`, aumentando a ocupação de tela de forma padronizada em
+  Dashboards/Categorização/Ativos/Passivos/Gestão de Contas sem precisar
+  tocar cada página individualmente.
 
 ## Qualidade (Sprint 1 → Sprint 11)
 

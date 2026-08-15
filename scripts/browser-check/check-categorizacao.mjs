@@ -66,14 +66,14 @@ await page.screenshot({
 
 console.log(`clique em "Próxima" -> render em ~${elapsed}ms`);
 
-// --- badge de status: pílula visual, não texto simples --------------------
-const badges = page.locator(".dash-table tbody .status-badge");
-if ((await badges.count()) === 0) {
-  consoleErrors.push("badge de status ausente na tabela");
+// --- ícone de status: SVG, não texto simples -------------------------------
+const statusIcons = page.locator(".dash-table tbody .status-icon");
+if ((await statusIcons.count()) === 0) {
+  consoleErrors.push("ícone de status ausente na tabela");
 } else {
-  const classes = await badges.first().getAttribute("class");
-  if (!/status-badge--(pending|confirmed)/.test(classes ?? "")) {
-    consoleErrors.push(`badge sem variante pending/confirmed: "${classes}"`);
+  const classes = await statusIcons.first().getAttribute("class");
+  if (!/status-icon (pending|confirmed)/.test(classes ?? "")) {
+    consoleErrors.push(`ícone de status sem variante pending/confirmed: "${classes}"`);
   }
 }
 
@@ -83,7 +83,7 @@ if ((await badges.count()) === 0) {
 const primeiraLinhaPendente = page
   .locator(".dash-table tbody tr")
   .filter({
-    has: page.locator(".status-badge--pending"),
+    has: page.locator(".status-icon.pending"),
   })
   .first();
 

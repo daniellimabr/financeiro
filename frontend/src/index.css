@@ -447,7 +447,7 @@ input {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
-  max-width: 1440px;
+  max-width: 1800px;
   width: 100%;
   margin: 0 auto;
   padding: var(--space-5);
@@ -900,37 +900,40 @@ input {
   color: var(--text);
 }
 
-/* Badge de status (Pendente/Confirmada) — nunca reutiliza a cor de despesa
-   (One Meaning Rule), Confirmada usa o mesmo par --accent/--accent-bg de
-   "estado ativo" já usado em outros pontos do app. */
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 10px;
-  border-radius: 8px;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
+/* Ícone de status (Pendente/Confirmada) — nunca reutiliza a cor de despesa
+   (One Meaning Rule); Confirmada usa o mesmo par --accent/--accent-text de
+   "estado ativo" já usado em outros pontos do app. Forma (relógio vs.
+   check), não só cor, distingue os dois estados — StatusIcon.tsx. */
+.status-icon {
+  vertical-align: middle;
 }
 
-.status-badge--pending {
-  border: 1px solid var(--border);
+.status-icon.pending {
   color: var(--text);
 }
 
-.status-badge--confirmed {
-  border: 1px solid transparent;
+.status-icon.confirmed {
   color: var(--accent-text);
+}
+
+/* Polish de linha e densidade só na tabela de Categorização (superfície de
+   trabalho primária, diferente do nível "terminal" das tabelas de
+   drill-down) — classe aditiva sobre .dash-table, não um fork. Ordem das
+   colunas: checkbox, Status, Data, Descrição, Categoria, Ativo, Valor,
+   Ações — Descrição/Categoria (texto livre/nome composto "grupo /
+   subcategoria") ganham mais espaço; Status/Data/Valor são curtos por
+   natureza e não precisam do teto de 200px genérico de .dash-table. */
+.cat-review-table tbody tr:hover {
   background: var(--accent-bg);
 }
 
-/* Polish de linha só na tabela de Categorização (superfície de trabalho
-   primária, diferente do nível "terminal" das tabelas de drill-down) —
-   classe aditiva sobre .dash-table, não um fork. */
-.cat-review-table tbody tr:hover {
-  background: var(--accent-bg);
+.cat-review-table th,
+.cat-review-table td {
+  padding: var(--space-2) var(--space-2);
+}
+
+.cat-review-table td {
+  vertical-align: middle;
 }
 
 .cat-review-table th:first-child,
@@ -939,8 +942,32 @@ input {
   text-align: center;
 }
 
-.cat-review-table td {
-  vertical-align: middle;
+.cat-review-table th:nth-child(2),
+.cat-review-table td:nth-child(2) {
+  width: 40px;
+  text-align: center;
+}
+
+.cat-review-table th:nth-child(3),
+.cat-review-table td:nth-child(3) {
+  width: 96px;
+}
+
+.cat-review-table td:nth-child(4) button {
+  max-width: 340px;
+}
+
+.cat-review-table td:nth-child(5) .cat-combobox-input {
+  max-width: 280px;
+}
+
+.cat-review-table td:nth-child(6) select {
+  max-width: 160px;
+}
+
+.cat-review-table th:nth-child(7),
+.cat-review-table td:nth-child(7) {
+  text-align: right;
 }
 
 @media (max-width: 640px) {

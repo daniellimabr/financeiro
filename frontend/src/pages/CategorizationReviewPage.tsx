@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import type { CategorizationStatus, TransactionTipo } from "../api/categorization";
 import { CategoryCombobox } from "../components/CategoryCombobox";
 import { PeriodFilter } from "../components/PeriodFilter";
+import { StatusIcon } from "../components/StatusIcon";
 import { AssetSelectCell, DescriptionCell } from "../components/TransactionEditCells";
 import { TransactionTipoIcon } from "../components/TransactionTipoIcon";
 import { useAssets } from "../hooks/useAssets";
@@ -206,12 +207,12 @@ export function CategorizationReviewPage() {
                   />
                 )}
               </th>
+              <th>Status</th>
               <th>Data</th>
               <th>Descrição</th>
-              <th>Valor</th>
               <th>Categoria</th>
               <th>Ativo</th>
-              <th>Status</th>
+              <th>Valor</th>
               <th></th>
             </tr>
           </thead>
@@ -239,15 +240,12 @@ export function CategorizationReviewPage() {
                       />
                     )}
                   </td>
+                  <td>
+                    <StatusIcon pending={isPendente} />
+                  </td>
                   <td>{tx.data}</td>
                   <td>
                     <DescriptionCell transaction={tx} />
-                  </td>
-                  <td>
-                    <span className="valor-cell">
-                      <TransactionTipoIcon tipo={tx.tipo} />
-                      {formatCurrency(tx.valor)}
-                    </span>
                   </td>
                   <td>
                     <CategoryCombobox
@@ -267,10 +265,9 @@ export function CategorizationReviewPage() {
                     <AssetSelectCell transaction={tx} assets={assets} />
                   </td>
                   <td>
-                    <span
-                      className={`status-badge status-badge--${isPendente ? "pending" : "confirmed"}`}
-                    >
-                      {isPendente ? "Pendente" : "Confirmada"}
+                    <span className="valor-cell">
+                      <TransactionTipoIcon tipo={tx.tipo} />
+                      {formatCurrency(tx.valor)}
                     </span>
                   </td>
                   <td>

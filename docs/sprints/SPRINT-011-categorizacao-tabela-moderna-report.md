@@ -181,3 +181,41 @@ Sprint 10).
 - Nenhuma pendência de código deixada solta — a implementação em si está
   completa e testada; o que falta é evidência empírica ao vivo, não
   trabalho de implementação.
+
+## Revisão pós-implementação (mesmo dia, feedback do CEO antes da aprovação)
+
+Antes de aprovar o relatório, o CEO pediu 4 ajustes na mesma tela:
+
+1. **Status como ícone, não texto.** O badge de texto ("Pendente"/
+   "Confirmada") virou `StatusIcon.tsx` — SVG inline, relógio para
+   pendente e check para confirmada (forma diferente, não só cor, pra
+   não depender só de cor), `role="img"`+`aria-label` no lugar do texto
+   visível, `<title>` pra tooltip nativo no hover. Coluna caiu de ~90px
+   (texto "CONFIRMADA" maiúsculo) pra 40px fixos.
+2. **Mais espaço pra Descrição/Categoria.** `.dash-page` (compartilhada
+   pelas 5 telas) passou de `max-width: 1440px` pra `1800px` — aumenta a
+   ocupação de tela em Dashboards/Categorização/Ativos/Passivos/Gestão de
+   Contas de uma vez, sem tocar cada página. Dentro da tabela de
+   Categorização, o teto de largura genérico de `.dash-table` (200px pra
+   qualquer botão/input) foi substituído por larguras por coluna via
+   `:nth-child`: Descrição sobe pra 340px, Categoria (combobox, rótulo
+   "grupo / subcategoria") pra 280px; Ativo cai pra 160px; Status/Data
+   ganham largura fixa curta (40px/96px).
+3. **Espaçamento entre colunas reduzido.** Padding horizontal de célula
+   caiu de `var(--space-3)` (12px) pra `var(--space-2)` (8px) — só na
+   tabela de Categorização (`cat-review-table`), mesma classe aditiva já
+   usada pro polish original, sem afetar as tabelas de drill-down.
+4. **Reordenar colunas** para Status → Data → Descrição → Categoria →
+   Ativo → Valor (checkbox de seleção continua primeiro, é controle, não
+   dado; Valor passa a ser a última coluna e ganha alinhamento à
+   direita, mesma convenção de `.dash-row .amt` já usada no funil).
+
+Testes atualizados (`CategorizationReviewPage.test.tsx`: asserção de
+badge trocada por asserção de `aria-label` do ícone); suíte completa
+rodada de novo — 109/109 verdes, `tsc`/`eslint`/`prettier` limpos.
+`check-categorizacao.mjs` atualizado para procurar `.status-icon` no
+lugar de `.status-badge`. `DESIGN.md` (seção Layout) e docs vivos
+atualizados para refletir o novo `max-width`. Mesma pendência de antes
+continua: validação ao vivo na VM de dev não rodou (sem token) — o
+ajuste de layout também não foi visto rendendo de verdade, só validado
+por teste automatizado e leitura de CSS.

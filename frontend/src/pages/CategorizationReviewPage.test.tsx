@@ -99,7 +99,7 @@ describe("CategorizationReviewPage", () => {
     expect(input.value).toBe("Alimentação / Supermercado");
   });
 
-  it("shows a status badge for pending and confirmed rows", async () => {
+  it("shows a status icon for pending and confirmed rows", async () => {
     const confirmedTransaction: CategorizedTransaction = {
       ...BASE_TRANSACTION,
       id: 2,
@@ -122,8 +122,14 @@ describe("CategorizationReviewPage", () => {
     renderWithQueryClient(<CategorizationReviewPage />);
     await screen.findByText("Mercado Sao Joao");
 
-    expect(document.querySelector(".status-badge--pending")).toHaveTextContent("Pendente");
-    expect(document.querySelector(".status-badge--confirmed")).toHaveTextContent("Confirmada");
+    expect(document.querySelector(".status-icon.pending")).toHaveAttribute(
+      "aria-label",
+      "Pendente"
+    );
+    expect(document.querySelector(".status-icon.confirmed")).toHaveAttribute(
+      "aria-label",
+      "Confirmada"
+    );
   });
 
   it("choosing a category on a pending row buffers locally instead of saving immediately", async () => {
