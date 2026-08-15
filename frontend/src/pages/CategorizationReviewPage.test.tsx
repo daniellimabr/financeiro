@@ -93,10 +93,73 @@ describe("CategorizationReviewPage", () => {
     renderWithQueryClient(<CategorizationReviewPage />);
 
     expect(await screen.findByText("Mercado Sao Joao")).toBeInTheDocument();
-    const select = (await screen.findByLabelText(
+    const input = (await screen.findByLabelText(
       "Categoria de Mercado Sao Joao"
-    )) as HTMLSelectElement;
-    expect(select.value).toBe("10");
+    )) as HTMLInputElement;
+    expect(input.value).toBe("Alimentação / Supermercado");
+  });
+
+  it("shows a status badge for pending and confirmed rows", async () => {
+    const confirmedTransaction: CategorizedTransaction = {
+      ...BASE_TRANSACTION,
+      id: 2,
+      descricao: "Restaurante Bom Sabor",
+      categorizacao_status: "confirmada",
+      subcategory_id: 10,
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url.startsWith("/categorization/transactions"))
+        return Promise.resolve(
+          jsonResponse(transactionsPage([BASE_TRANSACTION, confirmedTransaction]))
+        );
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<CategorizationReviewPage />);
+    await screen.findByText("Mercado Sao Joao");
+
+    expect(document.querySelector(".status-badge--pending")).toHaveTextContent("Pendente");
+    expect(document.querySelector(".status-badge--confirmed")).toHaveTextContent("Confirmada");
+  });
+
+  it("choosing a category on a pending row buffers locally instead of saving immediately", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      if (url.startsWith("/category-groups")) return Promise.resolve(jsonResponse([GROUP_FIXTURE]));
+      if (url.startsWith("/subcategories"))
+        return Promise.resolve(
+          jsonResponse([
+            SUBCATEGORY_FIXTURE,
+            { ...SUBCATEGORY_FIXTURE, id: 11, nome: "Restaurante" },
+          ])
+        );
+      if (url.startsWith("/assets")) return Promise.resolve(jsonResponse([]));
+      if (url.startsWith("/categorization/transactions") && method === "GET")
+        return Promise.resolve(jsonResponse(transactionsPage([BASE_TRANSACTION])));
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<CategorizationReviewPage />);
+    await screen.findByText("Mercado Sao Joao");
+
+    await userEvent.click(screen.getByLabelText("Categoria de Mercado Sao Joao"));
+    await userEvent.click(screen.getByRole("option", { name: "Restaurante" }));
+
+    const putCall = fetchMock.mock.calls.find(
+      (c) =>
+        String(c[0]) === "/categorization/transactions/1/category" &&
+        (c[1] as RequestInit)?.method === "PUT"
+    );
+    expect(putCall).toBeUndefined();
+
+    const input = screen.getByLabelText("Categoria de Mercado Sao Joao") as HTMLInputElement;
+    expect(input.value).toBe("Alimentação / Restaurante");
   });
 
   it("defaults to status=pendente in the request", async () => {

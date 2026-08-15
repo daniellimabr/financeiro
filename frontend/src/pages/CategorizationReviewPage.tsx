@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 
 import type { CategorizationStatus, TransactionTipo } from "../api/categorization";
+import { CategoryCombobox } from "../components/CategoryCombobox";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { AssetSelectCell, DescriptionCell } from "../components/TransactionEditCells";
 import { TransactionTipoIcon } from "../components/TransactionTipoIcon";
@@ -72,13 +73,6 @@ export function CategorizationReviewPage() {
     if (overrides.groupId !== undefined) setGroupId(overrides.groupId);
     setPage(1);
     setChecked({});
-  }
-
-  function subcategoryLabel(subcategoryId: number): string {
-    const subcategory = subcategories?.find((s) => s.id === subcategoryId);
-    if (!subcategory) return `Subcategoria ${subcategoryId}`;
-    const group = groups?.find((g) => g.id === subcategory.group_id);
-    return group ? `${group.nome} / ${subcategory.nome}` : subcategory.nome;
   }
 
   const allPendentesChecked =
@@ -199,7 +193,7 @@ export function CategorizationReviewPage() {
       )}
 
       <div className="dash-table-wrap">
-        <table className="dash-table">
+        <table className="dash-table cat-review-table">
           <thead>
             <tr>
               <th>
@@ -256,31 +250,29 @@ export function CategorizationReviewPage() {
                     </span>
                   </td>
                   <td>
-                    <select
-                      aria-label={`Categoria de ${exibida}`}
-                      value={subcategoryValue ?? ""}
-                      onChange={(event) => {
-                        const subcategoryId = event.target.value
-                          ? Number(event.target.value)
-                          : undefined;
+                    <CategoryCombobox
+                      ariaLabel={`Categoria de ${exibida}`}
+                      groups={groups}
+                      subcategories={subcategories}
+                      value={subcategoryValue}
+                      onChange={(subcategoryId) => {
                         setSelectedSubcategory((prev) => ({ ...prev, [tx.id]: subcategoryId }));
-                        if (!isPendente && subcategoryId !== undefined) {
+                        if (!isPendente) {
                           setCategory.mutate({ transactionId: tx.id, subcategoryId });
                         }
                       }}
-                    >
-                      <option value="">Selecione...</option>
-                      {subcategories?.map((subcategory) => (
-                        <option key={subcategory.id} value={subcategory.id}>
-                          {subcategoryLabel(subcategory.id)}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </td>
                   <td>
                     <AssetSelectCell transaction={tx} assets={assets} />
                   </td>
-                  <td>{isPendente ? "Pendente" : "Confirmada"}</td>
+                  <td>
+                    <span
+                      className={`status-badge status-badge--${isPendente ? "pending" : "confirmed"}`}
+                    >
+                      {isPendente ? "Pendente" : "Confirmada"}
+                    </span>
+                  </td>
                   <td>
                     {isPendente && (
                       <button

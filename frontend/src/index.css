@@ -825,6 +825,124 @@ input {
   text-overflow: ellipsis;
 }
 
+/* Categorização (Sprint 11): combobox buscável de categoria, compartilhado
+   via CategorySelectCell com os drill-downs de Dashboard/Ativos/Passivos.
+   O popup usa portal (document.body) + position:fixed porque .dash-table-wrap
+   é overflow-x:auto — um popup absoluto dentro dela seria cortado no scroll
+   horizontal (achado ao planejar, não ao debugar em produção). */
+.cat-combobox {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.cat-combobox-input {
+  width: 100%;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-h);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: var(--space-2) var(--space-3);
+}
+
+.cat-combobox-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cat-combobox-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.cat-combobox-popup {
+  z-index: 20;
+  max-height: 320px;
+  overflow-y: auto;
+  margin: var(--space-1) 0 0;
+  padding: var(--space-1) 0;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.cat-combobox-group-label {
+  padding: var(--space-1) var(--space-3);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cat-combobox-option {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-h);
+  cursor: pointer;
+}
+
+.cat-combobox-option.active {
+  background: var(--accent-bg);
+}
+
+.cat-combobox-option.selected {
+  font-weight: 600;
+  color: var(--accent-text);
+}
+
+.cat-combobox-empty {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+/* Badge de status (Pendente/Confirmada) — nunca reutiliza a cor de despesa
+   (One Meaning Rule), Confirmada usa o mesmo par --accent/--accent-bg de
+   "estado ativo" já usado em outros pontos do app. */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 8px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.status-badge--pending {
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.status-badge--confirmed {
+  border: 1px solid transparent;
+  color: var(--accent-text);
+  background: var(--accent-bg);
+}
+
+/* Polish de linha só na tabela de Categorização (superfície de trabalho
+   primária, diferente do nível "terminal" das tabelas de drill-down) —
+   classe aditiva sobre .dash-table, não um fork. */
+.cat-review-table tbody tr:hover {
+  background: var(--accent-bg);
+}
+
+.cat-review-table th:first-child,
+.cat-review-table td:first-child {
+  width: 40px;
+  text-align: center;
+}
+
+.cat-review-table td {
+  vertical-align: middle;
+}
+
 @media (max-width: 640px) {
   /* Linha ganhou tendência + percentual na Sprint 6 — em telas estreitas,
      6 elementos (chevron/nome/tendência/barra/valor/%) espremiam o valor e

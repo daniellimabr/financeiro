@@ -589,10 +589,8 @@ describe("DashboardsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /Mercado/ }));
     await screen.findByText("Mercado São João");
 
-    await userEvent.selectOptions(
-      screen.getByLabelText("Categoria de Mercado São João"),
-      "Alimentação / Restaurante"
-    );
+    await userEvent.click(screen.getByLabelText("Categoria de Mercado São João"));
+    await userEvent.click(screen.getByRole("option", { name: "Restaurante" }));
 
     await waitFor(() => {
       const call = fetchMock.mock.calls.find(

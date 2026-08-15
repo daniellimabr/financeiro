@@ -8,6 +8,7 @@ import { useSetCategory } from "../hooks/useSetCategory";
 import { useSetTransactionAsset } from "../hooks/useSetTransactionAsset";
 import { useUpdateDescription } from "../hooks/useUpdateDescription";
 import { descricaoExibida, type EditableTransaction } from "../utils/transactionEdit";
+import { CategoryCombobox } from "./CategoryCombobox";
 
 export function DescriptionCell({ transaction }: { transaction: EditableTransaction }) {
   const [editing, setEditing] = useState(false);
@@ -75,31 +76,16 @@ export function CategorySelectCell({
   const setCategory = useSetCategory();
   const value = transaction.subcategoria_sugerida_id ?? transaction.subcategory_id ?? undefined;
 
-  function label(subcategoryId: number): string {
-    const subcategory = subcategories?.find((s) => s.id === subcategoryId);
-    if (!subcategory) return `Subcategoria ${subcategoryId}`;
-    const group = groups?.find((g) => g.id === subcategory.group_id);
-    return group ? `${group.nome} / ${subcategory.nome}` : subcategory.nome;
-  }
-
   return (
-    <select
-      aria-label={`Categoria de ${descricaoExibida(transaction)}`}
-      value={value ?? ""}
-      onChange={(event) => {
-        const subcategoryId = event.target.value ? Number(event.target.value) : undefined;
-        if (subcategoryId !== undefined) {
-          setCategory.mutate({ transactionId: transaction.id, subcategoryId });
-        }
-      }}
-    >
-      <option value="">Selecione...</option>
-      {subcategories?.map((subcategory) => (
-        <option key={subcategory.id} value={subcategory.id}>
-          {label(subcategory.id)}
-        </option>
-      ))}
-    </select>
+    <CategoryCombobox
+      ariaLabel={`Categoria de ${descricaoExibida(transaction)}`}
+      groups={groups}
+      subcategories={subcategories}
+      value={value}
+      onChange={(subcategoryId) =>
+        setCategory.mutate({ transactionId: transaction.id, subcategoryId })
+      }
+    />
   );
 }
 
