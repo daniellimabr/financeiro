@@ -1,6 +1,6 @@
 # Arquitetura — Visão Geral
 
-> Stack abaixo reflete [ADR-001](adr/ADR-001-stack.md), **aprovado pelo CEO em 2026-08-03**. Este doc é atualizado a cada mudança estrutural relevante (regra de doc viva). **Atualizado em 2026-08-15 após Sprint 6** — tendência histórica, percentual de representatividade e drill-down em sanfona nos dashboards; fecha a primeira metade do épico E6. Tipografia própria (Archivo/Public Sans) e layout mais largo — ver [DESIGN.md](../../DESIGN.md).
+> Stack abaixo reflete [ADR-001](adr/ADR-001-stack.md), **aprovado pelo CEO em 2026-08-03**. Este doc é atualizado a cada mudança estrutural relevante (regra de doc viva). **Atualizado em 2026-08-15 após Sprint 7** — rework da fila de Categorização (filtro tipo/status, lote, descrição editável com propagação), eliminação da tela Transações e "Gestão de Contas" (apelido, remover conta do sync, sincronização unificada). Ver seção própria abaixo.
 
 ## Visão de alto nível
 
@@ -119,8 +119,12 @@ SSH), disponível para toda sprint futura com trabalho visual. `check.mjs`
 `check-dashboard.mjs` (fluxo autenticado específico do app: início →
 dashboards → drill-down, desktop + mobile), `check-sanfona.mjs` (Sprint 6:
 expande múltiplos níveis da sanfona — categoria + meio de pagamento — e
-captura desktop/mobile) e `check-categorizacao.mjs` (pós-Sprint 6: mede o
-tempo real de navegação de página na fila de Categorização). Sessão
+captura desktop/mobile), `check-categorizacao.mjs` (pós-Sprint 6: mede o
+tempo real de navegação de página na fila de Categorização) e
+`check-sprint7.mjs` (filtro tipo/status, seleção em lote, descrição
+editável e Gestão de Contas — apelido, diálogo de sincronização; ações que
+mutariam dado real são canceladas via Escape/"Cancelar" antes do
+screenshot). Sessão
 autenticada via token gerado por
 `app.auth.jwt.create_access_token` rodado dentro do container da API na VM
 de dev (mesmo mecanismo de uma sessão pós-login Google real, nunca uma
@@ -174,10 +178,77 @@ real).
   lint, nem `tsc`, nem os 28 testes Vitest pegam layout/overflow visual.
   Corrigidos e revalidados via `check-sanfona.mjs` contra a VM de dev.
 
-## Qualidade (Sprint 1 + Sprint 2 + Sprint 3 + Sprint 4 + Sprint 5)
+## Categorização (rework) e Gestão de Contas (Sprint 7)
 
-- **Testes backend:** 169 testes, 98% cobertura total. Auth (Sprint 1), dados mestres (Sprint 2, 97%), Pluggy (Sprint 3, 98%), categorização (Sprint 4, 97%: paginação/filtro ano-mes adicionados pós-Sprint 6) — ver histórico nos relatórios de sprint. Dashboards (Sprint 5+6, 100% em `app/dashboards/`): período vazio, período só com "Transferência interna" (totais zerados), misto débito/crédito, sinal do saldo de `cartao_credito` na fórmula de patrimônio, ativos/passivos inativos excluídos, borda de mês (`data_competencia` no limite entre meses), soma de `/por-categoria` batendo com `/summary`, isolamento entre usuários; tendência terminando no mês filtrado (não no calendário), mês sem transação aparecendo zerado, tendência por categoria com bucket "Não categorizado", percentual somando 100% (menos arredondamento) e retornando `0` com denominador zero.
-- **Testes frontend:** 30 testes (Vitest + Testing Library) — renderização condicional, tratamento de 401, mock fetch, widget Pluggy Connect mockado. Categorização: sugestão pré-preenchida, confirmar remove da lista, refetch ao trocar filtro ano/mês, avançar página. Dashboards (Sprint 5+6): 4 cards a partir de dado mockado, refetch ao trocar filtro ano/mês, sparkline a partir de tendência mockada, refetch ao trocar seletor de período histórico, sanfona expandindo múltiplos níveis sem esconder os anteriores (e mantendo duas categorias expandidas ao mesmo tempo), percentual exibido em cada nível, estado vazio.
+- **`descricao_usuario`/`descricao_sugerida`/`descricao_sugestao_origem_id`
+  em `pluggy_transactions`:** descrição exibida passa a ser
+  `descricao_usuario ?? descricao` (raw, nunca sobrescrito por sync).
+  Editar a descrição de uma transação grava `descricao_usuario` de
+  imediato nela e propaga uma **sugestão pendente** (`descricao_sugerida`
+  + `descricao_sugestao_origem_id`) para toda outra transação do mesmo
+  usuário com descrição normalizada idêntica (`normalize_description`,
+  match exato — não a similaridade `>=0.86` usada para sugestão de
+  categoria) **e** mesma categoria (confirmada ou sugerida) da transação de
+  origem. Candidata com sugestão pendente não é sobrescrita por uma
+  segunda origem concorrente ("a primeira grava, a segunda não
+  sobrescreve"). Aceitar/descartar por linha via
+  `POST .../description/confirm`/`.../dismiss` — nunca aplicado
+  automaticamente.
+- **`apelido`/`sync_enabled` em `pluggy_accounts`:** `apelido` é o nome
+  exibido quando setado (nunca sobrescrito por `_upsert_account` num
+  resync — mesma regra de `descricao_usuario`); `sync_enabled=false` faz
+  `sync_item`/`sync_items` pular a conta inteira (nem saldo nem
+  transações são atualizados), mecanismo de "remover da lista de sync" e
+  fonte da pré-seleção do diálogo de sincronização unificada.
+- **`app/categorization/service.py`:** `list_pending_transactions` vira
+  `list_transactions(status, tipo, ano, mes, page, page_size)` —
+  `status` (`pendente`/`confirmada`/`todas`, default `todas`) e `tipo`
+  (`debito`/`credito`) filtram a query; sugestão só é recalculada para as
+  linhas pendentes da página retornada (confirmadas não precisam). Rotas
+  `/categorization/pending/*` renomeadas para `/categorization/transactions/*`
+  sem shim de compatibilidade. `confirm_categorization` vira `set_category`
+  (sem trava de status — já podia reeditar categoria confirmada antes
+  desta sprint, só não tinha nome que refletisse isso). `bulk_confirm`
+  processa uma lista de `{transaction_id, subcategory_id}` e reporta
+  sucesso/falha por item — uma linha inválida (categoria inexistente,
+  transação de outro usuário) não bloqueia as demais.
+- **`app/pluggy_integration/service.py`:** `update_account` (apelido +
+  sync_enabled); `sync_items(item_ids)` sincroniza vários itens (ou todos
+  do usuário se `item_ids` omitido) reaproveitando `sync_item`, reporta
+  sucesso/falha por item. `sync_item` pula contas com `sync_enabled=False`
+  antes de tocar em saldo/transações.
+- **Frontend — `CategorizationReviewPage.tsx` vira a listagem única** de
+  transações (filtro `status=todas` cobre o que `TransactionsPage.tsx`
+  oferecia — página removida): filtro tipo/status, seleção em lote +
+  "Aprovar marcadas", categoria editável em linha confirmada (select
+  dispara `set_category` direto, sem botão extra), descrição inline
+  (clique no texto abre edição; nota "N itens com sugestão pendente" +
+  aceitar/descartar por linha).
+- **Frontend — `AccountManagementPage.tsx`** (renomeia
+  `ConnectAccountPage.tsx`, aba "Gestão de contas"): lista contas
+  conectadas (não só items) com apelido editável e toggle de
+  `sync_enabled`; botão único "Sincronizar MeuPluggy" abre diálogo com
+  contas pré-marcadas a partir do `sync_enabled` persistido, aguardando
+  confirmação antes de rodar `POST /pluggy/sync`.
+- **`frontend/src/utils/format.ts`:** `formatCurrency` extraído de
+  `DashboardsPage.tsx` para util compartilhado, aplicado também na fila
+  de Categorização e Gestão de Contas.
+- **Achado real de QA visual:** sem teto de largura, os `<select>` de
+  categoria/ativo (nomes de subcategoria longos) e o botão de descrição
+  empurravam a linha da tabela de Categorização para além de 1440px — o
+  botão "Confirmar" ficava invisível fora da área rolável de
+  `.dash-table-wrap`, sem nenhum indício visual de que havia mais
+  conteúdo à direita. Só detectável com o app renderizado de verdade
+  (`scripts/browser-check/check-sprint7.mjs`, novo); corrigido com
+  `max-width`/`text-overflow: ellipsis` nos selects/botão/input da tabela.
+- **Migration `0008`** (reversível): campos acima + seed idempotente da
+  subcategoria "Aluguel" sob o grupo "Receitas" (distinta da despesa
+  "Aluguel" já existente sob "Moradia").
+
+## Qualidade (Sprint 1 → Sprint 7)
+
+- **Testes backend:** 219 testes, 98% cobertura total. Auth (Sprint 1), dados mestres (Sprint 2, 97%), Pluggy (Sprint 3, 98%), categorização (Sprint 4, paginação/filtro ano-mes pós-Sprint 6) — ver histórico nos relatórios de sprint. Dashboards (Sprint 5+6, 100% em `app/dashboards/`): período vazio, período só com "Transferência interna" (totais zerados), misto débito/crédito, sinal do saldo de `cartao_credito` na fórmula de patrimônio, ativos/passivos inativos excluídos, borda de mês (`data_competencia` no limite entre meses), soma de `/por-categoria` batendo com `/summary`, isolamento entre usuários; tendência terminando no mês filtrado (não no calendário), mês sem transação aparecendo zerado, tendência por categoria com bucket "Não categorizado", percentual somando 100% (menos arredondamento) e retornando `0` com denominador zero. Categorização/Pluggy (Sprint 7, 99%): filtro status/tipo em todas as combinações, bulk-confirm parcial (linha inválida não bloqueia as demais), `set_category` em transação já confirmada, propagação de descrição (match normalizado + mesma categoria, isolamento por usuário, "primeira grava, segunda não sobrescreve"), `sync_item`/`sync_items` pulando conta com `sync_enabled=False`, `apelido` preservado em resync.
+- **Testes frontend:** 44 testes (Vitest + Testing Library) — renderização condicional, tratamento de 401, mock fetch, widget Pluggy Connect mockado. Dashboards (Sprint 5+6): 4 cards a partir de dado mockado, refetch ao trocar filtro ano/mês, sparkline a partir de tendência mockada, refetch ao trocar seletor de período histórico, sanfona expandindo múltiplos níveis sem esconder os anteriores (e mantendo duas categorias expandidas ao mesmo tempo), percentual exibido em cada nível, estado vazio. Categorização (Sprint 7): filtro tipo/status disparando refetch, seleção em lote + "Aprovar marcadas" chamando bulk-confirm, edição de descrição + propagação chamando o endpoint certo, aceitar sugestão de descrição. Gestão de Contas (Sprint 7): apelido/sync_enabled salvos via PUT, diálogo de sincronização unificada pré-selecionado a partir de `sync_enabled` e confirmando com os `item_ids` corretos, fluxo de conexão via widget Pluggy Connect.
 - **Lint:** ruff (Python), eslint (TypeScript) — suíte 100% verde
 - **Pre-commit:** ruff, eslint, detect-secrets (baseline) — executado local antes de push
 - **CI:** GitHub Actions — jobs `backend` (ruff check/format, pytest) e `frontend` (eslint, prettier, tsc, vitest) — roda em push/PR para `main`

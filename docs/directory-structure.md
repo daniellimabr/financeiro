@@ -1,6 +1,6 @@
 # Estrutura de diretórios
 
-Atualizado a cada mudança estrutural. Estado atual (fim da Sprint 6 — dashboards analíticos):
+Atualizado a cada mudança estrutural. Estado atual (fim da Sprint 7 — categorização/gestão de contas):
 
 ```
 Financeiro v3/
@@ -31,7 +31,8 @@ Financeiro v3/
 │   │   ├── PRD-003-integracao-pluggy.md  # Sprint 3 — contas/transações via Pluggy (E2)
 │   │   ├── PRD-004-categorizacao-automatica.md  # Sprint 4 — categorização + associação despesa↔ativo (E3)
 │   │   ├── PRD-005-dashboards-core.md    # Sprint 5 — dashboards core, drill-down (E5)
-│   │   └── PRD-006-dashboards-analiticos.md  # Sprint 6 — tendência, percentual, design system (E6)
+│   │   ├── PRD-006-dashboards-analiticos.md  # Sprint 6 — tendência, percentual, design system (E6)
+│   │   └── PRD-007-categorizacao-gestao-contas.md  # Sprint 7 — rework categorização, Gestão de Contas (E3, E2)
 │   ├── sprints/
 │   │   ├── SPRINT-001-fundacao-tecnica-plan.md       # Plano Sprint 1 (2026-08-04)
 │   │   ├── SPRINT-001-fundacao-tecnica-report.md     # Relatório Sprint 1 (2026-08-04)
@@ -43,9 +44,11 @@ Financeiro v3/
 │   │   ├── SPRINT-005-dashboards-core-plan.md        # Plano Sprint 5 (2026-08-14)
 │   │   ├── SPRINT-005-dashboards-core-report.md      # Relatório Sprint 5 (2026-08-14)
 │   │   ├── SPRINT-006-dashboards-analiticos-plan.md  # Plano Sprint 6 (2026-08-14)
-│   │   └── SPRINT-006-dashboards-analiticos-report.md  # Relatório Sprint 6 (2026-08-15)
+│   │   ├── SPRINT-006-dashboards-analiticos-report.md  # Relatório Sprint 6 (2026-08-15)
+│   │   ├── SPRINT-007-categorizacao-gestao-contas-plan.md  # Plano Sprint 7 (2026-08-15)
+│   │   └── SPRINT-007-categorizacao-gestao-contas-report.md  # Relatório Sprint 7 (2026-08-15)
 │   ├── roadmap.md                  # épicos + sprints
-│   ├── directory-structure.md      # este arquivo — atualizado em Sprint 6
+│   ├── directory-structure.md      # este arquivo — atualizado em Sprint 7
 │   ├── infra/
 │   │   └── ssh-workflow.md         # procedimento SSH obrigatório via venv (atualizado em Sprint 1)
 │   └── migration/
@@ -67,15 +70,15 @@ Financeiro v3/
 │   │   │   ├── category.py         # CategoryGroup (+excluir_de_totais na Sprint 5), Subcategory, enum Natureza, SEM_CATEGORIA_ID (Sprint 2)
 │   │   │   ├── asset.py            # Asset, enums AssetTipo/AssetStatus (Sprint 2)
 │   │   │   ├── liability.py        # Liability, enums LiabilityTipo/LiabilityStatus (Sprint 2)
-│   │   │   ├── pluggy.py           # PluggyItem/Account/Transaction + enums (Sprint 3; +9 colunas de categorização/ativo na Sprint 4)
+│   │   │   ├── pluggy.py           # PluggyItem/Account/Transaction + enums (Sprint 3; +9 colunas de categorização/ativo na Sprint 4; +apelido/sync_enabled em Account, +descricao_usuario/sugerida/origem_id em Transaction na Sprint 7)
 │   │   │   └── categorization.py   # CategorizationRule — memória de mapeamento padrão→subcategoria (Sprint 4)
 │   │   ├── schemas/
 │   │   │   ├── user.py
 │   │   │   ├── category.py         # CategoryGroupIn/Out, SubcategoryIn/Out (Sprint 2)
 │   │   │   ├── asset.py            # AssetIn/Out, AssetSellIn (Sprint 2)
 │   │   │   ├── liability.py        # LiabilityIn/Out (Sprint 2)
-│   │   │   ├── pluggy.py           # ConnectToken*, PluggyItem/Account/TransactionOut (Sprint 3)
-│   │   │   ├── categorization.py   # PendingTransactionOut, CategorizationConfirmIn, AssetAssociationIn (Sprint 4); PendingTransactionsPageOut (paginação, pós-Sprint 6)
+│   │   │   ├── pluggy.py           # ConnectToken*, PluggyItem/Account/TransactionOut (Sprint 3); PluggyAccountUpdateIn, SyncItemsIn/Out (Sprint 7)
+│   │   │   ├── categorization.py   # TransactionOut/TransactionsPageOut, CategoryIn, AssetAssociationIn, BulkConfirmIn/Out, DescriptionUpdateIn/Out (Sprint 4, renomeado/estendido na Sprint 7)
 │   │   │   └── dashboards.py       # SummaryOut, CategoriaTotalOut/MeioPagamentoTotalOut+percentual (Sprint 5), TendenciaMesOut/TendenciaCategoriaOut (Sprint 6)
 │   │   ├── auth/
 │   │   │   ├── jwt.py              # geração/validação JWT via PyJWT
@@ -94,13 +97,13 @@ Financeiro v3/
 │   │   │   └── router.py
 │   │   ├── pluggy_integration/     # integração Pluggy — connect token, sync manual (Sprint 3)
 │   │   │   ├── client.py           # PluggyClient — auth por API key cacheada, get_item/accounts/transactions
-│   │   │   ├── service.py          # register_item, sync_item, list_items/accounts/transactions
-│   │   │   └── router.py           # rotas /pluggy/*
+│   │   │   ├── service.py          # register_item, sync_item, list_items/accounts/transactions; update_account, sync_items (Sprint 7)
+│   │   │   └── router.py           # rotas /pluggy/*; PUT /pluggy/accounts/{id}, POST /pluggy/sync (Sprint 7)
 │   │   ├── categorization/         # motor de categorização por regras+memória, sem LLM (Sprint 4)
 │   │   │   ├── normalize.py        # normalize_description — NFKD/ASCII/minúsculas, prefixo de canal, números isolados
 │   │   │   ├── engine.py           # suggest_category (regra > histórico exato > similaridade ≥0.86), suggest_asset
-│   │   │   ├── service.py          # list_pending_transactions (paginado, filtro ano/mes, pós-Sprint 6), confirm_categorization, set_transaction_asset
-│   │   │   └── router.py           # rotas /categorization/*
+│   │   │   ├── service.py          # list_transactions (status/tipo/ano/mes/paginado, renomeado de list_pending_transactions na Sprint 7), set_category, bulk_confirm, set_transaction_asset, update_description/confirm_description_suggestion/dismiss_description_suggestion (Sprint 7)
+│   │   │   └── router.py           # rotas /categorization/transactions/* (renomeadas de /pending/* na Sprint 7)
 │   │   └── dashboards/             # agregação para dashboards — sem LLM, sem cache (Sprint 5)
 │   │       ├── service.py          # get_summary, get_por_categoria/get_por_meio_pagamento (+percentual), get_tendencia/get_tendencia_por_categoria (Sprint 6)
 │   │       └── router.py           # rotas /dashboards/* (+tendencia, por-categoria/tendencia na Sprint 6)
@@ -124,12 +127,12 @@ Financeiro v3/
 │   │   ├── test_liability_endpoints.py  # CRUD, isolamento user_id, settle (Sprint 2)
 │   │   ├── test_import_legacy_categories.py  # merge de duplicata, log de conflito (Sprint 2)
 │   │   ├── test_pluggy_client.py        # cache/refetch de API key, paginação, erro propagado (Sprint 3)
-│   │   ├── test_pluggy_service.py       # upsert idempotente, cutoff_date, status não-sincronizável (Sprint 3)
-│   │   ├── test_pluggy_endpoints.py     # 401/404/400, isolamento user_id (Sprint 3)
+│   │   ├── test_pluggy_service.py       # upsert idempotente, cutoff_date, status não-sincronizável (Sprint 3); apelido preservado em resync, sync_enabled pulando conta, update_account/sync_items (Sprint 7)
+│   │   ├── test_pluggy_endpoints.py     # 401/404/400, isolamento user_id (Sprint 3); PUT /accounts/{id}, POST /sync (Sprint 7)
 │   │   ├── test_categorization_normalize.py    # acentos, prefixos de canal, token numérico vs. alfanumérico (Sprint 4)
 │   │   ├── test_categorization_engine.py       # precedência de camadas, fronteira 0.86, isolamento por usuário (Sprint 4)
-│   │   ├── test_categorization_service.py      # invariante "nunca auto-confirma", reedição, 404 cross-user (Sprint 4); paginação, filtro ano/mes (pós-Sprint 6)
-│   │   ├── test_categorization_endpoints.py    # 401, isolamento, confirmar/editar via API (Sprint 4); paginação, filtro ano/mes (pós-Sprint 6)
+│   │   ├── test_categorization_service.py      # invariante "nunca auto-confirma", reedição, 404 cross-user (Sprint 4); paginação, filtro ano/mes (pós-Sprint 6); filtro status/tipo, bulk_confirm parcial, propagação de descrição (Sprint 7)
+│   │   ├── test_categorization_endpoints.py    # 401, isolamento, confirmar/editar via API (Sprint 4); paginação, filtro ano/mes (pós-Sprint 6); rotas /transactions/*, bulk-confirm, descrição (Sprint 7)
 │   │   ├── test_import_legacy_categorization_rules.py  # conflito, idempotência, categoria não resolvida, abort sem usuário (Sprint 4)
 │   │   ├── test_dashboards_service.py   # período vazio, só-transferência, misto, sinal do cartão, borda de mês (Sprint 5); tendência terminando no mês filtrado, percentual somando 100%/denominador zero (Sprint 6)
 │   │   ├── test_dashboards_endpoints.py # 401, isolamento entre usuários nos 5 endpoints (Sprint 5+6)
@@ -144,7 +147,8 @@ Financeiro v3/
 │           ├── 0004_create_pluggy_tables.py  # pluggy_items/accounts/transactions (Sprint 3)
 │           ├── 0005_create_categorization_rules.py  # categorization_rules (Sprint 4)
 │           ├── 0006_add_categorization_and_asset_fields_to_pluggy_transactions.py  # 9 colunas novas (Sprint 4)
-│           └── 0007_dashboards_transferencia_flag_e_competencia.py  # excluir_de_totais + backfill data_competencia + índice (Sprint 5)
+│           ├── 0007_dashboards_transferencia_flag_e_competencia.py  # excluir_de_totais + backfill data_competencia + índice (Sprint 5)
+│           └── 0008_categorizacao_gestao_contas.py  # apelido/sync_enabled em pluggy_accounts, descricao_usuario/sugerida/origem_id em pluggy_transactions, seed subcategoria Aluguel (Sprint 7)
 ├── frontend/                       # React 19 + Vite + TypeScript (Sprint 1)
 │   ├── package.json                # dependências frontend (React, TanStack Query, ESLint, Prettier, Vitest)
 │   ├── tsconfig.json
@@ -155,13 +159,15 @@ Financeiro v3/
 │   ├── src/
 │   │   ├── App.tsx                 # componente raiz (renderização condicional login/protected/loading)
 │   │   ├── main.tsx
+│   │   ├── utils/
+│   │   │   └── format.ts           # formatCurrency, extraído de DashboardsPage.tsx (Sprint 7)
 │   │   ├── api/
 │   │   │   ├── client.ts           # fetch wrapper com credentials:"include"
 │   │   │   ├── auth.ts             # chamadas /auth/me
-│   │   │   ├── pluggy.ts           # chamadas /pluggy/* (Sprint 3)
+│   │   │   ├── pluggy.ts           # chamadas /pluggy/* (Sprint 3); apelido/sync_enabled em PluggyAccount, updatePluggyAccount, syncPluggyItems (Sprint 7)
 │   │   │   ├── categories.ts       # chamadas /category-groups, /subcategories (Sprint 4, pré-requisito antes inexistente)
 │   │   │   ├── assets.ts           # chamadas /assets (Sprint 4, pré-requisito antes inexistente)
-│   │   │   ├── categorization.ts   # chamadas /categorization/* (Sprint 4; paginação/filtro ano-mes pós-Sprint 6)
+│   │   │   ├── categorization.ts   # chamadas /categorization/transactions/* — renomeado de /pending/*, +status/tipo, bulkConfirm, updateDescription/confirm/dismissDescriptionSuggestion (Sprint 7, era Sprint 4)
 │   │   │   └── dashboards.ts       # chamadas /dashboards/*, SEM_CATEGORIA_ID (Sprint 5); +tendencia/por-categoria/tendencia, +percentual (Sprint 6)
 │   │   ├── pluggy/
 │   │   │   └── loadPluggyConnect.ts  # injeta o script do widget Pluggy Connect sob demanda (Sprint 3)
@@ -169,15 +175,20 @@ Financeiro v3/
 │   │   │   ├── useCurrentUser.ts   # TanStack Query hook para sessão do usuário
 │   │   │   ├── usePluggyItems.ts   # lista items conectados (Sprint 3)
 │   │   │   ├── usePluggyAccounts.ts      # lista contas sincronizadas (Sprint 3)
-│   │   │   ├── usePluggyTransactions.ts  # lista transações sincronizadas (Sprint 3)
+│   │   │   ├── usePluggyTransactions.ts  # lista transações sincronizadas (Sprint 3) — ainda usada pelo drill-down do Dashboard
 │   │   │   ├── useRegisterPluggyItem.ts  # mutation POST /pluggy/items (Sprint 3)
-│   │   │   ├── useSyncPluggyItem.ts      # mutation POST /pluggy/items/{id}/sync (Sprint 3)
+│   │   │   ├── useUpdatePluggyAccount.ts # mutation PUT /pluggy/accounts/{id} — apelido/sync_enabled (Sprint 7)
+│   │   │   ├── useSyncPluggyItems.ts     # mutation POST /pluggy/sync, em lote (Sprint 7)
 │   │   │   ├── useCategoryGroups.ts      # lista category_groups (Sprint 4)
 │   │   │   ├── useSubcategories.ts       # lista subcategories (Sprint 4)
 │   │   │   ├── useAssets.ts              # lista assets do usuário (Sprint 4)
-│   │   │   ├── usePendingCategorizations.ts  # lista fila de pendentes, paginada + filtro ano/mes (Sprint 4; pós-Sprint 6)
-│   │   │   ├── useConfirmCategorization.ts   # mutation POST /categorization/pending/{id}/confirm (Sprint 4)
-│   │   │   ├── useSetTransactionAsset.ts     # mutation PUT /categorization/pending/{id}/asset (Sprint 4)
+│   │   │   ├── useCategorizationTransactions.ts  # lista transações filtrada por status/tipo/ano/mes, paginada (Sprint 7, renomeado de usePendingCategorizations)
+│   │   │   ├── useSetCategory.ts         # mutation PUT /categorization/transactions/{id}/category (Sprint 7, renomeado de useConfirmCategorization)
+│   │   │   ├── useBulkConfirmCategorization.ts   # mutation POST .../bulk-confirm (Sprint 7)
+│   │   │   ├── useSetTransactionAsset.ts # mutation PUT /categorization/transactions/{id}/asset (Sprint 4)
+│   │   │   ├── useUpdateDescription.ts   # mutation PUT .../description (Sprint 7)
+│   │   │   ├── useConfirmDescriptionSuggestion.ts  # mutation POST .../description/confirm (Sprint 7)
+│   │   │   ├── useDismissDescriptionSuggestion.ts  # mutation POST .../description/dismiss (Sprint 7)
 │   │   │   ├── useDashboardSummary.ts        # GET /dashboards/summary (Sprint 5)
 │   │   │   ├── useDashboardByCategoria.ts    # GET /dashboards/por-categoria (Sprint 5)
 │   │   │   ├── useDashboardByMeioPagamento.ts  # GET /dashboards/por-meio-pagamento (Sprint 5)
@@ -185,11 +196,10 @@ Financeiro v3/
 │   │   │   └── useDashboardCategoriaTendencia.ts  # GET /dashboards/por-categoria/tendencia, enabled só com categoria expandida (Sprint 6)
 │   │   └── pages/
 │   │       ├── LoginPage.tsx       # botão "Entrar com Google" (link para /auth/google/login)
-│   │       ├── ProtectedPage.tsx   # nome/e-mail do usuário + abas Início/Dashboards/Conectar conta/Transações/Categorizar (Sprint 5)
+│   │       ├── ProtectedPage.tsx   # nome/e-mail do usuário + abas Início/Dashboards/Categorizar/Gestão de contas (Sprint 5; aba Transações removida, Conectar conta renomeada na Sprint 7)
 │   │       ├── DashboardsPage.tsx  # filtro ano/mês, 4 cards com sparkline, funil de drill-down em sanfona + Recharts (Sprint 5, sanfona/tendência/percentual na Sprint 6)
-│   │       ├── ConnectAccountPage.tsx    # widget Pluggy Connect + lista de items conectados (Sprint 3)
-│   │       ├── TransactionsPage.tsx      # lista de transações + botão sincronizar por item (Sprint 3)
-│   │       └── CategorizationReviewPage.tsx  # fila de revisão — sugestão pré-preenchida, confirmar/editar, filtro ano/mês + paginação (Sprint 4; pós-Sprint 6)
+│   │       ├── AccountManagementPage.tsx  # Gestão de Contas — lista contas conectadas, apelido/sync_enabled editáveis, diálogo "Sincronizar MeuPluggy" com pré-seleção (Sprint 7, renomeado de ConnectAccountPage.tsx)
+│   │       └── CategorizationReviewPage.tsx  # listagem única de transações (substitui TransactionsPage) — filtro tipo/status, lote, categoria editável em confirmada, descrição inline + propagação (Sprint 4; paginação pós-Sprint 6; rework completo na Sprint 7)
 │   │   └── App.test.tsx            # testes Vitest + Testing Library (401, 200)
 │   └── test/
 │       └── setup.ts                # setup do Vitest (jest-dom matchers)
@@ -201,7 +211,8 @@ Financeiro v3/
 │       ├── check.mjs               # genérico: navega, screenshot, erros de console
 │       ├── check-dashboard.mjs     # fluxo autenticado: início → dashboards → drill-down
 │       ├── check-sanfona.mjs       # sanfona multi-nível + sparkline + tipografia, contra dado real (Sprint 6)
-│       └── check-categorizacao.mjs # filtro + paginação + tempo real do fluxo de confirmar (pós-Sprint 6)
+│       ├── check-categorizacao.mjs # filtro + paginação + tempo real do fluxo de confirmar (pós-Sprint 6)
+│       └── check-sprint7.mjs       # filtro tipo/status, seleção em lote, descrição editável, Gestão de Contas — apelido, diálogo de sync (Sprint 7; achou bug real de overflow desktop)
 ├── .github/
 │   └── workflows/
 │       └── ci.yml                  # GitHub Actions: pytest+ruff (backend), vitest+eslint+tsc (frontend) (Sprint 1)
@@ -214,10 +225,11 @@ Financeiro v3/
 - Frontend de gestão de `categorization_rules` (editar/remover regra manualmente) — fora de escopo, só o import e o motor automático (ver PRD-004).
 - UI de gestão de `category_groups.excluir_de_totais` — só setado via migration na Sprint 5; se surgir necessidade de mais grupos excluídos, é ajuste de dado, não de mecanismo (ver PRD-005).
 - Override manual de `data_competencia` por transação — schema já suporta (coluna gravada, não computada), endpoint/UI adiados (ver PRD-005).
-- Despesas por natureza/ativo (tela de Ativos) — E6 parte 2, Sprint 7. Evolução de patrimônio/investimentos ao longo do tempo segue sem série histórica no schema (precisaria de snapshot periódico, job novo).
+- Tela de Gestão de Ativos (cards, criar/editar ativo, drilldown de custos por ativo) — E6 parte 2, Sprint 8; backend CRUD já existe em `app/assets/`/`app/liabilities/` desde a Sprint 2. Evolução de patrimônio/investimentos ao longo do tempo segue sem série histórica no schema (precisaria de snapshot periódico, job novo).
+- Estado "pular/ignorar" na fila de Categorização; reconciliação de descrição quando a Pluggy reenvia uma transação já editada pelo usuário (`descricao_usuario` nunca é sobrescrito por sync, não há merge/conflito a resolver) — ambos fora de escopo desde o PRD-004/PRD-007.
+- Modernização visual/paginação da tabela de Categorização (hoje HTML puro, sem tokens do design system) — Sprint 10.
 - Herança de regras entre usuários (memória compartilhada opt-in) — schema de `categorization_rules` já preparado (`origem` extensível), mecanismo de opt-in/onboarding fica para sprint futura.
 - Camadas de token distintivo/IDF e léxico estático PT-BR no motor de categorização — adiadas até haver volume real suficiente para calibrar (ver PRD-004).
-- Estado "pular/ignorar" na fila de revisão — toda pendência exige categoria eventualmente.
 - Perfil de usuário, logout, multiusuário — E7.
 - Sync agendado/webhooks Pluggy e UI dedicada de reconexão — fora do roadmap a menos que o CEO priorize (decisão fixa do projeto é sync manual).
 - Tabelas pré-calculadas ou cache de agregação para dashboards — decisão fixa do projeto (leitura direta/agregação simples).

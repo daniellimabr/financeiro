@@ -113,23 +113,45 @@ Sprint 8, que paginará o endpoint.
 - 165 testes backend (98% cobertura) + 28 testes frontend.
 - PRD: [PRD-006-dashboards-analiticos.md](prd/PRD-006-dashboards-analiticos.md). Plano: [SPRINT-006-dashboards-analiticos-plan.md](sprints/SPRINT-006-dashboards-analiticos-plan.md). Relatório: [SPRINT-006-dashboards-analiticos-report.md](sprints/SPRINT-006-dashboards-analiticos-report.md) — aprovado pelo CEO em 2026-08-15.
 
-### Sprint 7 — Categorização (rework), eliminação de Transações e Gestão de Contas (E3, E2)
+### Sprint 7 — Categorização (rework), eliminação de Transações e Gestão de Contas (E3, E2) ✅ concluída em 2026-08-15
 
 CEO trouxe um pedido de ajustes de tela bem mais amplo que o "escopo a
 definir" originalmente reservado aqui — cobre 3 fatias de épico distintas,
 divididas em Sprints 7/8/9 nesta sessão de planejamento (2026-08-15).
 
-Escopo desta sprint: filtro por tipo (receita/despesa) e status
-(pendente/confirmada/todas) na fila de Categorização; seleção e aprovação
-em lote; edição de categoria em transação já confirmada; descrição de
-linha editável com propagação (pendente de aprovação individual) para
-transações idênticas do mesmo usuário; eliminação da tela Transações
-(funções absorvidas pela fila de Categorização); "Conectar Conta" vira
-"Gestão de Contas" — lista/edita/renomeia contas conectadas, remove conta
-da lista de sync, botão único de sincronização com pré-seleção; formato de
-moeda padronizado; nova subcategoria "Aluguel". PRD:
-[PRD-007-categorizacao-gestao-contas.md](prd/PRD-007-categorizacao-gestao-contas.md).
-Plano: [SPRINT-007-categorizacao-gestao-contas-plan.md](sprints/SPRINT-007-categorizacao-gestao-contas-plan.md).
+- Migration `0008`: `apelido`/`sync_enabled` em `pluggy_accounts`;
+  `descricao_usuario`/`descricao_sugerida`/`descricao_sugestao_origem_id`
+  em `pluggy_transactions`; seed idempotente da subcategoria "Aluguel" sob
+  o grupo "Receitas" (distinta da despesa "Aluguel" já existente sob
+  "Moradia").
+- `GET /categorization/transactions` (renomeado de `/pending`, sem shim):
+  filtro `status` (pendente/confirmada/todas, default todas) e `tipo`
+  (débito/crédito); `POST .../bulk-confirm` confirma uma lista em uma
+  chamada, reportando sucesso/falha por item; `PUT .../category` vira
+  `set_category` (sem trava de status — já podia reeditar confirmada
+  antes desta sprint); `PUT .../description` edita a descrição exibida e
+  propaga sugestão pendente (match normalizado exato + mesma categoria)
+  para transações idênticas do mesmo usuário — nunca aplicada
+  automaticamente, aceitar/descartar via `.../description/confirm`/`dismiss`.
+- `PUT /pluggy/accounts/{id}` (apelido/sync_enabled) e `POST /pluggy/sync`
+  (sincronização em lote, pula conta com `sync_enabled=false`).
+- Frontend: `CategorizationReviewPage.tsx` vira a listagem única de
+  transações (filtro `status=todas` cobre o que `TransactionsPage.tsx`
+  oferecia — página removida) — filtro tipo/status, seleção em lote +
+  "Aprovar marcadas", categoria editável em linha confirmada, descrição
+  inline com nota de propagação. `AccountManagementPage.tsx` (renomeia
+  `ConnectAccountPage.tsx`, aba "Gestão de contas"): apelido/sync_enabled
+  editáveis por conta, diálogo único "Sincronizar MeuPluggy" com
+  pré-seleção. `formatCurrency` extraído para `utils/format.ts`.
+- QA visual real (`scripts/browser-check/check-sprint7.mjs`, novo) contra
+  a VM de dev encontrou um bug real de overflow desktop — sem teto de
+  largura, os selects/botão de descrição empurravam a tabela de
+  Categorização para além de 1440px, escondendo o botão "Confirmar" fora
+  da área rolável sem indício visual — corrigido e revalidado.
+- 219 testes backend (98% cobertura) + 44 testes frontend.
+- PRD: [PRD-007-categorizacao-gestao-contas.md](prd/PRD-007-categorizacao-gestao-contas.md).
+  Plano: [SPRINT-007-categorizacao-gestao-contas-plan.md](sprints/SPRINT-007-categorizacao-gestao-contas-plan.md).
+  Relatório: [SPRINT-007-categorizacao-gestao-contas-report.md](sprints/SPRINT-007-categorizacao-gestao-contas-report.md).
 
 ### Sprint 8 — Gestão de Ativos (E6, parte 2)
 *Escopo ainda não detalhado em PRD/plano — planejar em sessão própria.*
