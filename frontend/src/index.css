@@ -710,18 +710,29 @@ input {
 }
 
 @media (max-width: 640px) {
-  .dash-row .nm {
-    flex-basis: 96px;
-  }
-
   /* Linha ganhou tendência + percentual na Sprint 6 — em telas estreitas,
      6 elementos (chevron/nome/tendência/barra/valor/%) espremiam o valor e
      cortavam o percentual na borda (achado real via browser-check). Barra e
      tendência já são reforço visual do gráfico acima; nome/valor/% seguem
-     visíveis e são o essencial pra ler a linha. */
+     visíveis e são o essencial pra ler a linha. Um nível de sanfona aninhado
+     (categoria → meio de pagamento) soma indentação + padding, por isso o
+     nome encolhe mais e o percentual ganha uma folga extra. */
   .dash-row .trend,
   .dash-row .track {
     display: none;
+  }
+
+  .dash-row .nm {
+    flex-basis: 72px;
+  }
+
+  .dash-row .pct {
+    min-width: 40px;
+  }
+
+  .dash-accordion-panel {
+    margin-left: var(--space-2);
+    padding-left: var(--space-3);
   }
 }
 
