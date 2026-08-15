@@ -458,6 +458,7 @@ function GrupoAccordion({
             {expandedGrupos.includes(grupo.group_id) && (
               <div className="dash-accordion-panel">
                 <SubcategoriaAccordion
+                  tipo={tipo}
                   groupId={grupo.group_id}
                   groupTotal={grupo.total}
                   subcategorias={grupo.subcategorias}
@@ -478,6 +479,7 @@ function GrupoAccordion({
 }
 
 function SubcategoriaAccordion({
+  tipo,
   groupId,
   groupTotal,
   subcategorias,
@@ -488,6 +490,7 @@ function SubcategoriaAccordion({
   expandedSubcategorias,
   onToggleSubcategoria,
 }: {
+  tipo: TransacaoTipo;
   groupId: number;
   groupTotal: number;
   subcategorias: CategoriaTotal[];
@@ -528,6 +531,7 @@ function SubcategoriaAccordion({
                   <TransacoesPanel
                     filter={filter}
                     categoriaId={item.subcategory_id}
+                    tipo={tipo}
                     totalParaPercentual={item.total}
                     emptyMessage="Nenhuma transação nesta categoria."
                   />

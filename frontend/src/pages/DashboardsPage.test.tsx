@@ -611,6 +611,28 @@ describe("DashboardsPage", () => {
     });
   });
 
+  it("requests the transaction list scoped to the funil's tipo, not mixing debito/credito under a shared subcategoria", async () => {
+    const fetchMock = routedFetchMock();
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /Despesa/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Alimentação/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Mercado/ }));
+    await screen.findByText("Mercado São João");
+
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls.map((call) => String(call[0]));
+      const chamadaTransacoes = calls.find(
+        (url) => url.startsWith("/pluggy/transactions") && url.includes("subcategory_id=10")
+      );
+      expect(chamadaTransacoes).toBeDefined();
+      expect(chamadaTransacoes).toContain("tipo=debito");
+    });
+  });
+
   it("shows the credit limit in parentheses next to a credit card balance", async () => {
     vi.stubGlobal("fetch", routedFetchMock());
 
