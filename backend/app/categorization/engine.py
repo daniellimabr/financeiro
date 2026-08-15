@@ -26,20 +26,31 @@ class AssetSuggestion:
     confianca: str
 
 
+@dataclass
+class HistoricoTransacao:
+    id: int
+    subcategory_id: int
+    normalizado: str
+
+
 def suggest_category(db: Session, user_id: int, descricao: str) -> CategorySuggestion | None:
     normalizado = normalize_description(descricao)
     if not normalizado:
         return None
-
-    rule = (
-        db.query(CategorizationRule)
-        .filter(
-            CategorizationRule.user_id == user_id,
-            CategorizationRule.padrao_normalizado == normalizado,
-        )
-        .order_by(CategorizationRule.id)
-        .first()
+    return suggest_category_from_index(
+        normalizado, build_rules_index(db, user_id), build_historico_index(db, user_id)
     )
+
+
+def suggest_category_from_index(
+    normalizado: str,
+    rules_by_pattern: dict[str, CategorizationRule],
+    historico: list[HistoricoTransacao],
+) -> CategorySuggestion | None:
+    if not normalizado:
+        return None
+
+    rule = rules_by_pattern.get(normalizado)
     if rule is not None:
         return CategorySuggestion(
             subcategory_id=rule.subcategory_id,
@@ -49,35 +60,57 @@ def suggest_category(db: Session, user_id: int, descricao: str) -> CategorySugge
             score=None,
         )
 
-    historico = _confirmed_history(db, user_id)
-
-    for tx in historico:
-        if normalize_description(tx.descricao) == normalizado:
+    for h in historico:
+        if h.normalizado == normalizado:
             return CategorySuggestion(
-                subcategory_id=tx.subcategory_id,
+                subcategory_id=h.subcategory_id,
                 confianca="alta",
                 fonte_tipo="historico_exato",
-                fonte_id=tx.id,
+                fonte_id=h.id,
                 score=None,
             )
 
-    best_match: tuple[PluggyTransaction, float] | None = None
-    for tx in historico:
-        score = SequenceMatcher(None, normalizado, normalize_description(tx.descricao)).ratio()
+    best_match: tuple[HistoricoTransacao, float] | None = None
+    for h in historico:
+        score = SequenceMatcher(None, normalizado, h.normalizado).ratio()
         if score >= SIMILARITY_THRESHOLD and (best_match is None or score > best_match[1]):
-            best_match = (tx, score)
+            best_match = (h, score)
 
     if best_match is not None:
-        tx, score = best_match
+        h, score = best_match
         return CategorySuggestion(
-            subcategory_id=tx.subcategory_id,
+            subcategory_id=h.subcategory_id,
             confianca="alta",
             fonte_tipo="historico_similar",
-            fonte_id=tx.id,
+            fonte_id=h.id,
             score=round(score, 3),
         )
 
     return None
+
+
+def build_rules_index(db: Session, user_id: int) -> dict[str, CategorizationRule]:
+    rules = (
+        db.query(CategorizationRule)
+        .filter(CategorizationRule.user_id == user_id)
+        .order_by(CategorizationRule.id)
+        .all()
+    )
+    index: dict[str, CategorizationRule] = {}
+    for rule in rules:
+        index.setdefault(rule.padrao_normalizado, rule)
+    return index
+
+
+def build_historico_index(db: Session, user_id: int) -> list[HistoricoTransacao]:
+    return [
+        HistoricoTransacao(
+            id=tx.id,
+            subcategory_id=tx.subcategory_id,
+            normalizado=normalize_description(tx.descricao),
+        )
+        for tx in _confirmed_history(db, user_id)
+    ]
 
 
 def _confirmed_history(db: Session, user_id: int) -> list[PluggyTransaction]:
@@ -98,11 +131,22 @@ def suggest_asset(db: Session, user_id: int, descricao: str) -> AssetSuggestion 
     normalizado = normalize_description(descricao)
     if not normalizado:
         return None
+    return suggest_asset_from_index(normalizado, build_assets_index(db, user_id))
 
-    assets = db.query(Asset).filter(Asset.user_id == user_id).order_by(Asset.id).all()
-    for asset in assets:
-        asset_normalizado = normalize_description(asset.nome)
+
+def suggest_asset_from_index(
+    normalizado: str, assets: list[tuple[int, str]]
+) -> AssetSuggestion | None:
+    if not normalizado:
+        return None
+
+    for asset_id, asset_normalizado in assets:
         if asset_normalizado and asset_normalizado in normalizado:
-            return AssetSuggestion(asset_id=asset.id, confianca="media")
+            return AssetSuggestion(asset_id=asset_id, confianca="media")
 
     return None
+
+
+def build_assets_index(db: Session, user_id: int) -> list[tuple[int, str]]:
+    assets = db.query(Asset).filter(Asset.user_id == user_id).order_by(Asset.id).all()
+    return [(a.id, normalize_description(a.nome)) for a in assets]

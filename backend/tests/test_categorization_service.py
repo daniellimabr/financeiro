@@ -2,6 +2,7 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import event
 
 from app.categorization import service
 from app.exceptions import NotFoundError
@@ -134,6 +135,86 @@ def test_list_pending_transactions_isolated_by_user_and_status(db_session, user,
     _pending_transaction(db_session, other_user, "Outra transacao")
 
     assert service.list_pending_transactions(db_session, user.id) == []
+
+
+def _confirmed_transaction(db_session, user, subcategory, descricao):
+    n = next(_SEQ)
+    item = PluggyItem(
+        user_id=user.id,
+        pluggy_item_id=f"item-hist-{n}",
+        connector_id=1,
+        connector_name="Banco Fake",
+        status=PluggyItemStatus.updated,
+        cutoff_date=date(2026, 1, 1),
+    )
+    db_session.add(item)
+    db_session.flush()
+    account = PluggyAccount(
+        item_id=item.id,
+        user_id=user.id,
+        pluggy_account_id=f"acc-hist-{n}",
+        tipo=PluggyAccountTipo.corrente,
+        nome="Conta",
+        saldo=Decimal("0"),
+    )
+    db_session.add(account)
+    db_session.flush()
+    tx = PluggyTransaction(
+        account_id=account.id,
+        user_id=user.id,
+        pluggy_transaction_id=f"tx-hist-{n}",
+        descricao=descricao,
+        valor=Decimal("-10.00"),
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 15),
+        status=PluggyTransactionStatus.efetivada,
+        categorizacao_status=PluggyTransactionCategorizacaoStatus.confirmada,
+        subcategory_id=subcategory.id,
+    )
+    db_session.add(tx)
+    db_session.commit()
+    db_session.refresh(tx)
+    return tx
+
+
+def test_list_pending_transactions_query_count_does_not_scale_with_pending_count(
+    db_session, user, subcategory
+):
+    # Regressão: antes da correção, cada transação pendente disparava sua
+    # própria busca de histórico confirmado (para a camada de similaridade) —
+    # o número de queries crescia linearmente com o tamanho da fila, o que na
+    # prática (centenas de pendências reais) tornava a tela "eternamente"
+    # lenta. Agora histórico/regras/ativos são buscados uma única vez por
+    # chamada, então o total de queries fica limitado independente de quantas
+    # transações estão pendentes.
+    for i in range(5):
+        _confirmed_transaction(db_session, user, subcategory, f"Historico confirmado {i}")
+    for i in range(20):
+        _pending_transaction(db_session, user, f"Pendente sem match {i}")
+
+    bind = db_session.get_bind()
+    select_count = {"n": 0}
+
+    def _count_selects(_conn, _cursor, statement, *_args, **_kwargs):
+        if statement.strip().upper().startswith("SELECT"):
+            select_count["n"] += 1
+
+    event.listen(bind, "before_cursor_execute", _count_selects)
+    try:
+        result = service.list_pending_transactions(db_session, user.id)
+    finally:
+        event.remove(bind, "before_cursor_execute", _count_selects)
+
+    # Custo esperado: 1 query para a lista de pendentes + 3 para os índices
+    # de regras/histórico/ativos (buscados uma única vez para o lote
+    # inteiro) + 1 SELECT de refresh por transação (necessário para pegar
+    # `updated_at` gerado pelo banco) — ou seja, ~1x por pendência, nunca
+    # ~4x. Antes da correção cada pendência também requeria seu próprio
+    # histórico/regras/ativos, então o total ficava perto de 4x por
+    # pendência (~81 para 20 pendências); o limite abaixo falha nesse
+    # cenário antigo e passa no atual.
+    assert len(result) == 20
+    assert select_count["n"] < 2 * len(result) + 10
 
 
 def test_confirm_categorization_sets_fields_and_removes_from_pending(db_session, user, subcategory):

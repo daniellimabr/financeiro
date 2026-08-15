@@ -1,8 +1,10 @@
 from sqlalchemy.orm import Session
 
 from app.categorization import engine
+from app.categorization.normalize import normalize_description
 from app.exceptions import NotFoundError
 from app.models.asset import Asset
+from app.models.categorization import CategorizationRule
 from app.models.category import Subcategory
 from app.models.pluggy import PluggyTransaction, PluggyTransactionCategorizacaoStatus
 
@@ -18,17 +20,35 @@ def list_pending_transactions(db: Session, user_id: int) -> list[PluggyTransacti
         .all()
     )
 
-    for tx in pending:
-        _apply_suggestions(db, tx)
-    db.commit()
-    for tx in pending:
-        db.refresh(tx)
+    if pending:
+        # Regras/histórico/ativos são buscados uma única vez para todo o lote —
+        # antes eram requeridos do banco a cada transação pendente (O(P×H) de
+        # round-trips + comparações de similaridade), o que tornava a fila
+        # praticamente inutilizável com centenas de pendências reais.
+        rules_by_pattern = engine.build_rules_index(db, user_id)
+        historico = engine.build_historico_index(db, user_id)
+        assets = engine.build_assets_index(db, user_id)
+        for tx in pending:
+            _apply_suggestions(db, tx, rules_by_pattern, historico, assets)
+        db.commit()
+        for tx in pending:
+            db.refresh(tx)
 
     return pending
 
 
-def _apply_suggestions(db: Session, tx: PluggyTransaction) -> None:
-    category_suggestion = engine.suggest_category(db, tx.user_id, tx.descricao)
+def _apply_suggestions(
+    db: Session,
+    tx: PluggyTransaction,
+    rules_by_pattern: dict[str, CategorizationRule],
+    historico: list[engine.HistoricoTransacao],
+    assets: list[tuple[int, str]],
+) -> None:
+    normalizado = normalize_description(tx.descricao)
+
+    category_suggestion = engine.suggest_category_from_index(
+        normalizado, rules_by_pattern, historico
+    )
     if category_suggestion is not None:
         tx.subcategoria_sugerida_id = category_suggestion.subcategory_id
         tx.sugestao_confianca = category_suggestion.confianca
@@ -42,7 +62,7 @@ def _apply_suggestions(db: Session, tx: PluggyTransaction) -> None:
         tx.sugestao_fonte_id = None
         tx.sugestao_score = None
 
-    asset_suggestion = engine.suggest_asset(db, tx.user_id, tx.descricao)
+    asset_suggestion = engine.suggest_asset_from_index(normalizado, assets)
     if asset_suggestion is not None:
         tx.asset_sugerido_id = asset_suggestion.asset_id
         tx.asset_sugestao_confianca = asset_suggestion.confianca
