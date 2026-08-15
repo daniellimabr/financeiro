@@ -76,7 +76,8 @@ async function run(browser, viewport, label) {
       path: path.join(shotsDir, `${label}-sprint8-04-drilldown-gasto.png`),
       fullPage: true,
     });
-    await verGasto.click();
+    // o botão troca de rótulo para "Fechar gasto" ao expandir — refaz o locator
+    await page.getByRole("button", { name: "Fechar gasto" }).first().click();
   }
 
   // vender — abre o diálogo, cancela sem submeter (não muta dado real)
