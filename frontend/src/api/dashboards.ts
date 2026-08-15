@@ -12,6 +12,8 @@ export interface DashboardSummary {
   despesa: string;
   saldo: string;
   patrimonio: string;
+  ativos: string;
+  passivos: string;
 }
 
 export interface CategoriaTotal {
@@ -59,6 +61,25 @@ export interface TendenciaAtivo {
   asset_id: number;
   asset_nome: string;
   pontos: PontoTendencia[];
+}
+
+export interface PassivoTotal {
+  liability_id: number;
+  liability_nome: string;
+  total: string;
+}
+
+export interface TendenciaPassivo {
+  liability_id: number;
+  liability_nome: string;
+  pontos: PontoTendencia[];
+}
+
+export interface SaldoConta {
+  account_id: number;
+  account_nome: string;
+  account_tipo: string;
+  saldo: string;
 }
 
 // Período histórico oferecido pelo seletor de tendência (3/6/12 meses).
@@ -128,4 +149,20 @@ export function fetchDashboardPorAtivoTendencia(
   return apiFetch<TendenciaAtivo[]>(
     `/dashboards/por-ativo/tendencia${buildQuery({ tipo, ...filter })}`
   );
+}
+
+export function fetchDashboardPorPassivo(filter: PeriodoFilter = {}): Promise<PassivoTotal[]> {
+  return apiFetch<PassivoTotal[]>(`/dashboards/por-passivo${buildQuery({ ...filter })}`);
+}
+
+export function fetchDashboardPorPassivoTendencia(
+  filter: Required<PeriodoFilter> & { meses: PeriodoHistorico }
+): Promise<TendenciaPassivo[]> {
+  return apiFetch<TendenciaPassivo[]>(
+    `/dashboards/por-passivo/tendencia${buildQuery({ ...filter })}`
+  );
+}
+
+export function fetchSaldoPorConta(): Promise<SaldoConta[]> {
+  return apiFetch<SaldoConta[]>("/dashboards/saldo-por-conta");
 }

@@ -5,6 +5,7 @@ from app.auth.jwt import COOKIE_NAME, create_access_token
 from app.main import app
 from app.models.asset import Asset, AssetTipo
 from app.models.category import CategoryGroup, Subcategory
+from app.models.liability import Liability, LiabilityTipo
 from app.models.pluggy import (
     PluggyAccount,
     PluggyAccountTipo,
@@ -238,6 +239,20 @@ def _asset(db_session, user, nome="Carro"):
     return asset
 
 
+def _liability(db_session, user, nome="Financiamento"):
+    liability = Liability(
+        user_id=user.id,
+        nome=nome,
+        tipo=LiabilityTipo.financiamento,
+        valor_total=Decimal("60000.00"),
+        saldo_devedor=Decimal("30000.00"),
+    )
+    db_session.add(liability)
+    db_session.commit()
+    db_session.refresh(liability)
+    return liability
+
+
 def _transaction(
     db_session,
     user,
@@ -249,6 +264,7 @@ def _transaction(
     data_competencia=None,
     subcategory_id=None,
     asset_id=None,
+    liability_id=None,
 ):
     item = PluggyItem(
         user_id=user.id,
@@ -281,6 +297,7 @@ def _transaction(
         data_competencia=data_competencia if data_competencia is not None else data,
         subcategory_id=subcategory_id,
         asset_id=asset_id,
+        liability_id=liability_id,
         status=PluggyTransactionStatus.efetivada,
     )
     db_session.add(tx)
@@ -518,6 +535,52 @@ def test_list_transactions_filters_by_asset_id_isolated_by_user(client, db_sessi
     body = response.json()
     assert len(body) == 1
     assert Decimal(body[0]["valor"]) == Decimal("-10.00")
+
+
+def test_list_transactions_filters_by_liability_id(client, db_session):
+    user = _authenticate(client, db_session)
+    liability = _liability(db_session, user)
+    _transaction(db_session, user, valor="-10.00", liability_id=liability.id)
+    _transaction(db_session, user, valor="-20.00", liability_id=None)
+
+    response = client.get("/pluggy/transactions", params={"liability_id": liability.id})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert Decimal(body[0]["valor"]) == Decimal("-10.00")
+
+
+def test_list_transactions_filters_by_liability_id_isolated_by_user(client, db_session):
+    user = _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    liability = _liability(db_session, user)
+    _transaction(db_session, user, valor="-10.00", liability_id=liability.id)
+
+    other = User(google_sub="google-2", email="b@example.com", name="Bob")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    other_liability = _liability(db_session, other, nome="Outro financiamento")
+    _transaction(db_session, other, valor="-999.00", liability_id=other_liability.id)
+
+    response = client.get("/pluggy/transactions", params={"liability_id": liability.id})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert Decimal(body[0]["valor"]) == Decimal("-10.00")
+
+
+def test_list_transactions_response_includes_account_tipo(client, db_session):
+    user = _authenticate(client, db_session)
+    _transaction(db_session, user, valor="-10.00", account_tipo=PluggyAccountTipo.cartao_credito)
+
+    response = client.get("/pluggy/transactions")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["account_tipo"] == "cartao_credito"
 
 
 # --- PUT /pluggy/accounts/{id} e POST /pluggy/sync (Sprint 7) --------------

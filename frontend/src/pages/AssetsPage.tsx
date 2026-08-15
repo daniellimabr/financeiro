@@ -1,5 +1,4 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { Line, LineChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 
 import type { Asset, AssetInput, AssetTipo } from "../api/assets";
 import type {
@@ -8,7 +7,9 @@ import type {
   PontoTendencia,
   TransacaoTipo,
 } from "../api/dashboards";
+import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
+import { TrendChart } from "../components/TrendChart";
 import { useAssetGastos } from "../hooks/useAssetGastos";
 import { useAssetGastosTendencia } from "../hooks/useAssetGastosTendencia";
 import { useAssets } from "../hooks/useAssets";
@@ -358,54 +359,6 @@ export function AssetsPage() {
   );
 }
 
-function CardSparkline({ values, color }: { values: number[] | undefined; color: string }) {
-  if (!values || values.length < 2) return null;
-  const data = values.map((v, i) => ({ i, v }));
-  return (
-    <span className="spark" aria-hidden="true">
-      <ResponsiveContainer width="100%" height={28}>
-        <LineChart data={data} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
-          <Line
-            type="monotone"
-            dataKey="v"
-            stroke={color}
-            strokeWidth={2}
-            dot={false}
-            isAnimationActive={false}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </span>
-  );
-}
-
-function AssetTrendChart({ pontos, color }: { pontos: PontoTendencia[]; color: string }) {
-  const data = pontos.map((p) => ({ nome: `${p.mes}/${p.ano}`, total: Number(p.total) }));
-  return (
-    <div className="dash-chart" aria-hidden="true">
-      <ResponsiveContainer width="100%" height={140}>
-        <LineChart data={data} margin={{ top: 8, right: 16, bottom: 4, left: 4 }}>
-          <XAxis
-            dataKey="nome"
-            tick={{ fontSize: 12, fill: "var(--text)" }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis hide />
-          <Line
-            type="monotone"
-            dataKey="total"
-            stroke={color}
-            strokeWidth={2}
-            dot={{ r: 3 }}
-            isAnimationActive={false}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
 function AssetDrilldown({
   assetId,
   tipo,
@@ -438,7 +391,7 @@ function AssetDrilldown({
 
   return (
     <>
-      {pontos && pontos.length > 1 && <AssetTrendChart pontos={pontos} color={color} />}
+      {pontos && pontos.length > 1 && <TrendChart pontos={pontos} color={color} />}
       <p>
         {rotulo} no período: <strong style={{ color }}>{formatCurrency(total)}</strong>
       </p>

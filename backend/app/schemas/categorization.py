@@ -33,6 +33,9 @@ class TransactionOut(BaseModel):
     asset_id: int | None
     asset_sugerido_id: int | None
     asset_sugestao_confianca: str | None
+    liability_id: int | None
+    liability_sugerido_id: int | None
+    liability_sugestao_confianca: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -50,6 +53,10 @@ class CategoryIn(BaseModel):
 
 class AssetAssociationIn(BaseModel):
     asset_id: int | None = None
+
+
+class LiabilityAssociationIn(BaseModel):
+    liability_id: int | None = None
 
 
 class BulkConfirmItemIn(BaseModel):

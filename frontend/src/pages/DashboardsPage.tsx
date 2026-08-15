@@ -1,5 +1,5 @@
 /**
- * DIRECTION CONTRACT — Sprint 5 / Impeccable new-work (extended Sprint 6)
+ * DIRECTION CONTRACT — Sprint 5 / Impeccable new-work (extended Sprint 6, refined Sprint 9)
  *
  * THESIS: personal finance dashboards default to "hero card + neutral SaaS
  * chrome" that summarizes and stops; this page instead makes despesa/receita
@@ -11,16 +11,17 @@
  * only for despesa — never used as chrome. Archivo/Public Sans pair (Sprint
  * 6, chosen by the CEO via rendered comparison artifact), tabular numerals,
  * 12px-radius cards, no icon+heading+text card scaffolding.
- * STORY: user already knows the month; sees four totals at a glance, each
- * with a sparkline of recent history (patrimônio marked "atual" so it never
- * reads as period-scoped, and explicitly flagged as having no history yet);
- * clicks the number they're curious about and expands an accordion funnel —
- * categoria, meio de pagamento and linha de extrato nest without ever hiding
- * a level the user already opened.
- * FIRST VIEWPORT: filtro ano/mês + seletor de histórico top-left, four
- * summary tiles in a grid immediately below, Despesa/Receita tiles visibly
- * interactive, Patrimônio tile carries an "atual" tag, no hero, no chart
- * above the fold.
+ * STORY: user already knows the month; sees six totals at a glance (Receita/
+ * Despesa/Saldo/Ativos/Passivos/Patrimônio), each with a sparkline of recent
+ * history (Patrimônio marked "atual" so it never reads as period-scoped,
+ * explicitly flagged as having no history yet); clicks the number they're
+ * curious about and expands a funnel — categoria (or ativo/passivo/conta)
+ * expands straight into the transaction list, one level deep, each row
+ * carrying a small icon for its meio de pagamento instead of an extra click.
+ * FIRST VIEWPORT: filtro ano/mês + seletor de histórico top-left, six
+ * summary tiles in a grid immediately below, Despesa/Receita/Saldo/Ativos/
+ * Passivos tiles visibly interactive, Patrimônio tile carries an "atual"
+ * tag, no hero, no chart above the fold.
  * FORM: direction D (YNAB/Copilot-esque) from the Sprint 5 direction round —
  * confirmed by the user via published comparison artifacts, dark mode
  * adjusted to neutral charcoal per feedback (terracotta stays an accent,
@@ -29,23 +30,27 @@
  * the finish review, the verdict, and DESIGN.md.
  */
 import { useMemo, useState } from "react";
-import { Bar, BarChart, Cell, Line, LineChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 
 import {
   SEM_CATEGORIA_ID,
   type CategoriaTotal,
-  type MeioPagamentoTotal,
   type PeriodoHistorico,
   type PontoTendencia,
   type TransacaoTipo,
 } from "../api/dashboards";
+import type { PluggyTransaction } from "../api/pluggy";
+import { AccountTipoIcon } from "../components/AccountTipoIcon";
+import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
+import { useAssetGastos } from "../hooks/useAssetGastos";
 import { useDashboardByCategoria } from "../hooks/useDashboardByCategoria";
-import { useDashboardByMeioPagamento } from "../hooks/useDashboardByMeioPagamento";
 import { useDashboardCategoriaTendencia } from "../hooks/useDashboardCategoriaTendencia";
 import { useDashboardSummary } from "../hooks/useDashboardSummary";
 import { useDashboardTendencia } from "../hooks/useDashboardTendencia";
+import { useLiabilityGastos } from "../hooks/useLiabilityGastos";
 import { usePluggyTransactions } from "../hooks/usePluggyTransactions";
+import { useSaldoPorConta } from "../hooks/useSaldoPorConta";
+import { useTableSort } from "../hooks/useTableSort";
 import { formatCurrency } from "../utils/format";
 
 const ACCOUNT_TIPO_LABEL: Record<string, string> = {
@@ -64,12 +69,14 @@ interface PeriodoFiltro {
   mes: number;
 }
 
+type DrillKind = "receita" | "despesa" | "ativos" | "passivos" | "saldo";
+
 interface DrillState {
-  tipo: TransacaoTipo;
-  // subcategory_id das categorias expandidas — sanfona: múltiplas ao mesmo tempo.
-  expandedCategorias: number[];
-  // subcategory_id -> lista de account_tipo expandidos dentro daquela categoria.
-  expandedMeios: Record<number, string[]>;
+  kind: DrillKind;
+  // ids das linhas expandidas na seção atualmente aberta (subcategory_id,
+  // asset_id ou liability_id conforme kind) — só uma seção fica aberta por
+  // vez, então um único array cobre os três casos.
+  expandedRows: number[];
 }
 
 export function DashboardsPage() {
@@ -78,56 +85,41 @@ export function DashboardsPage() {
   const [mes, setMes] = useState(now.getMonth() + 1);
   const [periodoHistorico, setPeriodoHistorico] = useState<PeriodoHistorico>(6);
   const [drill, setDrill] = useState<DrillState | null>(null);
+  const [ativosTipo, setAtivosTipo] = useState<TransacaoTipo>("debito");
 
   const filter: PeriodoFiltro = { ano, mes };
 
   const summaryQuery = useDashboardSummary(filter);
   const tendenciaQuery = useDashboardTendencia(ano, mes, periodoHistorico);
 
-  function abrirFunil(tipo: TransacaoTipo) {
-    setDrill((prev) =>
-      prev?.tipo === tipo ? null : { tipo, expandedCategorias: [], expandedMeios: {} }
-    );
+  function abrirFunil(kind: DrillKind) {
+    setDrill((prev) => (prev?.kind === kind ? null : { kind, expandedRows: [] }));
   }
 
   function fecharFunil() {
     setDrill(null);
   }
 
-  function toggleCategoria(subcategoryId: number) {
+  function toggleRow(id: number) {
     setDrill((prev) => {
       if (!prev) return prev;
-      const expandida = prev.expandedCategorias.includes(subcategoryId);
+      const expandida = prev.expandedRows.includes(id);
       return {
         ...prev,
-        expandedCategorias: expandida
-          ? prev.expandedCategorias.filter((id) => id !== subcategoryId)
-          : [...prev.expandedCategorias, subcategoryId],
-        expandedMeios: expandida
-          ? Object.fromEntries(
-              Object.entries(prev.expandedMeios).filter(([id]) => Number(id) !== subcategoryId)
-            )
-          : prev.expandedMeios,
+        expandedRows: expandida
+          ? prev.expandedRows.filter((rowId) => rowId !== id)
+          : [...prev.expandedRows, id],
       };
     });
   }
 
-  function toggleMeio(subcategoryId: number, accountTipo: string) {
-    setDrill((prev) => {
-      if (!prev) return prev;
-      const atual = prev.expandedMeios[subcategoryId] ?? [];
-      const expandido = atual.includes(accountTipo);
-      return {
-        ...prev,
-        expandedMeios: {
-          ...prev.expandedMeios,
-          [subcategoryId]: expandido
-            ? atual.filter((tipo) => tipo !== accountTipo)
-            : [...atual, accountTipo],
-        },
-      };
-    });
-  }
+  const drillTitle: Record<DrillKind, string> = {
+    receita: "Receita",
+    despesa: "Despesa",
+    ativos: "Ativos",
+    passivos: "Passivos",
+    saldo: "Saldo",
+  };
 
   return (
     <section className="dash-page">
@@ -164,7 +156,7 @@ export function DashboardsPage() {
           <button
             type="button"
             className="dash-tile clickable"
-            onClick={() => abrirFunil("credito")}
+            onClick={() => abrirFunil("receita")}
           >
             <span className="k">Receita</span>
             <span className="v receita">{formatCurrency(summaryQuery.data.receita)}</span>
@@ -176,7 +168,7 @@ export function DashboardsPage() {
           <button
             type="button"
             className="dash-tile clickable"
-            onClick={() => abrirFunil("debito")}
+            onClick={() => abrirFunil("despesa")}
           >
             <span className="k">Despesa</span>
             <span className="v despesa">{formatCurrency(summaryQuery.data.despesa)}</span>
@@ -185,14 +177,30 @@ export function DashboardsPage() {
               color="var(--despesa)"
             />
           </button>
-          <div className="dash-tile">
+          <button type="button" className="dash-tile clickable" onClick={() => abrirFunil("saldo")}>
             <span className="k">Saldo</span>
             <span className="v">{formatCurrency(summaryQuery.data.saldo)}</span>
             <CardSparkline
               values={tendenciaQuery.data?.map((p) => Number(p.saldo))}
               color="var(--accent)"
             />
-          </div>
+          </button>
+          <button
+            type="button"
+            className="dash-tile clickable"
+            onClick={() => abrirFunil("ativos")}
+          >
+            <span className="k">Ativos</span>
+            <span className="v">{formatCurrency(summaryQuery.data.ativos)}</span>
+          </button>
+          <button
+            type="button"
+            className="dash-tile clickable"
+            onClick={() => abrirFunil("passivos")}
+          >
+            <span className="k">Passivos</span>
+            <span className="v">{formatCurrency(summaryQuery.data.passivos)}</span>
+          </button>
           <div className="dash-tile">
             <span className="k">Patrimônio</span>
             <span className="v">{formatCurrency(summaryQuery.data.patrimonio)}</span>
@@ -204,45 +212,61 @@ export function DashboardsPage() {
       {drill && (
         <div className="dash-funnel">
           <div className="dash-funnel-head">
-            <h2>{drill.tipo === "credito" ? "Receita" : "Despesa"}</h2>
+            <h2>{drillTitle[drill.kind]}</h2>
             <button type="button" className="dash-back" onClick={fecharFunil}>
               Fechar
             </button>
           </div>
 
-          <CategoriaAccordion
-            tipo={drill.tipo}
-            filter={filter}
-            periodoHistorico={periodoHistorico}
-            expandedCategorias={drill.expandedCategorias}
-            expandedMeios={drill.expandedMeios}
-            onToggleCategoria={toggleCategoria}
-            onToggleMeio={toggleMeio}
-          />
+          {(drill.kind === "receita" || drill.kind === "despesa") && (
+            <CategoriaAccordion
+              tipo={drill.kind === "receita" ? "credito" : "debito"}
+              filter={filter}
+              periodoHistorico={periodoHistorico}
+              expandedRows={drill.expandedRows}
+              onToggleRow={toggleRow}
+            />
+          )}
+
+          {drill.kind === "ativos" && (
+            <>
+              <div className="dash-toggle" role="group" aria-label="Tipo de transação">
+                <button
+                  type="button"
+                  aria-pressed={ativosTipo === "debito"}
+                  onClick={() => setAtivosTipo("debito")}
+                >
+                  Despesa
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={ativosTipo === "credito"}
+                  onClick={() => setAtivosTipo("credito")}
+                >
+                  Receita
+                </button>
+              </div>
+              <AtivosAccordion
+                tipo={ativosTipo}
+                filter={filter}
+                expandedRows={drill.expandedRows}
+                onToggleRow={toggleRow}
+              />
+            </>
+          )}
+
+          {drill.kind === "passivos" && (
+            <PassivosAccordion
+              filter={filter}
+              expandedRows={drill.expandedRows}
+              onToggleRow={toggleRow}
+            />
+          )}
+
+          {drill.kind === "saldo" && <SaldoPorContaList />}
         </div>
       )}
     </section>
-  );
-}
-
-function CardSparkline({ values, color }: { values: number[] | undefined; color: string }) {
-  if (!values || values.length < 2) return null;
-  const data = values.map((v, i) => ({ i, v }));
-  return (
-    <span className="spark" aria-hidden="true">
-      <ResponsiveContainer width="100%" height={28}>
-        <LineChart data={data} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
-          <Line
-            type="monotone"
-            dataKey="v"
-            stroke={color}
-            strokeWidth={2}
-            dot={false}
-            isAnimationActive={false}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </span>
   );
 }
 
@@ -275,18 +299,14 @@ function CategoriaAccordion({
   tipo,
   filter,
   periodoHistorico,
-  expandedCategorias,
-  expandedMeios,
-  onToggleCategoria,
-  onToggleMeio,
+  expandedRows,
+  onToggleRow,
 }: {
   tipo: TransacaoTipo;
   filter: PeriodoFiltro;
   periodoHistorico: PeriodoHistorico;
-  expandedCategorias: number[];
-  expandedMeios: Record<number, string[]>;
-  onToggleCategoria: (subcategoryId: number) => void;
-  onToggleMeio: (subcategoryId: number, accountTipo: string) => void;
+  expandedRows: number[];
+  onToggleRow: (id: number) => void;
 }) {
   const query = useDashboardByCategoria(tipo, filter);
   const tendenciaQuery = useDashboardCategoriaTendencia(
@@ -301,10 +321,6 @@ function CategoriaAccordion({
     () => [...(query.data ?? [])].sort((a, b) => Number(b.total) - Number(a.total)),
     [query.data]
   );
-  const chartData = useMemo(
-    () => sorted.map((item) => ({ nome: item.subcategory_nome, total: Number(item.total) })),
-    [sorted]
-  );
   const trendBySubcategoria = useMemo(() => {
     const map = new Map<number, PontoTendencia[]>();
     for (const item of tendenciaQuery.data ?? []) map.set(item.subcategory_id, item.pontos);
@@ -315,165 +331,303 @@ function CategoriaAccordion({
   if (query.isError) return <p role="alert">Não foi possível carregar as categorias.</p>;
   if (sorted.length === 0) return <p className="dash-empty">Nenhuma transação neste período.</p>;
 
+  const max = Number(sorted[0]?.total ?? 1);
+
   return (
-    <>
-      <DashChart data={chartData} color={color} />
-      <ul className="dash-list dash-accordion">
-        {sorted.map((item: CategoriaTotal) => (
-          <li key={item.subcategory_id}>
-            <div className="dash-accordion-item">
-              <Row
-                nome={
-                  item.group_id === SEM_CATEGORIA_ID
-                    ? item.subcategory_nome
-                    : `${item.group_nome} · ${item.subcategory_nome}`
-                }
-                total={item.total}
-                percentual={item.percentual}
-                max={Number(chartData[0]?.total ?? 1)}
-                color={color}
-                expanded={expandedCategorias.includes(item.subcategory_id)}
-                onClick={() => onToggleCategoria(item.subcategory_id)}
-                trend={trendBySubcategoria.get(item.subcategory_id)}
-              />
-              {expandedCategorias.includes(item.subcategory_id) && (
-                <div className="dash-accordion-panel">
-                  <MeioPagamentoAccordion
-                    tipo={tipo}
-                    filter={filter}
-                    categoriaId={item.subcategory_id}
-                    expandedMeios={expandedMeios[item.subcategory_id] ?? []}
-                    onToggleMeio={(accountTipo) => onToggleMeio(item.subcategory_id, accountTipo)}
-                  />
-                </div>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
-    </>
+    <ul className="dash-list dash-accordion">
+      {sorted.map((item: CategoriaTotal) => (
+        <li key={item.subcategory_id}>
+          <div className="dash-accordion-item">
+            <Row
+              nome={
+                item.group_id === SEM_CATEGORIA_ID
+                  ? item.subcategory_nome
+                  : `${item.group_nome} · ${item.subcategory_nome}`
+              }
+              total={item.total}
+              percentual={item.percentual}
+              max={max}
+              color={color}
+              expanded={expandedRows.includes(item.subcategory_id)}
+              onClick={() => onToggleRow(item.subcategory_id)}
+              trend={trendBySubcategoria.get(item.subcategory_id)}
+            />
+            {expandedRows.includes(item.subcategory_id) && (
+              <div className="dash-accordion-panel">
+                <TransacoesPanel
+                  filter={filter}
+                  categoriaId={item.subcategory_id}
+                  totalParaPercentual={item.total}
+                  emptyMessage="Nenhuma transação nesta categoria."
+                />
+              </div>
+            )}
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
-function MeioPagamentoAccordion({
+function AtivosAccordion({
   tipo,
   filter,
-  categoriaId,
-  expandedMeios,
-  onToggleMeio,
+  expandedRows,
+  onToggleRow,
 }: {
   tipo: TransacaoTipo;
   filter: PeriodoFiltro;
-  categoriaId: number;
-  expandedMeios: string[];
-  onToggleMeio: (accountTipo: string) => void;
+  expandedRows: number[];
+  onToggleRow: (id: number) => void;
 }) {
-  const query = useDashboardByMeioPagamento(tipo, { ...filter, categoriaId });
+  const query = useAssetGastos(tipo, filter);
   const color = tipo === "credito" ? "var(--receita)" : "var(--despesa)";
 
   const sorted = useMemo(
     () => [...(query.data ?? [])].sort((a, b) => Number(b.total) - Number(a.total)),
     [query.data]
   );
-  const chartData = useMemo(
-    () =>
-      sorted.map((item) => ({
-        nome: ACCOUNT_TIPO_LABEL[item.account_tipo] ?? item.account_tipo,
-        total: Number(item.total),
-      })),
-    [sorted]
+
+  if (query.isLoading) return <p>Carregando...</p>;
+  if (query.isError) return <p role="alert">Não foi possível carregar os ativos.</p>;
+  if (sorted.length === 0)
+    return <p className="dash-empty">Nenhuma transação vinculada a um ativo neste período.</p>;
+
+  const max = Number(sorted[0]?.total ?? 1);
+
+  return (
+    <ul className="dash-list dash-accordion">
+      {sorted.map((item) => (
+        <li key={item.asset_id}>
+          <div className="dash-accordion-item">
+            <Row
+              nome={item.asset_nome}
+              total={item.total}
+              max={max}
+              color={color}
+              expanded={expandedRows.includes(item.asset_id)}
+              onClick={() => onToggleRow(item.asset_id)}
+            />
+            {expandedRows.includes(item.asset_id) && (
+              <div className="dash-accordion-panel">
+                <TransacoesPanel
+                  filter={filter}
+                  assetId={item.asset_id}
+                  tipo={tipo}
+                  emptyMessage="Nenhuma transação vinculada a este ativo neste período."
+                />
+              </div>
+            )}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function PassivosAccordion({
+  filter,
+  expandedRows,
+  onToggleRow,
+}: {
+  filter: PeriodoFiltro;
+  expandedRows: number[];
+  onToggleRow: (id: number) => void;
+}) {
+  const query = useLiabilityGastos(filter);
+  const color = "var(--despesa)";
+
+  const sorted = useMemo(
+    () => [...(query.data ?? [])].sort((a, b) => Number(b.total) - Number(a.total)),
+    [query.data]
   );
 
   if (query.isLoading) return <p>Carregando...</p>;
-  if (query.isError) return <p role="alert">Não foi possível carregar os meios de pagamento.</p>;
-  if (sorted.length === 0) return <p className="dash-empty">Nenhuma transação nesta categoria.</p>;
+  if (query.isError) return <p role="alert">Não foi possível carregar os passivos.</p>;
+  if (sorted.length === 0)
+    return <p className="dash-empty">Nenhuma transação vinculada a um passivo neste período.</p>;
+
+  const max = Number(sorted[0]?.total ?? 1);
 
   return (
-    <>
-      <DashChart data={chartData} color={color} />
-      <ul className="dash-list dash-accordion">
-        {sorted.map((item: MeioPagamentoTotal) => (
-          <li key={item.account_tipo}>
-            <div className="dash-accordion-item">
-              <Row
-                nome={ACCOUNT_TIPO_LABEL[item.account_tipo] ?? item.account_tipo}
-                total={item.total}
-                percentual={item.percentual}
-                max={Number(chartData[0]?.total ?? 1)}
-                color={color}
-                expanded={expandedMeios.includes(item.account_tipo)}
-                onClick={() => onToggleMeio(item.account_tipo)}
-              />
-              {expandedMeios.includes(item.account_tipo) && (
-                <div className="dash-accordion-panel">
-                  <TransacoesPanel
-                    filter={filter}
-                    categoriaId={categoriaId}
-                    accountTipo={item.account_tipo}
-                    meioPagamentoTotal={item.total}
-                  />
-                </div>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
-    </>
+    <ul className="dash-list dash-accordion">
+      {sorted.map((item) => (
+        <li key={item.liability_id}>
+          <div className="dash-accordion-item">
+            <Row
+              nome={item.liability_nome}
+              total={item.total}
+              max={max}
+              color={color}
+              expanded={expandedRows.includes(item.liability_id)}
+              onClick={() => onToggleRow(item.liability_id)}
+            />
+            {expandedRows.includes(item.liability_id) && (
+              <div className="dash-accordion-panel">
+                <TransacoesPanel
+                  filter={filter}
+                  liabilityId={item.liability_id}
+                  tipo="debito"
+                  emptyMessage="Nenhuma transação vinculada a este passivo neste período."
+                />
+              </div>
+            )}
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
+
+function SaldoPorContaList() {
+  const query = useSaldoPorConta();
+  const sorted = useMemo(
+    () => [...(query.data ?? [])].sort((a, b) => Number(b.saldo) - Number(a.saldo)),
+    [query.data]
+  );
+
+  if (query.isLoading) return <p>Carregando...</p>;
+  if (query.isError) return <p role="alert">Não foi possível carregar o saldo por conta.</p>;
+  if (sorted.length === 0) return <p className="dash-empty">Nenhuma conta cadastrada.</p>;
+
+  return (
+    <ul className="dash-list">
+      {sorted.map((conta) => (
+        <li key={conta.account_id} className="dash-row">
+          <AccountTipoIcon tipo={conta.account_tipo} />
+          <span className="nm">{conta.account_nome}</span>
+          <span className="tag">
+            {ACCOUNT_TIPO_LABEL[conta.account_tipo] ?? conta.account_tipo}
+          </span>
+          <span className="amt">{formatCurrency(conta.saldo)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+type TransacaoSortKey = "data" | "descricao" | "valor";
 
 function TransacoesPanel({
   filter,
   categoriaId,
-  accountTipo,
-  meioPagamentoTotal,
+  assetId,
+  liabilityId,
+  tipo,
+  totalParaPercentual,
+  emptyMessage,
 }: {
   filter: PeriodoFiltro;
-  categoriaId: number;
-  accountTipo: string;
-  meioPagamentoTotal: string;
+  categoriaId?: number;
+  assetId?: number;
+  liabilityId?: number;
+  tipo?: TransacaoTipo;
+  totalParaPercentual?: string;
+  emptyMessage: string;
 }) {
   const query = usePluggyTransactions({
     ano: filter.ano,
     mes: filter.mes,
     subcategoryId: categoriaId,
-    accountTipo,
+    assetId,
+    liabilityId,
+    tipo,
     competencia: true,
   });
   const data = query.data ?? [];
-  const total = Number(meioPagamentoTotal);
+  const total = totalParaPercentual !== undefined ? Number(totalParaPercentual) : undefined;
+
+  const { sorted, sortKey, direction, toggleSort } = useTableSort<
+    PluggyTransaction,
+    TransacaoSortKey
+  >(data, (item, key) => (key === "valor" ? Number(item.valor) : item[key]), "data", "desc");
 
   if (query.isLoading) return <p>Carregando...</p>;
   if (query.isError) return <p role="alert">Não foi possível carregar as transações.</p>;
-  if (data.length === 0)
-    return <p className="dash-empty">Nenhuma transação neste meio de pagamento.</p>;
+  if (data.length === 0) return <p className="dash-empty">{emptyMessage}</p>;
 
   return (
     <div className="dash-table-wrap">
       <table className="dash-table">
         <thead>
           <tr>
-            <th>Data</th>
-            <th>Descrição</th>
-            <th>Valor</th>
-            <th>%</th>
+            <th aria-label="Meio de pagamento" />
+            <SortableHeader
+              label="Data"
+              sortKeyName="data"
+              currentKey={sortKey}
+              direction={direction}
+              onClick={() => toggleSort("data")}
+            />
+            <SortableHeader
+              label="Descrição"
+              sortKeyName="descricao"
+              currentKey={sortKey}
+              direction={direction}
+              onClick={() => toggleSort("descricao")}
+            />
+            <SortableHeader
+              label="Valor"
+              sortKeyName="valor"
+              currentKey={sortKey}
+              direction={direction}
+              onClick={() => toggleSort("valor")}
+            />
+            {total !== undefined && <th>%</th>}
           </tr>
         </thead>
         <tbody>
-          {data.map((transaction) => {
-            const percentual = total > 0 ? (Math.abs(Number(transaction.valor)) / total) * 100 : 0;
+          {sorted.map((transaction) => {
+            const percentual =
+              total !== undefined && total > 0
+                ? (Math.abs(Number(transaction.valor)) / total) * 100
+                : 0;
             return (
               <tr key={transaction.id}>
+                <td>
+                  <AccountTipoIcon tipo={transaction.account_tipo} />
+                </td>
                 <td>{transaction.data}</td>
                 <td>{transaction.descricao}</td>
                 <td>{formatCurrency(transaction.valor)}</td>
-                <td className="pct-col">{formatPercent(percentual)}</td>
+                {total !== undefined && <td className="pct-col">{formatPercent(percentual)}</td>}
               </tr>
             );
           })}
         </tbody>
       </table>
     </div>
+  );
+}
+
+function SortableHeader({
+  label,
+  sortKeyName,
+  currentKey,
+  direction,
+  onClick,
+}: {
+  label: string;
+  sortKeyName: TransacaoSortKey;
+  currentKey: TransacaoSortKey;
+  direction: "asc" | "desc";
+  onClick: () => void;
+}) {
+  const active = currentKey === sortKeyName;
+  return (
+    <th
+      className="sortable"
+      aria-sort={active ? (direction === "asc" ? "ascending" : "descending") : "none"}
+    >
+      <button type="button" onClick={onClick}>
+        {label}
+        {active && (
+          <span className="sort-arrow" aria-hidden="true">
+            {direction === "asc" ? "▲" : "▼"}
+          </span>
+        )}
+      </button>
+    </th>
   );
 }
 
@@ -489,7 +643,7 @@ function Row({
 }: {
   nome: string;
   total: string;
-  percentual: string;
+  percentual?: string;
   max: number;
   color: string;
   onClick: () => void;
@@ -513,32 +667,7 @@ function Row({
         <span className="fillbar" style={{ width: `${pct}%`, background: color }} />
       </span>
       <span className="amt">{formatCurrency(total)}</span>
-      <span className="pct">{formatPercent(percentual)}</span>
+      {percentual !== undefined && <span className="pct">{formatPercent(percentual)}</span>}
     </button>
-  );
-}
-
-function DashChart({ data, color }: { data: { nome: string; total: number }[]; color: string }) {
-  return (
-    <div className="dash-chart" aria-hidden="true">
-      <ResponsiveContainer width="100%" height={Math.max(120, data.length * 34)}>
-        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 4 }}>
-          <XAxis type="number" hide />
-          <YAxis
-            type="category"
-            dataKey="nome"
-            width={130}
-            tick={{ fontSize: 12, fill: "var(--text)" }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <Bar dataKey="total" radius={[0, 6, 6, 0]}>
-            {data.map((entry) => (
-              <Cell key={entry.nome} fill={color} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
   );
 }

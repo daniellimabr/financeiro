@@ -9,6 +9,7 @@ from app.exceptions import InvalidStateError, NotFoundError
 from app.models.asset import Asset, AssetTipo
 from app.models.categorization import CategorizationRule
 from app.models.category import CategoryGroup, Subcategory
+from app.models.liability import Liability, LiabilityTipo
 from app.models.pluggy import (
     PluggyAccount,
     PluggyAccountTipo,
@@ -416,6 +417,55 @@ def test_set_transaction_asset_other_users_asset_raises_not_found(db_session, us
 def test_set_transaction_asset_missing_transaction_raises_not_found(db_session, user):
     with pytest.raises(NotFoundError):
         service.set_transaction_asset(db_session, user.id, 999, None)
+
+
+# --- set_transaction_liability ----------------------------------------------
+
+
+def test_set_transaction_liability_sets_and_clears(db_session, user):
+    tx = _pending_transaction(db_session, user)
+    liability = Liability(
+        user_id=user.id,
+        nome="Financiamento",
+        tipo=LiabilityTipo.financiamento,
+        valor_total=Decimal("60000.00"),
+        saldo_devedor=Decimal("30000.00"),
+    )
+    db_session.add(liability)
+    db_session.commit()
+    db_session.refresh(liability)
+
+    updated = service.set_transaction_liability(db_session, user.id, tx.id, liability.id)
+    assert updated.liability_id == liability.id
+    assert updated.asset_id is None
+    assert updated.subcategory_id is None
+
+    cleared = service.set_transaction_liability(db_session, user.id, tx.id, None)
+    assert cleared.liability_id is None
+
+
+def test_set_transaction_liability_other_users_liability_raises_not_found(
+    db_session, user, other_user
+):
+    tx = _pending_transaction(db_session, user)
+    liability = Liability(
+        user_id=other_user.id,
+        nome="Financiamento",
+        tipo=LiabilityTipo.financiamento,
+        valor_total=Decimal("60000.00"),
+        saldo_devedor=Decimal("30000.00"),
+    )
+    db_session.add(liability)
+    db_session.commit()
+    db_session.refresh(liability)
+
+    with pytest.raises(NotFoundError):
+        service.set_transaction_liability(db_session, user.id, tx.id, liability.id)
+
+
+def test_set_transaction_liability_missing_transaction_raises_not_found(db_session, user):
+    with pytest.raises(NotFoundError):
+        service.set_transaction_liability(db_session, user.id, 999, None)
 
 
 # --- update_description / propagation --------------------------------------

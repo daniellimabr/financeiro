@@ -155,9 +155,18 @@ class PluggyTransaction(Base):
     asset_id: Mapped[int | None] = mapped_column(ForeignKey("assets.id"), nullable=True)
     asset_sugerido_id: Mapped[int | None] = mapped_column(ForeignKey("assets.id"), nullable=True)
     asset_sugestao_confianca: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    liability_id: Mapped[int | None] = mapped_column(ForeignKey("liabilities.id"), nullable=True)
+    liability_sugerido_id: Mapped[int | None] = mapped_column(
+        ForeignKey("liabilities.id"), nullable=True
+    )
+    liability_sugestao_confianca: Mapped[str | None] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
     account: Mapped["PluggyAccount"] = relationship(back_populates="transactions")
+
+    @property
+    def account_tipo(self) -> "PluggyAccountTipo":
+        return self.account.tipo

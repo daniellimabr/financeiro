@@ -726,6 +726,27 @@ input {
   color: var(--text);
 }
 
+.dash-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.dash-table th.sortable:hover {
+  color: var(--text-h);
+}
+
+.dash-table th.sortable .sort-arrow {
+  margin-left: var(--space-1);
+  display: inline-block;
+}
+
+.account-tipo-icon {
+  flex: 0 0 auto;
+  color: var(--text);
+  vertical-align: middle;
+  margin-right: var(--space-1);
+}
+
 /* Categorização (Sprint 7): descrição/categoria/ativo têm largura intrínseca
    grande (nomes de subcategoria longos, texto livre da descrição) — sem um
    teto, a linha ultrapassa a largura da viewport e o botão "Confirmar"

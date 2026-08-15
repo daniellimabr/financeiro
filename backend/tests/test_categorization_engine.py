@@ -5,6 +5,7 @@ from app.categorization import engine
 from app.models.asset import Asset, AssetTipo
 from app.models.categorization import CategorizationRule
 from app.models.category import CategoryGroup, Subcategory
+from app.models.liability import Liability, LiabilityTipo
 from app.models.pluggy import (
     PluggyAccount,
     PluggyAccountTipo,
@@ -214,3 +215,54 @@ def test_suggest_asset_returns_none_when_no_match(db_session):
     db_session.commit()
 
     assert engine.suggest_asset(db_session, user.id, "Supermercado Extra") is None
+
+
+def test_suggest_liability_matches_by_normalized_contains(db_session):
+    user = _user(db_session)
+    liability = Liability(
+        user_id=user.id,
+        nome="Financiamento Carro",
+        tipo=LiabilityTipo.financiamento,
+        valor_total=Decimal("60000.00"),
+        saldo_devedor=Decimal("30000.00"),
+    )
+    db_session.add(liability)
+    db_session.commit()
+    db_session.refresh(liability)
+
+    suggestion = engine.suggest_liability(db_session, user.id, "Parcela Financiamento Carro Mes 08")
+
+    assert suggestion is not None
+    assert suggestion.liability_id == liability.id
+    assert suggestion.confianca == "media"
+
+
+def test_suggest_liability_isolated_by_user(db_session):
+    user = _user(db_session)
+    other_user = _user(db_session)
+    liability = Liability(
+        user_id=other_user.id,
+        nome="Financiamento Carro",
+        tipo=LiabilityTipo.financiamento,
+        valor_total=Decimal("60000.00"),
+        saldo_devedor=Decimal("30000.00"),
+    )
+    db_session.add(liability)
+    db_session.commit()
+
+    assert engine.suggest_liability(db_session, user.id, "Financiamento Carro") is None
+
+
+def test_suggest_liability_returns_none_when_no_match(db_session):
+    user = _user(db_session)
+    liability = Liability(
+        user_id=user.id,
+        nome="Financiamento Carro",
+        tipo=LiabilityTipo.financiamento,
+        valor_total=Decimal("60000.00"),
+        saldo_devedor=Decimal("30000.00"),
+    )
+    db_session.add(liability)
+    db_session.commit()
+
+    assert engine.suggest_liability(db_session, user.id, "Supermercado Extra") is None

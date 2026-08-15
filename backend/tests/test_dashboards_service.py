@@ -165,6 +165,52 @@ def test_get_summary_patrimonio_subtracts_cartao_credito_balance(db_session, use
     assert summary.patrimonio == Decimal("700.00")
 
 
+def test_get_summary_ativos_passivos_match_patrimonio_base(db_session, user):
+    db_session.add_all(
+        [
+            Asset(
+                user_id=user.id,
+                nome="Carro",
+                tipo=AssetTipo.veiculo,
+                valor_atual=Decimal("50000.00"),
+                data_aquisicao=date(2020, 1, 1),
+                status=AssetStatus.ativo,
+            ),
+            Asset(
+                user_id=user.id,
+                nome="Carro vendido",
+                tipo=AssetTipo.veiculo,
+                valor_atual=Decimal("20000.00"),
+                data_aquisicao=date(2019, 1, 1),
+                status=AssetStatus.baixado,
+            ),
+            Liability(
+                user_id=user.id,
+                nome="Financiamento",
+                tipo=LiabilityTipo.financiamento,
+                valor_total=Decimal("10000.00"),
+                saldo_devedor=Decimal("4000.00"),
+                status=LiabilityStatus.ativo,
+            ),
+            Liability(
+                user_id=user.id,
+                nome="Quitado",
+                tipo=LiabilityTipo.financiamento,
+                valor_total=Decimal("5000.00"),
+                saldo_devedor=Decimal("0.00"),
+                status=LiabilityStatus.quitado,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    summary = service.get_summary(db_session, user.id)
+
+    assert summary.ativos == Decimal("50000.00")
+    assert summary.passivos == Decimal("4000.00")
+    assert summary.patrimonio == summary.ativos - summary.passivos
+
+
 def test_get_summary_patrimonio_excludes_inactive_assets_and_liabilities(db_session, user):
     db_session.add_all(
         [
@@ -814,3 +860,186 @@ def test_tendencia_isolated_by_user(db_session, user):
 
     assert all(p.despesa == Decimal("0") for p in tendencia)
     assert tendencia_categoria == []
+
+
+def _liability(db_session, user, nome="Financiamento"):
+    liability = Liability(
+        user_id=user.id,
+        nome=nome,
+        tipo=LiabilityTipo.financiamento,
+        valor_total=Decimal("60000.00"),
+        saldo_devedor=Decimal("30000.00"),
+    )
+    db_session.add(liability)
+    db_session.flush()
+    return liability
+
+
+def test_get_por_passivo_no_transactions_returns_empty_list(db_session, user):
+    por_passivo = service.get_por_passivo(db_session, user.id, ano=2026, mes=1)
+
+    assert por_passivo == []
+
+
+def test_get_por_passivo_sums_expenses_and_excludes_liability_without_transaction(db_session, user):
+    account = _account(db_session, user)
+    liability_com_gasto = _liability(db_session, user, nome="Financiamento carro")
+    _liability(db_session, user, nome="Financiamento casa")
+    tx = _transaction(
+        db_session,
+        user,
+        account,
+        valor="-500.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+    )
+    tx.liability_id = liability_com_gasto.id
+    db_session.commit()
+
+    por_passivo = service.get_por_passivo(db_session, user.id, ano=2026, mes=1)
+
+    assert len(por_passivo) == 1
+    assert por_passivo[0].liability_id == liability_com_gasto.id
+    assert por_passivo[0].liability_nome == "Financiamento carro"
+    assert por_passivo[0].total == Decimal("500.00")
+
+
+def test_get_por_passivo_never_sums_credito(db_session, user):
+    account = _account(db_session, user)
+    liability = _liability(db_session, user)
+    tx = _transaction(
+        db_session,
+        user,
+        account,
+        valor="500.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 1, 10),
+    )
+    tx.liability_id = liability.id
+    db_session.commit()
+
+    por_passivo = service.get_por_passivo(db_session, user.id, ano=2026, mes=1)
+
+    assert por_passivo == []
+
+
+def test_get_por_passivo_isolated_by_user(db_session, user):
+    other = User(google_sub="google-por-passivo-other", email="other-pp@example.com", name="Bob")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+
+    account = _account(db_session, other)
+    liability = _liability(db_session, other)
+    tx = _transaction(
+        db_session,
+        other,
+        account,
+        valor="-500.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+    )
+    tx.liability_id = liability.id
+    db_session.commit()
+
+    por_passivo = service.get_por_passivo(db_session, user.id, ano=2026, mes=1)
+
+    assert por_passivo == []
+
+
+def test_get_tendencia_por_passivo_zero_fills_months_without_transaction(db_session, user):
+    account = _account(db_session, user)
+    liability = _liability(db_session, user, nome="Financiamento carro")
+    tx_jan = _transaction(
+        db_session,
+        user,
+        account,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+    )
+    tx_jan.liability_id = liability.id
+    tx_mar = _transaction(
+        db_session,
+        user,
+        account,
+        valor="-50.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 3, 5),
+    )
+    tx_mar.liability_id = liability.id
+    db_session.commit()
+
+    tendencia = service.get_tendencia_por_passivo(db_session, user.id, ano=2026, mes=3, meses=3)
+
+    assert len(tendencia) == 1
+    passivo = tendencia[0]
+    assert passivo.liability_id == liability.id
+    assert passivo.liability_nome == "Financiamento carro"
+    pontos = {(p.ano, p.mes): p.total for p in passivo.pontos}
+    assert pontos[(2026, 1)] == Decimal("100.00")
+    assert pontos[(2026, 2)] == Decimal("0")
+    assert pontos[(2026, 3)] == Decimal("50.00")
+
+
+def test_get_tendencia_por_passivo_isolated_by_user(db_session, user):
+    other = User(
+        google_sub="google-tendencia-passivo-other", email="other-tp@example.com", name="Bob"
+    )
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+
+    account = _account(db_session, other)
+    liability = _liability(db_session, other)
+    tx = _transaction(
+        db_session,
+        other,
+        account,
+        valor="-999.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+    )
+    tx.liability_id = liability.id
+    db_session.commit()
+
+    tendencia = service.get_tendencia_por_passivo(db_session, user.id, ano=2026, mes=1, meses=3)
+
+    assert tendencia == []
+
+
+def test_get_saldo_por_conta_returns_all_accounts_current_balance(db_session, user):
+    _account(db_session, user, tipo=PluggyAccountTipo.corrente, saldo=Decimal("1000.00"))
+    _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito, saldo=Decimal("300.00"))
+
+    saldos = service.get_saldo_por_conta(db_session, user.id)
+
+    assert len(saldos) == 2
+    total = {s.account_tipo: s.saldo for s in saldos}
+    assert total[PluggyAccountTipo.corrente] == Decimal("1000.00")
+    assert total[PluggyAccountTipo.cartao_credito] == Decimal("300.00")
+
+
+def test_get_saldo_por_conta_uses_apelido_fallback_to_nome(db_session, user):
+    account = _account(db_session, user, saldo=Decimal("500.00"))
+    account.apelido = "Conta do dia a dia"
+    db_session.commit()
+    other_account = _account(db_session, user, saldo=Decimal("200.00"))
+
+    saldos = service.get_saldo_por_conta(db_session, user.id)
+
+    por_id = {s.account_id: s for s in saldos}
+    assert por_id[account.id].account_nome == "Conta do dia a dia"
+    assert por_id[other_account.id].account_nome == "Conta"
+
+
+def test_get_saldo_por_conta_isolated_by_user(db_session, user):
+    other = User(google_sub="google-saldo-conta-other", email="other-sc@example.com", name="Bob")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    _account(db_session, other, saldo=Decimal("999.00"))
+
+    saldos = service.get_saldo_por_conta(db_session, user.id)
+
+    assert saldos == []

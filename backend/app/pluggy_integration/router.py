@@ -125,6 +125,7 @@ def list_transactions(
     subcategory_id: int | None = None,
     account_tipo: PluggyAccountTipo | None = None,
     asset_id: int | None = None,
+    liability_id: int | None = None,
     tipo: PluggyTransactionTipo | None = None,
     competencia: bool = False,
     db: Session = Depends(get_db),
@@ -138,6 +139,7 @@ def list_transactions(
         subcategory_id=subcategory_id,
         account_tipo=account_tipo,
         asset_id=asset_id,
+        liability_id=liability_id,
         tipo=tipo,
         competencia=competencia,
     )

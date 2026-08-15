@@ -12,6 +12,8 @@ class SummaryOut(BaseModel):
     despesa: Decimal
     saldo: Decimal
     patrimonio: Decimal
+    ativos: Decimal
+    passivos: Decimal
 
 
 class CategoriaTotalOut(BaseModel):
@@ -73,3 +75,28 @@ class TendenciaAtivoOut(BaseModel):
     asset_id: int
     asset_nome: str
     pontos: list[PontoTendenciaOut]
+
+
+class PassivoTotalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    liability_id: int
+    liability_nome: str
+    total: Decimal
+
+
+class TendenciaPassivoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    liability_id: int
+    liability_nome: str
+    pontos: list[PontoTendenciaOut]
+
+
+class SaldoContaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    account_id: int
+    account_nome: str
+    account_tipo: PluggyAccountTipo
+    saldo: Decimal

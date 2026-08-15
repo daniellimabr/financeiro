@@ -4,6 +4,7 @@ from decimal import Decimal
 from app.auth.jwt import COOKIE_NAME, create_access_token
 from app.models.asset import Asset, AssetTipo
 from app.models.category import CategoryGroup, Subcategory
+from app.models.liability import Liability, LiabilityTipo
 from app.models.pluggy import (
     PluggyAccount,
     PluggyAccountTipo,
@@ -51,8 +52,30 @@ def _asset(db_session, user, nome="Carro"):
     return asset
 
 
+def _liability(db_session, user, nome="Financiamento"):
+    liability = Liability(
+        user_id=user.id,
+        nome=nome,
+        tipo=LiabilityTipo.financiamento,
+        valor_total=Decimal("60000.00"),
+        saldo_devedor=Decimal("30000.00"),
+    )
+    db_session.add(liability)
+    db_session.commit()
+    db_session.refresh(liability)
+    return liability
+
+
 def _transaction(
-    db_session, user, *, valor, tipo, subcategory_id=None, data=date(2026, 1, 15), asset_id=None
+    db_session,
+    user,
+    *,
+    valor,
+    tipo,
+    subcategory_id=None,
+    data=date(2026, 1, 15),
+    asset_id=None,
+    liability_id=None,
 ):
     item = PluggyItem(
         user_id=user.id,
@@ -85,6 +108,7 @@ def _transaction(
         data_competencia=data,
         subcategory_id=subcategory_id,
         asset_id=asset_id,
+        liability_id=liability_id,
         status=PluggyTransactionStatus.efetivada,
     )
     db_session.add(tx)
@@ -364,3 +388,152 @@ def test_user_does_not_see_other_users_tendencia(client, db_session):
         params={"tipo": "debito", "ano": 2026, "mes": 1, "meses": 3},
     ).json()
     assert tendencia_categoria == []
+
+
+def test_por_passivo_without_cookie_returns_401(client):
+    assert client.get("/dashboards/por-passivo").status_code == 401
+
+
+def test_por_passivo_tendencia_without_cookie_returns_401(client):
+    response = client.get("/dashboards/por-passivo/tendencia", params={"ano": 2026, "mes": 1})
+    assert response.status_code == 401
+
+
+def test_saldo_por_conta_without_cookie_returns_401(client):
+    assert client.get("/dashboards/saldo-por-conta").status_code == 401
+
+
+def test_por_passivo_returns_totals_for_period(client, db_session):
+    user = _authenticate(client, db_session)
+    liability = _liability(db_session, user)
+    _transaction(
+        db_session,
+        user,
+        valor="-250.00",
+        tipo=PluggyTransactionTipo.debito,
+        liability_id=liability.id,
+    )
+
+    response = client.get("/dashboards/por-passivo", params={"ano": 2026, "mes": 1})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["liability_id"] == liability.id
+    assert body[0]["liability_nome"] == "Financiamento"
+    assert Decimal(body[0]["total"]) == Decimal("250.00")
+
+
+def test_por_passivo_isolated_by_user(client, db_session):
+    other = User(google_sub="google-por-passivo", email="por-passivo@example.com", name="Bob")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    other_liability = _liability(db_session, other, nome="Financiamento moto")
+    _transaction(
+        db_session,
+        other,
+        valor="-999.00",
+        tipo=PluggyTransactionTipo.debito,
+        liability_id=other_liability.id,
+    )
+
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+
+    response = client.get("/dashboards/por-passivo", params={"ano": 2026, "mes": 1})
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_por_passivo_tendencia_returns_series_zero_filled(client, db_session):
+    user = _authenticate(client, db_session)
+    liability = _liability(db_session, user)
+    _transaction(
+        db_session,
+        user,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        liability_id=liability.id,
+        data=date(2026, 1, 15),
+    )
+
+    response = client.get(
+        "/dashboards/por-passivo/tendencia",
+        params={"ano": 2026, "mes": 1, "meses": 3},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["liability_id"] == liability.id
+    assert len(body[0]["pontos"]) == 3
+    janeiro = next(p for p in body[0]["pontos"] if p["ano"] == 2026 and p["mes"] == 1)
+    assert Decimal(janeiro["total"]) == Decimal("100.00")
+
+
+def test_saldo_por_conta_returns_current_balance_ignoring_period(client, db_session):
+    user = _authenticate(client, db_session)
+    item = PluggyItem(
+        user_id=user.id,
+        pluggy_item_id="item-saldo-1",
+        connector_id=1,
+        connector_name="Banco Fake",
+        status=PluggyItemStatus.updated,
+        cutoff_date=date(2026, 1, 1),
+    )
+    db_session.add(item)
+    db_session.flush()
+    account = PluggyAccount(
+        item_id=item.id,
+        user_id=user.id,
+        pluggy_account_id="acc-saldo-1",
+        tipo=PluggyAccountTipo.corrente,
+        nome="Conta",
+        saldo=Decimal("1234.56"),
+    )
+    db_session.add(account)
+    db_session.commit()
+
+    response = client.get("/dashboards/saldo-por-conta")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["account_id"] == account.id
+    assert Decimal(body[0]["saldo"]) == Decimal("1234.56")
+
+
+def test_saldo_por_conta_isolated_by_user(client, db_session):
+    other = User(google_sub="google-saldo-conta", email="saldo-conta@example.com", name="Bob")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    item = PluggyItem(
+        user_id=other.id,
+        pluggy_item_id="item-saldo-2",
+        connector_id=1,
+        connector_name="Banco Fake",
+        status=PluggyItemStatus.updated,
+        cutoff_date=date(2026, 1, 1),
+    )
+    db_session.add(item)
+    db_session.flush()
+    db_session.add(
+        PluggyAccount(
+            item_id=item.id,
+            user_id=other.id,
+            pluggy_account_id="acc-saldo-2",
+            tipo=PluggyAccountTipo.corrente,
+            nome="Conta de outro",
+            saldo=Decimal("999.00"),
+        )
+    )
+    db_session.commit()
+
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+
+    response = client.get("/dashboards/saldo-por-conta")
+
+    assert response.status_code == 200
+    assert response.json() == []

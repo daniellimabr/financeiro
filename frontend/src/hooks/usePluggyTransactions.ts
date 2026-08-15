@@ -14,6 +14,7 @@ export function usePluggyTransactions(
       filters.subcategoryId,
       filters.accountTipo,
       filters.assetId,
+      filters.liabilityId,
       filters.tipo,
       filters.competencia,
     ],

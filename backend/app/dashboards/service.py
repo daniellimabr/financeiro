@@ -22,6 +22,8 @@ class Summary:
     despesa: Decimal
     saldo: Decimal
     patrimonio: Decimal
+    ativos: Decimal
+    passivos: Decimal
 
 
 @dataclass
@@ -76,6 +78,28 @@ class TendenciaAtivo:
     asset_id: int
     asset_nome: str
     pontos: list[PontoTendencia]
+
+
+@dataclass
+class PassivoTotal:
+    liability_id: int
+    liability_nome: str
+    total: Decimal
+
+
+@dataclass
+class TendenciaPassivo:
+    liability_id: int
+    liability_nome: str
+    pontos: list[PontoTendencia]
+
+
+@dataclass
+class SaldoConta:
+    account_id: int
+    account_nome: str
+    account_tipo: PluggyAccountTipo
+    saldo: Decimal
 
 
 def _to_decimal(value) -> Decimal:
@@ -139,7 +163,7 @@ def _sum_tipo(
     return _to_decimal(total)
 
 
-def _calcula_patrimonio(db: Session, user_id: int) -> Decimal:
+def _ativos_e_passivos(db: Session, user_id: int) -> tuple[Decimal, Decimal]:
     ativos = (
         db.query(func.coalesce(func.sum(Asset.valor_atual), 0))
         .filter(Asset.user_id == user_id, Asset.status == AssetStatus.ativo)
@@ -150,6 +174,11 @@ def _calcula_patrimonio(db: Session, user_id: int) -> Decimal:
         .filter(Liability.user_id == user_id, Liability.status == LiabilityStatus.ativo)
         .scalar()
     )
+    return _to_decimal(ativos), _to_decimal(passivos)
+
+
+def _calcula_patrimonio(db: Session, user_id: int) -> Decimal:
+    ativos, passivos = _ativos_e_passivos(db, user_id)
     saldo_contas = (
         db.query(func.coalesce(func.sum(PluggyAccount.saldo), 0))
         .filter(
@@ -169,12 +198,7 @@ def _calcula_patrimonio(db: Session, user_id: int) -> Decimal:
         )
         .scalar()
     )
-    return (
-        _to_decimal(ativos)
-        - _to_decimal(passivos)
-        + _to_decimal(saldo_contas)
-        - _to_decimal(saldo_cartoes)
-    )
+    return ativos - passivos + _to_decimal(saldo_contas) - _to_decimal(saldo_cartoes)
 
 
 def get_summary(
@@ -183,7 +207,15 @@ def get_summary(
     receita = _sum_tipo(db, user_id, PluggyTransactionTipo.credito, ano=ano, mes=mes)
     despesa = _sum_tipo(db, user_id, PluggyTransactionTipo.debito, ano=ano, mes=mes)
     patrimonio = _calcula_patrimonio(db, user_id)
-    return Summary(receita=receita, despesa=despesa, saldo=receita - despesa, patrimonio=patrimonio)
+    ativos, passivos = _ativos_e_passivos(db, user_id)
+    return Summary(
+        receita=receita,
+        despesa=despesa,
+        saldo=receita - despesa,
+        patrimonio=patrimonio,
+        ativos=ativos,
+        passivos=passivos,
+    )
 
 
 def get_por_categoria(
@@ -444,4 +476,110 @@ def get_tendencia_por_ativo(
             pontos=[PontoTendencia(ano=y, mes=m, total=dado["pontos"][(y, m)]) for y, m in periodo],
         )
         for asset_id, dado in por_ativo.items()
+    ]
+
+
+def get_por_passivo(
+    db: Session,
+    user_id: int,
+    *,
+    ano: int | None = None,
+    mes: int | None = None,
+) -> list[PassivoTotal]:
+    # Passivo nunca gera receita — sempre despesa (tipo=debito), sem toggle
+    # exposto ao chamador (diferente de /por-ativo).
+    query = (
+        _base_query(db, user_id)
+        .join(Liability, PluggyTransaction.liability_id == Liability.id)
+        .filter(PluggyTransaction.tipo == PluggyTransactionTipo.debito)
+    )
+    query = _apply_periodo(query, ano=ano, mes=mes)
+    rows = (
+        query.with_entities(
+            Liability.id, Liability.nome, func.sum(func.abs(PluggyTransaction.valor))
+        )
+        .group_by(Liability.id, Liability.nome)
+        .all()
+    )
+    return [
+        PassivoTotal(
+            liability_id=liability_id, liability_nome=liability_nome, total=_to_decimal(total)
+        )
+        for liability_id, liability_nome, total in rows
+    ]
+
+
+def get_tendencia_por_passivo(
+    db: Session,
+    user_id: int,
+    *,
+    ano: int,
+    mes: int,
+    meses: int = 6,
+) -> list[TendenciaPassivo]:
+    periodo = _month_range(ano, mes, meses)
+    inicio, fim = _date_bounds(periodo)
+
+    query = (
+        _base_query(db, user_id)
+        .join(Liability, PluggyTransaction.liability_id == Liability.id)
+        .filter(PluggyTransaction.tipo == PluggyTransactionTipo.debito)
+        .filter(
+            PluggyTransaction.data_competencia >= inicio,
+            PluggyTransaction.data_competencia < fim,
+        )
+    )
+    rows = (
+        query.with_entities(
+            Liability.id,
+            Liability.nome,
+            func.extract("year", PluggyTransaction.data_competencia),
+            func.extract("month", PluggyTransaction.data_competencia),
+            func.sum(func.abs(PluggyTransaction.valor)),
+        )
+        .group_by(
+            Liability.id,
+            Liability.nome,
+            func.extract("year", PluggyTransaction.data_competencia),
+            func.extract("month", PluggyTransaction.data_competencia),
+        )
+        .all()
+    )
+
+    por_passivo: dict[int, dict] = {}
+    for liability_id, liability_nome, y, m, total in rows:
+        if liability_id not in por_passivo:
+            por_passivo[liability_id] = {
+                "nome": liability_nome,
+                "pontos": {chave: Decimal("0") for chave in periodo},
+            }
+        por_passivo[liability_id]["pontos"][(int(y), int(m))] = _to_decimal(total)
+
+    return [
+        TendenciaPassivo(
+            liability_id=liability_id,
+            liability_nome=dado["nome"],
+            pontos=[PontoTendencia(ano=y, mes=m, total=dado["pontos"][(y, m)]) for y, m in periodo],
+        )
+        for liability_id, dado in por_passivo.items()
+    ]
+
+
+def get_saldo_por_conta(db: Session, user_id: int) -> list[SaldoConta]:
+    # Sempre snapshot atual (PluggyAccount.saldo) — sem parâmetro de período,
+    # mesmo padrão conceitual do campo `patrimonio` em /dashboards/summary.
+    accounts = (
+        db.query(PluggyAccount)
+        .filter(PluggyAccount.user_id == user_id)
+        .order_by(PluggyAccount.nome)
+        .all()
+    )
+    return [
+        SaldoConta(
+            account_id=account.id,
+            account_nome=account.apelido or account.nome,
+            account_tipo=account.tipo,
+            saldo=account.saldo,
+        )
+        for account in accounts
     ]

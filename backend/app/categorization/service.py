@@ -7,6 +7,7 @@ from app.exceptions import InvalidStateError, NotFoundError
 from app.models.asset import Asset
 from app.models.categorization import CategorizationRule
 from app.models.category import Subcategory
+from app.models.liability import Liability
 from app.models.pluggy import (
     PluggyTransaction,
     PluggyTransactionCategorizacaoStatus,
@@ -65,8 +66,9 @@ def list_transactions(
         rules_by_pattern = engine.build_rules_index(db, user_id)
         historico = engine.build_historico_index(db, user_id)
         assets = engine.build_assets_index(db, user_id)
+        liabilities = engine.build_liabilities_index(db, user_id)
         for tx in pendentes_da_pagina:
-            _apply_suggestions(db, tx, rules_by_pattern, historico, assets)
+            _apply_suggestions(db, tx, rules_by_pattern, historico, assets, liabilities)
         db.commit()
         for tx in pendentes_da_pagina:
             db.refresh(tx)
@@ -80,6 +82,7 @@ def _apply_suggestions(
     rules_by_pattern: dict[str, CategorizationRule],
     historico: list[engine.HistoricoTransacao],
     assets: list[tuple[int, str]],
+    liabilities: list[tuple[int, str]],
 ) -> None:
     normalizado = normalize_description(tx.descricao)
 
@@ -106,6 +109,14 @@ def _apply_suggestions(
     else:
         tx.asset_sugerido_id = None
         tx.asset_sugestao_confianca = None
+
+    liability_suggestion = engine.suggest_liability_from_index(normalizado, liabilities)
+    if liability_suggestion is not None:
+        tx.liability_sugerido_id = liability_suggestion.liability_id
+        tx.liability_sugestao_confianca = liability_suggestion.confianca
+    else:
+        tx.liability_sugerido_id = None
+        tx.liability_sugestao_confianca = None
 
     db.flush()
 
@@ -190,6 +201,26 @@ def set_transaction_asset(
             raise NotFoundError(f"Ativo {asset_id} não encontrado")
 
     tx.asset_id = asset_id
+    db.commit()
+    db.refresh(tx)
+    return tx
+
+
+def set_transaction_liability(
+    db: Session, user_id: int, transaction_id: int, liability_id: int | None
+) -> PluggyTransaction:
+    tx = _get_transaction(db, user_id, transaction_id)
+
+    if liability_id is not None:
+        liability = (
+            db.query(Liability)
+            .filter(Liability.id == liability_id, Liability.user_id == user_id)
+            .one_or_none()
+        )
+        if liability is None:
+            raise NotFoundError(f"Passivo {liability_id} não encontrado")
+
+    tx.liability_id = liability_id
     db.commit()
     db.refresh(tx)
     return tx

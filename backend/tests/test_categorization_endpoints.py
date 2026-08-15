@@ -4,6 +4,7 @@ from decimal import Decimal
 from app.auth.jwt import COOKIE_NAME, create_access_token
 from app.models.asset import Asset, AssetTipo
 from app.models.category import CategoryGroup, Subcategory
+from app.models.liability import Liability, LiabilityTipo
 from app.models.pluggy import (
     PluggyAccount,
     PluggyAccountTipo,
@@ -261,6 +262,11 @@ def test_user_a_does_not_see_or_act_on_user_bs_transactions(client, db_session):
     )
     assert asset_response.status_code == 404
 
+    liability_response = client.put(
+        f"/categorization/transactions/{tx_b.id}/liability", json={"liability_id": None}
+    )
+    assert liability_response.status_code == 404
+
     description_response = client.put(
         f"/categorization/transactions/{tx_b.id}/description", json={"descricao": "Nova"}
     )
@@ -371,6 +377,81 @@ def test_set_asset_with_invalid_asset_id_returns_404(client, db_session):
     tx = _pending_transaction(db_session, user)
 
     response = client.put(f"/categorization/transactions/{tx.id}/asset", json={"asset_id": 999})
+
+    assert response.status_code == 404
+
+
+# --- liability ---------------------------------------------------------------
+
+
+def test_set_liability_without_cookie_returns_401(client):
+    response = client.put("/categorization/transactions/1/liability", json={"liability_id": None})
+    assert response.status_code == 401
+
+
+def test_set_and_clear_liability_association(client, db_session):
+    user = _authenticate(client, db_session)
+    tx = _pending_transaction(db_session, user)
+    liability = Liability(
+        user_id=user.id,
+        nome="Financiamento",
+        tipo=LiabilityTipo.financiamento,
+        valor_total=Decimal("60000.00"),
+        saldo_devedor=Decimal("30000.00"),
+    )
+    db_session.add(liability)
+    db_session.commit()
+    db_session.refresh(liability)
+
+    set_response = client.put(
+        f"/categorization/transactions/{tx.id}/liability", json={"liability_id": liability.id}
+    )
+    assert set_response.status_code == 200
+    assert set_response.json()["liability_id"] == liability.id
+
+    clear_response = client.put(
+        f"/categorization/transactions/{tx.id}/liability", json={"liability_id": None}
+    )
+    assert clear_response.status_code == 200
+    assert clear_response.json()["liability_id"] is None
+
+
+def test_set_liability_with_invalid_liability_id_returns_404(client, db_session):
+    user = _authenticate(client, db_session)
+    tx = _pending_transaction(db_session, user)
+
+    response = client.put(
+        f"/categorization/transactions/{tx.id}/liability", json={"liability_id": 999}
+    )
+
+    assert response.status_code == 404
+
+
+def test_set_liability_other_users_liability_returns_404(client, db_session):
+    other = User(
+        google_sub="google-liability-other", email="liability-other@example.com", name="Bob"
+    )
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    other_liability = Liability(
+        user_id=other.id,
+        nome="Financiamento de outro",
+        tipo=LiabilityTipo.financiamento,
+        valor_total=Decimal("60000.00"),
+        saldo_devedor=Decimal("30000.00"),
+    )
+    db_session.add(other_liability)
+    db_session.commit()
+    db_session.refresh(other_liability)
+
+    user = _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    tx = _pending_transaction(db_session, user)
+
+    response = client.put(
+        f"/categorization/transactions/{tx.id}/liability",
+        json={"liability_id": other_liability.id},
+    )
 
     assert response.status_code == 404
 

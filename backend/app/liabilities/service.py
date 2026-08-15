@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.exceptions import InvalidStateError, NotFoundError
 from app.models.liability import Liability, LiabilityStatus, LiabilityTipo
+from app.models.pluggy import PluggyTransaction
 
 
 def list_liabilities(db: Session, user_id: int) -> list[Liability]:
@@ -66,6 +67,17 @@ def update_liability(
 
 def delete_liability(db: Session, user_id: int, liability_id: int) -> None:
     liability = get_liability(db, user_id, liability_id)
+    # Preserva o histórico de transação: exclusão nunca leva junto as
+    # transações que apontavam para o passivo, só desassocia (FK sem
+    # ON DELETE definido rejeitaria a exclusão direta, mas a desassociação é
+    # regra de negócio própria, independente do comportamento do banco).
+    db.query(PluggyTransaction).filter(
+        PluggyTransaction.user_id == user_id, PluggyTransaction.liability_id == liability_id
+    ).update({PluggyTransaction.liability_id: None})
+    db.query(PluggyTransaction).filter(
+        PluggyTransaction.user_id == user_id,
+        PluggyTransaction.liability_sugerido_id == liability_id,
+    ).update({PluggyTransaction.liability_sugerido_id: None})
     db.delete(liability)
     db.commit()
 

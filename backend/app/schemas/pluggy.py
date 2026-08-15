@@ -92,5 +92,6 @@ class PluggyTransactionOut(BaseModel):
     subcategory_id: int | None
     categoria_pluggy: str | None
     status: PluggyTransactionStatus
+    account_tipo: PluggyAccountTipo
     created_at: datetime
     updated_at: datetime

@@ -2,7 +2,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.config import settings
 from app.exceptions import InvalidStateError, NotFoundError
@@ -115,6 +115,7 @@ def list_transactions(
     subcategory_id: int | None = None,
     account_tipo: PluggyAccountTipo | None = None,
     asset_id: int | None = None,
+    liability_id: int | None = None,
     tipo: PluggyTransactionTipo | None = None,
     competencia: bool = False,
 ) -> list[PluggyTransaction]:
@@ -134,10 +135,16 @@ def list_transactions(
         query = query.join(PluggyAccount).filter(PluggyAccount.tipo == account_tipo)
     if asset_id is not None:
         query = query.filter(PluggyTransaction.asset_id == asset_id)
+    if liability_id is not None:
+        query = query.filter(PluggyTransaction.liability_id == liability_id)
     if tipo is not None:
         query = query.filter(PluggyTransaction.tipo == tipo)
 
-    return query.order_by(PluggyTransaction.data.desc()).all()
+    return (
+        query.options(joinedload(PluggyTransaction.account))
+        .order_by(PluggyTransaction.data.desc())
+        .all()
+    )
 
 
 def sync_item(db: Session, client: PluggyClient, user_id: int, item_id: int) -> PluggyItem:

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.categorization.normalize import normalize_description
 from app.models.asset import Asset
 from app.models.categorization import CategorizationRule
+from app.models.liability import Liability
 from app.models.pluggy import PluggyTransaction, PluggyTransactionCategorizacaoStatus
 
 SIMILARITY_THRESHOLD = 0.86
@@ -23,6 +24,12 @@ class CategorySuggestion:
 @dataclass
 class AssetSuggestion:
     asset_id: int
+    confianca: str
+
+
+@dataclass
+class LiabilitySuggestion:
+    liability_id: int
     confianca: str
 
 
@@ -150,3 +157,30 @@ def suggest_asset_from_index(
 def build_assets_index(db: Session, user_id: int) -> list[tuple[int, str]]:
     assets = db.query(Asset).filter(Asset.user_id == user_id).order_by(Asset.id).all()
     return [(a.id, normalize_description(a.nome)) for a in assets]
+
+
+def suggest_liability(db: Session, user_id: int, descricao: str) -> LiabilitySuggestion | None:
+    normalizado = normalize_description(descricao)
+    if not normalizado:
+        return None
+    return suggest_liability_from_index(normalizado, build_liabilities_index(db, user_id))
+
+
+def suggest_liability_from_index(
+    normalizado: str, liabilities: list[tuple[int, str]]
+) -> LiabilitySuggestion | None:
+    if not normalizado:
+        return None
+
+    for liability_id, liability_normalizado in liabilities:
+        if liability_normalizado and liability_normalizado in normalizado:
+            return LiabilitySuggestion(liability_id=liability_id, confianca="media")
+
+    return None
+
+
+def build_liabilities_index(db: Session, user_id: int) -> list[tuple[int, str]]:
+    liabilities = (
+        db.query(Liability).filter(Liability.user_id == user_id).order_by(Liability.id).all()
+    )
+    return [(liab.id, normalize_description(liab.nome)) for liab in liabilities]

@@ -47,6 +47,7 @@ export interface PluggyTransaction {
   subcategory_id: number | null;
   categoria_pluggy: string | null;
   status: string;
+  account_tipo: string;
   created_at: string;
   updated_at: string;
 }
@@ -111,6 +112,7 @@ export interface PluggyTransactionFilters {
   subcategoryId?: number;
   accountTipo?: string;
   assetId?: number;
+  liabilityId?: number;
   tipo?: string;
   competencia?: boolean;
 }
@@ -126,6 +128,7 @@ export function fetchPluggyTransactions(
   }
   if (filters.accountTipo !== undefined) params.set("account_tipo", filters.accountTipo);
   if (filters.assetId !== undefined) params.set("asset_id", String(filters.assetId));
+  if (filters.liabilityId !== undefined) params.set("liability_id", String(filters.liabilityId));
   if (filters.tipo !== undefined) params.set("tipo", filters.tipo);
   if (filters.competencia) params.set("competencia", "true");
 

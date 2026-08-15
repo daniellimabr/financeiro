@@ -44,6 +44,9 @@ const BASE_TRANSACTION: CategorizedTransaction = {
   asset_id: null,
   asset_sugerido_id: null,
   asset_sugestao_confianca: null,
+  liability_id: null,
+  liability_sugerido_id: null,
+  liability_sugestao_confianca: null,
   created_at: "2026-08-14T00:00:00Z",
   updated_at: "2026-08-14T00:00:00Z",
 };

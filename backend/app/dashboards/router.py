@@ -10,10 +10,13 @@ from app.schemas.dashboards import (
     AtivoTotalOut,
     CategoriaTotalOut,
     MeioPagamentoTotalOut,
+    PassivoTotalOut,
+    SaldoContaOut,
     SummaryOut,
     TendenciaAtivoOut,
     TendenciaCategoriaOut,
     TendenciaMesOut,
+    TendenciaPassivoOut,
 )
 
 router = APIRouter(prefix="/dashboards")
@@ -102,3 +105,32 @@ def get_por_ativo_tendencia(
     return service.get_tendencia_por_ativo(
         db, current_user.id, tipo=tipo, ano=ano, mes=mes, meses=meses
     )
+
+
+@router.get("/por-passivo", response_model=list[PassivoTotalOut])
+def get_por_passivo(
+    ano: int | None = None,
+    mes: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.get_por_passivo(db, current_user.id, ano=ano, mes=mes)
+
+
+@router.get("/por-passivo/tendencia", response_model=list[TendenciaPassivoOut])
+def get_por_passivo_tendencia(
+    ano: int,
+    mes: int,
+    meses: int = Query(6, ge=1, le=24),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.get_tendencia_por_passivo(db, current_user.id, ano=ano, mes=mes, meses=meses)
+
+
+@router.get("/saldo-por-conta", response_model=list[SaldoContaOut])
+def get_saldo_por_conta(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.get_saldo_por_conta(db, current_user.id)

@@ -24,6 +24,9 @@ export interface CategorizedTransaction {
   asset_id: number | null;
   asset_sugerido_id: number | null;
   asset_sugestao_confianca: string | null;
+  liability_id: number | null;
+  liability_sugerido_id: number | null;
+  liability_sugestao_confianca: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -107,6 +110,20 @@ export function setTransactionAsset(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ asset_id: assetId }),
   });
+}
+
+export function setTransactionLiability(
+  transactionId: number,
+  liabilityId: number | null
+): Promise<CategorizedTransaction> {
+  return apiFetch<CategorizedTransaction>(
+    `/categorization/transactions/${transactionId}/liability`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ liability_id: liabilityId }),
+    }
+  );
 }
 
 export interface DescriptionUpdateResult {
