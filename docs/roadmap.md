@@ -181,27 +181,36 @@ Plano: [SPRINT-008-gestao-de-ativos-plan.md](sprints/SPRINT-008-gestao-de-ativos
 Relatório: [SPRINT-008-gestao-de-ativos-report.md](sprints/SPRINT-008-gestao-de-ativos-report.md) — aprovado pelo CEO em 2026-08-15.
 
 ### Sprint 9 — Dashboard analítico: Ativos/Passivos e refinamentos (E6, parte 3)
-*Escopo ainda não detalhado em PRD/plano — planejar em sessão própria.*
 
 Cards "Ativos" e "Passivos" no Dashboard (soma via `Asset.valor_atual`/
-`Liability.saldo_devedor`, já usados em `_calcula_patrimonio`); clicar em
-"Ativos" abre drilldown de receita/despesa por ativo no mês filtrado;
-clicar em "Passivos" abre drilldown de despesas por passivo; clicar em
-"Saldo" abre drilldown de saldo por conta **restrito ao mês corrente** —
-sem histórico de saldo no schema (mesma limitação já documentada nas
-Sprints 5/6 para Patrimônio); tooltip no hover dos gráficos; eixo X
-reduzido; remoção do gráfico de categorias (mantém só o drilldown);
-remoção do nível "meio de pagamento" do funil (vira ícone por linha —
-reverte uma decisão até então tratada como fechada em PRD-005/006, feita
-explicitamente pelo CEO nesta sessão de planejamento); ordenação por
-coluna nos drilldowns do Dashboard.
+`Liability.saldo_devedor`, já usados em `_calcula_patrimonio`, agora
+expostos em `GET /dashboards/summary`); clicar em "Ativos" abre drilldown
+de receita/despesa por ativo no mês filtrado (reaproveita `/dashboards/
+por-ativo` da Sprint 8); clicar em "Passivos" abre drilldown de despesas
+por passivo (novo `/dashboards/por-passivo`, sem toggle receita); clicar
+em "Saldo" abre drilldown de saldo por conta **sempre no snapshot atual,
+ignora o filtro de período** (decisão da sessão de planejamento — mesmo
+padrão conceitual do card Patrimônio; sem histórico de saldo no schema,
+mesma limitação já documentada nas Sprints 5/6); tooltip no hover dos
+gráficos; eixo X reduzido; remoção do gráfico de barras redundante acima
+de cada lista; remoção do nível "meio de pagamento" do funil (vira ícone
+SVG inline por linha, sem biblioteca nova — reverte uma decisão até então
+tratada como fechada em PRD-005/006, feita explicitamente pelo CEO nesta
+sessão de planejamento); ordenação por coluna nos drilldowns do Dashboard.
 
-**Gap descoberto na sessão de planejamento de 2026-08-15:** não existe
-associação despesa↔passivo (`liability_id`) em `pluggy_transactions` — só
-despesa↔ativo (`asset_id`, desde a Sprint 4). O drilldown "despesas por
-passivo" pedido pelo CEO precisa dessa associação nova (schema + sugestão
-automática, espelhando o padrão de `asset_id`) — planejar como parte do
-escopo desta sprint, não descobrir só na execução.
+**Pré-requisito de schema:** `liability_id`/`liability_sugerido_id`/
+`liability_sugestao_confianca` novos em `pluggy_transactions` (migration
+`0009`), espelhando `asset_id` (Sprint 4) — sugestão automática, filtro em
+`/pluggy/transactions`, endpoint de confirmação manual. Descoberto como
+gap no planejamento da Sprint 8, tratado como pré-requisito desta sprint
+em vez de surpresa de execução. Risco real identificado no planejamento:
+`delete_liability` (existente desde a Sprint 2) não tem a desassociação
+que `delete_asset` ganhou na Sprint 8 — precisa do mesmo tratamento antes
+que `liability_id` tenha dado real, senão `DELETE /liabilities/{id}`
+quebra com `IntegrityError` assim que houver transação vinculada.
+
+PRD: [PRD-009-dashboards-ativos-passivos.md](prd/PRD-009-dashboards-ativos-passivos.md).
+Plano: [SPRINT-009-dashboards-ativos-passivos-plan.md](sprints/SPRINT-009-dashboards-ativos-passivos-plan.md).
 
 ### Sprint 10 — Categorização: tabela moderna (E3, polish)
 *Escopo ainda não detalhado em PRD/plano — planejar em sessão própria.*

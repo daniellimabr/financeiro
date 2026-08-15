@@ -33,7 +33,8 @@ Financeiro v3/
 │   │   ├── PRD-005-dashboards-core.md    # Sprint 5 — dashboards core, drill-down (E5)
 │   │   ├── PRD-006-dashboards-analiticos.md  # Sprint 6 — tendência, percentual, design system (E6)
 │   │   ├── PRD-007-categorizacao-gestao-contas.md  # Sprint 7 — rework categorização, Gestão de Contas (E3, E2)
-│   │   └── PRD-008-gestao-de-ativos.md  # Sprint 8 — tela de Gestão de Ativos (E6 parte 2)
+│   │   ├── PRD-008-gestao-de-ativos.md  # Sprint 8 — tela de Gestão de Ativos (E6 parte 2)
+│   │   └── PRD-009-dashboards-ativos-passivos.md  # Sprint 9 — cards Ativos/Passivos, liability_id, refinamentos de funil (E6 parte 3)
 │   ├── sprints/
 │   │   ├── SPRINT-001-fundacao-tecnica-plan.md       # Plano Sprint 1 (2026-08-04)
 │   │   ├── SPRINT-001-fundacao-tecnica-report.md     # Relatório Sprint 1 (2026-08-04)
@@ -48,7 +49,9 @@ Financeiro v3/
 │   │   ├── SPRINT-006-dashboards-analiticos-report.md  # Relatório Sprint 6 (2026-08-15)
 │   │   ├── SPRINT-007-categorizacao-gestao-contas-plan.md  # Plano Sprint 7 (2026-08-15)
 │   │   ├── SPRINT-007-categorizacao-gestao-contas-report.md  # Relatório Sprint 7 (2026-08-15)
-│   │   └── SPRINT-008-gestao-de-ativos-plan.md  # Plano Sprint 8 (2026-08-15)
+│   │   ├── SPRINT-008-gestao-de-ativos-plan.md  # Plano Sprint 8 (2026-08-15)
+│   │   ├── SPRINT-008-gestao-de-ativos-report.md  # Relatório Sprint 8 (2026-08-15)
+│   │   └── SPRINT-009-dashboards-ativos-passivos-plan.md  # Plano Sprint 9 (2026-08-15)
 │   ├── roadmap.md                  # épicos + sprints
 │   ├── directory-structure.md      # este arquivo — atualizado em Sprint 7
 │   ├── infra/
