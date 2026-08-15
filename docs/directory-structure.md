@@ -202,14 +202,15 @@ Financeiro v3/
 │   │   │   ├── useUpdateAsset.ts             # mutation PUT /assets/{id} (Sprint 8)
 │   │   │   ├── useSellAsset.ts               # mutation POST /assets/{id}/sell (Sprint 8)
 │   │   │   ├── useDeleteAsset.ts             # mutation DELETE /assets/{id} (Sprint 8)
-│   │   │   └── useAssetGastos.ts             # GET /dashboards/por-ativo, com período (Sprint 8)
+│   │   │   ├── useAssetGastos.ts             # GET /dashboards/por-ativo, com período+tipo (Sprint 8)
+│   │   │   └── useAssetGastosTendencia.ts    # GET /dashboards/por-ativo/tendencia, série por ativo (Sprint 8)
 │   │   └── pages/
 │   │       ├── LoginPage.tsx       # botão "Entrar com Google" (link para /auth/google/login)
 │   │       ├── ProtectedPage.tsx   # nome/e-mail do usuário + abas Início/Dashboards/Categorizar/Gestão de contas/Ativos (Sprint 5; aba Transações removida e Conectar conta renomeada na Sprint 7; aba Ativos na Sprint 8)
 │   │       ├── DashboardsPage.tsx  # filtro ano/mês, 4 cards com sparkline, funil de drill-down em sanfona + Recharts (Sprint 5, sanfona/tendência/percentual na Sprint 6)
 │   │       ├── AccountManagementPage.tsx  # Gestão de Contas — lista contas conectadas, apelido/sync_enabled editáveis, diálogo "Sincronizar MeuPluggy" com pré-seleção (Sprint 7, renomeado de ConnectAccountPage.tsx)
 │   │       ├── CategorizationReviewPage.tsx  # listagem única de transações (substitui TransactionsPage) — filtro tipo/status, lote, categoria editável em confirmada, descrição inline + propagação (Sprint 4; paginação pós-Sprint 6; rework completo na Sprint 7)
-│   │       └── AssetsPage.tsx      # Gestão de Ativos — grid de cards ativos/baixados, CRUD (criar/editar/vender/deletar), drill-down gasto+transações por ativo, filtro período (Sprint 8)
+│   │       └── AssetsPage.tsx      # Gestão de Ativos — grid de cards ativos/baixados, CRUD (criar/editar/vender/deletar), toggle despesa/receita, sparkline por card, drill-down (painel fora do card, gráfico de histórico + transações) por ativo, filtro período (Sprint 8)
 │   │   └── App.test.tsx            # testes Vitest + Testing Library (401, 200)
 │   └── test/
 │       └── setup.ts                # setup do Vitest (jest-dom matchers)
@@ -223,7 +224,7 @@ Financeiro v3/
 │       ├── check-sanfona.mjs       # sanfona multi-nível + sparkline + tipografia, contra dado real (Sprint 6)
 │       ├── check-categorizacao.mjs # filtro + paginação + tempo real do fluxo de confirmar (pós-Sprint 6)
 │       ├── check-sprint7.mjs       # filtro tipo/status, seleção em lote, descrição editável, Gestão de Contas — apelido, diálogo de sync (Sprint 7; achou bug real de overflow desktop)
-│       └── check-ativos.mjs        # grid de cards, criar ativo, drill-down, desktop+mobile screenshots (Sprint 8)
+│       └── check-ativos.mjs        # grid de cards, criar ativo, drill-down fora do card, toggle despesa/receita, desktop+mobile screenshots (Sprint 8)
 ├── .github/
 │   └── workflows/
 │       └── ci.yml                  # GitHub Actions: pytest+ruff (backend), vitest+eslint+tsc (frontend) (Sprint 1)

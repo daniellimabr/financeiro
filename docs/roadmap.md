@@ -158,17 +158,24 @@ divididas em Sprints 7/8/9 nesta sessão de planejamento (2026-08-15).
 Tela `AssetsPage.tsx` com cards por ativo (reaproveitando `.dash-tile`),
 formulário para cadastrar/editar/vender/excluir ativo (backend de CRUD já
 existe em `app/assets/` desde a Sprint 2 — mutation hooks implementados no
-frontend), filtro de período igual às outras telas, drill-down de custos por ativo (total gasto + transações
-vinculadas via `asset_id`, associação já existente desde a Sprint 4).
-Endpoints novos: `GET /dashboards/por-ativo` agregando gasto por ativo,
-e parâmetro `asset_id` em `/pluggy/transactions` — ambos
-implementados. Componente `PeriodFilter` extraído de
+frontend), filtro de período igual às outras telas, drill-down de custos
+por ativo (total + transações vinculadas via `asset_id`, associação já
+existente desde a Sprint 4). Endpoints novos: `GET /dashboards/por-ativo`
+(agregando por `tipo` — despesa ou receita) e `GET /dashboards/por-ativo/tendencia`
+(série mensal por ativo), mais parâmetros `asset_id`/`tipo` em
+`/pluggy/transactions`. Componente `PeriodFilter` extraído de
 `DashboardsPage`/`CategorizationReviewPage` e reutilizado em `AssetsPage`,
 eliminando duplicação. Investigação de risco (FK em `pluggy_transactions.asset_id`)
 realizada — sem cláusula `ON DELETE`, implementada desassociação explícita
-em `delete_asset`. Testes backend (232 passed, 98% cobertura) + frontend
-(53 passed). Deploy realizado, QA visual validou grid de cards, CRUD,
-drill-down, desktop/mobile, 3 test assets criados na VM como side effect.
+em `delete_asset`. **Revisão de escopo pedida pelo CEO ainda na sessão de
+execução:** o drill-down (inicialmente dentro do card, só despesa) foi
+movido para um painel fora do card (mesmo padrão do funil de Dashboards),
+ganhou toggle despesa/receita e gráfico de histórico (6 meses), replicado
+como sparkline em cada card — PRD-008 atualizado para refletir o escopo
+final. Testes backend (239 passed, 98% cobertura) + frontend (55 passed).
+Deploy realizado (2 rodadas), QA visual validou grid de cards, CRUD,
+drill-down fora do card, toggle despesa/receita, sparklines, desktop/mobile,
+3 test assets criados na VM como side effect.
 PRD: [PRD-008-gestao-de-ativos.md](prd/PRD-008-gestao-de-ativos.md).
 Plano: [SPRINT-008-gestao-de-ativos-plan.md](sprints/SPRINT-008-gestao-de-ativos-plan.md).
 Relatório: [SPRINT-008-gestao-de-ativos-report.md](sprints/SPRINT-008-gestao-de-ativos-report.md).

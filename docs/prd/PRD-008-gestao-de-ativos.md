@@ -23,16 +23,35 @@ para a Sprint 9 dependem de haver dado real cadastrado via UI).
     marcar venda (`valor_venda`/`data_venda`) e excluir ativo.
   - Filtro de período (ano/mês) igual às demais telas, escopando o
     drill-down de gasto — não a listagem de ativos em si.
-  - Drill-down de custos por ativo: total gasto no período filtrado +
-    lista de transações vinculadas (`asset_id`).
+  - Drill-down de custos por ativo, num painel fora do card (mesmo padrão
+    visual do funil de Dashboards): toggle despesa/receita, total do
+    tipo selecionado no período filtrado, gráfico de histórico (6 meses)
+    e lista de transações vinculadas (`asset_id`) — **revisado após a
+    entrega inicial** (ver nota abaixo).
+  - Sparkline de histórico (6 meses) em cada card, reagindo ao mesmo
+    toggle despesa/receita do drill-down — **revisado após a entrega
+    inicial**.
   - Ativos com `status=baixado` aparecem em seção separada, visualmente
     deslocada (opacidade reduzida), sem drill-down de gasto — mostram
     `valor_venda`/`data_venda`.
-  - Novo endpoint `GET /dashboards/por-ativo?ano=&mes=` — total de despesa
-    por ativo no período, mesmo padrão de `get_por_categoria`.
-  - Novo filtro `asset_id` em `GET /pluggy/transactions`, mesmo padrão de
-    `subcategory_id`/`account_tipo` já existentes — alimenta o nível
-    "linha de extrato" do drill-down.
+  - Novo endpoint `GET /dashboards/por-ativo?tipo=&ano=&mes=` — total de
+    despesa ou receita por ativo no período (`tipo` obrigatório), mesmo
+    padrão de `get_por_categoria`.
+  - Novo endpoint `GET /dashboards/por-ativo/tendencia?tipo=&ano=&mes=&meses=`
+    — série mensal por ativo, mesmo padrão de
+    `get_tendencia_por_categoria` — **revisado após a entrega inicial**.
+  - Novo filtro `asset_id`/`tipo` em `GET /pluggy/transactions`, mesmo
+    padrão de `subcategory_id`/`account_tipo` já existentes — alimenta o
+    nível "linha de extrato" do drill-down.
+
+> **Nota de revisão (2026-08-15, mesma sessão de execução):** o escopo
+> original desta seção previa drill-down só de despesa, expandido dentro
+> do próprio card. O CEO pediu, ainda na sessão de execução, que o
+> drill-down fosse movido para fora do card (like o funil de Dashboards)
+> e ganhasse um toggle despesa/receita com gráfico de histórico. Os itens
+> marcados acima foram implementados já revisados; as seções de
+> Critérios de aceite e Regras de negócio abaixo refletem o escopo final,
+> não o original.
   - Extração de um componente `PeriodFilter` reaproveitado por
     `DashboardsPage`, `CategorizationReviewPage` e `AssetsPage` — o filtro
     ano/mês está hoje duplicado nas duas primeiras; esta sprint criaria a
@@ -66,12 +85,15 @@ para a Sprint 9 dependem de haver dado real cadastrado via UI).
    transações que tinham `asset_id` apontando pra ele não são excluídas
    (só desassociadas).
 5. Dado um usuário autenticado, quando chama
-   `GET /dashboards/por-ativo?ano=&mes=`, então recebe o total de despesa
-   por ativo no período, isolado por `user_id`.
+   `GET /dashboards/por-ativo?tipo=&ano=&mes=`, então recebe o total de
+   despesa ou receita (conforme `tipo`) por ativo no período, isolado por
+   `user_id`.
 6. Dado um ativo com transações vinculadas via `asset_id`, quando o
-   usuário expande o drill-down do card no período filtrado, então vê o
-   total batendo com `/dashboards/por-ativo` e a lista de transações
-   batendo com `GET /pluggy/transactions?asset_id=&ano=&mes=`.
+   usuário abre o drill-down (painel fora do card) no período filtrado,
+   então vê o total do `tipo` selecionado no toggle batendo com
+   `/dashboards/por-ativo?tipo=` e a lista de transações batendo com
+   `GET /pluggy/transactions?asset_id=&tipo=&ano=&mes=`; ao trocar o
+   toggle, total, gráfico e lista mudam para o outro `tipo`.
 7. Dado dois usuários diferentes, quando cada um lista/cria/edita/vende/
    exclui ativos ou consulta `/dashboards/por-ativo`, então nunca vê ou
    altera dado do outro usuário.
@@ -82,13 +104,14 @@ para a Sprint 9 dependem de haver dado real cadastrado via UI).
 
 ## Regras de negócio
 
-- Gasto por ativo (`/dashboards/por-ativo`) considera só transações de
-  despesa (`tipo=debito`) — um ativo não "ganha" receita nesta modelagem
-  (venda é tratada à parte, via `valor_venda`, fora da agregação de
-  transações).
+- Gasto/receita por ativo (`/dashboards/por-ativo`) aceita `tipo=debito`
+  ou `tipo=credito` — a UI expõe um toggle Despesa/Receita para escolher.
+  Venda de ativo segue tratada à parte, via `valor_venda`, e nunca entra
+  na agregação de transações (mesmo com o toggle em receita).
 - Ao contrário de "não categorizado" nos dashboards por categoria, não há
-  bucket "sem ativo" em `/dashboards/por-ativo` — a maioria das despesas
-  não tem `asset_id`, e isso é esperado, não uma pendência de revisão.
+  bucket "sem ativo" em `/dashboards/por-ativo` — a maioria das
+  transações não tem `asset_id`, e isso é esperado, não uma pendência de
+  revisão.
 - Excluir um ativo (`DELETE /assets/{id}`) nunca exclui transações — só
   desassocia (`asset_id`/`asset_sugerido_id` voltam a `NULL`) as que
   apontavam para ele, preservando o histórico de transação intacto.
@@ -105,10 +128,10 @@ campos `asset_id`/`asset_sugerido_id` já existentes em
 
 ## Segurança
 
-- Isolamento por usuário: `/dashboards/por-ativo` e o filtro `asset_id`
-  em `/pluggy/transactions` seguem o mesmo padrão de todo endpoint
-  existente (`Depends(get_current_user)`, filtro `user_id` em toda
-  query).
+- Isolamento por usuário: `/dashboards/por-ativo`, `/dashboards/por-ativo/tendencia`
+  e o filtro `asset_id`/`tipo` em `/pluggy/transactions` seguem o mesmo
+  padrão de todo endpoint existente (`Depends(get_current_user)`, filtro
+  `user_id` em toda query).
 - Nenhum secret novo introduzido nesta sprint.
 - Nenhuma chamada a serviço externo nova.
 
