@@ -165,6 +165,104 @@ def test_get_summary_patrimonio_subtracts_cartao_credito_balance(db_session, use
     assert summary.patrimonio == Decimal("700.00")
 
 
+def test_get_summary_excludes_cartao_credito_credito_from_receita(db_session, user):
+    # Achado da Sprint 10 (investigação NuTag): em cartão de crédito,
+    # tipo=credito é sempre pagamento de fatura ou estorno (nunca receita
+    # real) — valor negativo, mesma convenção já validada na Sprint 5.
+    account = _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito)
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-50.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 1, 10),
+    )
+
+    summary = service.get_summary(db_session, user.id, ano=2026, mes=1)
+
+    assert summary.receita == Decimal("0")
+
+
+def test_get_summary_includes_cartao_credito_debito_as_despesa(db_session, user):
+    account = _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito)
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="50.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+    )
+
+    summary = service.get_summary(db_session, user.id, ano=2026, mes=1)
+
+    assert summary.despesa == Decimal("50.00")
+
+
+def test_get_summary_corrente_credito_still_counts_as_receita(db_session, user):
+    account = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="1000.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 1, 10),
+    )
+
+    summary = service.get_summary(db_session, user.id, ano=2026, mes=1)
+
+    assert summary.receita == Decimal("1000.00")
+
+
+def test_get_patrimonio_breakdown_parts_sum_to_summary_patrimonio(db_session, user):
+    _account(db_session, user, tipo=PluggyAccountTipo.corrente, saldo=Decimal("1000.00"))
+    _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito, saldo=Decimal("300.00"))
+    db_session.add(
+        Asset(
+            user_id=user.id,
+            nome="Carro",
+            tipo=AssetTipo.veiculo,
+            valor_atual=Decimal("50000.00"),
+            data_aquisicao=date(2020, 1, 1),
+            status=AssetStatus.ativo,
+        )
+    )
+    db_session.add(
+        Liability(
+            user_id=user.id,
+            nome="Financiamento",
+            tipo=LiabilityTipo.financiamento,
+            valor_total=Decimal("10000.00"),
+            saldo_devedor=Decimal("4000.00"),
+            status=LiabilityStatus.ativo,
+        )
+    )
+    db_session.commit()
+
+    breakdown = service.get_patrimonio_breakdown(db_session, user.id)
+    summary = service.get_summary(db_session, user.id)
+
+    assert breakdown.ativos == Decimal("50000.00")
+    assert breakdown.passivos == Decimal("4000.00")
+    assert breakdown.saldo_contas == Decimal("1000.00")
+    assert breakdown.saldo_cartoes == Decimal("300.00")
+    assert breakdown.total == summary.patrimonio
+
+
+def test_get_patrimonio_breakdown_isolated_by_user(db_session, user):
+    other = User(google_sub="google-breakdown-other", email="other-bd@example.com", name="Bob")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    _account(db_session, other, tipo=PluggyAccountTipo.corrente, saldo=Decimal("999.00"))
+
+    breakdown = service.get_patrimonio_breakdown(db_session, user.id)
+
+    assert breakdown.total == Decimal("0")
+
+
 def test_get_summary_ativos_passivos_match_patrimonio_base(db_session, user):
     db_session.add_all(
         [

@@ -292,10 +292,7 @@ export function AssetsPage() {
             <span className="v">{formatCurrency(asset.valor_atual)}</span>
             <strong>{asset.nome}</strong>
             <span className="tag">Adquirido em {asset.data_aquisicao}</span>
-            <CardSparkline
-              values={trendByAsset.get(asset.id)?.map((p) => Number(p.total))}
-              color={trendColor}
-            />
+            <CardSparkline pontos={trendByAsset.get(asset.id)} color={trendColor} />
             <div className="dash-filter">
               <button
                 type="button"

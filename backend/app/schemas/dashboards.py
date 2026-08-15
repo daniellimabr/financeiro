@@ -93,6 +93,16 @@ class TendenciaPassivoOut(BaseModel):
     pontos: list[PontoTendenciaOut]
 
 
+class PatrimonioBreakdownOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    ativos: Decimal
+    passivos: Decimal
+    saldo_contas: Decimal
+    saldo_cartoes: Decimal
+    total: Decimal
+
+
 class SaldoContaOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

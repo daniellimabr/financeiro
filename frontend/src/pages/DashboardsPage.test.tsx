@@ -90,6 +90,22 @@ const CATEGORIA_FIXTURE = [
 
 const ATIVO_FIXTURE = [{ asset_id: 1, asset_nome: "Carro", total: "300.00" }];
 
+const ASSETS_FIXTURE = [
+  {
+    id: 1,
+    user_id: 1,
+    nome: "Carro",
+    tipo: "veiculo",
+    valor_atual: "50000.00",
+    data_aquisicao: "2024-01-01",
+    status: "ativo",
+    data_venda: null,
+    valor_venda: null,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  },
+];
+
 const PASSIVO_FIXTURE = [
   { liability_id: 1, liability_nome: "Financiamento carro", total: "500.00" },
 ];
@@ -117,14 +133,19 @@ const TRANSACAO_FIXTURE = {
   user_id: 1,
   pluggy_transaction_id: "tx-1",
   descricao: "Mercado São João",
+  descricao_usuario: null,
+  descricao_sugerida: null,
   valor: "-45.00",
   tipo: "debito",
   data: "2026-01-10",
   data_competencia: "2026-01-10",
   subcategory_id: 10,
+  subcategoria_sugerida_id: null,
   categoria_pluggy: null,
   status: "efetivada",
   account_tipo: "corrente",
+  asset_id: null,
+  asset_sugerido_id: null,
   created_at: "2026-01-10T00:00:00Z",
   updated_at: "2026-01-10T00:00:00Z",
 };
@@ -181,8 +202,23 @@ function renderWithQueryClient(ui: ReactNode) {
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
+// A partir da Sprint 10, a linha de transação também renderiza um botão de
+// descrição editável (DescriptionCell) — quando o nome da subcategoria é um
+// prefixo da descrição da transação (ex.: "Mercado" / "Mercado São João"),
+// uma query `getByRole("button", { name: /Mercado/ })` fica ambígua depois
+// que a tabela de transações é expandida. Este helper escopa a busca ao
+// botão do próprio accordion (classe "dash-row"), nunca à célula de edição.
+function accordionRowButton(name: string | RegExp): HTMLElement {
+  const button = screen
+    .getAllByRole("button", { name })
+    .find((el) => el.classList.contains("dash-row"));
+  if (!button) throw new Error(`Nenhum botão de accordion encontrado para "${name}"`);
+  return button;
+}
+
 function routedFetchMock() {
-  return vi.fn((input: RequestInfo | URL) => {
+  return vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    void init;
     const url = String(input);
     if (url.startsWith("/dashboards/summary"))
       return Promise.resolve(jsonResponse(SUMMARY_FIXTURE));
@@ -201,6 +237,7 @@ function routedFetchMock() {
     if (url.startsWith("/category-groups")) return Promise.resolve(jsonResponse(GROUPS_FIXTURE));
     if (url.startsWith("/subcategories"))
       return Promise.resolve(jsonResponse(SUBCATEGORIES_FIXTURE));
+    if (url.startsWith("/assets")) return Promise.resolve(jsonResponse(ASSETS_FIXTURE));
     if (url.startsWith("/pluggy/transactions"))
       return Promise.resolve(jsonResponse([TRANSACAO_FIXTURE, TRANSACAO_FIXTURE_2]));
     throw new Error(`Unexpected fetch: ${url}`);
@@ -287,7 +324,7 @@ describe("DashboardsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /Mercado/ }));
     expect(await screen.findByText("Mercado São João")).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: /Mercado/ }));
+    await userEvent.click(accordionRowButton(/Mercado/));
     await waitFor(() => {
       expect(screen.queryByText("Mercado São João")).not.toBeInTheDocument();
     });
@@ -340,14 +377,8 @@ describe("DashboardsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /Restaurante/ }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Mercado/ })).toHaveAttribute(
-        "aria-expanded",
-        "true"
-      );
-      expect(screen.getByRole("button", { name: /Restaurante/ })).toHaveAttribute(
-        "aria-expanded",
-        "true"
-      );
+      expect(accordionRowButton(/Mercado/)).toHaveAttribute("aria-expanded", "true");
+      expect(accordionRowButton(/Restaurante/)).toHaveAttribute("aria-expanded", "true");
     });
   });
 
@@ -500,6 +531,84 @@ describe("DashboardsPage", () => {
       expect(saldoCalls.every((url) => !url.includes("mes="))).toBe(true);
     });
     expect(screen.getByText("R$ 1.200,00")).toBeInTheDocument();
+  });
+
+  it("opens the patrimonio breakdown showing the 4 parts and links to the existing drilldowns", async () => {
+    const fetchMock = routedFetchMock();
+    vi.stubGlobal("fetch", fetchMock);
+    const originalFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/dashboards/patrimonio/breakdown")) {
+        return Promise.resolve(
+          jsonResponse({
+            ativos: "150000.00",
+            passivos: "7200.00",
+            saldo_contas: "1200.00",
+            saldo_cartoes: "300.00",
+            total: "143700.00",
+          })
+        );
+      }
+      return originalFetch(input);
+    });
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /^Patrimônio/ }));
+
+    expect(await screen.findByText("R$ 143.700,00")).toBeInTheDocument();
+    expect(screen.getAllByText("R$ 150.000,00").length).toBeGreaterThan(0);
+    expect(screen.getByText("R$ 1.200,00")).toBeInTheDocument();
+
+    const detalheButtons = screen.getAllByRole("button", { name: "Ver detalhe" });
+    await userEvent.click(detalheButtons[0]);
+
+    expect(await screen.findByRole("button", { name: /Carro/ })).toBeInTheDocument();
+  });
+
+  it("editing a transaction's category from the drilldown invalidates the dashboard summary", async () => {
+    const fetchMock = routedFetchMock();
+    vi.stubGlobal("fetch", fetchMock);
+    const originalFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      if (url === "/categorization/transactions/1/category" && method === "PUT") {
+        return Promise.resolve(jsonResponse({ ...TRANSACAO_FIXTURE, subcategory_id: 11 }));
+      }
+      return originalFetch(input);
+    });
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /Despesa/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Alimentação/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Mercado/ }));
+    await screen.findByText("Mercado São João");
+
+    await userEvent.selectOptions(
+      screen.getByLabelText("Categoria de Mercado São João"),
+      "Alimentação / Restaurante"
+    );
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (c) =>
+          String(c[0]) === "/categorization/transactions/1/category" &&
+          (c[1] as RequestInit)?.method === "PUT"
+      );
+      expect(call).toBeDefined();
+    });
+
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls.map((call) => String(call[0]));
+      const summaryCalls = calls.filter((url) => url.startsWith("/dashboards/summary"));
+      // refetch automático (invalidação) além da chamada inicial
+      expect(summaryCalls.length).toBeGreaterThan(1);
+    });
   });
 
   it("shows the credit limit in parentheses next to a credit card balance", async () => {

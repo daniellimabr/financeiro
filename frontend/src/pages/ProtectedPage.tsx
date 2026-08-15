@@ -5,23 +5,24 @@ import { AccountManagementPage } from "./AccountManagementPage";
 import { AssetsPage } from "./AssetsPage";
 import { CategorizationReviewPage } from "./CategorizationReviewPage";
 import { DashboardsPage } from "./DashboardsPage";
+import { LiabilitiesPage } from "./LiabilitiesPage";
 
 interface ProtectedPageProps {
   user: CurrentUser;
 }
 
-type Tab = "inicio" | "dashboards" | "contas" | "categorizar" | "ativos";
+type Tab = "dashboards" | "categorizar" | "ativos" | "passivos" | "contas";
 
 const NAV_ITEMS: { tab: Tab; label: string }[] = [
-  { tab: "inicio", label: "Início" },
   { tab: "dashboards", label: "Dashboards" },
   { tab: "categorizar", label: "Categorizar" },
-  { tab: "contas", label: "Gestão de contas" },
   { tab: "ativos", label: "Ativos" },
+  { tab: "passivos", label: "Passivos" },
+  { tab: "contas", label: "Gestão de contas" },
 ];
 
 export function ProtectedPage({ user }: ProtectedPageProps) {
-  const [tab, setTab] = useState<Tab>("inicio");
+  const [tab, setTab] = useState<Tab>("dashboards");
 
   return (
     <div className="app-shell">
@@ -49,19 +50,11 @@ export function ProtectedPage({ user }: ProtectedPageProps) {
       </aside>
 
       <main className="app-main">
-        {tab === "inicio" && (
-          <section className="app-home">
-            <h1>Bem-vindo, {user.name}</h1>
-            <p>
-              Use <strong>Dashboards</strong> para ver receita, despesa, saldo e patrimônio do mês,
-              ou <strong>Categorizar</strong> para revisar e confirmar o extrato sincronizado.
-            </p>
-          </section>
-        )}
         {tab === "dashboards" && <DashboardsPage />}
-        {tab === "contas" && <AccountManagementPage />}
         {tab === "categorizar" && <CategorizationReviewPage />}
         {tab === "ativos" && <AssetsPage />}
+        {tab === "passivos" && <LiabilitiesPage />}
+        {tab === "contas" && <AccountManagementPage />}
       </main>
     </div>
   );

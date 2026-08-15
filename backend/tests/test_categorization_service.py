@@ -265,6 +265,112 @@ def test_list_transactions_query_count_does_not_scale_with_pending_count(
     assert select_count["n"] < 2 * len(result) + 10
 
 
+def test_list_transactions_filters_by_has_asset_true(db_session, user):
+    asset = Asset(
+        user_id=user.id,
+        nome="Apartamento",
+        tipo=AssetTipo.imovel,
+        valor_atual=Decimal("100.00"),
+        data_aquisicao=date(2020, 1, 1),
+    )
+    db_session.add(asset)
+    db_session.commit()
+    db_session.refresh(asset)
+    tx_com_asset = _pending_transaction(db_session, user, "Com ativo")
+    tx_com_asset.asset_id = asset.id
+    _pending_transaction(db_session, user, "Sem ativo")
+    db_session.commit()
+
+    items, total = service.list_transactions(db_session, user.id, has_asset=True)
+
+    assert total == 1
+    assert [tx.id for tx in items] == [tx_com_asset.id]
+
+
+def test_list_transactions_filters_by_has_asset_false(db_session, user):
+    asset = Asset(
+        user_id=user.id,
+        nome="Apartamento",
+        tipo=AssetTipo.imovel,
+        valor_atual=Decimal("100.00"),
+        data_aquisicao=date(2020, 1, 1),
+    )
+    db_session.add(asset)
+    db_session.commit()
+    db_session.refresh(asset)
+    tx_com_asset = _pending_transaction(db_session, user, "Com ativo")
+    tx_com_asset.asset_id = asset.id
+    tx_sem_asset = _pending_transaction(db_session, user, "Sem ativo")
+    db_session.commit()
+
+    items, total = service.list_transactions(db_session, user.id, has_asset=False)
+
+    assert total == 1
+    assert [tx.id for tx in items] == [tx_sem_asset.id]
+
+
+def test_list_transactions_has_asset_none_does_not_filter(db_session, user):
+    asset = Asset(
+        user_id=user.id,
+        nome="Apartamento",
+        tipo=AssetTipo.imovel,
+        valor_atual=Decimal("100.00"),
+        data_aquisicao=date(2020, 1, 1),
+    )
+    db_session.add(asset)
+    db_session.commit()
+    db_session.refresh(asset)
+    tx_com_asset = _pending_transaction(db_session, user, "Com ativo")
+    tx_com_asset.asset_id = asset.id
+    _pending_transaction(db_session, user, "Sem ativo")
+    db_session.commit()
+
+    items, total = service.list_transactions(db_session, user.id)
+
+    assert total == 2
+
+
+def test_list_transactions_filters_by_group_id(db_session, user, subcategory, other_subcategory):
+    tx_grupo = _confirmed_transaction(db_session, user, subcategory, "Grupo alvo")
+    _confirmed_transaction(db_session, user, other_subcategory, "Outro grupo")
+
+    items, total = service.list_transactions(
+        db_session, user.id, status="todas", group_id=subcategory.group_id
+    )
+
+    assert total == 1
+    assert [tx.id for tx in items] == [tx_grupo.id]
+
+
+def test_list_transactions_combines_has_asset_and_group_id(
+    db_session, user, subcategory, other_subcategory
+):
+    asset = Asset(
+        user_id=user.id,
+        nome="Apartamento",
+        tipo=AssetTipo.imovel,
+        valor_atual=Decimal("100.00"),
+        data_aquisicao=date(2020, 1, 1),
+    )
+    db_session.add(asset)
+    db_session.commit()
+    db_session.refresh(asset)
+    tx_match = _confirmed_transaction(db_session, user, subcategory, "Com ativo no grupo")
+    tx_match.asset_id = asset.id
+    tx_grupo_sem_ativo = _confirmed_transaction(db_session, user, subcategory, "Sem ativo no grupo")
+    tx_outro_grupo = _confirmed_transaction(db_session, user, other_subcategory, "Outro grupo")
+    tx_outro_grupo.asset_id = asset.id
+    db_session.commit()
+    del tx_grupo_sem_ativo, tx_outro_grupo
+
+    items, total = service.list_transactions(
+        db_session, user.id, status="todas", has_asset=True, group_id=subcategory.group_id
+    )
+
+    assert total == 1
+    assert [tx.id for tx in items] == [tx_match.id]
+
+
 # --- set_category --------------------------------------------------------
 
 

@@ -278,6 +278,77 @@ describe("CategorizationReviewPage", () => {
     });
   });
 
+  it("refetches with has_asset=true when the 'associado a ativo' filter is set to Sim", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url.startsWith("/categorization/transactions"))
+        return Promise.resolve(jsonResponse(transactionsPage([BASE_TRANSACTION])));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<CategorizationReviewPage />);
+    await screen.findByText("Mercado Sao Joao");
+
+    await userEvent.selectOptions(screen.getByLabelText("Associado a ativo"), "Sim");
+
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls.map((call) => String(call[0]));
+      expect(
+        calls.some(
+          (url) => url.startsWith("/categorization/transactions") && url.includes("has_asset=true")
+        )
+      ).toBe(true);
+    });
+  });
+
+  it("refetches with group_id when the categoria (grupo) filter changes", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url.startsWith("/categorization/transactions"))
+        return Promise.resolve(jsonResponse(transactionsPage([BASE_TRANSACTION])));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<CategorizationReviewPage />);
+    await screen.findByText("Mercado Sao Joao");
+
+    await userEvent.selectOptions(screen.getByLabelText("Categoria"), "Alimentação");
+
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls.map((call) => String(call[0]));
+      expect(
+        calls.some(
+          (url) => url.startsWith("/categorization/transactions") && url.includes("group_id=1")
+        )
+      ).toBe(true);
+    });
+  });
+
+  it("renders a débito/crédito direction icon next to the value", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url.startsWith("/categorization/transactions"))
+        return Promise.resolve(jsonResponse(transactionsPage([BASE_TRANSACTION])));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<CategorizationReviewPage />);
+    await screen.findByText("Mercado Sao Joao");
+
+    const valorCell = document.querySelector(".dash-table tbody .valor-cell");
+    expect(valorCell).not.toBeNull();
+    expect(valorCell?.querySelector(".transaction-tipo-icon.despesa")).not.toBeNull();
+  });
+
   it("accepting a pending description suggestion calls the confirm endpoint", async () => {
     const withSuggestion = { ...BASE_TRANSACTION, descricao_sugerida: "Mercado do bairro" };
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {

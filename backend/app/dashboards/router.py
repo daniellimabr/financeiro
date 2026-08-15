@@ -11,6 +11,7 @@ from app.schemas.dashboards import (
     CategoriaTotalOut,
     MeioPagamentoTotalOut,
     PassivoTotalOut,
+    PatrimonioBreakdownOut,
     SaldoContaOut,
     SummaryOut,
     TendenciaAtivoOut,
@@ -30,6 +31,14 @@ def get_summary(
     current_user: User = Depends(get_current_user),
 ):
     return service.get_summary(db, current_user.id, ano=ano, mes=mes)
+
+
+@router.get("/patrimonio/breakdown", response_model=PatrimonioBreakdownOut)
+def get_patrimonio_breakdown(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.get_patrimonio_breakdown(db, current_user.id)
 
 
 @router.get("/por-categoria", response_model=list[CategoriaTotalOut])

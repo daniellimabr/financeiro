@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { setCategory } from "../api/categorization";
+import { invalidateAfterTransactionEdit } from "./invalidateDashboardQueries";
 
 export function useSetCategory() {
   const queryClient = useQueryClient();
@@ -14,7 +15,7 @@ export function useSetCategory() {
       subcategoryId: number;
     }) => setCategory(transactionId, subcategoryId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["categorizationTransactions"] });
+      invalidateAfterTransactionEdit(queryClient);
     },
   });
 }

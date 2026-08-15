@@ -40,14 +40,19 @@ export interface PluggyTransaction {
   user_id: number;
   pluggy_transaction_id: string;
   descricao: string;
+  descricao_usuario: string | null;
+  descricao_sugerida: string | null;
   valor: string;
   tipo: string;
   data: string;
   data_competencia: string | null;
   subcategory_id: number | null;
+  subcategoria_sugerida_id: number | null;
   categoria_pluggy: string | null;
   status: string;
   account_tipo: string;
+  asset_id: number | null;
+  asset_sugerido_id: number | null;
   created_at: string;
   updated_at: string;
 }

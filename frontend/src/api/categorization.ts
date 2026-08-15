@@ -43,11 +43,13 @@ export interface TransactionsFilter {
   tipo?: TransactionTipo;
   ano?: number;
   mes?: number;
+  hasAsset?: boolean;
+  groupId?: number;
   page?: number;
   pageSize?: number;
 }
 
-function buildQuery(params: Record<string, string | number | undefined>): string {
+function buildQuery(params: Record<string, string | number | boolean | undefined>): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined) search.set(key, String(value));
@@ -57,9 +59,18 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 }
 
 export function fetchTransactions(filter: TransactionsFilter = {}): Promise<TransactionsPage> {
-  const { status, tipo, ano, mes, page, pageSize } = filter;
+  const { status, tipo, ano, mes, hasAsset, groupId, page, pageSize } = filter;
   return apiFetch<TransactionsPage>(
-    `/categorization/transactions${buildQuery({ status, tipo, ano, mes, page, page_size: pageSize })}`
+    `/categorization/transactions${buildQuery({
+      status,
+      tipo,
+      ano,
+      mes,
+      has_asset: hasAsset,
+      group_id: groupId,
+      page,
+      page_size: pageSize,
+    })}`
   );
 }
 

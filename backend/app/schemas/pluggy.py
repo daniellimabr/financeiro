@@ -85,13 +85,18 @@ class PluggyTransactionOut(BaseModel):
     user_id: int
     pluggy_transaction_id: str
     descricao: str
+    descricao_usuario: str | None
+    descricao_sugerida: str | None
     valor: Decimal
     tipo: PluggyTransactionTipo
     data: date
     data_competencia: date | None
     subcategory_id: int | None
+    subcategoria_sugerida_id: int | None
     categoria_pluggy: str | None
     status: PluggyTransactionStatus
     account_tipo: PluggyAccountTipo
+    asset_id: int | None
+    asset_sugerido_id: int | None
     created_at: datetime
     updated_at: datetime

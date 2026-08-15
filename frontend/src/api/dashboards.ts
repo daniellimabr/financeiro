@@ -75,6 +75,14 @@ export interface TendenciaPassivo {
   pontos: PontoTendencia[];
 }
 
+export interface PatrimonioBreakdown {
+  ativos: string;
+  passivos: string;
+  saldo_contas: string;
+  saldo_cartoes: string;
+  total: string;
+}
+
 export interface SaldoConta {
   account_id: number;
   account_nome: string;
@@ -166,4 +174,8 @@ export function fetchDashboardPorPassivoTendencia(
 
 export function fetchSaldoPorConta(): Promise<SaldoConta[]> {
   return apiFetch<SaldoConta[]>("/dashboards/saldo-por-conta");
+}
+
+export function fetchPatrimonioBreakdown(): Promise<PatrimonioBreakdown> {
+  return apiFetch<PatrimonioBreakdown>("/dashboards/patrimonio/breakdown");
 }

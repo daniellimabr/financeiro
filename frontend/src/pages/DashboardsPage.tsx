@@ -41,13 +41,20 @@ import type { PluggyTransaction } from "../api/pluggy";
 import { AccountTipoIcon } from "../components/AccountTipoIcon";
 import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
+import {
+  AssetSelectCell,
+  CategorySelectCell,
+  DescriptionCell,
+} from "../components/TransactionEditCells";
 import { useAssetGastos } from "../hooks/useAssetGastos";
+import { useAssets } from "../hooks/useAssets";
 import { useCategoryGroups } from "../hooks/useCategoryGroups";
 import { useDashboardByCategoria } from "../hooks/useDashboardByCategoria";
 import { useDashboardCategoriaTendencia } from "../hooks/useDashboardCategoriaTendencia";
 import { useDashboardSummary } from "../hooks/useDashboardSummary";
 import { useDashboardTendencia } from "../hooks/useDashboardTendencia";
 import { useLiabilityGastos } from "../hooks/useLiabilityGastos";
+import { usePatrimonioBreakdown } from "../hooks/usePatrimonioBreakdown";
 import { usePluggyTransactions } from "../hooks/usePluggyTransactions";
 import { useSaldoPorConta } from "../hooks/useSaldoPorConta";
 import { useSubcategories } from "../hooks/useSubcategories";
@@ -76,7 +83,7 @@ interface PeriodoFiltro {
   mes: number;
 }
 
-type DrillKind = "receita" | "despesa" | "ativos" | "passivos" | "saldo";
+type DrillKind = "receita" | "despesa" | "ativos" | "passivos" | "saldo" | "patrimonio";
 
 function toggleId(list: number[], id: number): number[] {
   return list.includes(id) ? list.filter((existing) => existing !== id) : [...list, id];
@@ -140,6 +147,7 @@ export function DashboardsPage() {
     ativos: "Ativos",
     passivos: "Passivos",
     saldo: "Saldo",
+    patrimonio: "Patrimônio",
   };
 
   return (
@@ -182,7 +190,11 @@ export function DashboardsPage() {
             <span className="k">Receita</span>
             <span className="v receita">{formatCurrency(summaryQuery.data.receita)}</span>
             <CardSparkline
-              values={tendenciaQuery.data?.map((p) => Number(p.receita))}
+              pontos={tendenciaQuery.data?.map((p) => ({
+                ano: p.ano,
+                mes: p.mes,
+                total: p.receita,
+              }))}
               color="var(--receita)"
             />
           </button>
@@ -194,7 +206,11 @@ export function DashboardsPage() {
             <span className="k">Despesa</span>
             <span className="v despesa">{formatCurrency(summaryQuery.data.despesa)}</span>
             <CardSparkline
-              values={tendenciaQuery.data?.map((p) => Number(p.despesa))}
+              pontos={tendenciaQuery.data?.map((p) => ({
+                ano: p.ano,
+                mes: p.mes,
+                total: p.despesa,
+              }))}
               color="var(--despesa)"
             />
           </button>
@@ -202,7 +218,7 @@ export function DashboardsPage() {
             <span className="k">Saldo</span>
             <span className="v">{formatCurrency(summaryQuery.data.saldo)}</span>
             <CardSparkline
-              values={tendenciaQuery.data?.map((p) => Number(p.saldo))}
+              pontos={tendenciaQuery.data?.map((p) => ({ ano: p.ano, mes: p.mes, total: p.saldo }))}
               color="var(--accent)"
             />
           </button>
@@ -222,11 +238,15 @@ export function DashboardsPage() {
             <span className="k">Passivos</span>
             <span className="v">{formatCurrency(summaryQuery.data.passivos)}</span>
           </button>
-          <div className="dash-tile">
+          <button
+            type="button"
+            className="dash-tile clickable"
+            onClick={() => abrirFunil("patrimonio")}
+          >
             <span className="k">Patrimônio</span>
             <span className="v">{formatCurrency(summaryQuery.data.patrimonio)}</span>
             <span className="tag">atual, fora do filtro de período — sem histórico ainda</span>
-          </div>
+          </button>
         </div>
       )}
 
@@ -287,6 +307,10 @@ export function DashboardsPage() {
           )}
 
           {drill.kind === "saldo" && <SaldoPorContaList />}
+
+          {drill.kind === "patrimonio" && (
+            <PatrimonioBreakdownPanel onNavigate={(kind) => abrirFunil(kind)} />
+          )}
         </div>
       )}
     </section>
@@ -659,6 +683,82 @@ function SaldoPorContaList() {
   );
 }
 
+function PatrimonioBreakdownPanel({
+  onNavigate,
+}: {
+  onNavigate: (kind: "ativos" | "passivos" | "saldo") => void;
+}) {
+  const query = usePatrimonioBreakdown();
+
+  if (query.isLoading) return <p>Carregando...</p>;
+  if (query.isError || !query.data) {
+    return <p role="alert">Não foi possível carregar a composição do patrimônio.</p>;
+  }
+
+  const { ativos, passivos, saldo_contas, saldo_cartoes, total } = query.data;
+
+  return (
+    <div className="dash-table-wrap">
+      <table className="dash-table">
+        <thead>
+          <tr>
+            <th>Componente</th>
+            <th>Valor</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Ativos</td>
+            <td>{formatCurrency(ativos)}</td>
+            <td>
+              <button type="button" onClick={() => onNavigate("ativos")}>
+                Ver detalhe
+              </button>
+            </td>
+          </tr>
+          <tr>
+            <td>Passivos</td>
+            <td>-{formatCurrency(passivos)}</td>
+            <td>
+              <button type="button" onClick={() => onNavigate("passivos")}>
+                Ver detalhe
+              </button>
+            </td>
+          </tr>
+          <tr>
+            <td>Saldo em conta</td>
+            <td>{formatCurrency(saldo_contas)}</td>
+            <td>
+              <button type="button" onClick={() => onNavigate("saldo")}>
+                Ver detalhe
+              </button>
+            </td>
+          </tr>
+          <tr>
+            <td>Saldo de cartão de crédito</td>
+            <td>-{formatCurrency(saldo_cartoes)}</td>
+            <td>
+              <button type="button" onClick={() => onNavigate("saldo")}>
+                Ver detalhe
+              </button>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <strong>Total</strong>
+            </td>
+            <td>
+              <strong>{formatCurrency(total)}</strong>
+            </td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 type TransacaoSortKey = "data" | "descricao" | "valor" | "percentual";
 
 function TransacoesPanel({
@@ -687,6 +787,9 @@ function TransacoesPanel({
     tipo,
     competencia: true,
   });
+  const { data: subcategories } = useSubcategories();
+  const { data: groups } = useCategoryGroups();
+  const { data: assets } = useAssets();
   const data = query.data ?? [];
   const total = totalParaPercentual !== undefined ? Number(totalParaPercentual) : undefined;
 
@@ -734,6 +837,8 @@ function TransacoesPanel({
               direction={direction}
               onClick={() => toggleSort("descricao")}
             />
+            <th>Categoria</th>
+            <th>Ativo</th>
             <SortableHeader
               label="Valor"
               sortKeyName="valor"
@@ -761,7 +866,19 @@ function TransacoesPanel({
             return (
               <tr key={transaction.id}>
                 <td>{transaction.data}</td>
-                <td>{transaction.descricao}</td>
+                <td>
+                  <DescriptionCell transaction={transaction} />
+                </td>
+                <td>
+                  <CategorySelectCell
+                    transaction={transaction}
+                    subcategories={subcategories}
+                    groups={groups}
+                  />
+                </td>
+                <td>
+                  <AssetSelectCell transaction={transaction} assets={assets} />
+                </td>
                 <td>
                   <span className="valor-cell">
                     <AccountTipoIcon tipo={transaction.account_tipo} />

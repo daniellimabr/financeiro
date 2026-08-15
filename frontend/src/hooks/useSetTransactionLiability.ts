@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { setTransactionLiability } from "../api/categorization";
+import { invalidateAfterTransactionEdit } from "./invalidateDashboardQueries";
 
 export function useSetTransactionLiability() {
   const queryClient = useQueryClient();
@@ -14,7 +15,7 @@ export function useSetTransactionLiability() {
       liabilityId: number | null;
     }) => setTransactionLiability(transactionId, liabilityId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["categorizationTransactions"] });
+      invalidateAfterTransactionEdit(queryClient);
     },
   });
 }

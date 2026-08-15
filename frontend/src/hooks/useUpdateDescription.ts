@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { updateDescription } from "../api/categorization";
+import { invalidateAfterTransactionEdit } from "./invalidateDashboardQueries";
 
 export function useUpdateDescription() {
   const queryClient = useQueryClient();
@@ -9,7 +10,7 @@ export function useUpdateDescription() {
     mutationFn: ({ transactionId, descricao }: { transactionId: number; descricao: string }) =>
       updateDescription(transactionId, descricao),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["categorizationTransactions"] });
+      invalidateAfterTransactionEdit(queryClient);
     },
   });
 }

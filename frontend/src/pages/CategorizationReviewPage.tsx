@@ -2,19 +2,20 @@ import { useMemo, useState } from "react";
 
 import type { CategorizationStatus, TransactionTipo } from "../api/categorization";
 import { PeriodFilter } from "../components/PeriodFilter";
+import { AssetSelectCell, DescriptionCell } from "../components/TransactionEditCells";
+import { TransactionTipoIcon } from "../components/TransactionTipoIcon";
 import { useAssets } from "../hooks/useAssets";
 import { useBulkConfirmCategorization } from "../hooks/useBulkConfirmCategorization";
 import { useCategorizationTransactions } from "../hooks/useCategorizationTransactions";
 import { useCategoryGroups } from "../hooks/useCategoryGroups";
-import { useConfirmDescriptionSuggestion } from "../hooks/useConfirmDescriptionSuggestion";
-import { useDismissDescriptionSuggestion } from "../hooks/useDismissDescriptionSuggestion";
 import { useSetCategory } from "../hooks/useSetCategory";
-import { useSetTransactionAsset } from "../hooks/useSetTransactionAsset";
 import { useSubcategories } from "../hooks/useSubcategories";
-import { useUpdateDescription } from "../hooks/useUpdateDescription";
 import { formatCurrency } from "../utils/format";
+import { descricaoExibida } from "../utils/transactionEdit";
 
 const PAGE_SIZE = 20;
+
+type HasAssetFilter = "todos" | "sim" | "nao";
 
 export function CategorizationReviewPage() {
   const now = new Date();
@@ -22,6 +23,8 @@ export function CategorizationReviewPage() {
   const [mes, setMes] = useState(now.getMonth() + 1);
   const [status, setStatus] = useState<CategorizationStatus>("pendente");
   const [tipo, setTipo] = useState<TransactionTipo | "todos">("todos");
+  const [hasAssetFilter, setHasAssetFilter] = useState<HasAssetFilter>("todos");
+  const [groupId, setGroupId] = useState<number | "todos">("todos");
   const [page, setPage] = useState(1);
 
   const { data, isLoading } = useCategorizationTransactions({
@@ -29,6 +32,8 @@ export function CategorizationReviewPage() {
     mes,
     status,
     tipo: tipo === "todos" ? undefined : tipo,
+    hasAsset: hasAssetFilter === "todos" ? undefined : hasAssetFilter === "sim",
+    groupId: groupId === "todos" ? undefined : groupId,
     page,
     pageSize: PAGE_SIZE,
   });
@@ -38,18 +43,11 @@ export function CategorizationReviewPage() {
   const { data: assets } = useAssets();
   const setCategory = useSetCategory();
   const bulkConfirm = useBulkConfirmCategorization();
-  const setTransactionAsset = useSetTransactionAsset();
-  const updateDescription = useUpdateDescription();
-  const confirmDescriptionSuggestion = useConfirmDescriptionSuggestion();
-  const dismissDescriptionSuggestion = useDismissDescriptionSuggestion();
 
   const [selectedSubcategory, setSelectedSubcategory] = useState<
     Record<number, number | undefined>
   >({});
-  const [selectedAsset, setSelectedAsset] = useState<Record<number, number | undefined>>({});
   const [checked, setChecked] = useState<Record<number, boolean>>({});
-  const [editingDescriptionId, setEditingDescriptionId] = useState<number | null>(null);
-  const [descriptionDraft, setDescriptionDraft] = useState("");
 
   const totalPaginas = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
   const pendentesDaPagina = useMemo(
@@ -63,11 +61,15 @@ export function CategorizationReviewPage() {
     mes?: number;
     status?: CategorizationStatus;
     tipo?: TransactionTipo | "todos";
+    hasAssetFilter?: HasAssetFilter;
+    groupId?: number | "todos";
   }) {
     if (overrides.ano !== undefined) setAno(overrides.ano);
     if (overrides.mes !== undefined) setMes(overrides.mes);
     if (overrides.status !== undefined) setStatus(overrides.status);
     if (overrides.tipo !== undefined) setTipo(overrides.tipo);
+    if (overrides.hasAssetFilter !== undefined) setHasAssetFilter(overrides.hasAssetFilter);
+    if (overrides.groupId !== undefined) setGroupId(overrides.groupId);
     setPage(1);
     setChecked({});
   }
@@ -103,18 +105,6 @@ export function CategorizationReviewPage() {
     bulkConfirm.mutate(itemsToConfirm, {
       onSuccess: () => setChecked({}),
     });
-  }
-
-  function startEditingDescription(txId: number, currentValue: string) {
-    setEditingDescriptionId(txId);
-    setDescriptionDraft(currentValue);
-  }
-
-  function saveDescription(txId: number) {
-    const value = descriptionDraft.trim();
-    setEditingDescriptionId(null);
-    if (!value) return;
-    updateDescription.mutate({ transactionId: txId, descricao: value });
   }
 
   const marcadasParaAprovar = pendentesDaPagina.filter(
@@ -153,6 +143,39 @@ export function CategorizationReviewPage() {
             <option value="pendente">Pendentes</option>
             <option value="confirmada">Confirmadas</option>
             <option value="todas">Todas</option>
+          </select>
+        </label>
+        <label>
+          Associado a ativo
+          <select
+            aria-label="Associado a ativo"
+            value={hasAssetFilter}
+            onChange={(event) =>
+              mudarFiltro({ hasAssetFilter: event.target.value as HasAssetFilter })
+            }
+          >
+            <option value="todos">Todos</option>
+            <option value="sim">Sim</option>
+            <option value="nao">Não</option>
+          </select>
+        </label>
+        <label>
+          Categoria
+          <select
+            aria-label="Categoria"
+            value={groupId}
+            onChange={(event) =>
+              mudarFiltro({
+                groupId: event.target.value === "todos" ? "todos" : Number(event.target.value),
+              })
+            }
+          >
+            <option value="todos">Todas</option>
+            {groups?.map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.nome}
+              </option>
+            ))}
           </select>
         </label>
       </div>
@@ -206,9 +229,7 @@ export function CategorizationReviewPage() {
                 tx.subcategoria_sugerida_id ??
                 tx.subcategory_id ??
                 undefined;
-              const assetValue =
-                selectedAsset[tx.id] ?? tx.asset_sugerido_id ?? tx.asset_id ?? undefined;
-              const descricaoExibida = tx.descricao_usuario ?? tx.descricao;
+              const exibida = descricaoExibida(tx);
 
               return (
                 <tr key={tx.id}>
@@ -216,7 +237,7 @@ export function CategorizationReviewPage() {
                     {isPendente && (
                       <input
                         type="checkbox"
-                        aria-label={`Marcar ${descricaoExibida}`}
+                        aria-label={`Marcar ${exibida}`}
                         checked={checked[tx.id] ?? false}
                         onChange={(event) =>
                           setChecked((prev) => ({ ...prev, [tx.id]: event.target.checked }))
@@ -226,49 +247,17 @@ export function CategorizationReviewPage() {
                   </td>
                   <td>{tx.data}</td>
                   <td>
-                    {editingDescriptionId === tx.id ? (
-                      <input
-                        aria-label={`Editar descrição de ${descricaoExibida}`}
-                        value={descriptionDraft}
-                        autoFocus
-                        onChange={(event) => setDescriptionDraft(event.target.value)}
-                        onBlur={() => saveDescription(tx.id)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") saveDescription(tx.id);
-                          if (event.key === "Escape") setEditingDescriptionId(null);
-                        }}
-                      />
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => startEditingDescription(tx.id, descricaoExibida)}
-                        title="Clique para editar a descrição"
-                      >
-                        {descricaoExibida}
-                      </button>
-                    )}
-                    {tx.descricao_sugerida !== null && (
-                      <div>
-                        <span>Sugestão: {tx.descricao_sugerida}</span>
-                        <button
-                          type="button"
-                          onClick={() => confirmDescriptionSuggestion.mutate(tx.id)}
-                        >
-                          Aceitar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => dismissDescriptionSuggestion.mutate(tx.id)}
-                        >
-                          Descartar
-                        </button>
-                      </div>
-                    )}
+                    <DescriptionCell transaction={tx} />
                   </td>
-                  <td>{formatCurrency(tx.valor)}</td>
+                  <td>
+                    <span className="valor-cell">
+                      <TransactionTipoIcon tipo={tx.tipo} />
+                      {formatCurrency(tx.valor)}
+                    </span>
+                  </td>
                   <td>
                     <select
-                      aria-label={`Categoria de ${descricaoExibida}`}
+                      aria-label={`Categoria de ${exibida}`}
                       value={subcategoryValue ?? ""}
                       onChange={(event) => {
                         const subcategoryId = event.target.value
@@ -289,22 +278,7 @@ export function CategorizationReviewPage() {
                     </select>
                   </td>
                   <td>
-                    <select
-                      aria-label={`Ativo de ${descricaoExibida}`}
-                      value={assetValue ?? ""}
-                      onChange={(event) => {
-                        const assetId = event.target.value ? Number(event.target.value) : null;
-                        setSelectedAsset((prev) => ({ ...prev, [tx.id]: assetId ?? undefined }));
-                        setTransactionAsset.mutate({ transactionId: tx.id, assetId });
-                      }}
-                    >
-                      <option value="">Nenhum</option>
-                      {assets?.map((asset) => (
-                        <option key={asset.id} value={asset.id}>
-                          {asset.nome}
-                        </option>
-                      ))}
-                    </select>
+                    <AssetSelectCell transaction={tx} assets={assets} />
                   </td>
                   <td>{isPendente ? "Pendente" : "Confirmada"}</td>
                   <td>

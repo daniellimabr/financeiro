@@ -504,6 +504,81 @@ def test_saldo_por_conta_returns_current_balance_ignoring_period(client, db_sess
     assert Decimal(body[0]["saldo"]) == Decimal("1234.56")
 
 
+def test_patrimonio_breakdown_without_cookie_returns_401(client):
+    assert client.get("/dashboards/patrimonio/breakdown").status_code == 401
+
+
+def test_patrimonio_breakdown_returns_parts_matching_summary(client, db_session):
+    user = _authenticate(client, db_session)
+    item = PluggyItem(
+        user_id=user.id,
+        pluggy_item_id="item-breakdown-1",
+        connector_id=1,
+        connector_name="Banco Fake",
+        status=PluggyItemStatus.updated,
+        cutoff_date=date(2026, 1, 1),
+    )
+    db_session.add(item)
+    db_session.flush()
+    db_session.add(
+        PluggyAccount(
+            item_id=item.id,
+            user_id=user.id,
+            pluggy_account_id="acc-breakdown-1",
+            tipo=PluggyAccountTipo.corrente,
+            nome="Conta",
+            saldo=Decimal("1000.00"),
+        )
+    )
+    db_session.commit()
+    asset = _asset(db_session, user)
+
+    response = client.get("/dashboards/patrimonio/breakdown")
+    summary = client.get("/dashboards/summary").json()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert Decimal(body["ativos"]) == Decimal("50000.00")
+    assert Decimal(body["saldo_contas"]) == Decimal("1000.00")
+    assert Decimal(body["total"]) == Decimal(summary["patrimonio"])
+    del asset
+
+
+def test_patrimonio_breakdown_isolated_by_user(client, db_session):
+    other = User(google_sub="google-breakdown", email="breakdown@example.com", name="Bob")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    item = PluggyItem(
+        user_id=other.id,
+        pluggy_item_id="item-breakdown-2",
+        connector_id=1,
+        connector_name="Banco Fake",
+        status=PluggyItemStatus.updated,
+        cutoff_date=date(2026, 1, 1),
+    )
+    db_session.add(item)
+    db_session.flush()
+    db_session.add(
+        PluggyAccount(
+            item_id=item.id,
+            user_id=other.id,
+            pluggy_account_id="acc-breakdown-2",
+            tipo=PluggyAccountTipo.corrente,
+            nome="Conta de outro",
+            saldo=Decimal("999.00"),
+        )
+    )
+    db_session.commit()
+
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+
+    response = client.get("/dashboards/patrimonio/breakdown")
+
+    assert response.status_code == 200
+    assert Decimal(response.json()["total"]) == Decimal("0")
+
+
 def test_saldo_por_conta_isolated_by_user(client, db_session):
     other = User(google_sub="google-saldo-conta", email="saldo-conta@example.com", name="Bob")
     db_session.add(other)

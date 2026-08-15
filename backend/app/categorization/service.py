@@ -5,7 +5,7 @@ from app.categorization import engine
 from app.categorization.normalize import normalize_description
 from app.exceptions import InvalidStateError, NotFoundError
 from app.models.asset import Asset
-from app.models.categorization import CategorizationRule
+from app.models.categorization import AssetCategorizationRule, CategorizationRule
 from app.models.category import Subcategory
 from app.models.liability import Liability
 from app.models.pluggy import (
@@ -23,6 +23,8 @@ def list_transactions(
     tipo: PluggyTransactionTipo | None = None,
     ano: int | None = None,
     mes: int | None = None,
+    has_asset: bool | None = None,
+    group_id: int | None = None,
     page: int = 1,
     page_size: int = 20,
 ) -> tuple[list[PluggyTransaction], int]:
@@ -45,6 +47,15 @@ def list_transactions(
         query = query.filter(func.extract("year", PluggyTransaction.data) == ano)
     if mes is not None:
         query = query.filter(func.extract("month", PluggyTransaction.data) == mes)
+    if has_asset is not None:
+        if has_asset:
+            query = query.filter(PluggyTransaction.asset_id.isnot(None))
+        else:
+            query = query.filter(PluggyTransaction.asset_id.is_(None))
+    if group_id is not None:
+        query = query.join(Subcategory, PluggyTransaction.subcategory_id == Subcategory.id).filter(
+            Subcategory.group_id == group_id
+        )
 
     total = query.count()
     items = (
@@ -65,10 +76,13 @@ def list_transactions(
     if pendentes_da_pagina:
         rules_by_pattern = engine.build_rules_index(db, user_id)
         historico = engine.build_historico_index(db, user_id)
-        assets = engine.build_assets_index(db, user_id)
+        asset_rules = engine.build_asset_rules_index(db, user_id)
+        asset_historico = engine.build_asset_historico_index(db, user_id)
         liabilities = engine.build_liabilities_index(db, user_id)
         for tx in pendentes_da_pagina:
-            _apply_suggestions(db, tx, rules_by_pattern, historico, assets, liabilities)
+            _apply_suggestions(
+                db, tx, rules_by_pattern, historico, asset_rules, asset_historico, liabilities
+            )
         db.commit()
         for tx in pendentes_da_pagina:
             db.refresh(tx)
@@ -81,7 +95,8 @@ def _apply_suggestions(
     tx: PluggyTransaction,
     rules_by_pattern: dict[str, CategorizationRule],
     historico: list[engine.HistoricoTransacao],
-    assets: list[tuple[int, str]],
+    asset_rules: dict[str, AssetCategorizationRule],
+    asset_historico: list[engine.HistoricoAtivo],
     liabilities: list[tuple[int, str]],
 ) -> None:
     normalizado = normalize_description(tx.descricao)
@@ -102,7 +117,7 @@ def _apply_suggestions(
         tx.sugestao_fonte_id = None
         tx.sugestao_score = None
 
-    asset_suggestion = engine.suggest_asset_from_index(normalizado, assets)
+    asset_suggestion = engine.suggest_asset_from_index(normalizado, asset_rules, asset_historico)
     if asset_suggestion is not None:
         tx.asset_sugerido_id = asset_suggestion.asset_id
         tx.asset_sugestao_confianca = asset_suggestion.confianca

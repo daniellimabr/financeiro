@@ -4,8 +4,7 @@ from difflib import SequenceMatcher
 from sqlalchemy.orm import Session
 
 from app.categorization.normalize import normalize_description
-from app.models.asset import Asset
-from app.models.categorization import CategorizationRule
+from app.models.categorization import AssetCategorizationRule, CategorizationRule
 from app.models.liability import Liability
 from app.models.pluggy import PluggyTransaction, PluggyTransactionCategorizacaoStatus
 
@@ -37,6 +36,13 @@ class LiabilitySuggestion:
 class HistoricoTransacao:
     id: int
     subcategory_id: int
+    normalizado: str
+
+
+@dataclass
+class HistoricoAtivo:
+    id: int
+    asset_id: int
     normalizado: str
 
 
@@ -138,25 +144,69 @@ def suggest_asset(db: Session, user_id: int, descricao: str) -> AssetSuggestion 
     normalizado = normalize_description(descricao)
     if not normalizado:
         return None
-    return suggest_asset_from_index(normalizado, build_assets_index(db, user_id))
+    return suggest_asset_from_index(
+        normalizado, build_asset_rules_index(db, user_id), build_asset_historico_index(db, user_id)
+    )
 
 
 def suggest_asset_from_index(
-    normalizado: str, assets: list[tuple[int, str]]
+    normalizado: str,
+    rules_by_pattern: dict[str, AssetCategorizationRule],
+    historico: list[HistoricoAtivo],
 ) -> AssetSuggestion | None:
     if not normalizado:
         return None
 
-    for asset_id, asset_normalizado in assets:
-        if asset_normalizado and asset_normalizado in normalizado:
-            return AssetSuggestion(asset_id=asset_id, confianca="media")
+    rule = rules_by_pattern.get(normalizado)
+    if rule is not None:
+        return AssetSuggestion(asset_id=rule.asset_id, confianca="alta")
+
+    for h in historico:
+        if h.normalizado == normalizado:
+            return AssetSuggestion(asset_id=h.asset_id, confianca="alta")
+
+    best_match: tuple[HistoricoAtivo, float] | None = None
+    for h in historico:
+        score = SequenceMatcher(None, normalizado, h.normalizado).ratio()
+        if score >= SIMILARITY_THRESHOLD and (best_match is None or score > best_match[1]):
+            best_match = (h, score)
+
+    if best_match is not None:
+        h, _score = best_match
+        return AssetSuggestion(asset_id=h.asset_id, confianca="alta")
 
     return None
 
 
-def build_assets_index(db: Session, user_id: int) -> list[tuple[int, str]]:
-    assets = db.query(Asset).filter(Asset.user_id == user_id).order_by(Asset.id).all()
-    return [(a.id, normalize_description(a.nome)) for a in assets]
+def build_asset_rules_index(db: Session, user_id: int) -> dict[str, AssetCategorizationRule]:
+    rules = (
+        db.query(AssetCategorizationRule)
+        .filter(AssetCategorizationRule.user_id == user_id)
+        .order_by(AssetCategorizationRule.id)
+        .all()
+    )
+    index: dict[str, AssetCategorizationRule] = {}
+    for rule in rules:
+        index.setdefault(rule.padrao_normalizado, rule)
+    return index
+
+
+def build_asset_historico_index(db: Session, user_id: int) -> list[HistoricoAtivo]:
+    return [
+        HistoricoAtivo(
+            id=tx.id, asset_id=tx.asset_id, normalizado=normalize_description(tx.descricao)
+        )
+        for tx in _confirmed_asset_history(db, user_id)
+    ]
+
+
+def _confirmed_asset_history(db: Session, user_id: int) -> list[PluggyTransaction]:
+    return (
+        db.query(PluggyTransaction)
+        .filter(PluggyTransaction.user_id == user_id, PluggyTransaction.asset_id.isnot(None))
+        .order_by(PluggyTransaction.id)
+        .all()
+    )
 
 
 def suggest_liability(db: Session, user_id: int, descricao: str) -> LiabilitySuggestion | None:

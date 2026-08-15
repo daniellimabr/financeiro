@@ -10,6 +10,8 @@ export function useCategorizationTransactions(filter: TransactionsFilter = {}) {
       filter.tipo,
       filter.ano,
       filter.mes,
+      filter.hasAsset,
+      filter.groupId,
       filter.page,
       filter.pageSize,
     ],

@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from app.categorization import engine
 from app.models.asset import Asset, AssetTipo
-from app.models.categorization import CategorizationRule
+from app.models.categorization import AssetCategorizationRule, CategorizationRule
 from app.models.category import CategoryGroup, Subcategory
 from app.models.liability import Liability, LiabilityTipo
 from app.models.pluggy import (
@@ -166,11 +166,10 @@ def test_suggest_category_isolated_by_user(db_session):
     assert engine.suggest_category(db_session, user.id, "Mercado Sao Joao") is None
 
 
-def test_suggest_asset_matches_by_normalized_contains(db_session):
-    user = _user(db_session)
+def _asset(db_session, user, nome="Apartamento Centro"):
     asset = Asset(
         user_id=user.id,
-        nome="Apartamento Centro",
+        nome=nome,
         tipo=AssetTipo.imovel,
         valor_atual=Decimal("500000.00"),
         data_aquisicao=date(2020, 1, 1),
@@ -178,41 +177,134 @@ def test_suggest_asset_matches_by_normalized_contains(db_session):
     db_session.add(asset)
     db_session.commit()
     db_session.refresh(asset)
+    return asset
 
-    suggestion = engine.suggest_asset(db_session, user.id, "Condominio Apartamento Centro Mes 08")
+
+def _confirmed_asset_transaction(db_session, user, asset, descricao):
+    n = next(_SEQ)
+    item = PluggyItem(
+        user_id=user.id,
+        pluggy_item_id=f"item-{n}",
+        connector_id=1,
+        connector_name="Banco Fake",
+        status=PluggyItemStatus.updated,
+        cutoff_date=date(2026, 1, 1),
+    )
+    db_session.add(item)
+    db_session.flush()
+    account = PluggyAccount(
+        item_id=item.id,
+        user_id=user.id,
+        pluggy_account_id=f"acc-{n}",
+        tipo=PluggyAccountTipo.corrente,
+        nome="Conta",
+        saldo=Decimal("0"),
+    )
+    db_session.add(account)
+    db_session.flush()
+    tx = PluggyTransaction(
+        account_id=account.id,
+        user_id=user.id,
+        pluggy_transaction_id=f"tx-{n}",
+        descricao=descricao,
+        valor=Decimal("-10.00"),
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 15),
+        status=PluggyTransactionStatus.efetivada,
+        categorizacao_status=PluggyTransactionCategorizacaoStatus.confirmada,
+        asset_id=asset.id,
+    )
+    db_session.add(tx)
+    db_session.commit()
+    db_session.refresh(tx)
+    return tx
+
+
+def test_suggest_asset_returns_none_when_nothing_matches(db_session):
+    user = _user(db_session)
+
+    assert engine.suggest_asset(db_session, user.id, "Loja desconhecida") is None
+
+
+def test_suggest_asset_regra_wins_over_historico_exato_and_similar(db_session):
+    user = _user(db_session)
+    asset_regra = _asset(db_session, user, nome="Apartamento Centro")
+    asset_historico = _asset(db_session, user, nome="Casa Praia")
+
+    db_session.add(
+        AssetCategorizationRule(
+            user_id=user.id,
+            asset_id=asset_regra.id,
+            padrao_descricao="Condominio Predio X",
+            padrao_normalizado="condominio predio x",
+            origem="usuario_confirmou",
+        )
+    )
+    db_session.commit()
+    # Confirmed history with the exact same normalized description, different
+    # asset — if precedence were wrong, this would win instead of the rule.
+    _confirmed_asset_transaction(db_session, user, asset_historico, "Condominio Predio X")
+
+    suggestion = engine.suggest_asset(db_session, user.id, "Condominio Predio X")
 
     assert suggestion is not None
+    assert suggestion.confianca == "alta"
+    assert suggestion.asset_id == asset_regra.id
+
+
+def test_suggest_asset_historico_exato_wins_over_similar(db_session):
+    user = _user(db_session)
+    asset_exato = _asset(db_session, user, nome="Apartamento Centro")
+    asset_similar = _asset(db_session, user, nome="Casa Praia")
+
+    _confirmed_asset_transaction(db_session, user, asset_exato, "IPTU Apartamento Centro")
+    # Highly similar (but not identical) description, would score high on layer 3.
+    _confirmed_asset_transaction(db_session, user, asset_similar, "IPTU Apartamento Centri")
+
+    suggestion = engine.suggest_asset(db_session, user.id, "IPTU Apartamento Centro")
+
+    assert suggestion.confianca == "alta"
+    assert suggestion.asset_id == asset_exato.id
+
+
+def test_suggest_asset_similarity_at_or_above_threshold_matches(db_session):
+    user = _user(db_session)
+    asset = _asset(db_session, user)
+    base = "condominio predio central ltda"
+    _confirmed_asset_transaction(db_session, user, asset, base)
+
+    # ratio(base, base + "x"*6) == 0.885... >= 0.86
+    suggestion = engine.suggest_asset(db_session, user.id, base + "xxxxxx")
+
+    assert suggestion is not None
+    assert suggestion.confianca == "alta"
     assert suggestion.asset_id == asset.id
-    assert suggestion.confianca == "media"
+
+
+def test_suggest_asset_below_similarity_threshold_returns_none(db_session):
+    user = _user(db_session)
+    asset = _asset(db_session, user)
+    base = "condominio predio central ltda"
+    _confirmed_asset_transaction(db_session, user, asset, base)
+
+    suggestion = engine.suggest_asset(db_session, user.id, base + "xxxxxxxxxxxx")
+
+    assert suggestion is None
 
 
 def test_suggest_asset_isolated_by_user(db_session):
     user = _user(db_session)
     other_user = _user(db_session)
-    asset = Asset(
-        user_id=other_user.id,
-        nome="Apartamento Centro",
-        tipo=AssetTipo.imovel,
-        valor_atual=Decimal("500000.00"),
-        data_aquisicao=date(2020, 1, 1),
-    )
-    db_session.add(asset)
-    db_session.commit()
+    asset = _asset(db_session, other_user, nome="Apartamento Centro")
+    _confirmed_asset_transaction(db_session, other_user, asset, "Apartamento Centro")
 
     assert engine.suggest_asset(db_session, user.id, "Apartamento Centro") is None
 
 
 def test_suggest_asset_returns_none_when_no_match(db_session):
     user = _user(db_session)
-    asset = Asset(
-        user_id=user.id,
-        nome="Apartamento Centro",
-        tipo=AssetTipo.imovel,
-        valor_atual=Decimal("500000.00"),
-        data_aquisicao=date(2020, 1, 1),
-    )
-    db_session.add(asset)
-    db_session.commit()
+    asset = _asset(db_session, user, nome="Apartamento Centro")
+    _confirmed_asset_transaction(db_session, user, asset, "Apartamento Centro")
 
     assert engine.suggest_asset(db_session, user.id, "Supermercado Extra") is None
 

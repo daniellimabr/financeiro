@@ -47,7 +47,10 @@ describe("App", () => {
 
     renderApp();
 
-    expect(await screen.findByText("Bem-vindo, Alice")).toBeInTheDocument();
-    expect(screen.getByText("alice@example.com")).toBeInTheDocument();
+    expect(await screen.findByText("alice@example.com")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Dashboards" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
   });
 });

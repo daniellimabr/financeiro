@@ -96,6 +96,15 @@ class TendenciaPassivo:
 
 
 @dataclass
+class PatrimonioBreakdown:
+    ativos: Decimal
+    passivos: Decimal
+    saldo_contas: Decimal
+    saldo_cartoes: Decimal
+    total: Decimal
+
+
+@dataclass
 class SaldoConta:
     account_id: int
     account_nome: str
@@ -139,10 +148,24 @@ def _date_bounds(periodo: list[tuple[int, int]]) -> tuple[date, date]:
 def _base_query(db: Session, user_id: int) -> Query:
     return (
         db.query(PluggyTransaction)
+        .join(PluggyAccount, PluggyTransaction.account_id == PluggyAccount.id)
         .outerjoin(Subcategory, PluggyTransaction.subcategory_id == Subcategory.id)
         .outerjoin(CategoryGroup, Subcategory.group_id == CategoryGroup.id)
         .filter(PluggyTransaction.user_id == user_id)
         .filter(func.coalesce(CategoryGroup.excluir_de_totais, False).is_(False))
+        # Em conta de cartão de crédito, `tipo=credito` nunca é receita real —
+        # é pagamento de fatura ou estorno/reversão de compra (sinal negativo
+        # de `valor`, convenção já validada na Sprint 5 para saldo/fatura).
+        # Investigado na Sprint 10 (achado NuTag): 100% dos `credito` de
+        # cartão têm valor negativo, contra 100% dos `debito` com valor
+        # positivo — sem exceção que sugira receita real (ex.: cashback)
+        # nesse tipo de conta.
+        .filter(
+            ~(
+                (PluggyAccount.tipo == PluggyAccountTipo.cartao_credito)
+                & (PluggyTransaction.tipo == PluggyTransactionTipo.credito)
+            )
+        )
     )
 
 
@@ -179,7 +202,7 @@ def _ativos_e_passivos(db: Session, user_id: int) -> tuple[Decimal, Decimal]:
     return _to_decimal(ativos), _to_decimal(passivos)
 
 
-def _calcula_patrimonio(db: Session, user_id: int) -> Decimal:
+def _patrimonio_breakdown(db: Session, user_id: int) -> PatrimonioBreakdown:
     ativos, passivos = _ativos_e_passivos(db, user_id)
     saldo_contas = (
         db.query(func.coalesce(func.sum(PluggyAccount.saldo), 0))
@@ -200,7 +223,23 @@ def _calcula_patrimonio(db: Session, user_id: int) -> Decimal:
         )
         .scalar()
     )
-    return ativos - passivos + _to_decimal(saldo_contas) - _to_decimal(saldo_cartoes)
+    saldo_contas = _to_decimal(saldo_contas)
+    saldo_cartoes = _to_decimal(saldo_cartoes)
+    return PatrimonioBreakdown(
+        ativos=ativos,
+        passivos=passivos,
+        saldo_contas=saldo_contas,
+        saldo_cartoes=saldo_cartoes,
+        total=ativos - passivos + saldo_contas - saldo_cartoes,
+    )
+
+
+def _calcula_patrimonio(db: Session, user_id: int) -> Decimal:
+    return _patrimonio_breakdown(db, user_id).total
+
+
+def get_patrimonio_breakdown(db: Session, user_id: int) -> PatrimonioBreakdown:
+    return _patrimonio_breakdown(db, user_id)
 
 
 def get_summary(
@@ -269,11 +308,7 @@ def get_por_meio_pagamento(
     mes: int | None = None,
     categoria_id: int | None = None,
 ) -> list[MeioPagamentoTotal]:
-    query = (
-        _base_query(db, user_id)
-        .join(PluggyAccount, PluggyTransaction.account_id == PluggyAccount.id)
-        .filter(PluggyTransaction.tipo == tipo)
-    )
+    query = _base_query(db, user_id).filter(PluggyTransaction.tipo == tipo)
     query = _apply_periodo(query, ano=ano, mes=mes)
     if categoria_id is not None:
         if categoria_id == SEM_CATEGORIA_ID:

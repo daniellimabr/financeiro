@@ -1,0 +1,16 @@
+// Forma mínima compartilhada entre `CategorizedTransaction` (api/categorization.ts)
+// e `PluggyTransaction` (api/pluggy.ts) — os dois já trazem esses campos.
+export interface EditableTransaction {
+  id: number;
+  descricao: string;
+  descricao_usuario: string | null;
+  descricao_sugerida: string | null;
+  subcategory_id: number | null;
+  subcategoria_sugerida_id: number | null;
+  asset_id: number | null;
+  asset_sugerido_id: number | null;
+}
+
+export function descricaoExibida(transaction: EditableTransaction): string {
+  return transaction.descricao_usuario ?? transaction.descricao;
+}

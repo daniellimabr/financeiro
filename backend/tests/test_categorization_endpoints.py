@@ -238,6 +238,47 @@ def test_list_transactions_paginates(client, db_session):
     assert len(second_page["items"]) == 2
 
 
+def test_list_transactions_filters_by_has_asset(client, db_session):
+    user = _authenticate(client, db_session)
+    asset = Asset(
+        user_id=user.id,
+        nome="Apartamento",
+        tipo=AssetTipo.imovel,
+        valor_atual=Decimal("100.00"),
+        data_aquisicao=date(2020, 1, 1),
+    )
+    db_session.add(asset)
+    db_session.commit()
+    db_session.refresh(asset)
+    tx_com_asset = _pending_transaction(db_session, user, "Com ativo")
+    tx_com_asset.asset_id = asset.id
+    _pending_transaction(db_session, user, "Sem ativo")
+    db_session.commit()
+
+    response = client.get("/categorization/transactions", params={"has_asset": True})
+
+    body = response.json()
+    assert body["total"] == 1
+    assert body["items"][0]["id"] == tx_com_asset.id
+
+
+def test_list_transactions_filters_by_group_id(client, db_session):
+    user = _authenticate(client, db_session)
+    subcategory = _subcategory(db_session, nome="Comer fora")
+    other_subcategory = _subcategory(db_session, nome="Supermercado")
+    tx_grupo = _confirmed_transaction(db_session, user, subcategory, "Grupo alvo")
+    _confirmed_transaction(db_session, user, other_subcategory, "Outro grupo")
+
+    response = client.get(
+        "/categorization/transactions",
+        params={"status": "todas", "group_id": subcategory.group_id},
+    )
+
+    body = response.json()
+    assert body["total"] == 1
+    assert body["items"][0]["id"] == tx_grupo.id
+
+
 def test_user_a_does_not_see_or_act_on_user_bs_transactions(client, db_session):
     user_a = _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
     tx_b_owner = User(google_sub="google-2", email="b@example.com", name="Bob")
