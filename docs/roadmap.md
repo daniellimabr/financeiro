@@ -11,7 +11,7 @@ Fases em épicos, derivados do escopo funcional do bootstrap. PRDs individuais s
 | E3 | Categorização ✅ | Regras + memória de revisão manual; associação despesa↔ativo (item 2) — concluído na Sprint 4 (2026-08-14) |
 | E4 | Gestão de dados mestres ✅ | Categorias/subcategorias/natureza (item 10); ativos/passivos (item 9) — concluído na Sprint 2 (2026-08-06) |
 | E5 | Dashboards core ✅ | Receita/despesa/saldo/patrimônio com drill-down; filtros ano/mês (itens 3, 7) — concluído na Sprint 5 (2026-08-14) |
-| E6 | Dashboards analíticos | Tendência histórica, percentual de representatividade, despesas por ativo (itens 4, 5, 6) — parte 1 (tendência/percentual/design system) ✅ concluída na Sprint 6; parte 2 (Gestão de Ativos) planejada para a Sprint 8; parte 3 (cards Ativos/Passivos, drilldowns, refinamentos de Dashboard) planejada para a Sprint 9; patrimônio/evolução de investimentos segue adiado por falta de série histórica no schema |
+| E6 | Dashboards analíticos ✅ | Tendência histórica, percentual de representatividade, despesas por ativo (itens 4, 5, 6) — parte 1 (tendência/percentual/design system) ✅ Sprint 6; parte 2 (Gestão de Ativos) ✅ Sprint 8; parte 3 (cards Ativos/Passivos, drilldowns, refinamentos de Dashboard) ✅ Sprint 9 — épico fechado. Patrimônio/evolução de investimentos segue adiado por falta de série histórica no schema |
 | E7 | Conta e perfil | Perfil de usuário, logout, multiusuário (item 11) |
 | E8 | Migração de dados legados ✅ | Import de categorias (Sprint 2) + memória de classificação do v1 (Sprint 4) — concluído em 2026-08-14 |
 
@@ -180,37 +180,56 @@ PRD: [PRD-008-gestao-de-ativos.md](prd/PRD-008-gestao-de-ativos.md).
 Plano: [SPRINT-008-gestao-de-ativos-plan.md](sprints/SPRINT-008-gestao-de-ativos-plan.md).
 Relatório: [SPRINT-008-gestao-de-ativos-report.md](sprints/SPRINT-008-gestao-de-ativos-report.md) — aprovado pelo CEO em 2026-08-15.
 
-### Sprint 9 — Dashboard analítico: Ativos/Passivos e refinamentos (E6, parte 3)
+### Sprint 9 — Dashboard analítico: Ativos/Passivos e refinamentos (E6, parte 3) ✅ concluída em 2026-08-15
 
 Cards "Ativos" e "Passivos" no Dashboard (soma via `Asset.valor_atual`/
 `Liability.saldo_devedor`, já usados em `_calcula_patrimonio`, agora
 expostos em `GET /dashboards/summary`); clicar em "Ativos" abre drilldown
 de receita/despesa por ativo no mês filtrado (reaproveita `/dashboards/
-por-ativo` da Sprint 8); clicar em "Passivos" abre drilldown de despesas
-por passivo (novo `/dashboards/por-passivo`, sem toggle receita); clicar
-em "Saldo" abre drilldown de saldo por conta **sempre no snapshot atual,
-ignora o filtro de período** (decisão da sessão de planejamento — mesmo
-padrão conceitual do card Patrimônio; sem histórico de saldo no schema,
-mesma limitação já documentada nas Sprints 5/6); tooltip no hover dos
-gráficos; eixo X reduzido; remoção do gráfico de barras redundante acima
-de cada lista; remoção do nível "meio de pagamento" do funil (vira ícone
-SVG inline por linha, sem biblioteca nova — reverte uma decisão até então
-tratada como fechada em PRD-005/006, feita explicitamente pelo CEO nesta
-sessão de planejamento); ordenação por coluna nos drilldowns do Dashboard.
+por-ativo` da Sprint 8, com toggle despesa/receita); clicar em "Passivos"
+abre drilldown de despesas por passivo (novo `/dashboards/por-passivo`,
+sem toggle receita); clicar em "Saldo" abre drilldown de saldo por conta
+**sempre no snapshot atual, ignora o filtro de período** (mesmo padrão
+conceitual do card Patrimônio; sem histórico de saldo no schema, mesma
+limitação já documentada nas Sprints 5/6); tooltip no hover dos gráficos
+de tendência; eixo X reduzido; remoção do gráfico de barras redundante
+acima de cada lista; remoção do nível "meio de pagamento" do funil —
+categoria expande direto pra lista de transações, meio de pagamento vira
+ícone SVG inline por linha (reverte uma decisão até então tratada como
+fechada em PRD-005/006, decisão explícita do CEO na sessão de
+planejamento); ordenação por coluna (clique no cabeçalho) nas tabelas de
+transação do Dashboard.
 
-**Pré-requisito de schema:** `liability_id`/`liability_sugerido_id`/
+**Schema:** `liability_id`/`liability_sugerido_id`/
 `liability_sugestao_confianca` novos em `pluggy_transactions` (migration
-`0009`), espelhando `asset_id` (Sprint 4) — sugestão automática, filtro em
-`/pluggy/transactions`, endpoint de confirmação manual. Descoberto como
-gap no planejamento da Sprint 8, tratado como pré-requisito desta sprint
-em vez de surpresa de execução. Risco real identificado no planejamento:
-`delete_liability` (existente desde a Sprint 2) não tem a desassociação
-que `delete_asset` ganhou na Sprint 8 — precisa do mesmo tratamento antes
-que `liability_id` tenha dado real, senão `DELETE /liabilities/{id}`
-quebra com `IntegrityError` assim que houver transação vinculada.
+`0009`), espelhando `asset_id` (Sprint 4) — sugestão automática
+(`suggest_liability`, heurística idêntica à de ativo), filtro
+`liability_id` em `/pluggy/transactions`, `PUT
+/categorization/transactions/{id}/liability`. `delete_liability` ganhou a
+mesma desassociação que `delete_asset` ganhou na Sprint 8 (FK sem `ON
+DELETE`, mesmo achado) — implementada junto da migration na mesma sprint,
+não como correção posterior.
+
+**Frontend:** `CardSparkline`/`TrendChart`/`useTableSort`/`AccountTipoIcon`
+extraídos como componentes/hook compartilhados entre `DashboardsPage` e
+`AssetsPage` (mesmo gatilho de duplicação que motivou a extração de
+`PeriodFilter` na Sprint 8). `TrendChart` ganha tooltip (Recharts) e eixo
+X com `interval="preserveStartEnd"`. `account_tipo` exposto em
+`PluggyTransactionOut` via `@property` no model (lê `self.account.tipo`,
+Pydantic v2 `from_attributes` trata como atributo comum), com eager-load
+(`joinedload`) em `list_transactions` pra evitar N+1 — toda linha do
+funil passou a acessar `tx.account`.
+
+231 testes backend novos nesta sprint (271 no total, 98% cobertura) + 13
+testes frontend novos (68 no total). QA visual real
+(`scripts/browser-check/check-sprint9.mjs`, novo) contra dado real da VM
+de dev confirmou os 3 drilldowns novos, ícone por linha e ordenação sem
+erros de console; `check-sanfona.mjs` (Sprint 6) removido — testava
+exatamente o nível "meio de pagamento" que esta sprint eliminou.
 
 PRD: [PRD-009-dashboards-ativos-passivos.md](prd/PRD-009-dashboards-ativos-passivos.md).
 Plano: [SPRINT-009-dashboards-ativos-passivos-plan.md](sprints/SPRINT-009-dashboards-ativos-passivos-plan.md).
+Relatório: [SPRINT-009-dashboards-ativos-passivos-report.md](sprints/SPRINT-009-dashboards-ativos-passivos-report.md).
 
 ### Sprint 10 — Categorização: tabela moderna (E3, polish)
 *Escopo ainda não detalhado em PRD/plano — planejar em sessão própria.*
