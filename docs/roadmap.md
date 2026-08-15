@@ -287,16 +287,41 @@ Plano: [SPRINT-010-revisao-ux-e-passivos-plan.md](sprints/SPRINT-010-revisao-ux-
 Relatório: [SPRINT-010-revisao-ux-e-passivos-report.md](sprints/SPRINT-010-revisao-ux-e-passivos-report.md).
 
 ### Sprint 11 — Categorização: tabela moderna (E3, polish)
-*Escopo ainda não detalhado em PRD/plano — planejar em sessão própria.*
 
-A lentidão (N+1 na busca de sugestões, depois o recálculo da fila inteira
-a cada refetch) já foi corrigida fora de sprint formal — ver nota
-"Correções pós-Sprint 6" abaixo: `GET /categorization/pending` (renomeado
-para `/categorization/transactions` na Sprint 7) pagina (page/page_size) e
+Planejada em sessão própria (2026-08-15). A lentidão (N+1 na busca de
+sugestões, depois o recálculo da fila inteira a cada refetch) já foi
+corrigida fora de sprint formal — ver nota "Correções pós-Sprint 6"
+abaixo: `GET /categorization/pending` (renomeado para
+`/categorization/transactions` na Sprint 7) pagina (page/page_size) e
 filtra por ano/mês, com o mesmo seletor visual da `DashboardsPage`; a
-Sprint 7 também adicionou filtro tipo/status e ações em lote. Falta só
-modernizar a tabela em si (hoje HTML puro, sem nenhum token do design
-system) reaproveitando a fundação de tipografia/layout da Sprint 6.
+Sprint 7 também adicionou filtro tipo/status e ações em lote. O que
+restava era modernizar a tabela em si: ela já usava os tokens do design
+system (`.dash-table`), mas essa classe é documentada no `DESIGN.md` como
+"o nível mais plano do funil" (pensada para drill-downs de leitura
+passiva) — descompasso para a superfície de trabalho primária que
+Categorização é. Escopo definido: novo `CategoryCombobox` (buscável,
+agrupado por categoria, teclado completo) substituindo o `<select>` nativo
+de 51 subcategorias — reaproveitado também pelos drill-downs de
+Dashboard/Ativos/Passivos via `CategorySelectCell`, sem mudar esses call
+sites; badge de status (Pendente/Confirmada) com tokens já existentes, sem
+reusar a cor de despesa; polish de linha (hover/espaçamento) só na tabela
+de Categorização. Sem mudança de backend/API. Fora de escopo: combobox
+para Ativo (lista pequena, não justifica), generalizar o padrão para
+outros `<select>`s do app, e restilizar o chrome das tabelas de
+drill-down.
+
+Implementada em sessão própria (2026-08-15): `CategoryCombobox` novo,
+`CategorySelectCell`/`CategorizationReviewPage` migrados, badge de status,
+polish de linha, 109 testes frontend verdes (suíte completa, sem
+regressão). Validação ao vivo contra a fila real da VM de dev e
+`/impeccable audit` ficaram pendentes — sem token de sessão disponível
+nesta sessão e sem Docker/Postgres localmente para rodar o stack
+completo; script de QA (`check-categorizacao.mjs`) já atualizado e pronto
+para essa validação de follow-up (ver relatório).
+
+PRD: [PRD-011-categorizacao-tabela-moderna.md](prd/PRD-011-categorizacao-tabela-moderna.md).
+Plano: [SPRINT-011-categorizacao-tabela-moderna-plan.md](sprints/SPRINT-011-categorizacao-tabela-moderna-plan.md).
+Relatório: [SPRINT-011-categorizacao-tabela-moderna-report.md](sprints/SPRINT-011-categorizacao-tabela-moderna-report.md).
 
 **Correções pós-Sprint 6 (2026-08-15, sessão própria):** CEO reportou o
 botão "Confirmar" da fila de Categorização parecendo travado. Causa real:
