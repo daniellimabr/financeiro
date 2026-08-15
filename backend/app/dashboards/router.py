@@ -7,6 +7,7 @@ from app.db import get_db
 from app.models.pluggy import PluggyTransactionTipo
 from app.models.user import User
 from app.schemas.dashboards import (
+    AtivoTotalOut,
     CategoriaTotalOut,
     MeioPagamentoTotalOut,
     SummaryOut,
@@ -75,3 +76,13 @@ def get_por_categoria_tendencia(
     return service.get_tendencia_por_categoria(
         db, current_user.id, tipo=tipo, ano=ano, mes=mes, meses=meses
     )
+
+
+@router.get("/por-ativo", response_model=list[AtivoTotalOut])
+def get_por_ativo(
+    ano: int | None = None,
+    mes: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.get_por_ativo(db, current_user.id, ano=ano, mes=mes)

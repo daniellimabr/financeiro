@@ -1,4 +1,16 @@
+from datetime import date
+from decimal import Decimal
+
 from app.auth.jwt import COOKIE_NAME, create_access_token
+from app.models.pluggy import (
+    PluggyAccount,
+    PluggyAccountTipo,
+    PluggyItem,
+    PluggyItemStatus,
+    PluggyTransaction,
+    PluggyTransactionStatus,
+    PluggyTransactionTipo,
+)
 from app.models.user import User
 
 
@@ -97,6 +109,55 @@ def test_update_missing_asset_returns_404(client, db_session):
     response = client.put("/assets/999", json=ASSET_PAYLOAD)
 
     assert response.status_code == 404
+
+
+def test_delete_asset_with_linked_transaction_disassociates_instead_of_failing(client, db_session):
+    user = _authenticate(client, db_session)
+    asset = client.post("/assets", json=ASSET_PAYLOAD).json()
+
+    item = PluggyItem(
+        user_id=user.id,
+        pluggy_item_id="item-1",
+        connector_id=1,
+        connector_name="Banco Fake",
+        status=PluggyItemStatus.updated,
+        cutoff_date=date(2026, 1, 1),
+    )
+    db_session.add(item)
+    db_session.flush()
+    account = PluggyAccount(
+        item_id=item.id,
+        user_id=user.id,
+        pluggy_account_id="acc-1",
+        tipo=PluggyAccountTipo.corrente,
+        nome="Conta",
+        saldo=Decimal("0"),
+    )
+    db_session.add(account)
+    db_session.flush()
+    tx = PluggyTransaction(
+        account_id=account.id,
+        user_id=user.id,
+        pluggy_transaction_id="tx-1",
+        descricao="Gasolina",
+        valor=Decimal("-100.00"),
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+        data_competencia=date(2026, 1, 10),
+        asset_id=asset["id"],
+        status=PluggyTransactionStatus.efetivada,
+    )
+    db_session.add(tx)
+    db_session.commit()
+    db_session.refresh(tx)
+
+    delete_response = client.delete(f"/assets/{asset['id']}")
+
+    assert delete_response.status_code == 204
+    db_session.refresh(tx)
+    assert tx.asset_id is None
+    transactions = client.get("/pluggy/transactions").json()
+    assert len(transactions) == 1
 
 
 def test_delete_missing_asset_returns_404(client, db_session):

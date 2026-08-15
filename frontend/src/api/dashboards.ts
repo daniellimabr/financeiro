@@ -49,6 +49,12 @@ export interface TendenciaCategoria {
   pontos: PontoTendencia[];
 }
 
+export interface AtivoTotal {
+  asset_id: number;
+  asset_nome: string;
+  total: string;
+}
+
 // Período histórico oferecido pelo seletor de tendência (3/6/12 meses).
 export type PeriodoHistorico = 3 | 6 | 12;
 
@@ -100,4 +106,8 @@ export function fetchDashboardPorCategoriaTendencia(
   return apiFetch<TendenciaCategoria[]>(
     `/dashboards/por-categoria/tendencia${buildQuery({ tipo, ...filter })}`
   );
+}
+
+export function fetchDashboardPorAtivo(filter: PeriodoFilter = {}): Promise<AtivoTotal[]> {
+  return apiFetch<AtivoTotal[]>(`/dashboards/por-ativo${buildQuery({ ...filter })}`);
 }

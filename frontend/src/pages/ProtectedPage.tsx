@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import type { CurrentUser } from "../api/auth";
 import { AccountManagementPage } from "./AccountManagementPage";
+import { AssetsPage } from "./AssetsPage";
 import { CategorizationReviewPage } from "./CategorizationReviewPage";
 import { DashboardsPage } from "./DashboardsPage";
 
@@ -9,13 +10,14 @@ interface ProtectedPageProps {
   user: CurrentUser;
 }
 
-type Tab = "inicio" | "dashboards" | "contas" | "categorizar";
+type Tab = "inicio" | "dashboards" | "contas" | "categorizar" | "ativos";
 
 const NAV_ITEMS: { tab: Tab; label: string }[] = [
   { tab: "inicio", label: "Início" },
   { tab: "dashboards", label: "Dashboards" },
   { tab: "categorizar", label: "Categorizar" },
   { tab: "contas", label: "Gestão de contas" },
+  { tab: "ativos", label: "Ativos" },
 ];
 
 export function ProtectedPage({ user }: ProtectedPageProps) {
@@ -59,6 +61,7 @@ export function ProtectedPage({ user }: ProtectedPageProps) {
         {tab === "dashboards" && <DashboardsPage />}
         {tab === "contas" && <AccountManagementPage />}
         {tab === "categorizar" && <CategorizationReviewPage />}
+        {tab === "ativos" && <AssetsPage />}
       </main>
     </div>
   );

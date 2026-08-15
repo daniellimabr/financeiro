@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.exceptions import InvalidStateError, NotFoundError
 from app.models.asset import Asset, AssetStatus, AssetTipo
+from app.models.pluggy import PluggyTransaction
 
 
 def list_assets(db: Session, user_id: int) -> list[Asset]:
@@ -62,6 +63,16 @@ def update_asset(
 
 def delete_asset(db: Session, user_id: int, asset_id: int) -> None:
     asset = get_asset(db, user_id, asset_id)
+    # Preserva o histórico de transação: exclusão nunca leva junto as
+    # transações que apontavam para o ativo, só desassocia (FK sem
+    # ON DELETE definido rejeitaria a exclusão direta, mas a desassociação é
+    # regra de negócio própria, independente do comportamento do banco).
+    db.query(PluggyTransaction).filter(
+        PluggyTransaction.user_id == user_id, PluggyTransaction.asset_id == asset_id
+    ).update({PluggyTransaction.asset_id: None})
+    db.query(PluggyTransaction).filter(
+        PluggyTransaction.user_id == user_id, PluggyTransaction.asset_sugerido_id == asset_id
+    ).update({PluggyTransaction.asset_sugerido_id: None})
     db.delete(asset)
     db.commit()
 

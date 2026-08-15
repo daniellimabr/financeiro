@@ -39,6 +39,7 @@ import {
   type PontoTendencia,
   type TransacaoTipo,
 } from "../api/dashboards";
+import { PeriodFilter } from "../components/PeriodFilter";
 import { useDashboardByCategoria } from "../hooks/useDashboardByCategoria";
 import { useDashboardByMeioPagamento } from "../hooks/useDashboardByMeioPagamento";
 import { useDashboardCategoriaTendencia } from "../hooks/useDashboardCategoriaTendencia";
@@ -46,21 +47,6 @@ import { useDashboardSummary } from "../hooks/useDashboardSummary";
 import { useDashboardTendencia } from "../hooks/useDashboardTendencia";
 import { usePluggyTransactions } from "../hooks/usePluggyTransactions";
 import { formatCurrency } from "../utils/format";
-
-const MESES = [
-  "Janeiro",
-  "Fevereiro",
-  "Março",
-  "Abril",
-  "Maio",
-  "Junho",
-  "Julho",
-  "Agosto",
-  "Setembro",
-  "Outubro",
-  "Novembro",
-  "Dezembro",
-];
 
 const ACCOUNT_TIPO_LABEL: Record<string, string> = {
   corrente: "Conta corrente",
@@ -146,34 +132,14 @@ export function DashboardsPage() {
   return (
     <section className="dash-page">
       <div className="dash-filter">
-        <label>
-          Mês
-          <select
-            aria-label="Mês"
-            value={mes}
-            onChange={(event) => setMes(Number(event.target.value))}
-          >
-            {MESES.map((nome, index) => (
-              <option key={nome} value={index + 1}>
-                {nome}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Ano
-          <select
-            aria-label="Ano"
-            value={ano}
-            onChange={(event) => setAno(Number(event.target.value))}
-          >
-            {[ano - 1, ano, ano + 1].map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
+        <PeriodFilter
+          ano={ano}
+          mes={mes}
+          onChange={(next) => {
+            if (next.ano !== undefined) setAno(next.ano);
+            if (next.mes !== undefined) setMes(next.mes);
+          }}
+        />
         <label>
           Histórico
           <select

@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from app.auth.jwt import COOKIE_NAME, create_access_token
 from app.main import app
+from app.models.asset import Asset, AssetTipo
 from app.models.category import CategoryGroup, Subcategory
 from app.models.pluggy import (
     PluggyAccount,
@@ -223,6 +224,20 @@ def _subcategory(db_session, nome="Mercado"):
     return subcategory
 
 
+def _asset(db_session, user, nome="Carro"):
+    asset = Asset(
+        user_id=user.id,
+        nome=nome,
+        tipo=AssetTipo.veiculo,
+        valor_atual=Decimal("50000.00"),
+        data_aquisicao=date(2024, 1, 1),
+    )
+    db_session.add(asset)
+    db_session.commit()
+    db_session.refresh(asset)
+    return asset
+
+
 def _transaction(
     db_session,
     user,
@@ -233,6 +248,7 @@ def _transaction(
     data=date(2026, 1, 15),
     data_competencia=None,
     subcategory_id=None,
+    asset_id=None,
 ):
     item = PluggyItem(
         user_id=user.id,
@@ -264,6 +280,7 @@ def _transaction(
         data=data,
         data_competencia=data_competencia if data_competencia is not None else data,
         subcategory_id=subcategory_id,
+        asset_id=asset_id,
         status=PluggyTransactionStatus.efetivada,
     )
     db_session.add(tx)
@@ -394,6 +411,77 @@ def test_list_transactions_combined_filters_isolated_by_user(client, db_session)
             "account_tipo": "corrente",
         },
     )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert Decimal(body[0]["valor"]) == Decimal("-10.00")
+
+
+def test_list_transactions_filters_by_asset_id(client, db_session):
+    user = _authenticate(client, db_session)
+    asset = _asset(db_session, user)
+    _transaction(db_session, user, valor="-10.00", asset_id=asset.id)
+    _transaction(db_session, user, valor="-20.00", asset_id=None)
+
+    response = client.get("/pluggy/transactions", params={"asset_id": asset.id})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert Decimal(body[0]["valor"]) == Decimal("-10.00")
+
+
+def test_list_transactions_filters_by_asset_id_combined_with_ano_mes_subcategoria(
+    client, db_session
+):
+    user = _authenticate(client, db_session)
+    asset = _asset(db_session, user)
+    sub = _subcategory(db_session)
+    _transaction(
+        db_session,
+        user,
+        valor="-10.00",
+        data=date(2026, 1, 15),
+        subcategory_id=sub.id,
+        asset_id=asset.id,
+    )
+    _transaction(
+        db_session,
+        user,
+        valor="-20.00",
+        data=date(2026, 2, 15),
+        subcategory_id=sub.id,
+        asset_id=asset.id,
+    )
+    _transaction(
+        db_session, user, valor="-30.00", data=date(2026, 1, 15), subcategory_id=None, asset_id=None
+    )
+
+    response = client.get(
+        "/pluggy/transactions",
+        params={"ano": 2026, "mes": 1, "subcategory_id": sub.id, "asset_id": asset.id},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert Decimal(body[0]["valor"]) == Decimal("-10.00")
+
+
+def test_list_transactions_filters_by_asset_id_isolated_by_user(client, db_session):
+    user = _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    asset = _asset(db_session, user)
+    _transaction(db_session, user, valor="-10.00", asset_id=asset.id)
+
+    other = User(google_sub="google-2", email="b@example.com", name="Bob")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    other_asset = _asset(db_session, other, nome="Moto")
+    _transaction(db_session, other, valor="-999.00", asset_id=other_asset.id)
+
+    response = client.get("/pluggy/transactions", params={"asset_id": asset.id})
 
     assert response.status_code == 200
     body = response.json()

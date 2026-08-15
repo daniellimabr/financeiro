@@ -124,6 +124,7 @@ def list_transactions(
     mes: int | None = None,
     subcategory_id: int | None = None,
     account_tipo: PluggyAccountTipo | None = None,
+    asset_id: int | None = None,
     competencia: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -135,5 +136,6 @@ def list_transactions(
         mes=mes,
         subcategory_id=subcategory_id,
         account_tipo=account_tipo,
+        asset_id=asset_id,
         competencia=competencia,
     )

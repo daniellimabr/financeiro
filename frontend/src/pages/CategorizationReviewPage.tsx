@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 
 import type { CategorizationStatus, TransactionTipo } from "../api/categorization";
+import { PeriodFilter } from "../components/PeriodFilter";
 import { useAssets } from "../hooks/useAssets";
 import { useBulkConfirmCategorization } from "../hooks/useBulkConfirmCategorization";
 import { useCategorizationTransactions } from "../hooks/useCategorizationTransactions";
@@ -12,21 +13,6 @@ import { useSetTransactionAsset } from "../hooks/useSetTransactionAsset";
 import { useSubcategories } from "../hooks/useSubcategories";
 import { useUpdateDescription } from "../hooks/useUpdateDescription";
 import { formatCurrency } from "../utils/format";
-
-const MESES = [
-  "Janeiro",
-  "Fevereiro",
-  "Março",
-  "Abril",
-  "Maio",
-  "Junho",
-  "Julho",
-  "Agosto",
-  "Setembro",
-  "Outubro",
-  "Novembro",
-  "Dezembro",
-];
 
 const PAGE_SIZE = 20;
 
@@ -140,34 +126,7 @@ export function CategorizationReviewPage() {
       <h2>Categorização</h2>
 
       <div className="dash-filter">
-        <label>
-          Mês
-          <select
-            aria-label="Mês"
-            value={mes}
-            onChange={(event) => mudarFiltro({ mes: Number(event.target.value) })}
-          >
-            {MESES.map((nome, index) => (
-              <option key={nome} value={index + 1}>
-                {nome}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Ano
-          <select
-            aria-label="Ano"
-            value={ano}
-            onChange={(event) => mudarFiltro({ ano: Number(event.target.value) })}
-          >
-            {[ano - 1, ano, ano + 1].map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
+        <PeriodFilter ano={ano} mes={mes} onChange={mudarFiltro} />
         <label>
           Tipo
           <select

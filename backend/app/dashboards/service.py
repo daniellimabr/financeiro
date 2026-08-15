@@ -64,6 +64,13 @@ class TendenciaCategoria:
     pontos: list[PontoTendencia]
 
 
+@dataclass
+class AtivoTotal:
+    asset_id: int
+    asset_nome: str
+    total: Decimal
+
+
 def _to_decimal(value) -> Decimal:
     return Decimal(str(value))
 
@@ -345,4 +352,27 @@ def get_tendencia_por_categoria(
             pontos=[PontoTendencia(ano=y, mes=m, total=dado["pontos"][(y, m)]) for y, m in periodo],
         )
         for cat_id, dado in por_categoria.items()
+    ]
+
+
+def get_por_ativo(
+    db: Session, user_id: int, *, ano: int | None = None, mes: int | None = None
+) -> list[AtivoTotal]:
+    # Só despesas — venda de ativo é tratada à parte (valor_venda), não entra
+    # na agregação de transações. Sem bucket "sem ativo": a maioria das
+    # despesas não tem asset_id, e isso é esperado (ver PRD-008).
+    query = (
+        _base_query(db, user_id)
+        .join(Asset, PluggyTransaction.asset_id == Asset.id)
+        .filter(PluggyTransaction.tipo == PluggyTransactionTipo.debito)
+    )
+    query = _apply_periodo(query, ano=ano, mes=mes)
+    rows = (
+        query.with_entities(Asset.id, Asset.nome, func.sum(func.abs(PluggyTransaction.valor)))
+        .group_by(Asset.id, Asset.nome)
+        .all()
+    )
+    return [
+        AtivoTotal(asset_id=asset_id, asset_nome=asset_nome, total=_to_decimal(total))
+        for asset_id, asset_nome, total in rows
     ]

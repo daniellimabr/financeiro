@@ -57,3 +57,11 @@ class TendenciaCategoriaOut(BaseModel):
     subcategory_id: int
     subcategory_nome: str
     pontos: list[PontoTendenciaOut]
+
+
+class AtivoTotalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    asset_id: int
+    asset_nome: str
+    total: Decimal

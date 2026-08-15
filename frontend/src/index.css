@@ -475,6 +475,10 @@ input {
   border-color: var(--accent);
 }
 
+.dash-tile.baixado {
+  opacity: 0.55;
+}
+
 .dash-tile .k {
   font-size: var(--text-xs);
   font-weight: 600;

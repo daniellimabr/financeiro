@@ -114,6 +114,7 @@ def list_transactions(
     mes: int | None = None,
     subcategory_id: int | None = None,
     account_tipo: PluggyAccountTipo | None = None,
+    asset_id: int | None = None,
     competencia: bool = False,
 ) -> list[PluggyTransaction]:
     query = db.query(PluggyTransaction).filter(PluggyTransaction.user_id == user_id)
@@ -130,6 +131,8 @@ def list_transactions(
             query = query.filter(PluggyTransaction.subcategory_id == subcategory_id)
     if account_tipo is not None:
         query = query.join(PluggyAccount).filter(PluggyAccount.tipo == account_tipo)
+    if asset_id is not None:
+        query = query.filter(PluggyTransaction.asset_id == asset_id)
 
     return query.order_by(PluggyTransaction.data.desc()).all()
 

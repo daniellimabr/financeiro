@@ -13,6 +13,7 @@ export function usePluggyTransactions(
       filters.mes,
       filters.subcategoryId,
       filters.accountTipo,
+      filters.assetId,
       filters.competencia,
     ],
     queryFn: () => fetchPluggyTransactions(filters),
