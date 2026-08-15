@@ -3,6 +3,7 @@
 - **Plano:** [SPRINT-008-gestao-de-ativos-plan.md](./SPRINT-008-gestao-de-ativos-plan.md)
 - **PRD:** [PRD-008-gestao-de-ativos.md](../prd/PRD-008-gestao-de-ativos.md)
 - **Data do relatório:** 2026-08-15
+- **Status:** aprovado pelo CEO em 2026-08-15
 
 ## Resumo
 
@@ -124,8 +125,8 @@ Sprint 8 implementou 14 tarefas planejadas + 1 revisão de escopo pedida pelo CE
 
 ## Pendências e próximos passos sugeridos
 
-### Informacional (não requer ação)
-- 3 test assets criados na VM de dev como side effect do script QA rodado 2x (primeira falhou, segunda sucedeu); dev VM por design não contém dados reais, leftover test data inspecionável. CEO pode deletar via UI se desejar.
+### Resolvido durante a sprint
+- Os ativos de teste que o `check-ativos.mjs` deixava cadastrados na VM de dev (side effect de rodadas anteriores do script) foram removidos, e o script foi corrigido para excluir o que cria antes de terminar (`try/finally`), em vez de depender de limpeza manual — pedido do CEO. De quebra, corrigiu um bug real: como a listagem de ativos é alfabética, os seletores usavam sempre o primeiro botão da página, que na maioria das vezes pertencia a um ativo real do usuário, não ao criado pelo script.
 
 ### Sprint 9 (E6, parte 3) — Dashboards: Ativos/Passivos
 Planejada para próxima sessão, conforme roadmap. Escopo: cards "Ativos"/"Passivos" no Dashboard principal, drilldowns de receita/despesa por ativo/passivo, tooltip em gráficos, refinamentos visuais. Gap descoberto no planejamento de Sprint 8: `liability_id` não existe em `pluggy_transactions` — necessário schema novo (espelhando padrão de `asset_id`) + sugestão automática, entrar como pré-requisito desta sprint.
@@ -135,4 +136,4 @@ Modernização visual da tabela de Categorização (hoje HTML puro) reaproveitan
 
 ---
 
-Aguardando revisão e aprovação do CEO.
+**Sprint aprovada pelo CEO em 2026-08-15.**
