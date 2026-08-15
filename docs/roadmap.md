@@ -151,7 +151,7 @@ divididas em Sprints 7/8/9 nesta sessão de planejamento (2026-08-15).
 - 219 testes backend (98% cobertura) + 44 testes frontend.
 - PRD: [PRD-007-categorizacao-gestao-contas.md](prd/PRD-007-categorizacao-gestao-contas.md).
   Plano: [SPRINT-007-categorizacao-gestao-contas-plan.md](sprints/SPRINT-007-categorizacao-gestao-contas-plan.md).
-  Relatório: [SPRINT-007-categorizacao-gestao-contas-report.md](sprints/SPRINT-007-categorizacao-gestao-contas-report.md).
+  Relatório: [SPRINT-007-categorizacao-gestao-contas-report.md](sprints/SPRINT-007-categorizacao-gestao-contas-report.md) — aprovado pelo CEO em 2026-08-15.
 
 ### Sprint 8 — Gestão de Ativos (E6, parte 2)
 *Escopo ainda não detalhado em PRD/plano — planejar em sessão própria.*

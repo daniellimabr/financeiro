@@ -2,6 +2,7 @@
 
 - **Plano:** [SPRINT-007-categorizacao-gestao-contas-plan.md](./SPRINT-007-categorizacao-gestao-contas-plan.md)
 - **Data do relatório:** 2026-08-15
+- **Status:** aprovado pelo CEO em 2026-08-15
 
 ## Resumo
 
@@ -181,3 +182,5 @@ mas dentro de uma única sessão sem necessidade de `/clear` intermediário.
   antecedência.
 - **Bundle do frontend segue acima de 500kB** (aviso do Vite, não erro) —
   mesma pendência registrada desde a Sprint 5, ainda não priorizada.
+
+**Sprint aprovada pelo CEO em 2026-08-15.**
