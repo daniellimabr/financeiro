@@ -1,0 +1,10 @@
+{
+  "name": "browser-check",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Ferramenta de QA visual do CTO (Claude Code) — não é dependência do app, não é publicada. Screenshots e inspeção real via Playwright/Chromium headless, já que este notebook não tem Docker/WSL2 para chromium-cli.",
+  "type": "module",
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

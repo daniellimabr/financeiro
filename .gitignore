@@ -49,3 +49,6 @@ Thumbs.db
 
 # Config local de acesso às VMs (host/porta) — nunca versionar
 scripts/vm-config.local.ps1
+
+# Screenshots de QA visual — podem conter dado real do dashboard, nunca versionar
+scripts/browser-check/shots/

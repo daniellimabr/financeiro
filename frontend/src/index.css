@@ -36,7 +36,7 @@
   --text-xl: 24px;
   --text-2xl: 32px;
 
-  font: var(--text-base) / 145% var(--sans);
+  font: var(--text-base) / 1.45 var(--sans);
   letter-spacing: 0.1px;
   color-scheme: light dark;
   color: var(--text);
@@ -348,21 +348,24 @@ input {
     padding: var(--space-3) var(--space-4);
   }
 
+  .app-brand {
+    flex: 0 0 auto;
+  }
+
   .app-nav {
     flex-direction: row;
-    flex: none;
+    flex: 1 1 auto;
+    min-width: 0;
     overflow-x: auto;
   }
 
   .app-nav button {
+    flex: 0 0 auto;
     white-space: nowrap;
   }
 
   .app-user {
-    border-top: none;
-    padding-top: 0;
-    margin-left: auto;
-    text-align: right;
+    display: none;
   }
 }
 
