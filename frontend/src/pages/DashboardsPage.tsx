@@ -492,29 +492,31 @@ function TransacoesPanel({
     return <p className="dash-empty">Nenhuma transação neste meio de pagamento.</p>;
 
   return (
-    <table className="dash-table">
-      <thead>
-        <tr>
-          <th>Data</th>
-          <th>Descrição</th>
-          <th>Valor</th>
-          <th>%</th>
-        </tr>
-      </thead>
-      <tbody>
-        {data.map((transaction) => {
-          const percentual = total > 0 ? (Math.abs(Number(transaction.valor)) / total) * 100 : 0;
-          return (
-            <tr key={transaction.id}>
-              <td>{transaction.data}</td>
-              <td>{transaction.descricao}</td>
-              <td>{formatCurrency(transaction.valor)}</td>
-              <td className="pct-col">{formatPercent(percentual)}</td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <div className="dash-table-wrap">
+      <table className="dash-table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Descrição</th>
+            <th>Valor</th>
+            <th>%</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((transaction) => {
+            const percentual = total > 0 ? (Math.abs(Number(transaction.valor)) / total) * 100 : 0;
+            return (
+              <tr key={transaction.id}>
+                <td>{transaction.data}</td>
+                <td>{transaction.descricao}</td>
+                <td>{formatCurrency(transaction.valor)}</td>
+                <td className="pct-col">{formatPercent(percentual)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
