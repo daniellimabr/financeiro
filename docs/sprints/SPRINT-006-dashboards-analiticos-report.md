@@ -2,6 +2,7 @@
 
 - **Plano:** [SPRINT-006-dashboards-analiticos-plan.md](./SPRINT-006-dashboards-analiticos-plan.md)
 - **Data do relatório:** 2026-08-15
+- **Status:** aprovado pelo CEO em 2026-08-15
 
 ## Resumo
 
@@ -139,9 +140,12 @@ consumo de contexto alto mas dentro de uma única sessão sem necessidade de
 
 - **Bundle do frontend segue acima de 500kB** (aviso do Vite, não erro) —
   mesma pendência registrada na Sprint 5, ainda não priorizada.
-- **Sprint 7 (E6 parte 2 — tela de Ativos)** e **Sprint 8 (Categorização:
-  paginação + tabela moderna)** seguem como próximas candidatas, ambas
-  reaproveitando a fundação de tipografia/layout desta sprint.
+- **Sprint 7** deixou de ser a tela de Ativos (E6 parte 2) — o CEO vai
+  apontar ajustes de tela específicos na próxima sessão; o escopo de
+  Ativos volta pro backlog, sem número de sprint fixo (ver roadmap.md).
+  **Sprint 8 (Categorização: tabela moderna)** segue como candidata — a
+  paginação em si já foi entregue fora de sprint formal, ver nota
+  "Correções pós-Sprint 6" em roadmap.md.
 - **Investigar a instabilidade do `ssh-vm.ps1`** (`pip install --quiet`
   falhando intermitentemente) antes que vire fricção recorrente em sprints
   futuras — não bloqueou esta sprint (contornável ativando o venv
@@ -150,3 +154,5 @@ consumo de contexto alto mas dentro de uma única sessão sem necessidade de
   escopo por falta de série histórica no schema (precisaria de snapshot
   periódico) — mesma limitação registrada desde a Sprint 5, sem sprint
   candidata ainda.
+
+**Sprint aprovada pelo CEO em 2026-08-15.**

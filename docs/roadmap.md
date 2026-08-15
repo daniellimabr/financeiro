@@ -11,7 +11,7 @@ Fases em épicos, derivados do escopo funcional do bootstrap. PRDs individuais s
 | E3 | Categorização ✅ | Regras + memória de revisão manual; associação despesa↔ativo (item 2) — concluído na Sprint 4 (2026-08-14) |
 | E4 | Gestão de dados mestres ✅ | Categorias/subcategorias/natureza (item 10); ativos/passivos (item 9) — concluído na Sprint 2 (2026-08-06) |
 | E5 | Dashboards core ✅ | Receita/despesa/saldo/patrimônio com drill-down; filtros ano/mês (itens 3, 7) — concluído na Sprint 5 (2026-08-14) |
-| E6 | Dashboards analíticos | Tendência histórica, percentual de representatividade, despesas por ativo (itens 4, 5, 6) — dividido em Sprint 6 (tendência/percentual/design system) ✅ e Sprint 7 (Ativos); patrimônio/evolução de investimentos adiado por falta de série histórica no schema |
+| E6 | Dashboards analíticos | Tendência histórica, percentual de representatividade, despesas por ativo (itens 4, 5, 6) — parte 1 (tendência/percentual/design system) ✅ concluída na Sprint 6; parte 2 (Ativos) volta pro backlog, sem sprint fixa ainda; patrimônio/evolução de investimentos adiado por falta de série histórica no schema |
 | E7 | Conta e perfil | Perfil de usuário, logout, multiusuário (item 11) |
 | E8 | Migração de dados legados ✅ | Import de categorias (Sprint 2) + memória de classificação do v1 (Sprint 4) — concluído em 2026-08-14 |
 
@@ -111,20 +111,23 @@ Sprint 8, que paginará o endpoint.
   cortando a coluna % em vez de rolar; linha da sanfona apertada demais em
   390px com 6 elementos) — ambos corrigidos e revalidados com screenshot.
 - 165 testes backend (98% cobertura) + 28 testes frontend.
-- PRD: [PRD-006-dashboards-analiticos.md](prd/PRD-006-dashboards-analiticos.md). Plano: [SPRINT-006-dashboards-analiticos-plan.md](sprints/SPRINT-006-dashboards-analiticos-plan.md). Relatório: [SPRINT-006-dashboards-analiticos-report.md](sprints/SPRINT-006-dashboards-analiticos-report.md).
+- PRD: [PRD-006-dashboards-analiticos.md](prd/PRD-006-dashboards-analiticos.md). Plano: [SPRINT-006-dashboards-analiticos-plan.md](sprints/SPRINT-006-dashboards-analiticos-plan.md). Relatório: [SPRINT-006-dashboards-analiticos-report.md](sprints/SPRINT-006-dashboards-analiticos-report.md) — aprovado pelo CEO em 2026-08-15.
 
-### Sprint 7 — Ativos: gestão e custos (E6, parte 2)
-*Escopo ainda não detalhado em PRD/plano — planejar em sessão própria,
-depois que a Sprint 6 estabelecer a fundação de design system.*
+### Sprint 7 — Ajustes de tela (a definir pelo CEO)
+*Escopo a ser apontado pelo CEO na próxima sessão — ainda sem PRD/plano.*
 
-Tela `AssetsPage.tsx`: cards por ativo (reaproveitando `.dash-tile`),
-botão/formulário para cadastrar ativo novo (backend de CRUD já existe em
-`app/assets/` desde a Sprint 2 — falta só mutation hooks no frontend, hoje
-só há leitura via `fetchAssets`). Clicar num card abre drill-down de custos
-relacionados: total gasto + lista de transações vinculadas (via `asset_id`
-confirmado em `pluggy_transactions`, associação já existente desde a
-Sprint 4). Versão simples confirmada pelo CEO — sem tendência/percentual
-nesta primeira versão da tela.
+Reservada para ajustes pontuais de UI/UX em telas já existentes que o CEO
+vai indicar diretamente no próximo chat (não necessariamente ligada a um
+épico específico do roadmap). Sem escopo fechado até lá.
+
+**Nota:** o escopo antes reservado aqui — "Ativos: gestão e custos (E6,
+parte 2)": tela `AssetsPage.tsx` com cards por ativo (reaproveitando
+`.dash-tile`), botão/formulário para cadastrar ativo novo (backend de CRUD
+já existe em `app/assets/` desde a Sprint 2 — falta só mutation hooks no
+frontend, hoje só há leitura via `fetchAssets`), drill-down de custos por
+ativo (total gasto + transações vinculadas via `asset_id`, associação já
+existente desde a Sprint 4) — volta pro backlog do épico E6, sem número de
+sprint fixo. Retoma quando entrar no plano de execução.
 
 ### Sprint 8 — Categorização: tabela moderna (E3, polish)
 *Escopo ainda não detalhado em PRD/plano — planejar em sessão própria.*
