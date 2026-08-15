@@ -22,23 +22,23 @@ colors:
   despesa-dark: "#e0855c"
 typography:
   display:
-    fontFamily: "system-ui, 'Segoe UI', Roboto, sans-serif"
+    fontFamily: "Archivo, system-ui, 'Segoe UI', Roboto, sans-serif"
     fontSize: "32px"
-    fontWeight: 600
+    fontWeight: 700
     lineHeight: 1.15
     letterSpacing: "-0.02em"
   headline:
-    fontFamily: "system-ui, 'Segoe UI', Roboto, sans-serif"
+    fontFamily: "Archivo, system-ui, 'Segoe UI', Roboto, sans-serif"
     fontSize: "24px"
     fontWeight: 600
     letterSpacing: "-0.01em"
   body:
-    fontFamily: "system-ui, 'Segoe UI', Roboto, sans-serif"
+    fontFamily: "'Public Sans', system-ui, 'Segoe UI', Roboto, sans-serif"
     fontSize: "16px"
     fontWeight: 400
     lineHeight: 1.45
   label:
-    fontFamily: "system-ui, 'Segoe UI', Roboto, sans-serif"
+    fontFamily: "'Public Sans', system-ui, 'Segoe UI', Roboto, sans-serif"
     fontSize: "12px"
     fontWeight: 600
     letterSpacing: "0.04em"
@@ -94,14 +94,24 @@ rendered comparison artifacts, with dark mode explicitly adjusted to a
 neutral charcoal (never brown) after user feedback — warmth stays confined
 to the despesa accent, not spread across the ground.
 
+**Sprint 6** replaced the placeholder `system-ui` stack with a real,
+self-hosted typeface pair — Archivo (display/headline/prominent numerals)
+and Public Sans (body/label) — chosen by the CEO from three real pairs
+rendered against actual dashboard content (a published comparison artifact,
+the same "render it for real, don't describe it" process used for the
+color direction). The layout also stopped centering everything into an
+880px column that left the sides of wide viewports empty; `.dash-page` now
+runs up to 1440px.
+
 **Key Characteristics:**
 - One brand accent (green), doubling as the "receita" semantic — there is no
   separate marketing accent competing with the data.
 - Terracotta despesa is semantic only; it never appears as chrome, a button,
   or a nav state.
 - Flat surfaces, 1px borders, no shadows anywhere.
-- System sans throughout — an Operate-mode surface that leans on legible
-  workhorse type rather than an invented display face.
+- A real display/body pair (Archivo/Public Sans, self-hosted `.woff2`) —
+  distinctive enough to read as a considered choice, still an Operate-mode
+  workhorse rather than an invented display face competing with the data.
 
 ## Colors
 
@@ -138,19 +148,33 @@ danger as an expense total.
 
 ## Typography
 
-**Display/Body/Label Font:** `system-ui, "Segoe UI", Roboto, sans-serif`
+**Display/Headline Font:** `Archivo, system-ui, "Segoe UI", Roboto,
+sans-serif` (self-hosted `.woff2`, weights 600/700)
+**Body/Label Font:** `"Public Sans", system-ui, "Segoe UI", Roboto,
+sans-serif` (self-hosted `.woff2`, weights 400/600)
 
-**Character:** one workhorse system-sans family for the whole app — this is
-an Operate surface (a tool you scan and act in), not a Persuade surface, so
-the type voice stays out of the way and lets tabular numerals and weight
-steps carry the hierarchy.
+**Character:** an industrial grotesque (Archivo) carries titles, section
+headings and every prominent numeral (summary-tile values), paired with a
+quieter humanist grotesque (Public Sans) for everything you read rather
+than scan. Chosen over two other real pairs (Space Grotesk/Inter,
+Sora/Work Sans) specifically for reading closest to the existing
+`system-ui` register while still being a considered, distinctive choice —
+this stays an Operate surface (a tool you scan and act in), not a Persuade
+surface, so the pairing reinforces hierarchy without competing with the
+data for attention. Both faces are Google Fonts under OFL, downloaded once
+and served from `frontend/public/fonts/` — no external font CDN in
+production.
 
 ### Hierarchy
-- **Display** (600, 32px, 1.15): the `h1` — page/section titles only.
-- **Headline** (600, 24px, -0.01em): `h2` — sub-section titles.
-- **Body** (400, 16px, 1.45): running text, table cells.
-- **Label** (600, 12px, uppercase, 0.04em tracking): tile labels
+- **Display** (Archivo 700, 32px, 1.15): the `h1` — page/section titles only.
+- **Headline** (Archivo 600, 24px, -0.01em): `h2` — sub-section titles.
+- **Body** (Public Sans 400, 16px, 1.45): running text, table cells.
+- **Label** (Public Sans 600, 12px, uppercase, 0.04em tracking): tile labels
   ("RECEITA", "DESPESA"), section eyebrows inside the funnel, table headers.
+
+Summary-tile values (`.dash-tile .v`) use the **display** face at 700
+weight — the one place a number is treated as a headline rather than body
+text, since it is the single most-scanned figure on the page.
 
 All monetary values use `font-variant-numeric: tabular-nums` so figures
 align in columns without extra markup.
@@ -167,13 +191,20 @@ renders inside the shell's main area; no screen owns its own top-level
 chrome or repeats the nav.
 
 Within the main area, screens are single-column, content-centered,
-`max-width: 880px`, generous `24px` page padding. The summary tiles form a
+`max-width: 1440px` (widened in Sprint 6 from an `880px` column that left
+wide viewports empty — content itself still reads left-aligned, not
+stretched to fill), generous `24px` page padding. The summary tiles form a
 responsive grid (`repeat(auto-fit, minmax(180px, 1fr))`) that reflows from 4-across on
 desktop to 2-across on narrow viewports without a breakpoint query. The
 funnel (categoria → meio de pagamento → linha de extrato) renders as one
-persistent panel below the summary, replacing its own contents per drill
-level rather than navigating to a new page — the summary tiles stay visible
-throughout so the user never loses the totals that motivated the drill.
+persistent panel below the summary; **as of Sprint 6 it is an accordion,
+not a replace-in-place funnel** — expanding a categoria nests its meio de
+pagamento breakdown indented below it without hiding the categoria list,
+and expanding a meio de pagamento nests the transaction table the same
+way. Multiple categorias can be expanded at once. The summary tiles stay
+visible throughout so the user never loses the totals that motivated the
+drill; a single "Fechar" control in the funnel header collapses the whole
+funnel back to the summary.
 
 Spacing follows a fixed scale (`4 / 8 / 12 / 16 / 24 / 32 / 48px`); flex/grid
 `gap` is used everywhere sibling groups are laid out — no per-element
@@ -208,10 +239,10 @@ read as "a form field" rather than "a bubble."
   filter chrome): `var(--surface)` background, `var(--text-h)` label,
   border shifts to `var(--accent)` on hover — no background fill change.
   `disabled` drops to `0.5` opacity with a not-allowed cursor.
-- **Ghost** (breadcrumb crumbs, sidebar nav items): no border, background
-  transparent at rest. Breadcrumb crumbs underline in `var(--accent-text)`;
-  nav items instead fill `var(--accent-bg)` on hover/active — see
-  Navigation below for why the two ghost variants differ.
+- **Ghost** (sidebar nav items, drill-down/accordion rows): no border,
+  background transparent at rest, fills `var(--accent-bg)` on hover/active
+  — see Navigation below for the "you are here" vocabulary this carries for
+  nav specifically.
 - **The One Button Rule.** There is exactly one visual button system in the
   app. A page that needs a button reaches for the base element, never a
   bespoke class — `TransactionsPage`'s sync button and `DashboardsPage`'s
@@ -240,12 +271,34 @@ read as "a form field" rather than "a bubble."
 
 ### List rows ("linha de detalhamento")
 The categoria/meio-de-pagamento drill lists reuse one row primitive: a
-full-width button with a name, an inline proportion bar (`.track`/
-`.fillbar`, filled with the current funnel's semantic color — green under
-Receita, terracotta under Despesa), and a right-aligned tabular amount. The
-inline bar echoes the Recharts chart above it at a glance-able, scannable
-grain; the chart gives shape, the row gives the exact number and the click
-target.
+full-width button (`.dash-row`) with a chevron (rotates 90° and tints
+`var(--accent-text)` when the row is expanded — see Funnel accordion
+below), a name, an inline proportion bar (`.track`/`.fillbar`, filled with
+the current funnel's semantic color — green under Receita, terracotta
+under Despesa), a right-aligned tabular amount, and (Sprint 6) a
+right-aligned `percentual` value in `--text`. The inline bar echoes the
+Recharts chart above it at a glance-able, scannable grain; the chart gives
+shape, the row gives the exact number, the percentual and the click
+target. Categoria rows additionally carry a small inline SVG trend
+sparkline (`RowTrend`) — deliberately a simpler mark than the summary-tile
+sparkline (no chart library, no axis, just a stroked polyline) since it is
+one of six things competing for space on a single row, not a card's
+headline visual. Below `640px` the trend and proportion bar drop from the
+row (they duplicate the chart already rendered above the list); name,
+amount and percentual are what a cramped touch target needs to stay
+legible — a real overflow found via `scripts/browser-check` against the
+deployed app, not a preemptive guess.
+
+### Funnel accordion (drill-down)
+Categoria → meio de pagamento → linha de extrato nest by indentation
+(`.dash-accordion-panel`: left border + left padding, one level per
+expansion) instead of one screen replacing another. Expanding a row never
+hides the level it belongs to, and more than one categoria can be expanded
+at once — each keeps its own nested state. A single "Fechar" control in
+the funnel header (`.dash-funnel-head`) collapses the entire funnel back
+to the summary tiles; there is no per-level "back", only expand/collapse
+per row and one full close. (This replaced a Sprint 5 breadcrumb-and-
+replace-in-place funnel — see history below.)
 
 ### Navigation
 
@@ -262,15 +315,18 @@ Nav items are full-width ghost buttons, left-aligned, `44px` minimum touch
 height. At rest they carry no background; hovering or being the active tab
 fills `var(--accent-bg)` — active additionally sets `var(--accent-text)`
 and `font-weight: 600`, and carries `aria-current="page"`. This is
-deliberately a filled-background state, not the breadcrumb's underline —
-**the Two Ghosts Rule**: an underline marks "you can leave this level and
-return," a filled background marks "you are here now." Never swap the two
-vocabularies between the sidebar and the breadcrumb.
+deliberately a filled-background state — **the One "Here" Rule**: a filled
+background always means "you are here now" (nav tabs, no other UI element
+in the app claims this vocabulary). The drill funnel does not compete with
+it: since Sprint 6 there is no breadcrumb trail, so "where am I" inside the
+funnel is answered by which rows are expanded (chevron rotation + nested
+indentation), not by a second navigation idiom living next to the sidebar's.
 
-**Breadcrumb (drill-down trail):** plain text trail (`Despesa / Alimentação
-/ Cartão de crédito`), each prior step an underlined ghost button, the
-current step un-clickable bold text. No pill/chip styling — this is a path,
-not a filter state.
+**History:** Sprint 5 shipped a breadcrumb trail (`Despesa / Alimentação /
+Cartão de crédito`, underlined prior steps) alongside a funnel that
+replaced its own contents per drill level. Sprint 6 replaced both with the
+accordion described above — multiple categorias can be open at once, so a
+single linear trail could no longer describe "where you are."
 
 ### Table (linha de extrato)
 Bottom-bordered rows, uppercase 12px labels for headers, no zebra striping,

@@ -1,12 +1,12 @@
 # Estrutura de diretórios
 
-Atualizado a cada mudança estrutural. Estado atual (fim da Sprint 5 — dashboards core):
+Atualizado a cada mudança estrutural. Estado atual (fim da Sprint 6 — dashboards analíticos):
 
 ```
 Financeiro v3/
 ├── CLAUDE.md                       # doc viva raiz — ponto de entrada (atualizado em Sprint 1)
 ├── PRODUCT.md                      # fatos de produto (gerado pelo Impeccable /impeccable init)
-├── DESIGN.md                       # sistema de design (gerado pelo fluxo new-work do Impeccable, Sprint 5)
+├── DESIGN.md                       # sistema de design (gerado pelo fluxo new-work do Impeccable, Sprint 5; tipografia/layout estendidos na Sprint 6)
 ├── .gitignore
 ├── .pre-commit-config.yaml         # hooks pre-commit: ruff, eslint, detect-secrets (Sprint 1)
 ├── .secrets.baseline               # baseline para detect-secrets, evita falsos positivos (Sprint 1)
@@ -42,9 +42,10 @@ Financeiro v3/
 │   │   ├── SPRINT-004-categorizacao-automatica-report.md  # Relatório Sprint 4 (2026-08-14)
 │   │   ├── SPRINT-005-dashboards-core-plan.md        # Plano Sprint 5 (2026-08-14)
 │   │   ├── SPRINT-005-dashboards-core-report.md      # Relatório Sprint 5 (2026-08-14)
-│   │   └── SPRINT-006-dashboards-analiticos-plan.md  # Plano Sprint 6 (2026-08-14)
+│   │   ├── SPRINT-006-dashboards-analiticos-plan.md  # Plano Sprint 6 (2026-08-14)
+│   │   └── SPRINT-006-dashboards-analiticos-report.md  # Relatório Sprint 6 (2026-08-15)
 │   ├── roadmap.md                  # épicos + sprints
-│   ├── directory-structure.md      # este arquivo — atualizado em Sprint 3
+│   ├── directory-structure.md      # este arquivo — atualizado em Sprint 6
 │   ├── infra/
 │   │   └── ssh-workflow.md         # procedimento SSH obrigatório via venv (atualizado em Sprint 1)
 │   └── migration/
@@ -75,7 +76,7 @@ Financeiro v3/
 │   │   │   ├── liability.py        # LiabilityIn/Out (Sprint 2)
 │   │   │   ├── pluggy.py           # ConnectToken*, PluggyItem/Account/TransactionOut (Sprint 3)
 │   │   │   ├── categorization.py   # PendingTransactionOut, CategorizationConfirmIn, AssetAssociationIn (Sprint 4)
-│   │   │   └── dashboards.py       # SummaryOut, CategoriaTotalOut, MeioPagamentoTotalOut (Sprint 5)
+│   │   │   └── dashboards.py       # SummaryOut, CategoriaTotalOut/MeioPagamentoTotalOut+percentual (Sprint 5), TendenciaMesOut/TendenciaCategoriaOut (Sprint 6)
 │   │   ├── auth/
 │   │   │   ├── jwt.py              # geração/validação JWT via PyJWT
 │   │   │   ├── google.py           # integração Authlib com Google OAuth
@@ -101,8 +102,8 @@ Financeiro v3/
 │   │   │   ├── service.py          # list_pending_transactions, confirm_categorization, set_transaction_asset
 │   │   │   └── router.py           # rotas /categorization/*
 │   │   └── dashboards/             # agregação para dashboards — sem LLM, sem cache (Sprint 5)
-│   │       ├── service.py          # get_summary, get_por_categoria, get_por_meio_pagamento
-│   │       └── router.py           # rotas /dashboards/*
+│   │       ├── service.py          # get_summary, get_por_categoria/get_por_meio_pagamento (+percentual), get_tendencia/get_tendencia_por_categoria (Sprint 6)
+│   │       └── router.py           # rotas /dashboards/* (+tendencia, por-categoria/tendencia na Sprint 6)
 │   ├── scripts/
 │   │   ├── import_legacy_categories.py  # import CSV grupo,subcategoria — upsert, loga conflito (Sprint 2)
 │   │   ├── import_legacy_categorization_rules.py  # import semente-classificacao.json (328 regras) — upsert por usuário (Sprint 4)
@@ -130,8 +131,8 @@ Financeiro v3/
 │   │   ├── test_categorization_service.py      # invariante "nunca auto-confirma", reedição, 404 cross-user (Sprint 4)
 │   │   ├── test_categorization_endpoints.py    # 401, isolamento, confirmar/editar via API (Sprint 4)
 │   │   ├── test_import_legacy_categorization_rules.py  # conflito, idempotência, categoria não resolvida, abort sem usuário (Sprint 4)
-│   │   ├── test_dashboards_service.py   # período vazio, só-transferência, misto, sinal do cartão, borda de mês (Sprint 5)
-│   │   ├── test_dashboards_endpoints.py # 401, isolamento entre usuários nos 3 endpoints (Sprint 5)
+│   │   ├── test_dashboards_service.py   # período vazio, só-transferência, misto, sinal do cartão, borda de mês (Sprint 5); tendência terminando no mês filtrado, percentual somando 100%/denominador zero (Sprint 6)
+│   │   ├── test_dashboards_endpoints.py # 401, isolamento entre usuários nos 5 endpoints (Sprint 5+6)
 │   │   └── fixtures/
 │   │       ├── legacy_categories_sample.csv           # fixture pequena p/ teste de import (Sprint 2)
 │   │       └── semente_classificacao_sample.json      # fixture pequena p/ teste de import de regras (Sprint 4)
@@ -149,6 +150,8 @@ Financeiro v3/
 │   ├── tsconfig.json
 │   ├── vite.config.ts
 │   ├── index.html                  # entry point, lang="pt-BR" (auditado via /impeccable audit)
+│   ├── public/
+│   │   └── fonts/                  # Archivo (600/700) + Public Sans (400/600), .woff2 auto-hospedado, licença OFL (Sprint 6)
 │   ├── src/
 │   │   ├── App.tsx                 # componente raiz (renderização condicional login/protected/loading)
 │   │   ├── main.tsx
@@ -159,7 +162,7 @@ Financeiro v3/
 │   │   │   ├── categories.ts       # chamadas /category-groups, /subcategories (Sprint 4, pré-requisito antes inexistente)
 │   │   │   ├── assets.ts           # chamadas /assets (Sprint 4, pré-requisito antes inexistente)
 │   │   │   ├── categorization.ts   # chamadas /categorization/* (Sprint 4)
-│   │   │   └── dashboards.ts       # chamadas /dashboards/*, SEM_CATEGORIA_ID (Sprint 5)
+│   │   │   └── dashboards.ts       # chamadas /dashboards/*, SEM_CATEGORIA_ID (Sprint 5); +tendencia/por-categoria/tendencia, +percentual (Sprint 6)
 │   │   ├── pluggy/
 │   │   │   └── loadPluggyConnect.ts  # injeta o script do widget Pluggy Connect sob demanda (Sprint 3)
 │   │   ├── hooks/
@@ -177,11 +180,13 @@ Financeiro v3/
 │   │   │   ├── useSetTransactionAsset.ts     # mutation PUT /categorization/pending/{id}/asset (Sprint 4)
 │   │   │   ├── useDashboardSummary.ts        # GET /dashboards/summary (Sprint 5)
 │   │   │   ├── useDashboardByCategoria.ts    # GET /dashboards/por-categoria (Sprint 5)
-│   │   │   └── useDashboardByMeioPagamento.ts  # GET /dashboards/por-meio-pagamento (Sprint 5)
+│   │   │   ├── useDashboardByMeioPagamento.ts  # GET /dashboards/por-meio-pagamento (Sprint 5)
+│   │   │   ├── useDashboardTendencia.ts      # GET /dashboards/tendencia (Sprint 6)
+│   │   │   └── useDashboardCategoriaTendencia.ts  # GET /dashboards/por-categoria/tendencia, enabled só com categoria expandida (Sprint 6)
 │   │   └── pages/
 │   │       ├── LoginPage.tsx       # botão "Entrar com Google" (link para /auth/google/login)
 │   │       ├── ProtectedPage.tsx   # nome/e-mail do usuário + abas Início/Dashboards/Conectar conta/Transações/Categorizar (Sprint 5)
-│   │       ├── DashboardsPage.tsx  # filtro ano/mês, 4 cards, funil de drill-down + Recharts (Sprint 5)
+│   │       ├── DashboardsPage.tsx  # filtro ano/mês, 4 cards com sparkline, funil de drill-down em sanfona + Recharts (Sprint 5, sanfona/tendência/percentual na Sprint 6)
 │   │       ├── ConnectAccountPage.tsx    # widget Pluggy Connect + lista de items conectados (Sprint 3)
 │   │       ├── TransactionsPage.tsx      # lista de transações + botão sincronizar por item (Sprint 3)
 │   │       └── CategorizationReviewPage.tsx  # fila de revisão — sugestão pré-preenchida, confirmar/editar (Sprint 4)
@@ -194,7 +199,8 @@ Financeiro v3/
 │   ├── requirements-ssh.txt        # dependências do venv de SSH (paramiko)
 │   └── browser-check/              # QA visual do CTO — Playwright/Chromium headless (Sprint 5)
 │       ├── check.mjs               # genérico: navega, screenshot, erros de console
-│       └── check-dashboard.mjs     # fluxo autenticado: início → dashboards → drill-down
+│       ├── check-dashboard.mjs     # fluxo autenticado: início → dashboards → drill-down
+│       └── check-sanfona.mjs       # sanfona multi-nível + sparkline + tipografia, contra dado real (Sprint 6)
 ├── .github/
 │   └── workflows/
 │       └── ci.yml                  # GitHub Actions: pytest+ruff (backend), vitest+eslint+tsc (frontend) (Sprint 1)
@@ -207,7 +213,7 @@ Financeiro v3/
 - Frontend de gestão de `categorization_rules` (editar/remover regra manualmente) — fora de escopo, só o import e o motor automático (ver PRD-004).
 - UI de gestão de `category_groups.excluir_de_totais` — só setado via migration na Sprint 5; se surgir necessidade de mais grupos excluídos, é ajuste de dado, não de mecanismo (ver PRD-005).
 - Override manual de `data_competencia` por transação — schema já suporta (coluna gravada, não computada), endpoint/UI adiados (ver PRD-005).
-- Despesas por natureza/ativo, evolução de patrimônio/investimentos ao longo do tempo — E6, próxima sprint candidata.
+- Despesas por natureza/ativo (tela de Ativos) — E6 parte 2, Sprint 7. Evolução de patrimônio/investimentos ao longo do tempo segue sem série histórica no schema (precisaria de snapshot periódico, job novo).
 - Herança de regras entre usuários (memória compartilhada opt-in) — schema de `categorization_rules` já preparado (`origem` extensível), mecanismo de opt-in/onboarding fica para sprint futura.
 - Camadas de token distintivo/IDF e léxico estático PT-BR no motor de categorização — adiadas até haver volume real suficiente para calibrar (ver PRD-004).
 - Estado "pular/ignorar" na fila de revisão — toda pendência exige categoria eventualmente.

@@ -1,6 +1,6 @@
 # Arquitetura — Visão Geral
 
-> Stack abaixo reflete [ADR-001](adr/ADR-001-stack.md), **aprovado pelo CEO em 2026-08-03**. Este doc é atualizado a cada mudança estrutural relevante (regra de doc viva). **Atualizado em 2026-08-14 após Sprint 5** — dashboards core (receita/despesa/saldo/patrimônio com drill-down) implementados; fecha o épico E5. Primeira sprint com identidade visual real — ver [DESIGN.md](../../DESIGN.md).
+> Stack abaixo reflete [ADR-001](adr/ADR-001-stack.md), **aprovado pelo CEO em 2026-08-03**. Este doc é atualizado a cada mudança estrutural relevante (regra de doc viva). **Atualizado em 2026-08-15 após Sprint 6** — tendência histórica, percentual de representatividade e drill-down em sanfona nos dashboards; fecha a primeira metade do épico E6. Tipografia própria (Archivo/Public Sans) e layout mais largo — ver [DESIGN.md](../../DESIGN.md).
 
 ## Visão de alto nível
 
@@ -114,19 +114,67 @@ Toda tabela transacional tem `user_id` obrigatório; toda query de aplicação f
 Playwright + Chromium headless, instalada como ferramenta própria do CTO
 (fora do `package.json` do frontend — mesmo padrão de `.venv-ssh/` para
 SSH), disponível para toda sprint futura com trabalho visual. `check.mjs`
-(genérico: navega, tira screenshot, reporta erros de console) e
+(genérico: navega, tira screenshot, reporta erros de console),
 `check-dashboard.mjs` (fluxo autenticado específico do app: início →
-dashboards → drill-down, desktop + mobile). Sessão autenticada via token
-gerado por `app.auth.jwt.create_access_token` rodado dentro do container da
-API na VM de dev (mesmo mecanismo de uma sessão pós-login Google real,
-nunca uma credencial nova ou bypass de auth). Screenshots em
+dashboards → drill-down, desktop + mobile) e `check-sanfona.mjs` (Sprint 6:
+expande múltiplos níveis da sanfona — categoria + meio de pagamento — e
+captura desktop/mobile). Sessão autenticada via token gerado por
+`app.auth.jwt.create_access_token` rodado dentro do container da API na VM
+de dev (mesmo mecanismo de uma sessão pós-login Google real, nunca uma
+credencial nova ou bypass de auth). Screenshots em
 `scripts/browser-check/shots/` — gitignored (podem conter dado financeiro
 real).
 
+## Dashboards analíticos (Sprint 6)
+
+- **Tendência:** `app/dashboards/service.py` ganha `get_tendencia()` (série
+  mensal receita/despesa/saldo) e `get_tendencia_por_categoria()` (mesma
+  série, agrupada por subcategoria) — cada uma numa única query agregada
+  por `(ano, mês)` extraído de `data_competencia`, evitando N chamadas por
+  mês/categoria. Período é sempre os últimos N meses (3/6/12,
+  parametrizável) **terminando no mês filtrado no dashboard**, não no mês
+  corrente do calendário; meses sem transação aparecem com zero, nunca
+  ausentes da série.
+- **Percentual:** `get_por_categoria`/`get_por_meio_pagamento` ganham campo
+  `percentual` (`Decimal`, 0–100, 2 casas) — fração da linha sobre a soma
+  de todas as linhas da mesma resposta; denominador zero retorna `0`, nunca
+  erro. Linha de extrato (transação individual) não tem endpoint próprio de
+  percentual — calculado no frontend contra o total do meio de pagamento já
+  conhecido do passo anterior do drill.
+- **Endpoints novos:** `GET /dashboards/tendencia?ano=&mes=&meses=`,
+  `GET /dashboards/por-categoria/tendencia?tipo=&ano=&mes=&meses=`. Mesmo
+  padrão de isolamento por `user_id` dos demais endpoints de `/dashboards/*`.
+  Nenhuma tabela nova, nenhuma migration — agregação por consulta direta,
+  mesma decisão fixa do projeto.
+- **Frontend — sanfona:** `DashboardsPage.tsx` reestruturado — estado de
+  expansão independente por categoria (`expandedCategorias: number[]`) e
+  por meio de pagamento dentro de cada categoria
+  (`expandedMeios: Record<number, string[]>`), em vez do estado único
+  `drill` de tela-substitui-tela da Sprint 5. Cada nível aninhado é seu
+  próprio componente (`CategoriaAccordion` → `MeioPagamentoAccordion` →
+  `TransacoesPanel`) que só busca dado quando montado — o `enabled` do
+  `useQuery` fica implícito na árvore de componentes, não um flag manual.
+  Botão "Fechar" no cabeçalho do funil substitui o antigo "← Voltar".
+- **Tipografia própria:** par Archivo (display/headline, 600/700) + Public
+  Sans (body/label, 400/600), escolhido pelo CEO via comparação visual real
+  (3 pares renderizados como Artifact com conteúdo real do dashboard — cada
+  fonte baixada do Google Fonts, subset `latin`, e re-hospedada localmente
+  em `frontend/public/fonts/*.woff2`, licença OFL, sem CDN em produção).
+  `--font-display`/`--font-body` novos em `index.css`; `--sans` passa a
+  apontar para `--font-body`. `.dash-page` alargado de `880px` para
+  `1440px`.
+- **Achado real de QA visual:** `.dash-table` (linha de extrato) não tinha
+  wrapper com `overflow-x`, cortando a coluna `%` em telas de 390px em vez
+  de rolar; e a linha da sanfona (6 elementos: chevron/nome/tendência/
+  barra/valor/%) ficava apertada demais no mesmo viewport, cortando o
+  percentual. Ambos só detectáveis com o app renderizado de verdade — nem
+  lint, nem `tsc`, nem os 28 testes Vitest pegam layout/overflow visual.
+  Corrigidos e revalidados via `check-sanfona.mjs` contra a VM de dev.
+
 ## Qualidade (Sprint 1 + Sprint 2 + Sprint 3 + Sprint 4 + Sprint 5)
 
-- **Testes backend:** 151 testes, 98% cobertura total. Auth (Sprint 1), dados mestres (Sprint 2, 97%), Pluggy (Sprint 3, 98%), categorização (Sprint 4, 96-100%) — ver histórico nos relatórios de sprint. Dashboards (Sprint 5, 100% em `app/dashboards/`): período vazio, período só com "Transferência interna" (totais zerados), misto débito/crédito, sinal do saldo de `cartao_credito` na fórmula de patrimônio, ativos/passivos inativos excluídos, borda de mês (`data_competencia` no limite entre meses), soma de `/por-categoria` batendo com `/summary`, isolamento entre usuários nos três endpoints e nos novos filtros de `/pluggy/transactions`.
-- **Testes frontend:** 24 testes (Vitest + Testing Library) — renderização condicional, tratamento de 401, mock fetch, widget Pluggy Connect mockado, fila de categorização. Dashboards (Sprint 5): 4 cards a partir de dado mockado, refetch ao trocar filtro ano/mês, navegação completa do funil (categoria → meio de pagamento → transações) e volta, estado vazio.
+- **Testes backend:** 165 testes, 98% cobertura total. Auth (Sprint 1), dados mestres (Sprint 2, 97%), Pluggy (Sprint 3, 98%), categorização (Sprint 4, 96-100%) — ver histórico nos relatórios de sprint. Dashboards (Sprint 5+6, 98% em `app/dashboards/`): período vazio, período só com "Transferência interna" (totais zerados), misto débito/crédito, sinal do saldo de `cartao_credito` na fórmula de patrimônio, ativos/passivos inativos excluídos, borda de mês (`data_competencia` no limite entre meses), soma de `/por-categoria` batendo com `/summary`, isolamento entre usuários; tendência terminando no mês filtrado (não no calendário), mês sem transação aparecendo zerado, tendência por categoria com bucket "Não categorizado", percentual somando 100% (menos arredondamento) e retornando `0` com denominador zero.
+- **Testes frontend:** 28 testes (Vitest + Testing Library) — renderização condicional, tratamento de 401, mock fetch, widget Pluggy Connect mockado, fila de categorização. Dashboards (Sprint 5+6): 4 cards a partir de dado mockado, refetch ao trocar filtro ano/mês, sparkline a partir de tendência mockada, refetch ao trocar seletor de período histórico, sanfona expandindo múltiplos níveis sem esconder os anteriores (e mantendo duas categorias expandidas ao mesmo tempo), percentual exibido em cada nível, estado vazio.
 - **Lint:** ruff (Python), eslint (TypeScript) — suíte 100% verde
 - **Pre-commit:** ruff, eslint, detect-secrets (baseline) — executado local antes de push
 - **CI:** GitHub Actions — jobs `backend` (ruff check/format, pytest) e `frontend` (eslint, prettier, tsc, vitest) — roda em push/PR para `main`

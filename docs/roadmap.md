@@ -11,7 +11,7 @@ Fases em épicos, derivados do escopo funcional do bootstrap. PRDs individuais s
 | E3 | Categorização ✅ | Regras + memória de revisão manual; associação despesa↔ativo (item 2) — concluído na Sprint 4 (2026-08-14) |
 | E4 | Gestão de dados mestres ✅ | Categorias/subcategorias/natureza (item 10); ativos/passivos (item 9) — concluído na Sprint 2 (2026-08-06) |
 | E5 | Dashboards core ✅ | Receita/despesa/saldo/patrimônio com drill-down; filtros ano/mês (itens 3, 7) — concluído na Sprint 5 (2026-08-14) |
-| E6 | Dashboards analíticos | Tendência histórica, percentual de representatividade, despesas por ativo (itens 4, 5, 6) — dividido em Sprint 6 (tendência/percentual/design system) e Sprint 7 (Ativos); patrimônio/evolução de investimentos adiado por falta de série histórica no schema |
+| E6 | Dashboards analíticos | Tendência histórica, percentual de representatividade, despesas por ativo (itens 4, 5, 6) — dividido em Sprint 6 (tendência/percentual/design system) ✅ e Sprint 7 (Ativos); patrimônio/evolução de investimentos adiado por falta de série histórica no schema |
 | E7 | Conta e perfil | Perfil de usuário, logout, multiusuário (item 11) |
 | E8 | Migração de dados legados ✅ | Import de categorias (Sprint 2) + memória de classificação do v1 (Sprint 4) — concluído em 2026-08-14 |
 
@@ -84,21 +84,34 @@ histórico/regras/ativos do zero a cada transação pendente) — corrigido,
 lentidão (centenas de UPDATEs individuais por página cheia) fica para a
 Sprint 8, que paginará o endpoint.
 
-### Sprint 6 — Dashboards analíticos: tendência e percentual (E6, parte 1)
-- Design system: tipografia própria (escolhida por comparação visual real,
-  não só descrita) + layout que aproveita a largura da tela, em vez da
-  coluna estreita centralizada da Sprint 5.
-- Tendência histórica (3/6/12 meses) nos cards de Receita/Despesa/Saldo e,
-  num modelo visual mais simples, em cada linha do drill-down de
-  categoria. Patrimônio fica de fora — não há série histórica de
-  saldo/valor de ativo no schema (mesma limitação já registrada na Sprint
-  5).
+### Sprint 6 — Dashboards analíticos: tendência e percentual (E6, parte 1) ✅ concluída em 2026-08-15
+- Design system: tipografia Archivo/Public Sans (escolhida pelo CEO por
+  comparação visual real via artifact — 3 pares renderizados com conteúdo
+  real do dashboard, mesmo processo usado pra direção de cor na Sprint 5) +
+  `.dash-page` alargado (1440px) pra aproveitar a largura da tela, em vez
+  da coluna estreita centralizada da Sprint 5. Fontes auto-hospedadas em
+  `frontend/public/fonts/` (`.woff2`, licença OFL), sem CDN externo.
+- Tendência histórica (3/6/12 meses, seletor no filtro) nos cards de
+  Receita/Despesa/Saldo (sparkline Recharts) e, num modelo visual mais
+  simples (SVG inline), em cada linha do drill-down de categoria.
+  Patrimônio fica de fora — não há série histórica de saldo/valor de ativo
+  no schema (mesma limitação já registrada na Sprint 5), com nota visual
+  explícita no card.
 - Percentual de representatividade em cada nível do funil (categoria % do
   total do período; meio de pagamento % da categoria; linha de extrato %
-  do meio de pagamento, calculado no frontend).
+  do meio de pagamento, calculado no frontend contra o total já conhecido).
 - Drill-down em formato sanfona — expandir um nível não esconde os
-  anteriores, diferente do comportamento de "substituir tela" da Sprint 5.
-- PRD: [PRD-006-dashboards-analiticos.md](prd/PRD-006-dashboards-analiticos.md). Plano: [SPRINT-006-dashboards-analiticos-plan.md](sprints/SPRINT-006-dashboards-analiticos-plan.md).
+  anteriores (múltiplas categorias podem estar expandidas ao mesmo tempo),
+  diferente do comportamento de "substituir tela" da Sprint 5. Botão
+  "Fechar" recolhe o funil inteiro.
+- Backend: `GET /dashboards/tendencia` e `GET /dashboards/por-categoria/tendencia`
+  — cada um numa única query agregada (evita N chamadas por mês/categoria).
+- QA visual real via `scripts/browser-check/check-sanfona.mjs` (novo)
+  contra a VM de dev encontrou 2 bugs mobile reais (tabela de extrato
+  cortando a coluna % em vez de rolar; linha da sanfona apertada demais em
+  390px com 6 elementos) — ambos corrigidos e revalidados com screenshot.
+- 165 testes backend (98% cobertura) + 28 testes frontend.
+- PRD: [PRD-006-dashboards-analiticos.md](prd/PRD-006-dashboards-analiticos.md). Plano: [SPRINT-006-dashboards-analiticos-plan.md](sprints/SPRINT-006-dashboards-analiticos-plan.md). Relatório: [SPRINT-006-dashboards-analiticos-report.md](sprints/SPRINT-006-dashboards-analiticos-report.md).
 
 ### Sprint 7 — Ativos: gestão e custos (E6, parte 2)
 *Escopo ainda não detalhado em PRD/plano — planejar em sessão própria,
