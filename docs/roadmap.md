@@ -153,21 +153,25 @@ divididas em Sprints 7/8/9 nesta sessão de planejamento (2026-08-15).
   Plano: [SPRINT-007-categorizacao-gestao-contas-plan.md](sprints/SPRINT-007-categorizacao-gestao-contas-plan.md).
   Relatório: [SPRINT-007-categorizacao-gestao-contas-report.md](sprints/SPRINT-007-categorizacao-gestao-contas-report.md) — aprovado pelo CEO em 2026-08-15.
 
-### Sprint 8 — Gestão de Ativos (E6, parte 2)
+### Sprint 8 — Gestão de Ativos (E6, parte 2) ✅ concluída em 2026-08-15
 
 Tela `AssetsPage.tsx` com cards por ativo (reaproveitando `.dash-tile`),
 formulário para cadastrar/editar/vender/excluir ativo (backend de CRUD já
-existe em `app/assets/` desde a Sprint 2 — falta só mutation hooks no
-frontend, hoje só há leitura via `fetchAssets`), filtro de período igual
-às outras telas, drill-down de custos por ativo (total gasto + transações
+existe em `app/assets/` desde a Sprint 2 — mutation hooks implementados no
+frontend), filtro de período igual às outras telas, drill-down de custos por ativo (total gasto + transações
 vinculadas via `asset_id`, associação já existente desde a Sprint 4).
-Gap real encontrado no planejamento (2026-08-15): nenhum endpoint agrega
-gasto por ativo nem filtra `/pluggy/transactions` por `asset_id` — ambos
-entram como pré-requisito do drill-down, não descoberta de execução.
-Extração de um componente `PeriodFilter` compartilhado também entra no
-escopo (evita a terceira cópia duplicada do filtro ano/mês).
+Endpoints novos: `GET /dashboards/por-ativo` agregando gasto por ativo,
+e parâmetro `asset_id` em `/pluggy/transactions` — ambos
+implementados. Componente `PeriodFilter` extraído de
+`DashboardsPage`/`CategorizationReviewPage` e reutilizado em `AssetsPage`,
+eliminando duplicação. Investigação de risco (FK em `pluggy_transactions.asset_id`)
+realizada — sem cláusula `ON DELETE`, implementada desassociação explícita
+em `delete_asset`. Testes backend (232 passed, 98% cobertura) + frontend
+(53 passed). Deploy realizado, QA visual validou grid de cards, CRUD,
+drill-down, desktop/mobile, 3 test assets criados na VM como side effect.
 PRD: [PRD-008-gestao-de-ativos.md](prd/PRD-008-gestao-de-ativos.md).
 Plano: [SPRINT-008-gestao-de-ativos-plan.md](sprints/SPRINT-008-gestao-de-ativos-plan.md).
+Relatório: [SPRINT-008-gestao-de-ativos-report.md](sprints/SPRINT-008-gestao-de-ativos-report.md) — aprovado pelo CEO em 2026-08-15.
 
 ### Sprint 9 — Dashboard analítico: Ativos/Passivos e refinamentos (E6, parte 3)
 *Escopo ainda não detalhado em PRD/plano — planejar em sessão própria.*

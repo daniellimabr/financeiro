@@ -1,6 +1,6 @@
 # Estrutura de diretórios
 
-Atualizado a cada mudança estrutural. Estado atual (fim da Sprint 7 — categorização/gestão de contas):
+Atualizado a cada mudança estrutural. Estado atual (fim da Sprint 8 — gestão de ativos):
 
 ```
 Financeiro v3/
@@ -173,6 +173,8 @@ Financeiro v3/
 │   │   │   └── dashboards.ts       # chamadas /dashboards/*, SEM_CATEGORIA_ID (Sprint 5); +tendencia/por-categoria/tendencia, +percentual (Sprint 6)
 │   │   ├── pluggy/
 │   │   │   └── loadPluggyConnect.ts  # injeta o script do widget Pluggy Connect sob demanda (Sprint 3)
+│   │   ├── components/
+│   │   │   └── PeriodFilter.tsx      # seletor ano/mês reutilizável (Sprint 8, extraído de DashboardsPage/CategorizationReviewPage)
 │   │   ├── hooks/
 │   │   │   ├── useCurrentUser.ts   # TanStack Query hook para sessão do usuário
 │   │   │   ├── usePluggyItems.ts   # lista items conectados (Sprint 3)
@@ -195,13 +197,19 @@ Financeiro v3/
 │   │   │   ├── useDashboardByCategoria.ts    # GET /dashboards/por-categoria (Sprint 5)
 │   │   │   ├── useDashboardByMeioPagamento.ts  # GET /dashboards/por-meio-pagamento (Sprint 5)
 │   │   │   ├── useDashboardTendencia.ts      # GET /dashboards/tendencia (Sprint 6)
-│   │   │   └── useDashboardCategoriaTendencia.ts  # GET /dashboards/por-categoria/tendencia, enabled só com categoria expandida (Sprint 6)
+│   │   │   ├── useDashboardCategoriaTendencia.ts  # GET /dashboards/por-categoria/tendencia, enabled só com categoria expandida (Sprint 6)
+│   │   │   ├── useCreateAsset.ts             # mutation POST /assets (Sprint 8)
+│   │   │   ├── useUpdateAsset.ts             # mutation PUT /assets/{id} (Sprint 8)
+│   │   │   ├── useSellAsset.ts               # mutation POST /assets/{id}/sell (Sprint 8)
+│   │   │   ├── useDeleteAsset.ts             # mutation DELETE /assets/{id} (Sprint 8)
+│   │   │   └── useAssetGastos.ts             # GET /dashboards/por-ativo, com período (Sprint 8)
 │   │   └── pages/
 │   │       ├── LoginPage.tsx       # botão "Entrar com Google" (link para /auth/google/login)
 │   │       ├── ProtectedPage.tsx   # nome/e-mail do usuário + abas Início/Dashboards/Categorizar/Gestão de contas (Sprint 5; aba Transações removida, Conectar conta renomeada na Sprint 7)
 │   │       ├── DashboardsPage.tsx  # filtro ano/mês, 4 cards com sparkline, funil de drill-down em sanfona + Recharts (Sprint 5, sanfona/tendência/percentual na Sprint 6)
 │   │       ├── AccountManagementPage.tsx  # Gestão de Contas — lista contas conectadas, apelido/sync_enabled editáveis, diálogo "Sincronizar MeuPluggy" com pré-seleção (Sprint 7, renomeado de ConnectAccountPage.tsx)
-│   │       └── CategorizationReviewPage.tsx  # listagem única de transações (substitui TransactionsPage) — filtro tipo/status, lote, categoria editável em confirmada, descrição inline + propagação (Sprint 4; paginação pós-Sprint 6; rework completo na Sprint 7)
+│   │       ├── CategorizationReviewPage.tsx  # listagem única de transações (substitui TransactionsPage) — filtro tipo/status, lote, categoria editável em confirmada, descrição inline + propagação (Sprint 4; paginação pós-Sprint 6; rework completo na Sprint 7)
+│   │       └── AssetsPage.tsx      # Gestão de Ativos — grid de cards ativos/baixados, CRUD (criar/editar/vender/deletar), drill-down gasto+transações por ativo, filtro período (Sprint 8)
 │   │   └── App.test.tsx            # testes Vitest + Testing Library (401, 200)
 │   └── test/
 │       └── setup.ts                # setup do Vitest (jest-dom matchers)
@@ -214,7 +222,8 @@ Financeiro v3/
 │       ├── check-dashboard.mjs     # fluxo autenticado: início → dashboards → drill-down
 │       ├── check-sanfona.mjs       # sanfona multi-nível + sparkline + tipografia, contra dado real (Sprint 6)
 │       ├── check-categorizacao.mjs # filtro + paginação + tempo real do fluxo de confirmar (pós-Sprint 6)
-│       └── check-sprint7.mjs       # filtro tipo/status, seleção em lote, descrição editável, Gestão de Contas — apelido, diálogo de sync (Sprint 7; achou bug real de overflow desktop)
+│       ├── check-sprint7.mjs       # filtro tipo/status, seleção em lote, descrição editável, Gestão de Contas — apelido, diálogo de sync (Sprint 7; achou bug real de overflow desktop)
+│       └── check-ativos.mjs        # grid de cards, criar ativo, drill-down, desktop+mobile screenshots (Sprint 8)
 ├── .github/
 │   └── workflows/
 │       └── ci.yml                  # GitHub Actions: pytest+ruff (backend), vitest+eslint+tsc (frontend) (Sprint 1)
@@ -223,11 +232,11 @@ Financeiro v3/
 
 ## O que ainda não existe
 
-- Frontend de gestão de categorias/ativos/passivos (CRUD completo) — fora de escopo da Sprint 4 também; `api/categories.ts`/`api/assets.ts` criados nesta sprint só cobrem leitura (`GET`), suficiente para alimentar os selects da fila de revisão.
+- Frontend de gestão de categorias/passivos (CRUD completo) — fora de escopo; `api/categories.ts` só cobre leitura (`GET`), suficiente para alimentar os selects da fila de revisão. CRUD de ativos (`createAsset`/`updateAsset`/`sellAsset`/`deleteAsset`) implementado na Sprint 8 via `AssetsPage.tsx`.
 - Frontend de gestão de `categorization_rules` (editar/remover regra manualmente) — fora de escopo, só o import e o motor automático (ver PRD-004).
 - UI de gestão de `category_groups.excluir_de_totais` — só setado via migration na Sprint 5; se surgir necessidade de mais grupos excluídos, é ajuste de dado, não de mecanismo (ver PRD-005).
 - Override manual de `data_competencia` por transação — schema já suporta (coluna gravada, não computada), endpoint/UI adiados (ver PRD-005).
-- Tela de Gestão de Ativos (cards, criar/editar ativo, drilldown de custos por ativo) — E6 parte 2, Sprint 8; backend CRUD já existe em `app/assets/`/`app/liabilities/` desde a Sprint 2. Evolução de patrimônio/investimentos ao longo do tempo segue sem série histórica no schema (precisaria de snapshot periódico, job novo).
+- Evolução de patrimônio/investimentos ao longo do tempo — segue sem série histórica no schema (precisaria de snapshot periódico, job novo); cards Ativos/Passivos no Dashboard com drilldowns planejados para Sprint 9 (E6 parte 3).
 - Estado "pular/ignorar" na fila de Categorização; reconciliação de descrição quando a Pluggy reenvia uma transação já editada pelo usuário (`descricao_usuario` nunca é sobrescrito por sync, não há merge/conflito a resolver) — ambos fora de escopo desde o PRD-004/PRD-007.
 - Modernização visual/paginação da tabela de Categorização (hoje HTML puro, sem tokens do design system) — Sprint 10.
 - Herança de regras entre usuários (memória compartilhada opt-in) — schema de `categorization_rules` já preparado (`origem` extensível), mecanismo de opt-in/onboarding fica para sprint futura.
