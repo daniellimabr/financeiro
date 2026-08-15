@@ -3,6 +3,7 @@
 - **Plano:** [SPRINT-009-dashboards-ativos-passivos-plan.md](./SPRINT-009-dashboards-ativos-passivos-plan.md)
 - **PRD:** [PRD-009-dashboards-ativos-passivos.md](../prd/PRD-009-dashboards-ativos-passivos.md)
 - **Data do relatório:** 2026-08-15
+- **Status:** aprovado pelo CEO em 2026-08-15
 
 ## Resumo
 
@@ -249,4 +250,4 @@ atribuição.
 
 ---
 
-**Sprint pendente de aprovação do CEO.**
+**Sprint aprovada pelo CEO em 2026-08-15.**
