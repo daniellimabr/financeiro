@@ -2,7 +2,7 @@
 
 - **Plano:** [SPRINT-005-dashboards-core-plan.md](./SPRINT-005-dashboards-core-plan.md)
 - **Data do relatório:** 2026-08-14
-- **Status:** implementado, testado e deployado na VM de dev; aguardando validação visual do CEO no navegador (não verificada nesta sessão — ver seção de deploy)
+- **Status:** implementado, testado, deployado e verificado visualmente contra a VM de dev real (screenshots via Playwright — ver seção de QA visual). Aguardando validação/aprovação do CEO.
 
 ## Resumo
 
@@ -234,11 +234,53 @@ diretamente para o usuário real, sem mutar nada):
 - `get_por_meio_pagamento`: `corrente=161930.39`, `cartao_credito=32374.18`
   — soma bate com `despesa` do summary.
 
-**Não verificado nesta sessão:** navegação real no navegador pelo CEO (a
-validação de UI ficou limitada à revisão de código do `/impeccable audit`,
-sem `chromium-cli`/Docker/WSL2 disponíveis no notebook corporativo — ver
-seção de Pendências). Recomendado como próximo passo antes de considerar a
-sprint fechada.
+## QA visual real (2026-08-14, pós-feedback do CEO)
+
+Validação inicial (seção acima) ficou limitada a revisão de código — sem
+navegador headless disponível, `/impeccable audit` não pôde pixel-verificar
+nada. O CEO testou a versão deployada e reportou visual "experimental":
+nav não estilizada (botões soltos, sem disposição em painel/abas) e
+ausência de identidade visual fora de `DashboardsPage`.
+
+**Causa raiz:** `DashboardsPage` recebeu os tokens novos, mas `ProtectedPage`
+(nav + shell do app) nunca foi tocado — continuava HTML puro sem nenhuma
+classe do design system, e o `button` base em `index.css` não tinha estilo
+próprio (herda aparência default do navegador). Corrigido: `ProtectedPage`
+virou um app shell real (sidebar fixa, colapsa para barra horizontal em
+mobile), e o elemento `button` base ganhou estilo sistêmico — toda página
+passa a herdar a mesma linguagem visual sem precisar de classe própria
+("The One Button Rule", registrada em `DESIGN.md`).
+
+**Ferramenta nova:** `scripts/browser-check/` — Playwright + Chromium
+headless instalado como ferramenta própria do CTO (fora do `package.json`
+do app, mesmo padrão de `.venv-ssh/` para SSH), já que o ambiente Windows
+sem Docker/WSL2 não tem `chromium-cli`. Fecha a lacuna de QA visual
+registrada na primeira versão deste relatório. Sessão autenticada real
+gerada via `app.auth.jwt.create_access_token` rodado dentro do container da
+API (mesmo mecanismo de uma sessão pós-login Google real, nunca uma
+credencial nova).
+
+**Dois bugs reais encontrados só ao ver o app renderizado** (nenhum dos
+dois seria pego por lint/tsc/testes, já que nenhum quebra comportamento
+testável — são puramente visuais):
+1. `line-height: 145%` no shorthand `font` de `:root` computa para um valor
+   fixo em `px` (145% de 16px = 23.2px) que é **herdado como esse valor
+   absoluto**, não recalculado, por qualquer elemento maior — `h1` (32px)
+   herdava 23.2px de `line-height`, então "Bem-vindo, Nome Longo" quebrando
+   em duas linhas sobrepunha a segunda linha na primeira. Corrigido trocando
+   para `line-height: 1.45` (unitless), que recalcula por elemento — reforça
+   por que shorthand `font` com `%` de line-height é uma armadilha clássica
+   de herança em CSS.
+2. Nav mobile (barra horizontal) estourava a largura da viewport — `.app-nav`
+   sem `min-width: 0` não encolhia dentro do flex row do `.app-sidebar`,
+   então em vez de rolar horizontalmente (o `overflow-x: auto` já estava lá,
+   mas nunca era acionado) o conteúdo simplesmente vazava para fora da barra.
+   Corrigido com `min-width: 0` no nav e ocultando o bloco de nome/e-mail do
+   usuário no layout compacto de mobile.
+
+Screenshots reais (desktop 1440px + mobile 390px, telas Início/Dashboards/
+drill-down) confirmam as duas correções — sem sobreposição de texto, nav
+mobile contida dentro da barra, cards/funil com o acabamento pretendido.
 
 ## Pendências e próximos passos sugeridos
 
@@ -246,15 +288,12 @@ sprint fechada.
   nova) — aviso do Vite no build, não um erro. Aceitável para um app de 2
   usuários numa VM Free Tier; revisitar com `dynamic import()`/code-splitting
   se o app crescer ou a VM de prod tiver restrição de banda relevante.
-- **`/impeccable audit` não pixel-verificado** — sem navegador headless
-  disponível no ambiente Windows do notebook corporativo (mesma restrição de
-  Docker/WSL2 já documentada). Recomendado: validação visual real pelo CEO
-  no navegador (contraste, alinhamento, comportamento em mobile) como parte
-  da validação manual desta sprint, complementando a revisão de código já
-  feita.
 - **Update do Impeccable disponível** (v4.0.4 instalado → v4.1.1) — não
   aplicado nesta sessão para não interromper o fluxo de execução; rodar
   `npx impeccable update` numa sessão futura, efeito só na próxima sessão.
+- **`scripts/browser-check/` fica disponível para sprints futuras** — vale
+  rodar como parte do `/impeccable audit` sempre que houver trabalho visual
+  novo, em vez de depender só de revisão de código.
 - Sprints seguintes (E6 — dashboards analíticos por natureza/ativo/evolução
   de patrimônio; E7 — perfil/multiusuário) podem ser detalhadas agora que E5
   está pronta, conforme já registrado em `docs/roadmap.md`.

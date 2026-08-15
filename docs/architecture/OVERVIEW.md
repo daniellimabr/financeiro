@@ -107,7 +107,21 @@ Toda tabela transacional tem `user_id` obrigatório; toda query de aplicação f
 - **Endpoints (`app/dashboards/`):** `GET /dashboards/summary?ano=&mes=` (receita/despesa/saldo — filtrados por período; `patrimonio` é sempre snapshot atual, ignora o filtro), `GET /dashboards/por-categoria?tipo=debito|credito&ano=&mes=` (agrupado por grupo/subcategoria), `GET /dashboards/por-meio-pagamento?tipo=&ano=&mes=&categoria_id=` (agrupado por `pluggy_accounts.tipo`). Todos isolados por `user_id`, agregação via `func.sum`/`group_by` direto — sem cache nem tabela pré-calculada.
 - **Filtros novos em `GET /pluggy/transactions`:** `ano`, `mes`, `subcategory_id`, `account_tipo`, `competencia` (bool — quando `true`, `ano`/`mes` filtram por `data_competencia` em vez de `data`; usado pelo último nível do funil para bater com a base de agregação). Sem filtro nenhum, comportamento idêntico ao anterior à Sprint 5.
 - **Frontend — primeira identidade visual real do projeto:** direção escolhida com o CEO via fluxo `new-work` do Impeccable (comparação de esboços renderizados como artifacts — cupom fiscal / hypercard / SaaS clássico, depois variações do registro SaaS fintech). Tokens em `frontend/src/index.css` (cores, tipografia, espaçamento) — ver [DESIGN.md](../../DESIGN.md) para o sistema completo. `DashboardsPage.tsx`: filtro ano/mês, 4 cards de resumo (Receita/Despesa clicáveis, Saldo e Patrimônio estáticos — Patrimônio rotulado "atual" para não sugerir que varia com o filtro), funil de drill-down com gráficos Recharts + lista acessível por teclado.
-- **`/impeccable audit`** rodado como gate antes de fechar a sprint — sem navegador/screenshot disponível neste ambiente (Windows sem Docker/WSL2, sem `chromium-cli`), avaliação feita por revisão de código contra os 5 eixos (a11y, performance, theming, responsivo, integridade de implementação); 2 achados reais corrigidos (touch targets abaixo de 44px em linhas do funil, filtro sem `flex-wrap` em viewport estreito). Detector mecânico (`detect.mjs`) sem achados.
+- **`/impeccable audit`** rodado como gate antes de fechar a sprint — inicialmente por revisão de código contra os 5 eixos (a11y, performance, theming, responsivo, integridade de implementação), já que o ambiente Windows não tem Docker/WSL2/`chromium-cli`. 2 achados corrigidos nessa passada (touch targets abaixo de 44px, filtro sem `flex-wrap`). Detector mecânico (`detect.mjs`) sem achados. Feedback visual real do CEO pós-deploy revelou uma lacuna maior — `ProtectedPage` (nav/shell) nunca recebeu os tokens novos, só `DashboardsPage` — resolvida com `scripts/browser-check/` (Playwright/Chromium headless, ferramenta própria do CTO, ver seção abaixo), que encontrou 2 bugs visuais reais (herança de `line-height` percentual sobrepondo texto de heading; overflow de nav mobile) invisíveis a lint/testes. Ver [SPRINT-005-dashboards-core-report.md](../sprints/SPRINT-005-dashboards-core-report.md) para o relato completo.
+
+### Ferramenta de QA visual (`scripts/browser-check/`)
+
+Playwright + Chromium headless, instalada como ferramenta própria do CTO
+(fora do `package.json` do frontend — mesmo padrão de `.venv-ssh/` para
+SSH), disponível para toda sprint futura com trabalho visual. `check.mjs`
+(genérico: navega, tira screenshot, reporta erros de console) e
+`check-dashboard.mjs` (fluxo autenticado específico do app: início →
+dashboards → drill-down, desktop + mobile). Sessão autenticada via token
+gerado por `app.auth.jwt.create_access_token` rodado dentro do container da
+API na VM de dev (mesmo mecanismo de uma sessão pós-login Google real,
+nunca uma credencial nova ou bypass de auth). Screenshots em
+`scripts/browser-check/shots/` — gitignored (podem conter dado financeiro
+real).
 
 ## Qualidade (Sprint 1 + Sprint 2 + Sprint 3 + Sprint 4 + Sprint 5)
 

@@ -189,7 +189,10 @@ Financeiro v3/
 ├── scripts/
 │   ├── ssh-vm.ps1                  # wrapper PowerShell: venv + paramiko, alvo dev|prod
 │   ├── ssh_vm.py                   # cliente SSH paramiko (dev: livre; prod: aprovação)
-│   └── requirements-ssh.txt        # dependências do venv de SSH (paramiko)
+│   ├── requirements-ssh.txt        # dependências do venv de SSH (paramiko)
+│   └── browser-check/              # QA visual do CTO — Playwright/Chromium headless (Sprint 5)
+│       ├── check.mjs               # genérico: navega, screenshot, erros de console
+│       └── check-dashboard.mjs     # fluxo autenticado: início → dashboards → drill-down
 ├── .github/
 │   └── workflows/
 │       └── ci.yml                  # GitHub Actions: pytest+ruff (backend), vitest+eslint+tsc (frontend) (Sprint 1)
