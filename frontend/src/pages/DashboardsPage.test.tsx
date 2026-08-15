@@ -15,22 +15,76 @@ const SUMMARY_FIXTURE = {
   passivos: "7200.00",
 };
 
+const GROUPS_FIXTURE = [
+  {
+    id: 1,
+    nome: "Alimentação",
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: 2,
+    nome: "Transporte",
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  },
+];
+
+const SUBCATEGORIES_FIXTURE = [
+  {
+    id: 10,
+    group_id: 1,
+    nome: "Mercado",
+    natureza: null,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: 11,
+    group_id: 1,
+    nome: "Restaurante",
+    natureza: null,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: 20,
+    group_id: 2,
+    nome: "Combustível",
+    natureza: null,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  },
+];
+
+// Alimentação (grupo) = Mercado 800 + Restaurante 200 = 1000 (80%/20% dentro
+// do grupo); Transporte (grupo) = Combustível 1000. Total geral 2000 — cada
+// grupo fica em 50% do total, números redondos de propósito pra facilitar
+// as asserções de percentual.
 const CATEGORIA_FIXTURE = [
   {
     group_id: 1,
     group_nome: "Alimentação",
     subcategory_id: 10,
     subcategory_nome: "Mercado",
-    total: "1240.00",
-    percentual: "62.50",
+    total: "800.00",
+    percentual: "0",
+  },
+  {
+    group_id: 1,
+    group_nome: "Alimentação",
+    subcategory_id: 11,
+    subcategory_nome: "Restaurante",
+    total: "200.00",
+    percentual: "0",
   },
   {
     group_id: 2,
     group_nome: "Transporte",
     subcategory_id: 20,
     subcategory_nome: "Combustível",
-    total: "744.00",
-    percentual: "37.50",
+    total: "1000.00",
+    percentual: "0",
   },
 ];
 
@@ -41,8 +95,20 @@ const PASSIVO_FIXTURE = [
 ];
 
 const SALDO_FIXTURE = [
-  { account_id: 1, account_nome: "Conta corrente", account_tipo: "corrente", saldo: "1200.00" },
-  { account_id: 2, account_nome: "Cartão", account_tipo: "cartao_credito", saldo: "300.00" },
+  {
+    account_id: 1,
+    account_nome: "Conta corrente",
+    account_tipo: "corrente",
+    saldo: "1200.00",
+    limite_credito: null,
+  },
+  {
+    account_id: 2,
+    account_nome: "Cartão",
+    account_tipo: "cartao_credito",
+    saldo: "300.00",
+    limite_credito: "5000.00",
+  },
 ];
 
 const TRANSACAO_FIXTURE = {
@@ -87,18 +153,18 @@ const TENDENCIA_CATEGORIA_FIXTURE = [
     subcategory_id: 10,
     subcategory_nome: "Mercado",
     pontos: [
-      { ano: 2025, mes: 11, total: "1000.00" },
-      { ano: 2025, mes: 12, total: "1100.00" },
-      { ano: 2026, mes: 1, total: "1240.00" },
+      { ano: 2025, mes: 11, total: "700.00" },
+      { ano: 2025, mes: 12, total: "750.00" },
+      { ano: 2026, mes: 1, total: "800.00" },
     ],
   },
   {
     subcategory_id: 20,
     subcategory_nome: "Combustível",
     pontos: [
-      { ano: 2025, mes: 11, total: "600.00" },
-      { ano: 2025, mes: 12, total: "700.00" },
-      { ano: 2026, mes: 1, total: "744.00" },
+      { ano: 2025, mes: 11, total: "900.00" },
+      { ano: 2025, mes: 12, total: "950.00" },
+      { ano: 2026, mes: 1, total: "1000.00" },
     ],
   },
 ];
@@ -132,6 +198,9 @@ function routedFetchMock() {
       return Promise.resolve(jsonResponse(PASSIVO_FIXTURE));
     if (url.startsWith("/dashboards/saldo-por-conta"))
       return Promise.resolve(jsonResponse(SALDO_FIXTURE));
+    if (url.startsWith("/category-groups")) return Promise.resolve(jsonResponse(GROUPS_FIXTURE));
+    if (url.startsWith("/subcategories"))
+      return Promise.resolve(jsonResponse(SUBCATEGORIES_FIXTURE));
     if (url.startsWith("/pluggy/transactions"))
       return Promise.resolve(jsonResponse([TRANSACAO_FIXTURE, TRANSACAO_FIXTURE_2]));
     throw new Error(`Unexpected fetch: ${url}`);
@@ -201,18 +270,22 @@ describe("DashboardsPage", () => {
     });
   });
 
-  it("expands the funnel from despesa straight to the transaction list, no meio de pagamento level", async () => {
+  it("expands the funnel from despesa through grupo and tipo down to the transaction list", async () => {
     vi.stubGlobal("fetch", routedFetchMock());
 
     renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
 
     await userEvent.click(screen.getByRole("button", { name: /Despesa/ }));
+    await screen.findByRole("button", { name: /Alimentação/ });
+    expect(screen.queryByText("Mercado")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Alimentação/ }));
     await screen.findByRole("button", { name: /Mercado/ });
+    expect(screen.queryByText("Mercado São João")).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /Mercado/ }));
     expect(await screen.findByText("Mercado São João")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Mercado/ })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /Mercado/ }));
     await waitFor(() => {
@@ -221,49 +294,81 @@ describe("DashboardsPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Fechar" }));
     await waitFor(() => {
-      expect(screen.queryByRole("button", { name: /Mercado/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Alimentação/ })).not.toBeInTheDocument();
     });
   });
 
-  it("keeps a first expanded categoria visible when a second one is expanded (sanfona)", async () => {
+  it("keeps a first expanded grupo visible when a second grupo is expanded (sanfona)", async () => {
     vi.stubGlobal("fetch", routedFetchMock());
 
     renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
 
     await userEvent.click(screen.getByRole("button", { name: /Despesa/ }));
+    await screen.findByRole("button", { name: /Alimentação/ });
+
+    await userEvent.click(screen.getByRole("button", { name: /Alimentação/ }));
+    await screen.findByRole("button", { name: /Mercado/ });
+
+    await userEvent.click(screen.getByRole("button", { name: /Transporte/ }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Alimentação/ })).toHaveAttribute(
+        "aria-expanded",
+        "true"
+      );
+      expect(screen.getByRole("button", { name: /Transporte/ })).toHaveAttribute(
+        "aria-expanded",
+        "true"
+      );
+    });
+  });
+
+  it("keeps a first expanded tipo visible when a second tipo in the same grupo is expanded", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /Despesa/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Alimentação/ }));
     await screen.findByRole("button", { name: /Mercado/ });
 
     await userEvent.click(screen.getByRole("button", { name: /Mercado/ }));
     await screen.findByText("Mercado São João");
 
-    await userEvent.click(screen.getByRole("button", { name: /Combustível/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Restaurante/ }));
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /Mercado/ })).toHaveAttribute(
         "aria-expanded",
         "true"
       );
-      expect(screen.getByRole("button", { name: /Combustível/ })).toHaveAttribute(
+      expect(screen.getByRole("button", { name: /Restaurante/ })).toHaveAttribute(
         "aria-expanded",
         "true"
       );
     });
   });
 
-  it("shows percentual against the categoria total at both the categoria and transaction row levels", async () => {
+  it("shows percentual at grupo level (vs total), tipo level (vs grupo) and transaction level (vs tipo)", async () => {
     vi.stubGlobal("fetch", routedFetchMock());
 
     renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
 
     await userEvent.click(screen.getByRole("button", { name: /Despesa/ }));
-    await screen.findByText("62.5%");
-    expect(screen.getByText("37.5%")).toBeInTheDocument();
+    // Alimentação (1000) e Transporte (1000) — 50% cada do total (2000)
+    expect(await screen.findAllByText("50.0%")).toHaveLength(2);
+
+    await userEvent.click(screen.getByRole("button", { name: /Alimentação/ }));
+    // Mercado (800) / grupo Alimentação (1000) = 80%; Restaurante = 20%
+    expect(await screen.findByText("80.0%")).toBeInTheDocument();
+    expect(screen.getByText("20.0%")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /Mercado/ }));
-    // 45.00 / 1240.00 (total da categoria "Mercado", não mais do meio de pagamento)
-    expect(await screen.findByText("3.6%")).toBeInTheDocument();
+    // 45.00 / 800.00 (total do tipo "Mercado")
+    expect(await screen.findByText("5.6%")).toBeInTheDocument();
   });
 
   it("shows an empty state when there are no transactions in the period", async () => {
@@ -274,6 +379,9 @@ describe("DashboardsPage", () => {
       if (url.startsWith("/dashboards/tendencia"))
         return Promise.resolve(jsonResponse(TENDENCIA_FIXTURE));
       if (url.startsWith("/dashboards/por-categoria")) return Promise.resolve(jsonResponse([]));
+      if (url.startsWith("/category-groups")) return Promise.resolve(jsonResponse(GROUPS_FIXTURE));
+      if (url.startsWith("/subcategories"))
+        return Promise.resolve(jsonResponse(SUBCATEGORIES_FIXTURE));
       throw new Error(`Unexpected fetch: ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -286,18 +394,21 @@ describe("DashboardsPage", () => {
     expect(await screen.findByText("Nenhuma transação neste período.")).toBeInTheDocument();
   });
 
-  it("each transaction row renders an account tipo icon", async () => {
+  it("each transaction row renders an account tipo icon to the left of the value", async () => {
     vi.stubGlobal("fetch", routedFetchMock());
 
     renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
 
     await userEvent.click(screen.getByRole("button", { name: /Despesa/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Alimentação/ }));
     await userEvent.click(screen.getByRole("button", { name: /Mercado/ }));
     await screen.findByText("Mercado São João");
 
-    const icons = document.querySelectorAll(".dash-table tbody .account-tipo-icon");
-    expect(icons.length).toBeGreaterThan(0);
+    const valorCell = document.querySelector(".dash-table tbody .valor-cell");
+    expect(valorCell).not.toBeNull();
+    expect(valorCell?.querySelector(".account-tipo-icon")).not.toBeNull();
+    expect(valorCell?.textContent).toContain("R$");
   });
 
   it("reorders the transaction table when a column header is clicked", async () => {
@@ -307,6 +418,7 @@ describe("DashboardsPage", () => {
     await screen.findByText("R$ 8.400,00");
 
     await userEvent.click(screen.getByRole("button", { name: /Despesa/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Alimentação/ }));
     await userEvent.click(screen.getByRole("button", { name: /Mercado/ }));
     await screen.findByText("Mercado São João");
 
@@ -314,7 +426,7 @@ describe("DashboardsPage", () => {
       return within(screen.getByRole("table"))
         .getAllByRole("row")
         .slice(1)
-        .map((row) => within(row).getAllByRole("cell")[2].textContent);
+        .map((row) => within(row).getAllByRole("cell")[1].textContent);
     }
 
     // default: data desc — tx-1 (2026-01-10) antes de tx-2 (2026-01-05)
@@ -323,6 +435,26 @@ describe("DashboardsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Data" }));
     await waitFor(() => {
       expect(rowsDescricao()).toEqual(["Açougue Bairro", "Mercado São João"]);
+    });
+  });
+
+  it("sorts the transaction table by percentual when its column header is clicked", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /Despesa/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Alimentação/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Mercado/ }));
+    await screen.findByText("Mercado São João");
+
+    const percentHeader = screen.getByRole("button", { name: "%" });
+    expect(percentHeader).toBeInTheDocument();
+
+    await userEvent.click(percentHeader);
+    await waitFor(() => {
+      expect(percentHeader.closest("th")).toHaveAttribute("aria-sort", "ascending");
     });
   });
 
@@ -368,5 +500,16 @@ describe("DashboardsPage", () => {
       expect(saldoCalls.every((url) => !url.includes("mes="))).toBe(true);
     });
     expect(screen.getByText("R$ 1.200,00")).toBeInTheDocument();
+  });
+
+  it("shows the credit limit in parentheses next to a credit card balance", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /Saldo/ }));
+
+    expect(await screen.findByText(/limite R\$ 5\.000,00/)).toBeInTheDocument();
   });
 });

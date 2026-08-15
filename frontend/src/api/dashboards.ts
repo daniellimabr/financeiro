@@ -80,6 +80,7 @@ export interface SaldoConta {
   account_nome: string;
   account_tipo: string;
   saldo: string;
+  limite_credito: string | null;
 }
 
 // Período histórico oferecido pelo seletor de tendência (3/6/12 meses).

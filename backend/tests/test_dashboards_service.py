@@ -1033,6 +1033,88 @@ def test_get_saldo_por_conta_uses_apelido_fallback_to_nome(db_session, user):
     assert por_id[other_account.id].account_nome == "Conta"
 
 
+def test_subtract_month_rolls_back_year_at_january():
+    assert service._subtract_month(date(2026, 1, 15)) == date(2025, 12, 15)
+
+
+def test_subtract_month_clamps_day_overflow():
+    assert service._subtract_month(date(2026, 3, 31)) == date(2026, 2, 28)
+
+
+def test_get_saldo_por_conta_credit_card_shows_sum_of_current_invoice(db_session, user):
+    account = _account(
+        db_session, user, tipo=PluggyAccountTipo.cartao_credito, saldo=Decimal("999999.00")
+    )
+    account.fatura_vencimento = date(2026, 8, 6)
+    account.limite_credito = Decimal("15300.00")
+    db_session.commit()
+    # dentro da janela (2026-07-06, 2026-08-06]
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 7, 20),
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-50.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 8, 6),
+    )
+    # fora da janela (antes do início) — não deve entrar na soma
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-999.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 7, 5),
+    )
+    # crédito (pagamento/estorno) dentro da janela — nunca soma
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="200.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 7, 25),
+    )
+
+    saldos = service.get_saldo_por_conta(db_session, user.id)
+
+    saldo_cartao = next(s for s in saldos if s.account_id == account.id)
+    assert saldo_cartao.saldo == Decimal("150.00")
+    assert saldo_cartao.limite_credito == Decimal("15300.00")
+
+
+def test_get_saldo_por_conta_credit_card_without_fatura_vencimento_falls_back_to_saldo(
+    db_session, user
+):
+    account = _account(
+        db_session, user, tipo=PluggyAccountTipo.cartao_credito, saldo=Decimal("300.00")
+    )
+
+    saldos = service.get_saldo_por_conta(db_session, user.id)
+
+    saldo_cartao = next(s for s in saldos if s.account_id == account.id)
+    assert saldo_cartao.saldo == Decimal("300.00")
+    assert saldo_cartao.limite_credito is None
+
+
+def test_get_saldo_por_conta_non_credit_account_ignores_limite_credito(db_session, user):
+    account = _account(db_session, user, tipo=PluggyAccountTipo.corrente, saldo=Decimal("500.00"))
+
+    saldos = service.get_saldo_por_conta(db_session, user.id)
+
+    saldo_conta = next(s for s in saldos if s.account_id == account.id)
+    assert saldo_conta.saldo == Decimal("500.00")
+    assert saldo_conta.limite_credito is None
+
+
 def test_get_saldo_por_conta_isolated_by_user(db_session, user):
     other = User(google_sub="google-saldo-conta-other", email="other-sc@example.com", name="Bob")
     db_session.add(other)

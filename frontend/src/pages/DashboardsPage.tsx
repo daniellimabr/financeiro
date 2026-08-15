@@ -32,7 +32,6 @@
 import { useMemo, useState } from "react";
 
 import {
-  SEM_CATEGORIA_ID,
   type CategoriaTotal,
   type PeriodoHistorico,
   type PontoTendencia,
@@ -43,6 +42,7 @@ import { AccountTipoIcon } from "../components/AccountTipoIcon";
 import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { useAssetGastos } from "../hooks/useAssetGastos";
+import { useCategoryGroups } from "../hooks/useCategoryGroups";
 import { useDashboardByCategoria } from "../hooks/useDashboardByCategoria";
 import { useDashboardCategoriaTendencia } from "../hooks/useDashboardCategoriaTendencia";
 import { useDashboardSummary } from "../hooks/useDashboardSummary";
@@ -50,7 +50,14 @@ import { useDashboardTendencia } from "../hooks/useDashboardTendencia";
 import { useLiabilityGastos } from "../hooks/useLiabilityGastos";
 import { usePluggyTransactions } from "../hooks/usePluggyTransactions";
 import { useSaldoPorConta } from "../hooks/useSaldoPorConta";
+import { useSubcategories } from "../hooks/useSubcategories";
 import { useTableSort } from "../hooks/useTableSort";
+import {
+  buildGroupColorIndex,
+  buildSubcategoryTintIndex,
+  groupColorVar,
+  subcategoryColorVar,
+} from "../utils/categoryColors";
 import { formatCurrency } from "../utils/format";
 
 const ACCOUNT_TIPO_LABEL: Record<string, string> = {
@@ -71,12 +78,19 @@ interface PeriodoFiltro {
 
 type DrillKind = "receita" | "despesa" | "ativos" | "passivos" | "saldo";
 
+function toggleId(list: number[], id: number): number[] {
+  return list.includes(id) ? list.filter((existing) => existing !== id) : [...list, id];
+}
+
 interface DrillState {
   kind: DrillKind;
-  // ids das linhas expandidas na seção atualmente aberta (subcategory_id,
-  // asset_id ou liability_id conforme kind) — só uma seção fica aberta por
-  // vez, então um único array cobre os três casos.
+  // ids das linhas expandidas na seção atualmente aberta — usado por
+  // ativos/passivos (asset_id/liability_id, um único nível).
   expandedRows: number[];
+  // usados só por receita/despesa, que tem dois níveis de agrupamento:
+  // Categoria (group_id) e, dentro dela, Tipo (subcategory_id).
+  expandedGrupos: number[];
+  expandedSubcategorias: number[];
 }
 
 export function DashboardsPage() {
@@ -93,7 +107,11 @@ export function DashboardsPage() {
   const tendenciaQuery = useDashboardTendencia(ano, mes, periodoHistorico);
 
   function abrirFunil(kind: DrillKind) {
-    setDrill((prev) => (prev?.kind === kind ? null : { kind, expandedRows: [] }));
+    setDrill((prev) =>
+      prev?.kind === kind
+        ? null
+        : { kind, expandedRows: [], expandedGrupos: [], expandedSubcategorias: [] }
+    );
   }
 
   function fecharFunil() {
@@ -101,16 +119,19 @@ export function DashboardsPage() {
   }
 
   function toggleRow(id: number) {
-    setDrill((prev) => {
-      if (!prev) return prev;
-      const expandida = prev.expandedRows.includes(id);
-      return {
-        ...prev,
-        expandedRows: expandida
-          ? prev.expandedRows.filter((rowId) => rowId !== id)
-          : [...prev.expandedRows, id],
-      };
-    });
+    setDrill((prev) => (prev ? { ...prev, expandedRows: toggleId(prev.expandedRows, id) } : prev));
+  }
+
+  function toggleGrupo(id: number) {
+    setDrill((prev) =>
+      prev ? { ...prev, expandedGrupos: toggleId(prev.expandedGrupos, id) } : prev
+    );
+  }
+
+  function toggleSubcategoria(id: number) {
+    setDrill((prev) =>
+      prev ? { ...prev, expandedSubcategorias: toggleId(prev.expandedSubcategorias, id) } : prev
+    );
   }
 
   const drillTitle: Record<DrillKind, string> = {
@@ -219,12 +240,14 @@ export function DashboardsPage() {
           </div>
 
           {(drill.kind === "receita" || drill.kind === "despesa") && (
-            <CategoriaAccordion
+            <GrupoAccordion
               tipo={drill.kind === "receita" ? "credito" : "debito"}
               filter={filter}
               periodoHistorico={periodoHistorico}
-              expandedRows={drill.expandedRows}
-              onToggleRow={toggleRow}
+              expandedGrupos={drill.expandedGrupos}
+              expandedSubcategorias={drill.expandedSubcategorias}
+              onToggleGrupo={toggleGrupo}
+              onToggleSubcategoria={toggleSubcategoria}
             />
           )}
 
@@ -295,18 +318,41 @@ function RowTrend({ pontos, color }: { pontos: PontoTendencia[]; color: string }
   );
 }
 
-function CategoriaAccordion({
+function sumTrends(lists: PontoTendencia[][]): PontoTendencia[] | undefined {
+  if (lists.length === 0) return undefined;
+  const [first] = lists;
+  return first.map((ponto, i) => ({
+    ano: ponto.ano,
+    mes: ponto.mes,
+    total: String(lists.reduce((sum, list) => sum + Number(list[i]?.total ?? 0), 0)),
+  }));
+}
+
+interface GrupoTotal {
+  group_id: number;
+  group_nome: string;
+  total: number;
+  percentual: number;
+  trend: PontoTendencia[] | undefined;
+  subcategorias: CategoriaTotal[];
+}
+
+function GrupoAccordion({
   tipo,
   filter,
   periodoHistorico,
-  expandedRows,
-  onToggleRow,
+  expandedGrupos,
+  expandedSubcategorias,
+  onToggleGrupo,
+  onToggleSubcategoria,
 }: {
   tipo: TransacaoTipo;
   filter: PeriodoFiltro;
   periodoHistorico: PeriodoHistorico;
-  expandedRows: number[];
-  onToggleRow: (id: number) => void;
+  expandedGrupos: number[];
+  expandedSubcategorias: number[];
+  onToggleGrupo: (id: number) => void;
+  onToggleSubcategoria: (id: number) => void;
 }) {
   const query = useDashboardByCategoria(tipo, filter);
   const tendenciaQuery = useDashboardCategoriaTendencia(
@@ -315,56 +361,158 @@ function CategoriaAccordion({
     filter.mes,
     periodoHistorico
   );
-  const color = tipo === "credito" ? "var(--receita)" : "var(--despesa)";
+  const groupsQuery = useCategoryGroups();
+  const subcategoriesQuery = useSubcategories();
 
-  const sorted = useMemo(
-    () => [...(query.data ?? [])].sort((a, b) => Number(b.total) - Number(a.total)),
-    [query.data]
+  const groupColorIndex = useMemo(
+    () => buildGroupColorIndex(groupsQuery.data ?? []),
+    [groupsQuery.data]
   );
+  const subcategoryTintIndex = useMemo(
+    () => buildSubcategoryTintIndex(subcategoriesQuery.data ?? []),
+    [subcategoriesQuery.data]
+  );
+
   const trendBySubcategoria = useMemo(() => {
     const map = new Map<number, PontoTendencia[]>();
     for (const item of tendenciaQuery.data ?? []) map.set(item.subcategory_id, item.pontos);
     return map;
   }, [tendenciaQuery.data]);
 
+  const grupos = useMemo<GrupoTotal[]>(() => {
+    const items = query.data ?? [];
+    const totalGeral = items.reduce((sum, item) => sum + Number(item.total), 0);
+    const porGrupo = new Map<number, GrupoTotal>();
+    for (const item of items) {
+      const grupo = porGrupo.get(item.group_id) ?? {
+        group_id: item.group_id,
+        group_nome: item.group_nome,
+        total: 0,
+        percentual: 0,
+        trend: undefined,
+        subcategorias: [],
+      };
+      grupo.total += Number(item.total);
+      grupo.subcategorias.push(item);
+      porGrupo.set(item.group_id, grupo);
+    }
+    return [...porGrupo.values()]
+      .map((grupo) => ({
+        ...grupo,
+        percentual: totalGeral > 0 ? (grupo.total / totalGeral) * 100 : 0,
+        subcategorias: [...grupo.subcategorias].sort((a, b) => Number(b.total) - Number(a.total)),
+        trend: sumTrends(
+          grupo.subcategorias
+            .map((s) => trendBySubcategoria.get(s.subcategory_id))
+            .filter((pontos): pontos is PontoTendencia[] => pontos !== undefined)
+        ),
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [query.data, trendBySubcategoria]);
+
   if (query.isLoading) return <p>Carregando...</p>;
   if (query.isError) return <p role="alert">Não foi possível carregar as categorias.</p>;
-  if (sorted.length === 0) return <p className="dash-empty">Nenhuma transação neste período.</p>;
+  if (grupos.length === 0) return <p className="dash-empty">Nenhuma transação neste período.</p>;
 
-  const max = Number(sorted[0]?.total ?? 1);
+  const max = grupos[0]?.total ?? 1;
 
   return (
     <ul className="dash-list dash-accordion">
-      {sorted.map((item: CategoriaTotal) => (
-        <li key={item.subcategory_id}>
+      {grupos.map((grupo) => (
+        <li key={grupo.group_id}>
           <div className="dash-accordion-item">
             <Row
-              nome={
-                item.group_id === SEM_CATEGORIA_ID
-                  ? item.subcategory_nome
-                  : `${item.group_nome} · ${item.subcategory_nome}`
-              }
-              total={item.total}
-              percentual={item.percentual}
+              nome={grupo.group_nome}
+              total={String(grupo.total)}
+              percentual={grupo.percentual.toFixed(2)}
               max={max}
-              color={color}
-              expanded={expandedRows.includes(item.subcategory_id)}
-              onClick={() => onToggleRow(item.subcategory_id)}
-              trend={trendBySubcategoria.get(item.subcategory_id)}
+              color={groupColorVar(grupo.group_id, groupColorIndex)}
+              expanded={expandedGrupos.includes(grupo.group_id)}
+              onClick={() => onToggleGrupo(grupo.group_id)}
+              trend={grupo.trend}
             />
-            {expandedRows.includes(item.subcategory_id) && (
+            {expandedGrupos.includes(grupo.group_id) && (
               <div className="dash-accordion-panel">
-                <TransacoesPanel
+                <SubcategoriaAccordion
+                  groupId={grupo.group_id}
+                  groupTotal={grupo.total}
+                  subcategorias={grupo.subcategorias}
+                  groupColorIndex={groupColorIndex}
+                  subcategoryTintIndex={subcategoryTintIndex}
+                  trendBySubcategoria={trendBySubcategoria}
                   filter={filter}
-                  categoriaId={item.subcategory_id}
-                  totalParaPercentual={item.total}
-                  emptyMessage="Nenhuma transação nesta categoria."
+                  expandedSubcategorias={expandedSubcategorias}
+                  onToggleSubcategoria={onToggleSubcategoria}
                 />
               </div>
             )}
           </div>
         </li>
       ))}
+    </ul>
+  );
+}
+
+function SubcategoriaAccordion({
+  groupId,
+  groupTotal,
+  subcategorias,
+  groupColorIndex,
+  subcategoryTintIndex,
+  trendBySubcategoria,
+  filter,
+  expandedSubcategorias,
+  onToggleSubcategoria,
+}: {
+  groupId: number;
+  groupTotal: number;
+  subcategorias: CategoriaTotal[];
+  groupColorIndex: Map<number, number>;
+  subcategoryTintIndex: Map<number, number>;
+  trendBySubcategoria: Map<number, PontoTendencia[]>;
+  filter: PeriodoFiltro;
+  expandedSubcategorias: number[];
+  onToggleSubcategoria: (id: number) => void;
+}) {
+  const max = Number(subcategorias[0]?.total ?? 1);
+
+  return (
+    <ul className="dash-list dash-accordion">
+      {subcategorias.map((item) => {
+        const percentual =
+          groupTotal > 0 ? ((Number(item.total) / groupTotal) * 100).toFixed(2) : "0.00";
+        return (
+          <li key={item.subcategory_id}>
+            <div className="dash-accordion-item">
+              <Row
+                nome={item.subcategory_nome}
+                total={item.total}
+                percentual={percentual}
+                max={max}
+                color={subcategoryColorVar(
+                  item.subcategory_id,
+                  groupId,
+                  groupColorIndex,
+                  subcategoryTintIndex
+                )}
+                expanded={expandedSubcategorias.includes(item.subcategory_id)}
+                onClick={() => onToggleSubcategoria(item.subcategory_id)}
+                trend={trendBySubcategoria.get(item.subcategory_id)}
+              />
+              {expandedSubcategorias.includes(item.subcategory_id) && (
+                <div className="dash-accordion-panel">
+                  <TransacoesPanel
+                    filter={filter}
+                    categoriaId={item.subcategory_id}
+                    totalParaPercentual={item.total}
+                    emptyMessage="Nenhuma transação nesta categoria."
+                  />
+                </div>
+              )}
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -499,14 +647,19 @@ function SaldoPorContaList() {
           <span className="tag">
             {ACCOUNT_TIPO_LABEL[conta.account_tipo] ?? conta.account_tipo}
           </span>
-          <span className="amt">{formatCurrency(conta.saldo)}</span>
+          <span className="amt">
+            {formatCurrency(conta.saldo)}
+            {conta.limite_credito !== null && (
+              <span className="amt-detail"> (limite {formatCurrency(conta.limite_credito)})</span>
+            )}
+          </span>
         </li>
       ))}
     </ul>
   );
 }
 
-type TransacaoSortKey = "data" | "descricao" | "valor";
+type TransacaoSortKey = "data" | "descricao" | "valor" | "percentual";
 
 function TransacoesPanel({
   filter,
@@ -540,7 +693,23 @@ function TransacoesPanel({
   const { sorted, sortKey, direction, toggleSort } = useTableSort<
     PluggyTransaction,
     TransacaoSortKey
-  >(data, (item, key) => (key === "valor" ? Number(item.valor) : item[key]), "data", "desc");
+  >(
+    data,
+    (item, key) => {
+      switch (key) {
+        case "valor":
+          return Number(item.valor);
+        case "percentual":
+          return total !== undefined && total > 0 ? Math.abs(Number(item.valor)) / total : 0;
+        case "data":
+          return item.data;
+        case "descricao":
+          return item.descricao;
+      }
+    },
+    "data",
+    "desc"
+  );
 
   if (query.isLoading) return <p>Carregando...</p>;
   if (query.isError) return <p role="alert">Não foi possível carregar as transações.</p>;
@@ -551,7 +720,6 @@ function TransacoesPanel({
       <table className="dash-table">
         <thead>
           <tr>
-            <th aria-label="Meio de pagamento" />
             <SortableHeader
               label="Data"
               sortKeyName="data"
@@ -573,7 +741,15 @@ function TransacoesPanel({
               direction={direction}
               onClick={() => toggleSort("valor")}
             />
-            {total !== undefined && <th>%</th>}
+            {total !== undefined && (
+              <SortableHeader
+                label="%"
+                sortKeyName="percentual"
+                currentKey={sortKey}
+                direction={direction}
+                onClick={() => toggleSort("percentual")}
+              />
+            )}
           </tr>
         </thead>
         <tbody>
@@ -584,12 +760,14 @@ function TransacoesPanel({
                 : 0;
             return (
               <tr key={transaction.id}>
-                <td>
-                  <AccountTipoIcon tipo={transaction.account_tipo} />
-                </td>
                 <td>{transaction.data}</td>
                 <td>{transaction.descricao}</td>
-                <td>{formatCurrency(transaction.valor)}</td>
+                <td>
+                  <span className="valor-cell">
+                    <AccountTipoIcon tipo={transaction.account_tipo} />
+                    {formatCurrency(transaction.valor)}
+                  </span>
+                </td>
                 {total !== undefined && <td className="pct-col">{formatPercent(percentual)}</td>}
               </tr>
             );

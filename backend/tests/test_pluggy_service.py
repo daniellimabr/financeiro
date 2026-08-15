@@ -131,6 +131,37 @@ def test_sync_item_creates_accounts_and_transactions(db_session, user):
     assert transactions[0].valor == Decimal("-50.25")
 
 
+def test_sync_item_persists_credit_data_for_credit_card(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[
+            _account_raw(
+                type="CREDIT",
+                subtype="CREDIT_CARD",
+                creditData={"creditLimit": 15300, "balanceDueDate": "2026-08-06"},
+            )
+        ],
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+
+    service.sync_item(db_session, client, user.id, item.id)
+
+    account = service.list_accounts(db_session, user.id)[0]
+    assert account.limite_credito == Decimal("15300")
+    assert account.fatura_vencimento == date(2026, 8, 6)
+
+
+def test_sync_item_without_credit_data_leaves_credit_fields_none(db_session, user):
+    client = FakePluggyClient(item=_item_raw(), accounts=[_account_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+
+    service.sync_item(db_session, client, user.id, item.id)
+
+    account = service.list_accounts(db_session, user.id)[0]
+    assert account.limite_credito is None
+    assert account.fatura_vencimento is None
+
+
 def test_sync_item_writes_data_competencia_equal_to_data_on_resync(db_session, user):
     client = FakePluggyClient(
         item=_item_raw(),

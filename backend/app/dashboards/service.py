@@ -1,3 +1,4 @@
+from calendar import monthrange
 from dataclasses import dataclass
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
@@ -100,6 +101,7 @@ class SaldoConta:
     account_nome: str
     account_tipo: PluggyAccountTipo
     saldo: Decimal
+    limite_credito: Decimal | None = None
 
 
 def _to_decimal(value) -> Decimal:
@@ -565,9 +567,43 @@ def get_tendencia_por_passivo(
     ]
 
 
+def _subtract_month(d: date) -> date:
+    year = d.year
+    month = d.month - 1
+    if month == 0:
+        month = 12
+        year -= 1
+    day = min(d.day, monthrange(year, month)[1])
+    return date(year, month, day)
+
+
+def _fatura_atual(db: Session, account: PluggyAccount) -> Decimal:
+    # Janela auto-contida (vencimento anterior, vencimento atual] — a Pluggy
+    # não expõe data de fechamento de fatura nem um endpoint de bill/invoice
+    # separado (só accounts/transactions), então a soma dos itens ainda não
+    # pagos é aproximada por essa janela mensal ancorada no próprio
+    # vencimento (não depende de nenhum outro dado do sync).
+    inicio = _subtract_month(account.fatura_vencimento)
+    total = (
+        db.query(func.coalesce(func.sum(func.abs(PluggyTransaction.valor)), 0))
+        .filter(
+            PluggyTransaction.account_id == account.id,
+            PluggyTransaction.tipo == PluggyTransactionTipo.debito,
+            PluggyTransaction.data > inicio,
+            PluggyTransaction.data <= account.fatura_vencimento,
+        )
+        .scalar()
+    )
+    return _to_decimal(total)
+
+
 def get_saldo_por_conta(db: Session, user_id: int) -> list[SaldoConta]:
-    # Sempre snapshot atual (PluggyAccount.saldo) — sem parâmetro de período,
-    # mesmo padrão conceitual do campo `patrimonio` em /dashboards/summary.
+    # Sempre snapshot atual — sem parâmetro de período, mesmo padrão
+    # conceitual do campo `patrimonio` em /dashboards/summary. Para
+    # cartão de crédito com fatura_vencimento conhecido, mostra a soma dos
+    # itens da fatura ainda não paga (ver _fatura_atual) em vez do saldo
+    # bruto da conta; sem esse dado (conector não trouxe creditData), cai de
+    # volta pro saldo bruto — mesmo comportamento de antes desta sprint.
     accounts = (
         db.query(PluggyAccount)
         .filter(PluggyAccount.user_id == user_id)
@@ -579,7 +615,13 @@ def get_saldo_por_conta(db: Session, user_id: int) -> list[SaldoConta]:
             account_id=account.id,
             account_nome=account.apelido or account.nome,
             account_tipo=account.tipo,
-            saldo=account.saldo,
+            saldo=(
+                _fatura_atual(db, account)
+                if account.tipo == PluggyAccountTipo.cartao_credito
+                and account.fatura_vencimento is not None
+                else account.saldo
+            ),
+            limite_credito=account.limite_credito,
         )
         for account in accounts
     ]

@@ -90,6 +90,8 @@ class PluggyAccount(Base):
     saldo: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     moeda: Mapped[str] = mapped_column(String(10), nullable=False, default="BRL")
     sync_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    limite_credito: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    fatura_vencimento: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

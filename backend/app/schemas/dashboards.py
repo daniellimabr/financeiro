@@ -100,3 +100,4 @@ class SaldoContaOut(BaseModel):
     account_nome: str
     account_tipo: PluggyAccountTipo
     saldo: Decimal
+    limite_credito: Decimal | None

@@ -227,6 +227,19 @@ def _upsert_account(db: Session, item: PluggyItem, raw: dict) -> PluggyAccount:
     account.numero_mascarado = raw.get("number")
     account.saldo = Decimal(str(raw["balance"]))
     account.moeda = raw.get("currencyCode", "BRL")
+
+    credit_data = raw.get("creditData") or {}
+    account.limite_credito = (
+        Decimal(str(credit_data["creditLimit"]))
+        if credit_data.get("creditLimit") is not None
+        else None
+    )
+    account.fatura_vencimento = (
+        date.fromisoformat(credit_data["balanceDueDate"])
+        if credit_data.get("balanceDueDate")
+        else None
+    )
+
     db.flush()
     return account
 
