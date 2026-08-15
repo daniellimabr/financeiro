@@ -1,8 +1,10 @@
-// QA visual da Sprint 8 — tela nova de Gestão de Ativos (grid de cards, criar
-// ativo, abrir drill-down de gasto por ativo). Interações que mutariam dado
-// real da VM de dev (excluir, vender) são canceladas antes de qualquer
-// submissão — o ativo criado neste script é o único dado novo persistido, e
-// fica cadastrado propositalmente para inspeção manual do CEO.
+// QA visual da Sprint 8 — tela de Gestão de Ativos (grid de cards, criar
+// ativo, abrir drill-down de gasto por ativo, toggle despesa/receita).
+// Roda contra a VM de dev com a conta real do CEO — qualquer mutação que o
+// script fizer (o ativo que ele cria) é desfeita antes do script terminar,
+// via o próprio fluxo de exclusão da UI. Interações que mutariam um ativo
+// já existente (excluir, vender) são canceladas antes de qualquer
+// submissão e nunca tocam em cards que não foram criados por este script.
 
 import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
@@ -40,6 +42,9 @@ async function run(browser, viewport, label) {
     if (msg.type() === "error") consoleErrors.push(`[${label}] ${msg.text()}`);
   });
   page.on("pageerror", (err) => consoleErrors.push(`[${label}] pageerror: ${err.message}`));
+  // handleDelete() usa window.confirm — sem esse handler o Playwright
+  // descarta o dialog por padrão e a exclusão de limpeza nunca aconteceria.
+  page.on("dialog", (dialog) => dialog.accept());
 
   await page.goto(url, { waitUntil: "networkidle" });
   await page.getByRole("button", { name: "Ativos" }).click();
@@ -49,14 +54,15 @@ async function run(browser, viewport, label) {
     fullPage: true,
   });
 
-  // criar ativo (única mutação real — fica cadastrado para inspeção do CEO)
+  // criar ativo (única mutação real do script — desfeita no final via Excluir)
+  const nomeAtivo = `QA browser-check ${label}`;
   await page.getByRole("button", { name: "Novo ativo" }).click();
   await page.waitForTimeout(300);
   await page.screenshot({
     path: path.join(shotsDir, `${label}-sprint8-02-form-novo-ativo.png`),
     fullPage: true,
   });
-  await page.getByLabel("Nome").fill(`QA browser-check ${label}`);
+  await page.getByLabel("Nome").fill(nomeAtivo);
   await page.getByLabel("Tipo do ativo").selectOption("outro");
   await page.getByLabel("Valor atual").fill("1000");
   await page.getByLabel("Data de aquisição").fill("2026-01-15");
@@ -67,43 +73,60 @@ async function run(browser, viewport, label) {
     fullPage: true,
   });
 
-  // drill-down de gasto no período filtrado — agora fora do card, painel
-  // dash-funnel abaixo da grid (mesmo padrão do funil de Dashboards)
-  const verGasto = page.getByRole("button", { name: "Ver gasto no período" }).first();
-  if (await verGasto.count()) {
-    await verGasto.click();
+  // toda interação abaixo fica restrita ao card recém-criado — a listagem é
+  // alfabética, então "primeiro card"/"primeiro botão" na página quase
+  // sempre seria um ativo real do usuário, não este
+  const card = page.locator(".dash-tile").filter({ hasText: nomeAtivo });
+
+  try {
+    // drill-down de gasto no período filtrado — fora do card, painel
+    // dash-funnel abaixo da grid (mesmo padrão do funil de Dashboards)
+    const verGasto = card.getByRole("button", { name: "Ver gasto no período" });
+    if (await verGasto.count()) {
+      await verGasto.click();
+      await page.waitForTimeout(500);
+      await page.screenshot({
+        path: path.join(shotsDir, `${label}-sprint8-04-drilldown-despesa.png`),
+        fullPage: true,
+      });
+
+      // toggle despesa/receita — troca o total, a lista de transações e a
+      // sparkline dos cards simultaneamente
+      await page.getByRole("button", { name: "Receita" }).click();
+      await page.waitForTimeout(500);
+      await page.screenshot({
+        path: path.join(shotsDir, `${label}-sprint8-05-drilldown-receita.png`),
+        fullPage: true,
+      });
+      await page.getByRole("button", { name: "Despesa" }).click();
+      await page.waitForTimeout(300);
+
+      await page.getByRole("button", { name: "Fechar", exact: true }).click();
+      await page.waitForTimeout(300);
+    }
+
+    // vender — abre o diálogo, cancela sem submeter (não muta dado real)
+    const vender = card.getByRole("button", { name: "Vender" });
+    if (await vender.count()) {
+      await vender.click();
+      await page.waitForTimeout(300);
+      await page.screenshot({
+        path: path.join(shotsDir, `${label}-sprint8-06-dialogo-vender.png`),
+        fullPage: true,
+      });
+      await page.getByRole("button", { name: "Cancelar" }).click();
+      await page.waitForTimeout(300);
+    }
+  } finally {
+    // desfaz a única mutação real do script, mesmo que um passo acima tenha
+    // falhado — nunca deixa o ativo de QA para trás na conta do CEO
+    await card.getByRole("button", { name: "Excluir" }).click();
     await page.waitForTimeout(500);
-    await page.screenshot({
-      path: path.join(shotsDir, `${label}-sprint8-04-drilldown-despesa.png`),
-      fullPage: true,
-    });
-
-    // toggle despesa/receita — troca o total, a lista de transações e a
-    // sparkline dos cards simultaneamente
-    await page.getByRole("button", { name: "Receita" }).click();
-    await page.waitForTimeout(500);
-    await page.screenshot({
-      path: path.join(shotsDir, `${label}-sprint8-05-drilldown-receita.png`),
-      fullPage: true,
-    });
-    await page.getByRole("button", { name: "Despesa" }).click();
-    await page.waitForTimeout(300);
-
-    await page.getByRole("button", { name: "Fechar", exact: true }).click();
-    await page.waitForTimeout(300);
-  }
-
-  // vender — abre o diálogo, cancela sem submeter (não muta dado real)
-  const vender = page.getByRole("button", { name: "Vender" }).first();
-  if (await vender.count()) {
-    await vender.click();
-    await page.waitForTimeout(300);
-    await page.screenshot({
-      path: path.join(shotsDir, `${label}-sprint8-06-dialogo-vender.png`),
-      fullPage: true,
-    });
-    await page.getByRole("button", { name: "Cancelar" }).click();
-    await page.waitForTimeout(300);
+    if (await card.count()) {
+      consoleErrors.push(
+        `[${label}] limpeza falhou: card "${nomeAtivo}" ainda presente após excluir`
+      );
+    }
   }
 
   await context.close();
