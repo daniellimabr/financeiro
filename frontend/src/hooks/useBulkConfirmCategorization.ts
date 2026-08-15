@@ -1,13 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { setTransactionAsset } from "../api/categorization";
+import { bulkConfirm, type BulkConfirmItem } from "../api/categorization";
 
-export function useSetTransactionAsset() {
+export function useBulkConfirmCategorization() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ transactionId, assetId }: { transactionId: number; assetId: number | null }) =>
-      setTransactionAsset(transactionId, assetId),
+    mutationFn: (items: BulkConfirmItem[]) => bulkConfirm(items),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["categorizationTransactions"] });
     },

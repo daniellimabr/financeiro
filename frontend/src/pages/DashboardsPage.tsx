@@ -45,6 +45,7 @@ import { useDashboardCategoriaTendencia } from "../hooks/useDashboardCategoriaTe
 import { useDashboardSummary } from "../hooks/useDashboardSummary";
 import { useDashboardTendencia } from "../hooks/useDashboardTendencia";
 import { usePluggyTransactions } from "../hooks/usePluggyTransactions";
+import { formatCurrency } from "../utils/format";
 
 const MESES = [
   "Janeiro",
@@ -67,16 +68,6 @@ const ACCOUNT_TIPO_LABEL: Record<string, string> = {
   cartao_credito: "Cartão de crédito",
   investimento: "Investimento",
 };
-
-const currencyFormatter = new Intl.NumberFormat("pt-BR", {
-  style: "currency",
-  currency: "BRL",
-});
-
-function formatCurrency(value: string | undefined): string {
-  if (value === undefined) return "—";
-  return currencyFormatter.format(Number(value));
-}
 
 function formatPercent(value: string | number): string {
   return `${Number(value).toFixed(1)}%`;

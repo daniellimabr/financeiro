@@ -84,6 +84,28 @@ def list_accounts(db: Session, user_id: int) -> list[PluggyAccount]:
     )
 
 
+def get_account(db: Session, user_id: int, account_id: int) -> PluggyAccount:
+    account = (
+        db.query(PluggyAccount)
+        .filter(PluggyAccount.id == account_id, PluggyAccount.user_id == user_id)
+        .one_or_none()
+    )
+    if account is None:
+        raise NotFoundError(f"Conta {account_id} não encontrada")
+    return account
+
+
+def update_account(
+    db: Session, user_id: int, account_id: int, *, apelido: str | None, sync_enabled: bool
+) -> PluggyAccount:
+    account = get_account(db, user_id, account_id)
+    account.apelido = apelido
+    account.sync_enabled = sync_enabled
+    db.commit()
+    db.refresh(account)
+    return account
+
+
 def list_transactions(
     db: Session,
     user_id: int,
@@ -128,6 +150,16 @@ def sync_item(db: Session, client: PluggyClient, user_id: int, item_id: int) -> 
 
     accounts_raw = client.get_accounts(item.pluggy_item_id)
     for account_raw in accounts_raw:
+        existing = (
+            db.query(PluggyAccount)
+            .filter(PluggyAccount.pluggy_account_id == account_raw["id"])
+            .one_or_none()
+        )
+        if existing is not None and not existing.sync_enabled:
+            # Conta removida da lista de sync pelo usuário — nem saldo nem
+            # transações são atualizados enquanto sync_enabled=False.
+            continue
+
         account = _upsert_account(db, item, account_raw)
         transactions_raw = client.get_transactions(account_raw["id"], from_date=item.cutoff_date)
         for tx_raw in transactions_raw:
@@ -140,6 +172,33 @@ def sync_item(db: Session, client: PluggyClient, user_id: int, item_id: int) -> 
     db.commit()
     db.refresh(item)
     return item
+
+
+class SyncItemResult:
+    def __init__(
+        self, item_id: int, success: bool, error: str | None = None, item: PluggyItem | None = None
+    ):
+        self.item_id = item_id
+        self.success = success
+        self.error = error
+        self.item = item
+
+
+def sync_items(
+    db: Session, client: PluggyClient, user_id: int, item_ids: list[int] | None = None
+) -> list[SyncItemResult]:
+    ids = item_ids if item_ids is not None else [item.id for item in list_items(db, user_id)]
+
+    results: list[SyncItemResult] = []
+    for item_id in ids:
+        try:
+            synced = sync_item(db, client, user_id, item_id)
+            results.append(SyncItemResult(item_id, True, None, synced))
+        except NotFoundError as exc:
+            results.append(SyncItemResult(item_id, False, str(exc)))
+        except InvalidStateError as exc:
+            results.append(SyncItemResult(item_id, False, str(exc)))
+    return results
 
 
 def _upsert_account(db: Session, item: PluggyItem, raw: dict) -> PluggyAccount:

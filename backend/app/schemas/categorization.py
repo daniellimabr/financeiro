@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.pluggy import (
     PluggyTransactionCategorizacaoStatus,
@@ -10,13 +10,16 @@ from app.models.pluggy import (
 )
 
 
-class PendingTransactionOut(BaseModel):
+class TransactionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     account_id: int
     user_id: int
     descricao: str
+    descricao_usuario: str | None
+    descricao_sugerida: str | None
+    descricao_sugestao_origem_id: int | None
     valor: Decimal
     tipo: PluggyTransactionTipo
     data: date
@@ -34,16 +37,44 @@ class PendingTransactionOut(BaseModel):
     updated_at: datetime
 
 
-class PendingTransactionsPageOut(BaseModel):
-    items: list[PendingTransactionOut]
+class TransactionsPageOut(BaseModel):
+    items: list[TransactionOut]
     total: int
     page: int
     page_size: int
 
 
-class CategorizationConfirmIn(BaseModel):
+class CategoryIn(BaseModel):
     subcategory_id: int
 
 
 class AssetAssociationIn(BaseModel):
     asset_id: int | None = None
+
+
+class BulkConfirmItemIn(BaseModel):
+    transaction_id: int
+    subcategory_id: int
+
+
+class BulkConfirmIn(BaseModel):
+    items: list[BulkConfirmItemIn] = Field(min_length=1)
+
+
+class BulkConfirmResultOut(BaseModel):
+    transaction_id: int
+    success: bool
+    error: str | None = None
+
+
+class BulkConfirmOut(BaseModel):
+    results: list[BulkConfirmResultOut]
+
+
+class DescriptionUpdateIn(BaseModel):
+    descricao: str = Field(min_length=1, max_length=500)
+
+
+class DescriptionUpdateOut(BaseModel):
+    transaction: TransactionOut
+    propagated: int

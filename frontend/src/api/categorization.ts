@@ -1,12 +1,18 @@
 import { apiFetch } from "./client";
 
-export interface PendingTransaction {
+export type CategorizationStatus = "pendente" | "confirmada" | "todas";
+export type TransactionTipo = "debito" | "credito";
+
+export interface CategorizedTransaction {
   id: number;
   account_id: number;
   user_id: number;
   descricao: string;
+  descricao_usuario: string | null;
+  descricao_sugerida: string | null;
+  descricao_sugestao_origem_id: number | null;
   valor: string;
-  tipo: string;
+  tipo: TransactionTipo;
   data: string;
   status: string;
   categorizacao_status: string;
@@ -22,14 +28,16 @@ export interface PendingTransaction {
   updated_at: string;
 }
 
-export interface PendingTransactionsPage {
-  items: PendingTransaction[];
+export interface TransactionsPage {
+  items: CategorizedTransaction[];
   total: number;
   page: number;
   page_size: number;
 }
 
-export interface PendingCategorizationsFilter {
+export interface TransactionsFilter {
+  status?: CategorizationStatus;
+  tipo?: TransactionTipo;
   ano?: number;
   mes?: number;
   page?: number;
@@ -45,33 +53,95 @@ function buildQuery(params: Record<string, string | number | undefined>): string
   return query ? `?${query}` : "";
 }
 
-export function fetchPendingCategorizations(
-  filter: PendingCategorizationsFilter = {}
-): Promise<PendingTransactionsPage> {
-  const { ano, mes, page, pageSize } = filter;
-  return apiFetch<PendingTransactionsPage>(
-    `/categorization/pending${buildQuery({ ano, mes, page, page_size: pageSize })}`
+export function fetchTransactions(filter: TransactionsFilter = {}): Promise<TransactionsPage> {
+  const { status, tipo, ano, mes, page, pageSize } = filter;
+  return apiFetch<TransactionsPage>(
+    `/categorization/transactions${buildQuery({ status, tipo, ano, mes, page, page_size: pageSize })}`
   );
 }
 
-export function confirmCategorization(
+export function setCategory(
   transactionId: number,
   subcategoryId: number
-): Promise<PendingTransaction> {
-  return apiFetch<PendingTransaction>(`/categorization/pending/${transactionId}/confirm`, {
+): Promise<CategorizedTransaction> {
+  return apiFetch<CategorizedTransaction>(
+    `/categorization/transactions/${transactionId}/category`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subcategory_id: subcategoryId }),
+    }
+  );
+}
+
+export interface BulkConfirmItem {
+  transactionId: number;
+  subcategoryId: number;
+}
+
+export interface BulkConfirmResult {
+  transaction_id: number;
+  success: boolean;
+  error: string | null;
+}
+
+export function bulkConfirm(items: BulkConfirmItem[]): Promise<{ results: BulkConfirmResult[] }> {
+  return apiFetch<{ results: BulkConfirmResult[] }>("/categorization/transactions/bulk-confirm", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ subcategory_id: subcategoryId }),
+    body: JSON.stringify({
+      items: items.map((item) => ({
+        transaction_id: item.transactionId,
+        subcategory_id: item.subcategoryId,
+      })),
+    }),
   });
 }
 
 export function setTransactionAsset(
   transactionId: number,
   assetId: number | null
-): Promise<PendingTransaction> {
-  return apiFetch<PendingTransaction>(`/categorization/pending/${transactionId}/asset`, {
+): Promise<CategorizedTransaction> {
+  return apiFetch<CategorizedTransaction>(`/categorization/transactions/${transactionId}/asset`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ asset_id: assetId }),
   });
+}
+
+export interface DescriptionUpdateResult {
+  transaction: CategorizedTransaction;
+  propagated: number;
+}
+
+export function updateDescription(
+  transactionId: number,
+  descricao: string
+): Promise<DescriptionUpdateResult> {
+  return apiFetch<DescriptionUpdateResult>(
+    `/categorization/transactions/${transactionId}/description`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ descricao }),
+    }
+  );
+}
+
+export function confirmDescriptionSuggestion(
+  transactionId: number
+): Promise<CategorizedTransaction> {
+  return apiFetch<CategorizedTransaction>(
+    `/categorization/transactions/${transactionId}/description/confirm`,
+    { method: "POST" }
+  );
+}
+
+export function dismissDescriptionSuggestion(
+  transactionId: number
+): Promise<CategorizedTransaction> {
+  return apiFetch<CategorizedTransaction>(
+    `/categorization/transactions/${transactionId}/description/dismiss`,
+    { method: "POST" }
+  );
 }

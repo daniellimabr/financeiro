@@ -48,11 +48,33 @@ class PluggyAccountOut(BaseModel):
     pluggy_account_id: str
     tipo: PluggyAccountTipo
     nome: str
+    apelido: str | None
     numero_mascarado: str | None
     saldo: Decimal
     moeda: str
+    sync_enabled: bool
     created_at: datetime
     updated_at: datetime
+
+
+class PluggyAccountUpdateIn(BaseModel):
+    apelido: str | None = None
+    sync_enabled: bool = True
+
+
+class SyncItemsIn(BaseModel):
+    item_ids: list[int] | None = None
+
+
+class SyncItemResultOut(BaseModel):
+    item_id: int
+    success: bool
+    error: str | None = None
+    item: PluggyItemOut | None = None
+
+
+class SyncItemsOut(BaseModel):
+    results: list[SyncItemResultOut]
 
 
 class PluggyTransactionOut(BaseModel):

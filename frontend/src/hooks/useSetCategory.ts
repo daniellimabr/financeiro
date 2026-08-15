@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { confirmCategorization } from "../api/categorization";
+import { setCategory } from "../api/categorization";
 
-export function useConfirmCategorization() {
+export function useSetCategory() {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -12,9 +12,9 @@ export function useConfirmCategorization() {
     }: {
       transactionId: number;
       subcategoryId: number;
-    }) => confirmCategorization(transactionId, subcategoryId),
+    }) => setCategory(transactionId, subcategoryId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["pendingCategorizations"] });
+      queryClient.invalidateQueries({ queryKey: ["categorizationTransactions"] });
     },
   });
 }

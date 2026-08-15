@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import event
 
 from app.categorization import service
-from app.exceptions import NotFoundError
+from app.exceptions import InvalidStateError, NotFoundError
 from app.models.asset import Asset, AssetTipo
 from app.models.categorization import CategorizationRule
 from app.models.category import CategoryGroup, Subcategory
@@ -66,7 +66,17 @@ def _subcategory(db_session, nome="Comer fora"):
     return s
 
 
-def _pending_transaction(db_session, user, descricao="Mercado Sao Joao"):
+def _transaction(
+    db_session,
+    user,
+    descricao="Mercado Sao Joao",
+    *,
+    tipo=PluggyTransactionTipo.debito,
+    status_categorizacao=PluggyTransactionCategorizacaoStatus.pendente,
+    subcategory_id=None,
+    subcategoria_sugerida_id=None,
+    data=date(2026, 1, 15),
+):
     n = next(_SEQ)
     item = PluggyItem(
         user_id=user.id,
@@ -94,9 +104,12 @@ def _pending_transaction(db_session, user, descricao="Mercado Sao Joao"):
         pluggy_transaction_id=f"tx-{n}",
         descricao=descricao,
         valor=Decimal("-10.00"),
-        tipo=PluggyTransactionTipo.debito,
-        data=date(2026, 1, 15),
+        tipo=tipo,
+        data=data,
         status=PluggyTransactionStatus.efetivada,
+        categorizacao_status=status_categorizacao,
+        subcategory_id=subcategory_id,
+        subcategoria_sugerida_id=subcategoria_sugerida_id,
     )
     db_session.add(tx)
     db_session.commit()
@@ -104,9 +117,24 @@ def _pending_transaction(db_session, user, descricao="Mercado Sao Joao"):
     return tx
 
 
-def test_list_pending_transactions_applies_suggestion_but_never_confirms(
-    db_session, user, subcategory
-):
+def _pending_transaction(db_session, user, descricao="Mercado Sao Joao"):
+    return _transaction(db_session, user, descricao)
+
+
+def _confirmed_transaction(db_session, user, subcategory, descricao):
+    return _transaction(
+        db_session,
+        user,
+        descricao,
+        status_categorizacao=PluggyTransactionCategorizacaoStatus.confirmada,
+        subcategory_id=subcategory.id,
+    )
+
+
+# --- list_transactions -------------------------------------------------
+
+
+def test_list_transactions_applies_suggestion_but_never_confirms(db_session, user, subcategory):
     db_session.add(
         CategorizationRule(
             user_id=user.id,
@@ -120,48 +148,86 @@ def test_list_pending_transactions_applies_suggestion_but_never_confirms(
     tx = _pending_transaction(db_session, user, "Mercado Sao Joao")
 
     for _ in range(2):
-        pending, total = service.list_pending_transactions(db_session, user.id)
+        items, total = service.list_transactions(db_session, user.id, status="pendente")
         assert total == 1
-        assert len(pending) == 1
-        result = pending[0]
+        assert len(items) == 1
+        result = items[0]
         assert result.id == tx.id
         assert result.subcategoria_sugerida_id == subcategory.id
         assert result.sugestao_fonte_tipo == "regra"
         assert result.subcategory_id is None
-        assert result.asset_id is None
         assert result.categorizacao_status == PluggyTransactionCategorizacaoStatus.pendente
 
 
-def test_list_pending_transactions_isolated_by_user_and_status(db_session, user, other_user):
+def test_list_transactions_isolated_by_user(db_session, user, other_user):
     _pending_transaction(db_session, other_user, "Outra transacao")
 
-    pending, total = service.list_pending_transactions(db_session, user.id)
-    assert pending == []
+    items, total = service.list_transactions(db_session, user.id)
+    assert items == []
     assert total == 0
 
 
-def test_list_pending_transactions_filters_by_ano_mes(db_session, user):
+def test_list_transactions_default_status_returns_pending_and_confirmed(
+    db_session, user, subcategory
+):
+    _pending_transaction(db_session, user, "Pendente")
+    _confirmed_transaction(db_session, user, subcategory, "Confirmada")
+
+    items, total = service.list_transactions(db_session, user.id)
+
+    assert total == 2
+
+
+def test_list_transactions_status_pendente_excludes_confirmed(db_session, user, subcategory):
+    tx_pendente = _pending_transaction(db_session, user, "Pendente")
+    _confirmed_transaction(db_session, user, subcategory, "Confirmada")
+
+    items, total = service.list_transactions(db_session, user.id, status="pendente")
+
+    assert total == 1
+    assert [tx.id for tx in items] == [tx_pendente.id]
+
+
+def test_list_transactions_status_confirmada_excludes_pending(db_session, user, subcategory):
+    _pending_transaction(db_session, user, "Pendente")
+    tx_confirmada = _confirmed_transaction(db_session, user, subcategory, "Confirmada")
+
+    items, total = service.list_transactions(db_session, user.id, status="confirmada")
+
+    assert total == 1
+    assert [tx.id for tx in items] == [tx_confirmada.id]
+
+
+def test_list_transactions_filters_by_tipo(db_session, user):
+    tx_debito = _transaction(db_session, user, "Debito", tipo=PluggyTransactionTipo.debito)
+    _transaction(db_session, user, "Credito", tipo=PluggyTransactionTipo.credito)
+
+    items, total = service.list_transactions(db_session, user.id, tipo=PluggyTransactionTipo.debito)
+
+    assert total == 1
+    assert [tx.id for tx in items] == [tx_debito.id]
+
+
+def test_list_transactions_filters_by_ano_mes(db_session, user):
     tx_jan = _pending_transaction(db_session, user, "Compra janeiro")
     tx_jan.data = date(2026, 1, 10)
     tx_fev = _pending_transaction(db_session, user, "Compra fevereiro")
     tx_fev.data = date(2026, 2, 10)
     db_session.commit()
 
-    pending, total = service.list_pending_transactions(db_session, user.id, ano=2026, mes=1)
+    items, total = service.list_transactions(db_session, user.id, ano=2026, mes=1)
 
     assert total == 1
-    assert [tx.id for tx in pending] == [tx_jan.id]
+    assert [tx.id for tx in items] == [tx_jan.id]
     del tx_fev
 
 
-def test_list_pending_transactions_paginates(db_session, user):
+def test_list_transactions_paginates(db_session, user):
     for i in range(5):
         _pending_transaction(db_session, user, f"Pendente {i}")
 
-    first_page, total = service.list_pending_transactions(db_session, user.id, page=1, page_size=2)
-    second_page, total_again = service.list_pending_transactions(
-        db_session, user.id, page=2, page_size=2
-    )
+    first_page, total = service.list_transactions(db_session, user.id, page=1, page_size=2)
+    second_page, total_again = service.list_transactions(db_session, user.id, page=2, page_size=2)
 
     assert total == 5
     assert total_again == 5
@@ -170,56 +236,9 @@ def test_list_pending_transactions_paginates(db_session, user):
     assert {tx.id for tx in first_page}.isdisjoint({tx.id for tx in second_page})
 
 
-def _confirmed_transaction(db_session, user, subcategory, descricao):
-    n = next(_SEQ)
-    item = PluggyItem(
-        user_id=user.id,
-        pluggy_item_id=f"item-hist-{n}",
-        connector_id=1,
-        connector_name="Banco Fake",
-        status=PluggyItemStatus.updated,
-        cutoff_date=date(2026, 1, 1),
-    )
-    db_session.add(item)
-    db_session.flush()
-    account = PluggyAccount(
-        item_id=item.id,
-        user_id=user.id,
-        pluggy_account_id=f"acc-hist-{n}",
-        tipo=PluggyAccountTipo.corrente,
-        nome="Conta",
-        saldo=Decimal("0"),
-    )
-    db_session.add(account)
-    db_session.flush()
-    tx = PluggyTransaction(
-        account_id=account.id,
-        user_id=user.id,
-        pluggy_transaction_id=f"tx-hist-{n}",
-        descricao=descricao,
-        valor=Decimal("-10.00"),
-        tipo=PluggyTransactionTipo.debito,
-        data=date(2026, 1, 15),
-        status=PluggyTransactionStatus.efetivada,
-        categorizacao_status=PluggyTransactionCategorizacaoStatus.confirmada,
-        subcategory_id=subcategory.id,
-    )
-    db_session.add(tx)
-    db_session.commit()
-    db_session.refresh(tx)
-    return tx
-
-
-def test_list_pending_transactions_query_count_does_not_scale_with_pending_count(
+def test_list_transactions_query_count_does_not_scale_with_pending_count(
     db_session, user, subcategory
 ):
-    # Regressão: antes da correção, cada transação pendente disparava sua
-    # própria busca de histórico confirmado (para a camada de similaridade) —
-    # o número de queries crescia linearmente com o tamanho da fila, o que na
-    # prática (centenas de pendências reais) tornava a tela "eternamente"
-    # lenta. Agora histórico/regras/ativos são buscados uma única vez por
-    # chamada, então o total de queries fica limitado independente de quantas
-    # transações estão pendentes.
     for i in range(5):
         _confirmed_transaction(db_session, user, subcategory, f"Historico confirmado {i}")
     for i in range(20):
@@ -234,65 +253,127 @@ def test_list_pending_transactions_query_count_does_not_scale_with_pending_count
 
     event.listen(bind, "before_cursor_execute", _count_selects)
     try:
-        result, total = service.list_pending_transactions(db_session, user.id, page_size=20)
+        result, total = service.list_transactions(
+            db_session, user.id, status="pendente", page_size=20
+        )
     finally:
         event.remove(bind, "before_cursor_execute", _count_selects)
 
-    # Custo esperado: 1 query de COUNT + 1 query para a página de pendentes +
-    # 3 para os índices de regras/histórico/ativos (buscados uma única vez
-    # por chamada) + 1 SELECT de refresh por transação (necessário para
-    # pegar `updated_at` gerado pelo banco) — ou seja, ~1x por pendência,
-    # nunca ~4x. Antes da correção cada pendência também requeria seu
-    # próprio histórico/regras/ativos, então o total ficava perto de 4x por
-    # pendência (~81 para 20 pendências); o limite abaixo falha nesse
-    # cenário antigo e passa no atual.
     assert len(result) == 20
     assert total == 20
     assert select_count["n"] < 2 * len(result) + 10
 
 
-def test_confirm_categorization_sets_fields_and_removes_from_pending(db_session, user, subcategory):
+# --- set_category --------------------------------------------------------
+
+
+def test_set_category_sets_fields_and_removes_from_pending(db_session, user, subcategory):
     tx = _pending_transaction(db_session, user)
 
-    confirmed = service.confirm_categorization(db_session, user.id, tx.id, subcategory.id)
+    confirmed = service.set_category(db_session, user.id, tx.id, subcategory.id)
 
     assert confirmed.subcategory_id == subcategory.id
     assert confirmed.categorizacao_status == PluggyTransactionCategorizacaoStatus.confirmada
-    pending, total = service.list_pending_transactions(db_session, user.id)
-    assert pending == []
+    items, total = service.list_transactions(db_session, user.id, status="pendente")
+    assert items == []
     assert total == 0
 
 
-def test_confirm_categorization_can_be_reedited_with_different_subcategory(
+def test_set_category_on_already_confirmed_transaction_updates_it(
     db_session, user, subcategory, other_subcategory
 ):
-    tx = _pending_transaction(db_session, user)
-    service.confirm_categorization(db_session, user.id, tx.id, subcategory.id)
+    tx = _confirmed_transaction(db_session, user, subcategory, "Ja confirmada")
 
-    reedited = service.confirm_categorization(db_session, user.id, tx.id, other_subcategory.id)
+    updated = service.set_category(db_session, user.id, tx.id, other_subcategory.id)
 
-    assert reedited.subcategory_id == other_subcategory.id
+    assert updated.subcategory_id == other_subcategory.id
+    assert updated.categorizacao_status == PluggyTransactionCategorizacaoStatus.confirmada
 
 
-def test_confirm_categorization_missing_transaction_raises_not_found(db_session, user, subcategory):
+def test_set_category_missing_transaction_raises_not_found(db_session, user, subcategory):
     with pytest.raises(NotFoundError):
-        service.confirm_categorization(db_session, user.id, 999, subcategory.id)
+        service.set_category(db_session, user.id, 999, subcategory.id)
 
 
-def test_confirm_categorization_other_users_transaction_raises_not_found(
+def test_set_category_other_users_transaction_raises_not_found(
     db_session, user, other_user, subcategory
 ):
     tx = _pending_transaction(db_session, other_user)
 
     with pytest.raises(NotFoundError):
-        service.confirm_categorization(db_session, user.id, tx.id, subcategory.id)
+        service.set_category(db_session, user.id, tx.id, subcategory.id)
 
 
-def test_confirm_categorization_invalid_subcategory_raises_not_found(db_session, user):
+def test_set_category_invalid_subcategory_raises_not_found(db_session, user):
     tx = _pending_transaction(db_session, user)
 
     with pytest.raises(NotFoundError):
-        service.confirm_categorization(db_session, user.id, tx.id, 999)
+        service.set_category(db_session, user.id, tx.id, 999)
+
+
+# --- bulk_confirm ---------------------------------------------------------
+
+
+def test_bulk_confirm_confirms_all_valid_rows(db_session, user, subcategory, other_subcategory):
+    tx1 = _pending_transaction(db_session, user, "Um")
+    tx2 = _pending_transaction(db_session, user, "Dois")
+
+    results = service.bulk_confirm(
+        db_session, user.id, [(tx1.id, subcategory.id), (tx2.id, other_subcategory.id)]
+    )
+
+    assert all(r.success for r in results)
+    db_session.refresh(tx1)
+    db_session.refresh(tx2)
+    assert tx1.subcategory_id == subcategory.id
+    assert tx1.categorizacao_status == PluggyTransactionCategorizacaoStatus.confirmada
+    assert tx2.subcategory_id == other_subcategory.id
+
+
+def test_bulk_confirm_invalid_row_does_not_block_the_rest(db_session, user, subcategory):
+    tx_valid = _pending_transaction(db_session, user, "Valida")
+
+    results = service.bulk_confirm(
+        db_session, user.id, [(tx_valid.id, subcategory.id), (999, subcategory.id)]
+    )
+
+    by_id = {r.transaction_id: r for r in results}
+    assert by_id[tx_valid.id].success is True
+    assert by_id[999].success is False
+    db_session.refresh(tx_valid)
+    assert tx_valid.categorizacao_status == PluggyTransactionCategorizacaoStatus.confirmada
+
+
+def test_bulk_confirm_invalid_subcategory_reports_failure_without_blocking_rest(
+    db_session, user, subcategory
+):
+    tx_valid = _pending_transaction(db_session, user, "Valida")
+    tx_invalid_subcat = _pending_transaction(db_session, user, "Categoria invalida")
+
+    results = service.bulk_confirm(
+        db_session, user.id, [(tx_valid.id, subcategory.id), (tx_invalid_subcat.id, 999)]
+    )
+
+    by_id = {r.transaction_id: r for r in results}
+    assert by_id[tx_valid.id].success is True
+    assert by_id[tx_invalid_subcat.id].success is False
+    db_session.refresh(tx_invalid_subcat)
+    assert tx_invalid_subcat.categorizacao_status == PluggyTransactionCategorizacaoStatus.pendente
+
+
+def test_bulk_confirm_other_users_transaction_fails_without_leaking(
+    db_session, user, other_user, subcategory
+):
+    tx_other = _pending_transaction(db_session, other_user, "De outro usuario")
+
+    results = service.bulk_confirm(db_session, user.id, [(tx_other.id, subcategory.id)])
+
+    assert results[0].success is False
+    db_session.refresh(tx_other)
+    assert tx_other.categorizacao_status == PluggyTransactionCategorizacaoStatus.pendente
+
+
+# --- set_transaction_asset -------------------------------------------------
 
 
 def test_set_transaction_asset_sets_and_clears(db_session, user):
@@ -335,3 +416,190 @@ def test_set_transaction_asset_other_users_asset_raises_not_found(db_session, us
 def test_set_transaction_asset_missing_transaction_raises_not_found(db_session, user):
     with pytest.raises(NotFoundError):
         service.set_transaction_asset(db_session, user.id, 999, None)
+
+
+# --- update_description / propagation --------------------------------------
+
+
+def test_update_description_sets_descricao_usuario_immediately(db_session, user, subcategory):
+    tx = _confirmed_transaction(db_session, user, subcategory, "PADARIA DO ZE 1234")
+
+    updated, propagated = service.update_description(db_session, user.id, tx.id, "Padaria do Zé")
+
+    assert updated.descricao_usuario == "Padaria do Zé"
+    assert propagated == 0
+
+
+def test_update_description_propagates_to_identical_description_and_same_category(
+    db_session, user, subcategory
+):
+    origem = _confirmed_transaction(db_session, user, subcategory, "PADARIA DO ZE 1234")
+    candidato = _confirmed_transaction(db_session, user, subcategory, "Padaria do Ze 5678")
+
+    _, propagated = service.update_description(db_session, user.id, origem.id, "Padaria do Zé")
+
+    assert propagated == 1
+    db_session.refresh(candidato)
+    assert candidato.descricao_sugerida == "Padaria do Zé"
+    assert candidato.descricao_sugestao_origem_id == origem.id
+    assert candidato.descricao_usuario is None  # não aplicado até aprovação
+
+
+def test_update_description_does_not_propagate_to_different_description(
+    db_session, user, subcategory
+):
+    origem = _confirmed_transaction(db_session, user, subcategory, "PADARIA DO ZE 1234")
+    outro = _confirmed_transaction(db_session, user, subcategory, "Mercado Extra 9999")
+
+    _, propagated = service.update_description(db_session, user.id, origem.id, "Padaria do Zé")
+
+    assert propagated == 0
+    db_session.refresh(outro)
+    assert outro.descricao_sugerida is None
+
+
+def test_update_description_does_not_propagate_to_different_category(db_session, user, other_user):
+    grupo_a = _subcategory(db_session, nome="Alimentação")
+    grupo_b = _subcategory(db_session, nome="Outra categoria")
+    origem = _confirmed_transaction(db_session, user, grupo_a, "PADARIA DO ZE 1234")
+    candidato_categoria_diferente = _confirmed_transaction(
+        db_session, user, grupo_b, "Padaria do Ze 5678"
+    )
+
+    _, propagated = service.update_description(db_session, user.id, origem.id, "Padaria do Zé")
+
+    assert propagated == 0
+    db_session.refresh(candidato_categoria_diferente)
+    assert candidato_categoria_diferente.descricao_sugerida is None
+
+
+def test_update_description_never_crosses_user_id(db_session, user, other_user, subcategory):
+    origem = _confirmed_transaction(db_session, user, subcategory, "PADARIA DO ZE 1234")
+    candidato_outro_usuario = _confirmed_transaction(
+        db_session, other_user, subcategory, "Padaria do Ze 5678"
+    )
+
+    _, propagated = service.update_description(db_session, user.id, origem.id, "Padaria do Zé")
+
+    assert propagated == 0
+    db_session.refresh(candidato_outro_usuario)
+    assert candidato_outro_usuario.descricao_sugerida is None
+
+
+def test_update_description_matches_by_suggested_category_when_not_confirmed(
+    db_session, user, subcategory
+):
+    origem = _transaction(
+        db_session,
+        user,
+        "PADARIA DO ZE 1234",
+        status_categorizacao=PluggyTransactionCategorizacaoStatus.pendente,
+        subcategoria_sugerida_id=subcategory.id,
+    )
+    candidato = _transaction(
+        db_session,
+        user,
+        "Padaria do Ze 5678",
+        status_categorizacao=PluggyTransactionCategorizacaoStatus.pendente,
+        subcategoria_sugerida_id=subcategory.id,
+    )
+
+    _, propagated = service.update_description(db_session, user.id, origem.id, "Padaria do Zé")
+
+    assert propagated == 1
+    db_session.refresh(candidato)
+    assert candidato.descricao_sugerida == "Padaria do Zé"
+
+
+def test_update_description_without_category_does_not_propagate(db_session, user):
+    origem = _pending_transaction(db_session, user, "PADARIA DO ZE 1234")
+    candidato = _pending_transaction(db_session, user, "Padaria do Ze 5678")
+
+    _, propagated = service.update_description(db_session, user.id, origem.id, "Padaria do Zé")
+
+    assert propagated == 0
+    db_session.refresh(candidato)
+    assert candidato.descricao_sugerida is None
+
+
+def test_update_description_second_origin_does_not_overwrite_pending_suggestion(
+    db_session, user, subcategory
+):
+    origem_1 = _confirmed_transaction(db_session, user, subcategory, "PADARIA DO ZE 1234")
+    candidato = _confirmed_transaction(db_session, user, subcategory, "Padaria do Ze 9999")
+
+    service.update_description(db_session, user.id, origem_1.id, "Padaria do Zé (bairro)")
+    db_session.refresh(candidato)
+    assert candidato.descricao_sugerida == "Padaria do Zé (bairro)"
+    assert candidato.descricao_sugestao_origem_id == origem_1.id
+
+    # Uma segunda transação de origem com a MESMA descrição normalizada da
+    # candidata (que já tem sugestão pendente) não deve sobrescrever a
+    # sugestão já gravada — "a primeira grava, a segunda não sobrescreve".
+    outra_origem = _confirmed_transaction(db_session, user, subcategory, "Padaria do Ze 9999")
+    service.update_description(db_session, user.id, outra_origem.id, "Outra sugestao")
+    db_session.refresh(candidato)
+    assert candidato.descricao_sugerida == "Padaria do Zé (bairro)"
+    assert candidato.descricao_sugestao_origem_id == origem_1.id
+
+
+def test_update_description_missing_transaction_raises_not_found(db_session, user):
+    with pytest.raises(NotFoundError):
+        service.update_description(db_session, user.id, 999, "Nova descricao")
+
+
+def test_update_description_other_users_transaction_raises_not_found(db_session, user, other_user):
+    tx = _pending_transaction(db_session, other_user)
+
+    with pytest.raises(NotFoundError):
+        service.update_description(db_session, user.id, tx.id, "Nova descricao")
+
+
+# --- confirm/dismiss description suggestion --------------------------------
+
+
+def test_confirm_description_suggestion_applies_and_clears(db_session, user, subcategory):
+    origem = _confirmed_transaction(db_session, user, subcategory, "PADARIA DO ZE 1234")
+    candidato = _confirmed_transaction(db_session, user, subcategory, "Padaria do Ze 5678")
+    service.update_description(db_session, user.id, origem.id, "Padaria do Zé")
+
+    confirmed = service.confirm_description_suggestion(db_session, user.id, candidato.id)
+
+    assert confirmed.descricao_usuario == "Padaria do Zé"
+    assert confirmed.descricao_sugerida is None
+    assert confirmed.descricao_sugestao_origem_id is None
+
+
+def test_dismiss_description_suggestion_clears_without_applying(db_session, user, subcategory):
+    origem = _confirmed_transaction(db_session, user, subcategory, "PADARIA DO ZE 1234")
+    candidato = _confirmed_transaction(db_session, user, subcategory, "Padaria do Ze 5678")
+    service.update_description(db_session, user.id, origem.id, "Padaria do Zé")
+
+    dismissed = service.dismiss_description_suggestion(db_session, user.id, candidato.id)
+
+    assert dismissed.descricao_usuario is None
+    assert dismissed.descricao_sugerida is None
+    assert dismissed.descricao_sugestao_origem_id is None
+
+
+def test_confirm_description_suggestion_without_pending_raises_invalid_state(db_session, user):
+    tx = _pending_transaction(db_session, user)
+
+    with pytest.raises(InvalidStateError):
+        service.confirm_description_suggestion(db_session, user.id, tx.id)
+
+
+def test_dismiss_description_suggestion_without_pending_raises_invalid_state(db_session, user):
+    tx = _pending_transaction(db_session, user)
+
+    with pytest.raises(InvalidStateError):
+        service.dismiss_description_suggestion(db_session, user.id, tx.id)
+
+
+def test_confirm_description_suggestion_other_users_transaction_raises_not_found(
+    db_session, user, other_user
+):
+    tx = _pending_transaction(db_session, other_user)
+
+    with pytest.raises(NotFoundError):
+        service.confirm_description_suggestion(db_session, user.id, tx.id)

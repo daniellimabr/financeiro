@@ -13,9 +13,13 @@ from app.schemas.pluggy import (
     ConnectTokenIn,
     ConnectTokenOut,
     PluggyAccountOut,
+    PluggyAccountUpdateIn,
     PluggyItemIn,
     PluggyItemOut,
     PluggyTransactionOut,
+    SyncItemResultOut,
+    SyncItemsIn,
+    SyncItemsOut,
 )
 
 router = APIRouter(prefix="/pluggy")
@@ -77,6 +81,41 @@ def sync_item(
 @router.get("/accounts", response_model=list[PluggyAccountOut])
 def list_accounts(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return service.list_accounts(db, current_user.id)
+
+
+@router.put("/accounts/{account_id}", response_model=PluggyAccountOut)
+def update_account(
+    account_id: int,
+    payload: PluggyAccountUpdateIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return service.update_account(
+            db,
+            current_user.id,
+            account_id,
+            apelido=payload.apelido,
+            sync_enabled=payload.sync_enabled,
+        )
+    except NotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post("/sync", response_model=SyncItemsOut)
+def sync_items(
+    payload: SyncItemsIn = SyncItemsIn(),
+    db: Session = Depends(get_db),
+    client: PluggyClient = Depends(get_pluggy_client),
+    current_user: User = Depends(get_current_user),
+):
+    results = service.sync_items(db, client, current_user.id, payload.item_ids)
+    return SyncItemsOut(
+        results=[
+            SyncItemResultOut(item_id=r.item_id, success=r.success, error=r.error, item=r.item)
+            for r in results
+        ]
+    )
 
 
 @router.get("/transactions", response_model=list[PluggyTransactionOut])

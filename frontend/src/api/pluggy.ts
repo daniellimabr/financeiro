@@ -25,9 +25,11 @@ export interface PluggyAccount {
   pluggy_account_id: string;
   tipo: string;
   nome: string;
+  apelido: string | null;
   numero_mascarado: string | null;
   saldo: string;
   moeda: string;
+  sync_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -75,6 +77,32 @@ export function syncPluggyItem(itemId: number): Promise<PluggyItem> {
 
 export function fetchPluggyAccounts(): Promise<PluggyAccount[]> {
   return apiFetch<PluggyAccount[]>("/pluggy/accounts");
+}
+
+export function updatePluggyAccount(
+  accountId: number,
+  payload: { apelido: string | null; syncEnabled: boolean }
+): Promise<PluggyAccount> {
+  return apiFetch<PluggyAccount>(`/pluggy/accounts/${accountId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ apelido: payload.apelido, sync_enabled: payload.syncEnabled }),
+  });
+}
+
+export interface SyncItemResult {
+  item_id: number;
+  success: boolean;
+  error: string | null;
+  item: PluggyItem | null;
+}
+
+export function syncPluggyItems(itemIds?: number[]): Promise<{ results: SyncItemResult[] }> {
+  return apiFetch<{ results: SyncItemResult[] }>("/pluggy/sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ item_ids: itemIds ?? null }),
+  });
 }
 
 export interface PluggyTransactionFilters {

@@ -399,3 +399,109 @@ def test_list_transactions_combined_filters_isolated_by_user(client, db_session)
     body = response.json()
     assert len(body) == 1
     assert Decimal(body[0]["valor"]) == Decimal("-10.00")
+
+
+# --- PUT /pluggy/accounts/{id} e POST /pluggy/sync (Sprint 7) --------------
+
+
+def _account_raw_payload(**overrides):
+    data = {
+        "id": "acc-ext-1",
+        "type": "BANK",
+        "subtype": "CHECKING_ACCOUNT",
+        "name": "Conta Corrente",
+        "number": "1234",
+        "balance": 100.50,
+        "currencyCode": "BRL",
+    }
+    data.update(overrides)
+    return data
+
+
+def _connect_account(client, db_session):
+    fake_client = FakePluggyClient(
+        accounts=[_account_raw_payload()],
+        transactions_by_account={"acc-ext-1": []},
+    )
+    _use_fake_client(fake_client)
+    item = client.post("/pluggy/items", json={"pluggy_item_id": "item-ext-1"}).json()
+    client.post(f"/pluggy/items/{item['id']}/sync")
+    account = client.get("/pluggy/accounts").json()[0]
+    return item, account, fake_client
+
+
+def test_update_account_without_cookie_returns_401(client):
+    response = client.put("/pluggy/accounts/1", json={"apelido": "X", "sync_enabled": True})
+    assert response.status_code == 401
+
+
+def test_sync_without_cookie_returns_401(client):
+    response = client.post("/pluggy/sync", json={})
+    assert response.status_code == 401
+
+
+def test_update_account_sets_apelido_and_sync_enabled(client, db_session):
+    _authenticate(client, db_session)
+    _, account, _fake_client = _connect_account(client, db_session)
+
+    response = client.put(
+        f"/pluggy/accounts/{account['id']}",
+        json={"apelido": "Conta principal", "sync_enabled": False},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["apelido"] == "Conta principal"
+    assert body["sync_enabled"] is False
+
+
+def test_update_other_users_account_returns_404(client, db_session):
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    _, account, _fake_client = _connect_account(client, db_session)
+
+    client.cookies.clear()
+    _authenticate(client, db_session, google_sub="google-2", email="b@example.com")
+
+    response = client.put(
+        f"/pluggy/accounts/{account['id']}", json={"apelido": "X", "sync_enabled": True}
+    )
+
+    assert response.status_code == 404
+
+
+def test_sync_endpoint_syncs_all_items_when_no_filter(client, db_session):
+    _authenticate(client, db_session)
+    item, _account, fake_client = _connect_account(client, db_session)
+    del fake_client
+
+    response = client.post("/pluggy/sync", json={})
+
+    assert response.status_code == 200
+    results = response.json()["results"]
+    assert len(results) == 1
+    assert results[0]["item_id"] == item["id"]
+    assert results[0]["success"] is True
+
+
+def test_sync_endpoint_respects_sync_enabled_false_on_account(client, db_session):
+    _authenticate(client, db_session)
+    _item, account, fake_client = _connect_account(client, db_session)
+    client.put(f"/pluggy/accounts/{account['id']}", json={"apelido": None, "sync_enabled": False})
+    fake_client.accounts = [_account_raw_payload(balance=999.99)]
+
+    response = client.post("/pluggy/sync", json={})
+
+    assert response.status_code == 200
+    reloaded = client.get("/pluggy/accounts").json()[0]
+    assert Decimal(reloaded["saldo"]) == Decimal("100.50")
+
+
+def test_sync_endpoint_reports_failure_for_invalid_item_without_blocking_others(client, db_session):
+    _authenticate(client, db_session)
+    item, _account, _fake_client = _connect_account(client, db_session)
+
+    response = client.post("/pluggy/sync", json={"item_ids": [item["id"], 999]})
+
+    results = {r["item_id"]: r for r in response.json()["results"]}
+    assert results[item["id"]]["success"] is True
+    assert results[999]["success"] is False

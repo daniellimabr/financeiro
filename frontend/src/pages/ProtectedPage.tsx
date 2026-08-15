@@ -1,23 +1,21 @@
 import { useState } from "react";
 
 import type { CurrentUser } from "../api/auth";
+import { AccountManagementPage } from "./AccountManagementPage";
 import { CategorizationReviewPage } from "./CategorizationReviewPage";
-import { ConnectAccountPage } from "./ConnectAccountPage";
 import { DashboardsPage } from "./DashboardsPage";
-import { TransactionsPage } from "./TransactionsPage";
 
 interface ProtectedPageProps {
   user: CurrentUser;
 }
 
-type Tab = "inicio" | "dashboards" | "conectar" | "transacoes" | "categorizar";
+type Tab = "inicio" | "dashboards" | "contas" | "categorizar";
 
 const NAV_ITEMS: { tab: Tab; label: string }[] = [
   { tab: "inicio", label: "Início" },
   { tab: "dashboards", label: "Dashboards" },
-  { tab: "transacoes", label: "Transações" },
   { tab: "categorizar", label: "Categorizar" },
-  { tab: "conectar", label: "Conectar conta" },
+  { tab: "contas", label: "Gestão de contas" },
 ];
 
 export function ProtectedPage({ user }: ProtectedPageProps) {
@@ -54,13 +52,12 @@ export function ProtectedPage({ user }: ProtectedPageProps) {
             <h1>Bem-vindo, {user.name}</h1>
             <p>
               Use <strong>Dashboards</strong> para ver receita, despesa, saldo e patrimônio do mês,
-              ou <strong>Transações</strong> para conferir o extrato sincronizado.
+              ou <strong>Categorizar</strong> para revisar e confirmar o extrato sincronizado.
             </p>
           </section>
         )}
         {tab === "dashboards" && <DashboardsPage />}
-        {tab === "conectar" && <ConnectAccountPage />}
-        {tab === "transacoes" && <TransactionsPage />}
+        {tab === "contas" && <AccountManagementPage />}
         {tab === "categorizar" && <CategorizationReviewPage />}
       </main>
     </div>

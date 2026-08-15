@@ -1,13 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { setTransactionAsset } from "../api/categorization";
+import { dismissDescriptionSuggestion } from "../api/categorization";
 
-export function useSetTransactionAsset() {
+export function useDismissDescriptionSuggestion() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ transactionId, assetId }: { transactionId: number; assetId: number | null }) =>
-      setTransactionAsset(transactionId, assetId),
+    mutationFn: (transactionId: number) => dismissDescriptionSuggestion(transactionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["categorizationTransactions"] });
     },

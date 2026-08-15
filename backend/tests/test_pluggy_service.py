@@ -262,3 +262,118 @@ def test_list_accounts_and_transactions_isolated_by_user(db_session, user, other
     assert service.list_transactions(db_session, other_user.id) == []
     assert len(service.list_accounts(db_session, user.id)) == 1
     assert len(service.list_transactions(db_session, user.id)) == 1
+
+
+# --- apelido / sync_enabled (Sprint 7) --------------------------------------
+
+
+def test_apelido_preserved_across_resync(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(), accounts=[_account_raw()], transactions_by_account={}
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+
+    account = service.list_accounts(db_session, user.id)[0]
+    service.update_account(
+        db_session, user.id, account.id, apelido="Conta do dia a dia", sync_enabled=True
+    )
+
+    client.accounts = [_account_raw(name="Nome atualizado pela Pluggy")]
+    service.sync_item(db_session, client, user.id, item.id)
+
+    reloaded = service.list_accounts(db_session, user.id)[0]
+    assert reloaded.apelido == "Conta do dia a dia"
+    assert reloaded.nome == "Nome atualizado pela Pluggy"
+
+
+def test_sync_item_skips_account_with_sync_disabled(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[_account_raw()],
+        transactions_by_account={"acc-ext-1": [_transaction_raw()]},
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+
+    account = service.list_accounts(db_session, user.id)[0]
+    service.update_account(db_session, user.id, account.id, apelido=None, sync_enabled=False)
+
+    client.accounts = [_account_raw(balance=999.99)]
+    client.transactions_by_account["acc-ext-1"] = [
+        _transaction_raw(id="tx-ext-2", description="Nova transacao")
+    ]
+    service.sync_item(db_session, client, user.id, item.id)
+
+    reloaded = service.list_accounts(db_session, user.id)[0]
+    assert reloaded.saldo == Decimal("100.50")  # não atualizado
+    assert len(service.list_transactions(db_session, user.id)) == 1  # nenhuma transação nova
+
+
+def test_update_account_sets_apelido_and_sync_enabled(db_session, user):
+    client = FakePluggyClient(item=_item_raw(), accounts=[_account_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    account = service.list_accounts(db_session, user.id)[0]
+
+    updated = service.update_account(
+        db_session, user.id, account.id, apelido="Poupança conjunta", sync_enabled=False
+    )
+
+    assert updated.apelido == "Poupança conjunta"
+    assert updated.sync_enabled is False
+
+
+def test_update_account_other_users_account_raises_not_found(db_session, user, other_user):
+    client = FakePluggyClient(item=_item_raw(), accounts=[_account_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    account = service.list_accounts(db_session, user.id)[0]
+
+    with pytest.raises(NotFoundError):
+        service.update_account(
+            db_session, other_user.id, account.id, apelido="X", sync_enabled=True
+        )
+
+
+def test_sync_items_syncs_all_items_when_none_specified(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(), accounts=[_account_raw()], transactions_by_account={"acc-ext-1": []}
+    )
+    item_a = service.register_item(db_session, client, user.id, "item-ext-1")
+    client.item = _item_raw(id="item-ext-2")
+    item_b = service.register_item(db_session, client, user.id, "item-ext-2")
+
+    results = service.sync_items(db_session, client, user.id, None)
+
+    assert {r.item_id for r in results} == {item_a.id, item_b.id}
+    assert all(r.success for r in results)
+
+
+def test_sync_items_reports_failure_per_item_without_blocking_others(db_session, user):
+    client = FakePluggyClient(item=_item_raw(), accounts=[], transactions_by_account={})
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+
+    results = service.sync_items(db_session, client, user.id, [item.id, 999])
+
+    by_id = {r.item_id: r for r in results}
+    assert by_id[item.id].success is True
+    assert by_id[999].success is False
+
+
+def test_sync_items_filter_does_not_bypass_sync_enabled_per_account(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[_account_raw()],
+        transactions_by_account={"acc-ext-1": [_transaction_raw()]},
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    account = service.list_accounts(db_session, user.id)[0]
+    service.update_account(db_session, user.id, account.id, apelido=None, sync_enabled=False)
+
+    client.accounts = [_account_raw(balance=999.99)]
+    service.sync_items(db_session, client, user.id, [item.id])
+
+    reloaded = service.list_accounts(db_session, user.id)[0]
+    assert reloaded.saldo == Decimal("100.50")

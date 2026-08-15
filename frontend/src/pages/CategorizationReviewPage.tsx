@@ -1,11 +1,17 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
+import type { CategorizationStatus, TransactionTipo } from "../api/categorization";
 import { useAssets } from "../hooks/useAssets";
+import { useBulkConfirmCategorization } from "../hooks/useBulkConfirmCategorization";
+import { useCategorizationTransactions } from "../hooks/useCategorizationTransactions";
 import { useCategoryGroups } from "../hooks/useCategoryGroups";
-import { useConfirmCategorization } from "../hooks/useConfirmCategorization";
-import { usePendingCategorizations } from "../hooks/usePendingCategorizations";
+import { useConfirmDescriptionSuggestion } from "../hooks/useConfirmDescriptionSuggestion";
+import { useDismissDescriptionSuggestion } from "../hooks/useDismissDescriptionSuggestion";
+import { useSetCategory } from "../hooks/useSetCategory";
 import { useSetTransactionAsset } from "../hooks/useSetTransactionAsset";
 import { useSubcategories } from "../hooks/useSubcategories";
+import { useUpdateDescription } from "../hooks/useUpdateDescription";
+import { formatCurrency } from "../utils/format";
 
 const MESES = [
   "Janeiro",
@@ -28,27 +34,56 @@ export function CategorizationReviewPage() {
   const now = new Date();
   const [ano, setAno] = useState(now.getFullYear());
   const [mes, setMes] = useState(now.getMonth() + 1);
+  const [status, setStatus] = useState<CategorizationStatus>("pendente");
+  const [tipo, setTipo] = useState<TransactionTipo | "todos">("todos");
   const [page, setPage] = useState(1);
 
-  const { data, isLoading } = usePendingCategorizations({ ano, mes, page, pageSize: PAGE_SIZE });
-  const pending = data?.items;
+  const { data, isLoading } = useCategorizationTransactions({
+    ano,
+    mes,
+    status,
+    tipo: tipo === "todos" ? undefined : tipo,
+    page,
+    pageSize: PAGE_SIZE,
+  });
+  const items = data?.items;
   const { data: groups } = useCategoryGroups();
   const { data: subcategories } = useSubcategories();
   const { data: assets } = useAssets();
-  const confirmCategorization = useConfirmCategorization();
+  const setCategory = useSetCategory();
+  const bulkConfirm = useBulkConfirmCategorization();
   const setTransactionAsset = useSetTransactionAsset();
+  const updateDescription = useUpdateDescription();
+  const confirmDescriptionSuggestion = useConfirmDescriptionSuggestion();
+  const dismissDescriptionSuggestion = useDismissDescriptionSuggestion();
 
   const [selectedSubcategory, setSelectedSubcategory] = useState<
     Record<number, number | undefined>
   >({});
   const [selectedAsset, setSelectedAsset] = useState<Record<number, number | undefined>>({});
+  const [checked, setChecked] = useState<Record<number, boolean>>({});
+  const [editingDescriptionId, setEditingDescriptionId] = useState<number | null>(null);
+  const [descriptionDraft, setDescriptionDraft] = useState("");
 
   const totalPaginas = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
+  const pendentesDaPagina = useMemo(
+    () => (items ?? []).filter((tx) => tx.categorizacao_status === "pendente"),
+    [items]
+  );
+  const suggestionCount = (items ?? []).filter((tx) => tx.descricao_sugerida !== null).length;
 
-  function mudarFiltro(novoAno: number, novoMes: number) {
-    setAno(novoAno);
-    setMes(novoMes);
+  function mudarFiltro(overrides: {
+    ano?: number;
+    mes?: number;
+    status?: CategorizationStatus;
+    tipo?: TransactionTipo | "todos";
+  }) {
+    if (overrides.ano !== undefined) setAno(overrides.ano);
+    if (overrides.mes !== undefined) setMes(overrides.mes);
+    if (overrides.status !== undefined) setStatus(overrides.status);
+    if (overrides.tipo !== undefined) setTipo(overrides.tipo);
     setPage(1);
+    setChecked({});
   }
 
   function subcategoryLabel(subcategoryId: number): string {
@@ -58,8 +93,50 @@ export function CategorizationReviewPage() {
     return group ? `${group.nome} / ${subcategory.nome}` : subcategory.nome;
   }
 
+  const allPendentesChecked =
+    pendentesDaPagina.length > 0 && pendentesDaPagina.every((tx) => checked[tx.id]);
+
+  function toggleAllPendentes() {
+    const next = !allPendentesChecked;
+    setChecked((prev) => {
+      const updated = { ...prev };
+      for (const tx of pendentesDaPagina) updated[tx.id] = next;
+      return updated;
+    });
+  }
+
+  function aprovarMarcadas() {
+    const marcadas = pendentesDaPagina.filter((tx) => checked[tx.id]);
+    const itemsToConfirm = marcadas
+      .map((tx) => {
+        const subcategoryId = selectedSubcategory[tx.id] ?? tx.subcategoria_sugerida_id;
+        return subcategoryId ? { transactionId: tx.id, subcategoryId } : null;
+      })
+      .filter((item): item is { transactionId: number; subcategoryId: number } => item !== null);
+    if (itemsToConfirm.length === 0) return;
+    bulkConfirm.mutate(itemsToConfirm, {
+      onSuccess: () => setChecked({}),
+    });
+  }
+
+  function startEditingDescription(txId: number, currentValue: string) {
+    setEditingDescriptionId(txId);
+    setDescriptionDraft(currentValue);
+  }
+
+  function saveDescription(txId: number) {
+    const value = descriptionDraft.trim();
+    setEditingDescriptionId(null);
+    if (!value) return;
+    updateDescription.mutate({ transactionId: txId, descricao: value });
+  }
+
+  const marcadasParaAprovar = pendentesDaPagina.filter(
+    (tx) => checked[tx.id] && (selectedSubcategory[tx.id] ?? tx.subcategoria_sugerida_id)
+  ).length;
+
   return (
-    <section>
+    <section className="dash-page">
       <h2>Categorização</h2>
 
       <div className="dash-filter">
@@ -68,7 +145,7 @@ export function CategorizationReviewPage() {
           <select
             aria-label="Mês"
             value={mes}
-            onChange={(event) => mudarFiltro(ano, Number(event.target.value))}
+            onChange={(event) => mudarFiltro({ mes: Number(event.target.value) })}
           >
             {MESES.map((nome, index) => (
               <option key={nome} value={index + 1}>
@@ -82,7 +159,7 @@ export function CategorizationReviewPage() {
           <select
             aria-label="Ano"
             value={ano}
-            onChange={(event) => mudarFiltro(Number(event.target.value), mes)}
+            onChange={(event) => mudarFiltro({ ano: Number(event.target.value) })}
           >
             {[ano - 1, ano, ano + 1].map((value) => (
               <option key={value} value={value}>
@@ -91,90 +168,208 @@ export function CategorizationReviewPage() {
             ))}
           </select>
         </label>
+        <label>
+          Tipo
+          <select
+            aria-label="Tipo"
+            value={tipo}
+            onChange={(event) =>
+              mudarFiltro({ tipo: event.target.value as TransactionTipo | "todos" })
+            }
+          >
+            <option value="todos">Todos</option>
+            <option value="debito">Despesa</option>
+            <option value="credito">Receita</option>
+          </select>
+        </label>
+        <label>
+          Status
+          <select
+            aria-label="Status"
+            value={status}
+            onChange={(event) =>
+              mudarFiltro({ status: event.target.value as CategorizationStatus })
+            }
+          >
+            <option value="pendente">Pendentes</option>
+            <option value="confirmada">Confirmadas</option>
+            <option value="todas">Todas</option>
+          </select>
+        </label>
       </div>
 
       {isLoading && <p>Carregando...</p>}
-      {data && data.total === 0 && <p>Nenhuma transação pendente.</p>}
-      {confirmCategorization.isError && <p role="alert">Não foi possível confirmar a categoria.</p>}
+      {data && data.total === 0 && <p>Nenhuma transação encontrada.</p>}
+      {setCategory.isError && <p role="alert">Não foi possível confirmar a categoria.</p>}
+      {suggestionCount > 0 && (
+        <p>
+          {suggestionCount} {suggestionCount === 1 ? "item" : "itens"} com sugestão de descrição
+          pendente.
+        </p>
+      )}
 
-      <table>
-        <thead>
-          <tr>
-            <th>Data</th>
-            <th>Descrição</th>
-            <th>Valor</th>
-            <th>Categoria</th>
-            <th>Ativo</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {pending?.map((tx) => {
-            const subcategoryValue =
-              selectedSubcategory[tx.id] ?? tx.subcategoria_sugerida_id ?? undefined;
-            const assetValue = selectedAsset[tx.id] ?? tx.asset_sugerido_id ?? undefined;
+      {pendentesDaPagina.length > 0 && (
+        <div className="dash-filter">
+          <button type="button" onClick={aprovarMarcadas} disabled={marcadasParaAprovar === 0}>
+            Aprovar marcadas ({marcadasParaAprovar})
+          </button>
+        </div>
+      )}
 
-            return (
-              <tr key={tx.id}>
-                <td>{tx.data}</td>
-                <td>{tx.descricao}</td>
-                <td>{tx.valor}</td>
-                <td>
-                  <select
-                    aria-label={`Categoria de ${tx.descricao}`}
-                    value={subcategoryValue ?? ""}
-                    onChange={(event) =>
-                      setSelectedSubcategory((prev) => ({
-                        ...prev,
-                        [tx.id]: event.target.value ? Number(event.target.value) : undefined,
-                      }))
-                    }
-                  >
-                    <option value="">Selecione...</option>
-                    {subcategories?.map((subcategory) => (
-                      <option key={subcategory.id} value={subcategory.id}>
-                        {subcategoryLabel(subcategory.id)}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <select
-                    aria-label={`Ativo de ${tx.descricao}`}
-                    value={assetValue ?? ""}
-                    onChange={(event) => {
-                      const assetId = event.target.value ? Number(event.target.value) : null;
-                      setSelectedAsset((prev) => ({ ...prev, [tx.id]: assetId ?? undefined }));
-                      setTransactionAsset.mutate({ transactionId: tx.id, assetId });
-                    }}
-                  >
-                    <option value="">Nenhum</option>
-                    {assets?.map((asset) => (
-                      <option key={asset.id} value={asset.id}>
-                        {asset.nome}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <button
-                    onClick={() => {
-                      if (subcategoryValue === undefined) return;
-                      confirmCategorization.mutate({
-                        transactionId: tx.id,
-                        subcategoryId: subcategoryValue,
-                      });
-                    }}
-                    disabled={subcategoryValue === undefined || confirmCategorization.isPending}
-                  >
-                    Confirmar
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <div className="dash-table-wrap">
+        <table className="dash-table">
+          <thead>
+            <tr>
+              <th>
+                {pendentesDaPagina.length > 0 && (
+                  <input
+                    type="checkbox"
+                    aria-label="Marcar todas as pendentes"
+                    checked={allPendentesChecked}
+                    onChange={toggleAllPendentes}
+                  />
+                )}
+              </th>
+              <th>Data</th>
+              <th>Descrição</th>
+              <th>Valor</th>
+              <th>Categoria</th>
+              <th>Ativo</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {items?.map((tx) => {
+              const isPendente = tx.categorizacao_status === "pendente";
+              const subcategoryValue =
+                selectedSubcategory[tx.id] ??
+                tx.subcategoria_sugerida_id ??
+                tx.subcategory_id ??
+                undefined;
+              const assetValue =
+                selectedAsset[tx.id] ?? tx.asset_sugerido_id ?? tx.asset_id ?? undefined;
+              const descricaoExibida = tx.descricao_usuario ?? tx.descricao;
+
+              return (
+                <tr key={tx.id}>
+                  <td>
+                    {isPendente && (
+                      <input
+                        type="checkbox"
+                        aria-label={`Marcar ${descricaoExibida}`}
+                        checked={checked[tx.id] ?? false}
+                        onChange={(event) =>
+                          setChecked((prev) => ({ ...prev, [tx.id]: event.target.checked }))
+                        }
+                      />
+                    )}
+                  </td>
+                  <td>{tx.data}</td>
+                  <td>
+                    {editingDescriptionId === tx.id ? (
+                      <input
+                        aria-label={`Editar descrição de ${descricaoExibida}`}
+                        value={descriptionDraft}
+                        autoFocus
+                        onChange={(event) => setDescriptionDraft(event.target.value)}
+                        onBlur={() => saveDescription(tx.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") saveDescription(tx.id);
+                          if (event.key === "Escape") setEditingDescriptionId(null);
+                        }}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => startEditingDescription(tx.id, descricaoExibida)}
+                        title="Clique para editar a descrição"
+                      >
+                        {descricaoExibida}
+                      </button>
+                    )}
+                    {tx.descricao_sugerida !== null && (
+                      <div>
+                        <span>Sugestão: {tx.descricao_sugerida}</span>
+                        <button
+                          type="button"
+                          onClick={() => confirmDescriptionSuggestion.mutate(tx.id)}
+                        >
+                          Aceitar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => dismissDescriptionSuggestion.mutate(tx.id)}
+                        >
+                          Descartar
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                  <td>{formatCurrency(tx.valor)}</td>
+                  <td>
+                    <select
+                      aria-label={`Categoria de ${descricaoExibida}`}
+                      value={subcategoryValue ?? ""}
+                      onChange={(event) => {
+                        const subcategoryId = event.target.value
+                          ? Number(event.target.value)
+                          : undefined;
+                        setSelectedSubcategory((prev) => ({ ...prev, [tx.id]: subcategoryId }));
+                        if (!isPendente && subcategoryId !== undefined) {
+                          setCategory.mutate({ transactionId: tx.id, subcategoryId });
+                        }
+                      }}
+                    >
+                      <option value="">Selecione...</option>
+                      {subcategories?.map((subcategory) => (
+                        <option key={subcategory.id} value={subcategory.id}>
+                          {subcategoryLabel(subcategory.id)}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <select
+                      aria-label={`Ativo de ${descricaoExibida}`}
+                      value={assetValue ?? ""}
+                      onChange={(event) => {
+                        const assetId = event.target.value ? Number(event.target.value) : null;
+                        setSelectedAsset((prev) => ({ ...prev, [tx.id]: assetId ?? undefined }));
+                        setTransactionAsset.mutate({ transactionId: tx.id, assetId });
+                      }}
+                    >
+                      <option value="">Nenhum</option>
+                      {assets?.map((asset) => (
+                        <option key={asset.id} value={asset.id}>
+                          {asset.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>{isPendente ? "Pendente" : "Confirmada"}</td>
+                  <td>
+                    {isPendente && (
+                      <button
+                        onClick={() => {
+                          if (subcategoryValue === undefined) return;
+                          setCategory.mutate({
+                            transactionId: tx.id,
+                            subcategoryId: subcategoryValue,
+                          });
+                        }}
+                        disabled={subcategoryValue === undefined || setCategory.isPending}
+                      >
+                        Confirmar
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
       {data && data.total > 0 && (
         <div className="dash-filter">
@@ -186,7 +381,7 @@ export function CategorizationReviewPage() {
             ← Anterior
           </button>
           <span>
-            Página {page} de {totalPaginas} ({data.total} pendências)
+            Página {page} de {totalPaginas} ({data.total} transações)
           </span>
           <button
             type="button"

@@ -7,6 +7,8 @@ import {
   fetchPluggyTransactions,
   registerPluggyItem,
   syncPluggyItem,
+  syncPluggyItems,
+  updatePluggyAccount,
 } from "./pluggy";
 
 function jsonResponse(body: unknown, status = 200) {
@@ -71,5 +73,42 @@ describe("pluggy api", () => {
       "/pluggy/accounts",
       "/pluggy/transactions",
     ]);
+  });
+
+  it("updatePluggyAccount puts apelido and sync_enabled to the account endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ id: 1 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await updatePluggyAccount(1, { apelido: "Conta principal", syncEnabled: false });
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/pluggy/accounts/1");
+    expect(init.method).toBe("PUT");
+    expect(JSON.parse(init.body as string)).toEqual({
+      apelido: "Conta principal",
+      sync_enabled: false,
+    });
+  });
+
+  it("syncPluggyItems posts the item_ids list to the sync endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ results: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await syncPluggyItems([1, 2]);
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/pluggy/sync");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ item_ids: [1, 2] });
+  });
+
+  it("syncPluggyItems sends item_ids null when called without arguments", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ results: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await syncPluggyItems();
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(JSON.parse(init.body as string)).toEqual({ item_ids: null });
   });
 });
