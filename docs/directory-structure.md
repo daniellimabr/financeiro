@@ -75,7 +75,7 @@ Financeiro v3/
 │   │   │   ├── asset.py            # AssetIn/Out, AssetSellIn (Sprint 2)
 │   │   │   ├── liability.py        # LiabilityIn/Out (Sprint 2)
 │   │   │   ├── pluggy.py           # ConnectToken*, PluggyItem/Account/TransactionOut (Sprint 3)
-│   │   │   ├── categorization.py   # PendingTransactionOut, CategorizationConfirmIn, AssetAssociationIn (Sprint 4)
+│   │   │   ├── categorization.py   # PendingTransactionOut, CategorizationConfirmIn, AssetAssociationIn (Sprint 4); PendingTransactionsPageOut (paginação, pós-Sprint 6)
 │   │   │   └── dashboards.py       # SummaryOut, CategoriaTotalOut/MeioPagamentoTotalOut+percentual (Sprint 5), TendenciaMesOut/TendenciaCategoriaOut (Sprint 6)
 │   │   ├── auth/
 │   │   │   ├── jwt.py              # geração/validação JWT via PyJWT
@@ -99,7 +99,7 @@ Financeiro v3/
 │   │   ├── categorization/         # motor de categorização por regras+memória, sem LLM (Sprint 4)
 │   │   │   ├── normalize.py        # normalize_description — NFKD/ASCII/minúsculas, prefixo de canal, números isolados
 │   │   │   ├── engine.py           # suggest_category (regra > histórico exato > similaridade ≥0.86), suggest_asset
-│   │   │   ├── service.py          # list_pending_transactions, confirm_categorization, set_transaction_asset
+│   │   │   ├── service.py          # list_pending_transactions (paginado, filtro ano/mes, pós-Sprint 6), confirm_categorization, set_transaction_asset
 │   │   │   └── router.py           # rotas /categorization/*
 │   │   └── dashboards/             # agregação para dashboards — sem LLM, sem cache (Sprint 5)
 │   │       ├── service.py          # get_summary, get_por_categoria/get_por_meio_pagamento (+percentual), get_tendencia/get_tendencia_por_categoria (Sprint 6)
@@ -128,8 +128,8 @@ Financeiro v3/
 │   │   ├── test_pluggy_endpoints.py     # 401/404/400, isolamento user_id (Sprint 3)
 │   │   ├── test_categorization_normalize.py    # acentos, prefixos de canal, token numérico vs. alfanumérico (Sprint 4)
 │   │   ├── test_categorization_engine.py       # precedência de camadas, fronteira 0.86, isolamento por usuário (Sprint 4)
-│   │   ├── test_categorization_service.py      # invariante "nunca auto-confirma", reedição, 404 cross-user (Sprint 4)
-│   │   ├── test_categorization_endpoints.py    # 401, isolamento, confirmar/editar via API (Sprint 4)
+│   │   ├── test_categorization_service.py      # invariante "nunca auto-confirma", reedição, 404 cross-user (Sprint 4); paginação, filtro ano/mes (pós-Sprint 6)
+│   │   ├── test_categorization_endpoints.py    # 401, isolamento, confirmar/editar via API (Sprint 4); paginação, filtro ano/mes (pós-Sprint 6)
 │   │   ├── test_import_legacy_categorization_rules.py  # conflito, idempotência, categoria não resolvida, abort sem usuário (Sprint 4)
 │   │   ├── test_dashboards_service.py   # período vazio, só-transferência, misto, sinal do cartão, borda de mês (Sprint 5); tendência terminando no mês filtrado, percentual somando 100%/denominador zero (Sprint 6)
 │   │   ├── test_dashboards_endpoints.py # 401, isolamento entre usuários nos 5 endpoints (Sprint 5+6)
@@ -161,7 +161,7 @@ Financeiro v3/
 │   │   │   ├── pluggy.ts           # chamadas /pluggy/* (Sprint 3)
 │   │   │   ├── categories.ts       # chamadas /category-groups, /subcategories (Sprint 4, pré-requisito antes inexistente)
 │   │   │   ├── assets.ts           # chamadas /assets (Sprint 4, pré-requisito antes inexistente)
-│   │   │   ├── categorization.ts   # chamadas /categorization/* (Sprint 4)
+│   │   │   ├── categorization.ts   # chamadas /categorization/* (Sprint 4; paginação/filtro ano-mes pós-Sprint 6)
 │   │   │   └── dashboards.ts       # chamadas /dashboards/*, SEM_CATEGORIA_ID (Sprint 5); +tendencia/por-categoria/tendencia, +percentual (Sprint 6)
 │   │   ├── pluggy/
 │   │   │   └── loadPluggyConnect.ts  # injeta o script do widget Pluggy Connect sob demanda (Sprint 3)
@@ -175,7 +175,7 @@ Financeiro v3/
 │   │   │   ├── useCategoryGroups.ts      # lista category_groups (Sprint 4)
 │   │   │   ├── useSubcategories.ts       # lista subcategories (Sprint 4)
 │   │   │   ├── useAssets.ts              # lista assets do usuário (Sprint 4)
-│   │   │   ├── usePendingCategorizations.ts  # lista fila de pendentes (Sprint 4)
+│   │   │   ├── usePendingCategorizations.ts  # lista fila de pendentes, paginada + filtro ano/mes (Sprint 4; pós-Sprint 6)
 │   │   │   ├── useConfirmCategorization.ts   # mutation POST /categorization/pending/{id}/confirm (Sprint 4)
 │   │   │   ├── useSetTransactionAsset.ts     # mutation PUT /categorization/pending/{id}/asset (Sprint 4)
 │   │   │   ├── useDashboardSummary.ts        # GET /dashboards/summary (Sprint 5)
@@ -189,7 +189,7 @@ Financeiro v3/
 │   │       ├── DashboardsPage.tsx  # filtro ano/mês, 4 cards com sparkline, funil de drill-down em sanfona + Recharts (Sprint 5, sanfona/tendência/percentual na Sprint 6)
 │   │       ├── ConnectAccountPage.tsx    # widget Pluggy Connect + lista de items conectados (Sprint 3)
 │   │       ├── TransactionsPage.tsx      # lista de transações + botão sincronizar por item (Sprint 3)
-│   │       └── CategorizationReviewPage.tsx  # fila de revisão — sugestão pré-preenchida, confirmar/editar (Sprint 4)
+│   │       └── CategorizationReviewPage.tsx  # fila de revisão — sugestão pré-preenchida, confirmar/editar, filtro ano/mês + paginação (Sprint 4; pós-Sprint 6)
 │   │   └── App.test.tsx            # testes Vitest + Testing Library (401, 200)
 │   └── test/
 │       └── setup.ts                # setup do Vitest (jest-dom matchers)
@@ -200,7 +200,8 @@ Financeiro v3/
 │   └── browser-check/              # QA visual do CTO — Playwright/Chromium headless (Sprint 5)
 │       ├── check.mjs               # genérico: navega, screenshot, erros de console
 │       ├── check-dashboard.mjs     # fluxo autenticado: início → dashboards → drill-down
-│       └── check-sanfona.mjs       # sanfona multi-nível + sparkline + tipografia, contra dado real (Sprint 6)
+│       ├── check-sanfona.mjs       # sanfona multi-nível + sparkline + tipografia, contra dado real (Sprint 6)
+│       └── check-categorizacao.mjs # filtro + paginação + tempo real do fluxo de confirmar (pós-Sprint 6)
 ├── .github/
 │   └── workflows/
 │       └── ci.yml                  # GitHub Actions: pytest+ruff (backend), vitest+eslint+tsc (frontend) (Sprint 1)

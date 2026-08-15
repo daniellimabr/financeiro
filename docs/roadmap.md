@@ -126,15 +126,28 @@ confirmado em `pluggy_transactions`, associação já existente desde a
 Sprint 4). Versão simples confirmada pelo CEO — sem tendência/percentual
 nesta primeira versão da tela.
 
-### Sprint 8 — Categorização: tabela moderna e paginação (E3, polish)
+### Sprint 8 — Categorização: tabela moderna (E3, polish)
 *Escopo ainda não detalhado em PRD/plano — planejar em sessão própria.*
 
-A lentidão em si (N+1 na busca de sugestões) já foi corrigida fora de
-sprint formal (ver nota acima). Falta: paginar `GET /categorization/pending`
-(hoje recomputa sugestão para todas as pendências a cada chamada — paginar
-limita esse custo a uma página por vez, resolvendo o restante da lentidão
-observada mesmo após o fix de N+1) e modernizar a tabela reaproveitando a
-fundação de design system da Sprint 6.
+A lentidão (N+1 na busca de sugestões, depois o recálculo da fila inteira
+a cada refetch) já foi corrigida fora de sprint formal — ver nota
+"Correções pós-Sprint 6" abaixo: `GET /categorization/pending` agora pagina
+(page/page_size) e filtra por ano/mês, com o mesmo seletor visual da
+`DashboardsPage`. Falta só modernizar a tabela em si (hoje HTML puro, sem
+nenhum token do design system) reaproveitando a fundação de tipografia/
+layout da Sprint 6.
+
+**Correções pós-Sprint 6 (2026-08-15, sessão própria):** CEO reportou o
+botão "Confirmar" da fila de Categorização parecendo travado. Causa real:
+o clique confirma rápido (update de uma linha), mas o refetch da fila
+recalculava sugestão para **todas** as pendências a cada chamada, não só a
+confirmada — mesmo após o fix de N+1 da Sprint 5, o custo ainda escalava
+com o tamanho total da fila (929 pendências reais na VM de dev). Corrigido
+paginando `GET /categorization/pending` (`page`/`page_size`, default 20) e
+adicionando filtro `ano`/`mes`; frontend ganhou o mesmo seletor ano/mês da
+`DashboardsPage` + navegação Anterior/Próxima. Validado contra dado real:
+refetch completo pós-confirmação caiu de vários segundos para ~250ms.
+Ferramenta nova `scripts/browser-check/check-categorizacao.mjs`.
 
 ## Registro de reavaliações futuras
 
