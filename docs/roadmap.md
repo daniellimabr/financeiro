@@ -154,14 +154,20 @@ divididas em Sprints 7/8/9 nesta sessão de planejamento (2026-08-15).
   Relatório: [SPRINT-007-categorizacao-gestao-contas-report.md](sprints/SPRINT-007-categorizacao-gestao-contas-report.md) — aprovado pelo CEO em 2026-08-15.
 
 ### Sprint 8 — Gestão de Ativos (E6, parte 2)
-*Escopo ainda não detalhado em PRD/plano — planejar em sessão própria.*
 
 Tela `AssetsPage.tsx` com cards por ativo (reaproveitando `.dash-tile`),
-botão/formulário para cadastrar/editar ativo (backend de CRUD já existe em
-`app/assets/` desde a Sprint 2 — falta só mutation hooks no frontend, hoje
-só há leitura via `fetchAssets`), filtro de data igual às outras telas,
-drill-down de custos por ativo (total gasto + transações vinculadas via
-`asset_id`, associação já existente desde a Sprint 4).
+formulário para cadastrar/editar/vender/excluir ativo (backend de CRUD já
+existe em `app/assets/` desde a Sprint 2 — falta só mutation hooks no
+frontend, hoje só há leitura via `fetchAssets`), filtro de período igual
+às outras telas, drill-down de custos por ativo (total gasto + transações
+vinculadas via `asset_id`, associação já existente desde a Sprint 4).
+Gap real encontrado no planejamento (2026-08-15): nenhum endpoint agrega
+gasto por ativo nem filtra `/pluggy/transactions` por `asset_id` — ambos
+entram como pré-requisito do drill-down, não descoberta de execução.
+Extração de um componente `PeriodFilter` compartilhado também entra no
+escopo (evita a terceira cópia duplicada do filtro ano/mês).
+PRD: [PRD-008-gestao-de-ativos.md](prd/PRD-008-gestao-de-ativos.md).
+Plano: [SPRINT-008-gestao-de-ativos-plan.md](sprints/SPRINT-008-gestao-de-ativos-plan.md).
 
 ### Sprint 9 — Dashboard analítico: Ativos/Passivos e refinamentos (E6, parte 3)
 *Escopo ainda não detalhado em PRD/plano — planejar em sessão própria.*
