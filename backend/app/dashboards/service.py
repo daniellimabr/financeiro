@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from decimal import Decimal
+from datetime import date
+from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import func
 from sqlalchemy.orm import Query, Session
@@ -30,16 +31,69 @@ class CategoriaTotal:
     subcategory_id: int
     subcategory_nome: str
     total: Decimal
+    percentual: Decimal
 
 
 @dataclass
 class MeioPagamentoTotal:
     account_tipo: PluggyAccountTipo
     total: Decimal
+    percentual: Decimal
+
+
+@dataclass
+class TendenciaMes:
+    ano: int
+    mes: int
+    receita: Decimal
+    despesa: Decimal
+    saldo: Decimal
+
+
+@dataclass
+class PontoTendencia:
+    ano: int
+    mes: int
+    total: Decimal
+
+
+@dataclass
+class TendenciaCategoria:
+    subcategory_id: int
+    subcategory_nome: str
+    pontos: list[PontoTendencia]
 
 
 def _to_decimal(value) -> Decimal:
     return Decimal(str(value))
+
+
+def _percentual(total: Decimal, total_geral: Decimal) -> Decimal:
+    if total_geral == 0:
+        return Decimal("0")
+    return (total / total_geral * 100).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _month_range(ano: int, mes: int, meses: int) -> list[tuple[int, int]]:
+    """Últimos `meses` meses terminando em (ano, mes), em ordem cronológica."""
+    periodo = []
+    y, m = ano, mes
+    for _ in range(meses):
+        periodo.append((y, m))
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+    periodo.reverse()
+    return periodo
+
+
+def _date_bounds(periodo: list[tuple[int, int]]) -> tuple[date, date]:
+    ano_ini, mes_ini = periodo[0]
+    ano_fim, mes_fim = periodo[-1]
+    inicio = date(ano_ini, mes_ini, 1)
+    fim = date(ano_fim + 1, 1, 1) if mes_fim == 12 else date(ano_fim, mes_fim + 1, 1)
+    return inicio, fim
 
 
 def _base_query(db: Session, user_id: int) -> Query:
@@ -139,6 +193,8 @@ def get_por_categoria(
         .group_by(CategoryGroup.id, CategoryGroup.nome, Subcategory.id, Subcategory.nome)
         .all()
     )
+    totais = [_to_decimal(total) for *_resto, total in rows]
+    total_geral = sum(totais, Decimal("0"))
     return [
         CategoriaTotal(
             group_id=group_id if group_id is not None else SEM_CATEGORIA_ID,
@@ -147,9 +203,12 @@ def get_por_categoria(
             subcategory_nome=(
                 subcategory_nome if subcategory_nome is not None else "Não categorizado"
             ),
-            total=_to_decimal(total),
+            total=total,
+            percentual=_percentual(total, total_geral),
         )
-        for group_id, group_nome, subcategory_id, subcategory_nome, total in rows
+        for (group_id, group_nome, subcategory_id, subcategory_nome, _), total in zip(
+            rows, totais, strict=True
+        )
     ]
 
 
@@ -179,7 +238,111 @@ def get_por_meio_pagamento(
         .group_by(PluggyAccount.tipo)
         .all()
     )
+    totais = [_to_decimal(total) for _, total in rows]
+    total_geral = sum(totais, Decimal("0"))
     return [
-        MeioPagamentoTotal(account_tipo=account_tipo, total=_to_decimal(total))
-        for account_tipo, total in rows
+        MeioPagamentoTotal(
+            account_tipo=account_tipo, total=total, percentual=_percentual(total, total_geral)
+        )
+        for (account_tipo, _), total in zip(rows, totais, strict=True)
+    ]
+
+
+def get_tendencia(
+    db: Session, user_id: int, *, ano: int, mes: int, meses: int = 6
+) -> list[TendenciaMes]:
+    periodo = _month_range(ano, mes, meses)
+    inicio, fim = _date_bounds(periodo)
+
+    query = _base_query(db, user_id).filter(
+        PluggyTransaction.data_competencia >= inicio,
+        PluggyTransaction.data_competencia < fim,
+    )
+    rows = (
+        query.with_entities(
+            func.extract("year", PluggyTransaction.data_competencia),
+            func.extract("month", PluggyTransaction.data_competencia),
+            PluggyTransaction.tipo,
+            func.sum(func.abs(PluggyTransaction.valor)),
+        )
+        .group_by(
+            func.extract("year", PluggyTransaction.data_competencia),
+            func.extract("month", PluggyTransaction.data_competencia),
+            PluggyTransaction.tipo,
+        )
+        .all()
+    )
+
+    totais = {chave: {"receita": Decimal("0"), "despesa": Decimal("0")} for chave in periodo}
+    for y, m, tipo, total in rows:
+        campo = "receita" if tipo == PluggyTransactionTipo.credito else "despesa"
+        totais[(int(y), int(m))][campo] = _to_decimal(total)
+
+    return [
+        TendenciaMes(
+            ano=y,
+            mes=m,
+            receita=totais[(y, m)]["receita"],
+            despesa=totais[(y, m)]["despesa"],
+            saldo=totais[(y, m)]["receita"] - totais[(y, m)]["despesa"],
+        )
+        for y, m in periodo
+    ]
+
+
+def get_tendencia_por_categoria(
+    db: Session,
+    user_id: int,
+    *,
+    tipo: PluggyTransactionTipo,
+    ano: int,
+    mes: int,
+    meses: int = 6,
+) -> list[TendenciaCategoria]:
+    periodo = _month_range(ano, mes, meses)
+    inicio, fim = _date_bounds(periodo)
+
+    query = (
+        _base_query(db, user_id)
+        .filter(PluggyTransaction.tipo == tipo)
+        .filter(
+            PluggyTransaction.data_competencia >= inicio,
+            PluggyTransaction.data_competencia < fim,
+        )
+    )
+    rows = (
+        query.with_entities(
+            Subcategory.id,
+            Subcategory.nome,
+            func.extract("year", PluggyTransaction.data_competencia),
+            func.extract("month", PluggyTransaction.data_competencia),
+            func.sum(func.abs(PluggyTransaction.valor)),
+        )
+        .group_by(
+            Subcategory.id,
+            Subcategory.nome,
+            func.extract("year", PluggyTransaction.data_competencia),
+            func.extract("month", PluggyTransaction.data_competencia),
+        )
+        .all()
+    )
+
+    por_categoria: dict[int, dict] = {}
+    for subcategory_id, subcategory_nome, y, m, total in rows:
+        chave_cat = subcategory_id if subcategory_id is not None else SEM_CATEGORIA_ID
+        nome = subcategory_nome if subcategory_nome is not None else "Não categorizado"
+        if chave_cat not in por_categoria:
+            por_categoria[chave_cat] = {
+                "nome": nome,
+                "pontos": {chave: Decimal("0") for chave in periodo},
+            }
+        por_categoria[chave_cat]["pontos"][(int(y), int(m))] = _to_decimal(total)
+
+    return [
+        TendenciaCategoria(
+            subcategory_id=cat_id,
+            subcategory_nome=dado["nome"],
+            pontos=[PontoTendencia(ano=y, mes=m, total=dado["pontos"][(y, m)]) for y, m in periodo],
+        )
+        for cat_id, dado in por_categoria.items()
     ]

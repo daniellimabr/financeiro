@@ -399,3 +399,201 @@ def test_summary_and_por_categoria_isolated_by_user(db_session, user):
 
     assert summary.despesa == Decimal("0")
     assert por_categoria == []
+
+
+def test_get_por_categoria_percentual_sums_to_100(db_session, user):
+    account = _account(db_session, user)
+    group = _group(db_session, nome="Alimentação")
+    sub1 = _subcategory(db_session, group=group, nome="Mercado")
+    sub2 = _subcategory(db_session, group=group, nome="Restaurante")
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-75.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+        subcategory_id=sub1.id,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-25.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 11),
+        subcategory_id=sub2.id,
+    )
+
+    por_categoria = service.get_por_categoria(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
+
+    assert sum(c.percentual for c in por_categoria) == Decimal("100.00")
+    assert next(c for c in por_categoria if c.subcategory_id == sub1.id).percentual == Decimal(
+        "75.00"
+    )
+    assert next(c for c in por_categoria if c.subcategory_id == sub2.id).percentual == Decimal(
+        "25.00"
+    )
+
+
+def test_percentual_helper_returns_zero_for_zero_denominator():
+    assert service._percentual(Decimal("0"), Decimal("0")) == Decimal("0")
+
+
+def test_get_por_categoria_percentual_zero_when_no_data(db_session, user):
+    por_categoria = service.get_por_categoria(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
+
+    assert por_categoria == []
+
+
+def test_get_por_meio_pagamento_percentual(db_session, user):
+    corrente = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    cartao = _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito)
+    _transaction(
+        db_session,
+        user,
+        corrente,
+        valor="-60.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 5),
+    )
+    _transaction(
+        db_session,
+        user,
+        cartao,
+        valor="-40.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 6),
+    )
+
+    resultado = service.get_por_meio_pagamento(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
+
+    percentuais = {r.account_tipo: r.percentual for r in resultado}
+    assert percentuais[PluggyAccountTipo.corrente] == Decimal("60.00")
+    assert percentuais[PluggyAccountTipo.cartao_credito] == Decimal("40.00")
+
+
+def test_get_tendencia_terminates_at_filtered_month_not_calendar_month(db_session, user):
+    account = _account(db_session, user)
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="1000.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2025, 11, 15),
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-200.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2025, 12, 5),
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-9999.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 6, 1),
+    )
+
+    tendencia = service.get_tendencia(db_session, user.id, ano=2025, mes=12, meses=3)
+
+    assert [(p.ano, p.mes) for p in tendencia] == [(2025, 10), (2025, 11), (2025, 12)]
+    out_by_month = {(p.ano, p.mes): p for p in tendencia}
+    assert out_by_month[(2025, 10)].receita == Decimal("0")
+    assert out_by_month[(2025, 10)].despesa == Decimal("0")
+    assert out_by_month[(2025, 11)].receita == Decimal("1000.00")
+    assert out_by_month[(2025, 12)].despesa == Decimal("200.00")
+    assert out_by_month[(2025, 12)].saldo == Decimal("-200.00")
+
+
+def test_get_tendencia_month_without_transactions_appears_zeroed(db_session, user):
+    tendencia = service.get_tendencia(db_session, user.id, ano=2026, mes=3, meses=6)
+
+    assert len(tendencia) == 6
+    assert all(p.receita == Decimal("0") and p.despesa == Decimal("0") for p in tendencia)
+
+
+def test_get_tendencia_por_categoria_groups_across_months_with_uncategorized_bucket(
+    db_session, user
+):
+    account = _account(db_session, user)
+    group = _group(db_session, nome="Alimentação")
+    sub = _subcategory(db_session, group=group, nome="Mercado")
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+        subcategory_id=sub.id,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-50.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 2, 10),
+        subcategory_id=sub.id,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-20.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 2, 11),
+        subcategory_id=None,
+    )
+
+    tendencia = service.get_tendencia_por_categoria(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=2, meses=3
+    )
+
+    por_sub = {t.subcategory_id: t for t in tendencia}
+    mercado = por_sub[sub.id]
+    pontos_mercado = {(p.ano, p.mes): p.total for p in mercado.pontos}
+    assert pontos_mercado[(2025, 12)] == Decimal("0")
+    assert pontos_mercado[(2026, 1)] == Decimal("100.00")
+    assert pontos_mercado[(2026, 2)] == Decimal("50.00")
+
+    nao_categorizado = por_sub[service.SEM_CATEGORIA_ID]
+    pontos_nc = {(p.ano, p.mes): p.total for p in nao_categorizado.pontos}
+    assert pontos_nc[(2026, 2)] == Decimal("20.00")
+
+
+def test_tendencia_isolated_by_user(db_session, user):
+    other = User(google_sub="google-tendencia-other", email="other-t@example.com", name="Bob")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+
+    account = _account(db_session, other)
+    _transaction(
+        db_session,
+        other,
+        account,
+        valor="-999.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 5),
+    )
+
+    tendencia = service.get_tendencia(db_session, user.id, ano=2026, mes=1, meses=3)
+    tendencia_categoria = service.get_tendencia_por_categoria(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1, meses=3
+    )
+
+    assert all(p.despesa == Decimal("0") for p in tendencia)
+    assert tendencia_categoria == []

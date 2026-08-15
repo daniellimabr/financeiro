@@ -160,3 +160,82 @@ def test_user_does_not_see_other_users_totals(client, db_session):
         "/dashboards/por-meio-pagamento", params={"tipo": "debito", "ano": 2026, "mes": 1}
     ).json()
     assert por_meio_pagamento == []
+
+
+def test_tendencia_without_cookie_returns_401(client):
+    assert client.get("/dashboards/tendencia", params={"ano": 2026, "mes": 1}).status_code == 401
+
+
+def test_por_categoria_tendencia_without_cookie_returns_401(client):
+    response = client.get(
+        "/dashboards/por-categoria/tendencia",
+        params={"tipo": "debito", "ano": 2026, "mes": 1},
+    )
+    assert response.status_code == 401
+
+
+def test_tendencia_returns_series_combining_meses_and_periodo_filter(client, db_session):
+    user = _authenticate(client, db_session)
+    _transaction(
+        db_session, user, valor="-100.00", tipo=PluggyTransactionTipo.debito, data=date(2026, 1, 15)
+    )
+    _transaction(
+        db_session, user, valor="500.00", tipo=PluggyTransactionTipo.credito, data=date(2026, 1, 16)
+    )
+
+    response = client.get("/dashboards/tendencia", params={"ano": 2026, "mes": 1, "meses": 3})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 3
+    assert [p["mes"] for p in body] == [11, 12, 1]
+    janeiro = next(p for p in body if p["ano"] == 2026 and p["mes"] == 1)
+    assert Decimal(janeiro["receita"]) == Decimal("500.00")
+    assert Decimal(janeiro["despesa"]) == Decimal("100.00")
+
+
+def test_por_categoria_tendencia_returns_series_per_subcategory(client, db_session):
+    user = _authenticate(client, db_session)
+    sub = _subcategory(db_session)
+    _transaction(
+        db_session,
+        user,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        subcategory_id=sub.id,
+        data=date(2026, 1, 15),
+    )
+
+    response = client.get(
+        "/dashboards/por-categoria/tendencia",
+        params={"tipo": "debito", "ano": 2026, "mes": 1, "meses": 6},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["subcategory_id"] == sub.id
+    assert len(body[0]["pontos"]) == 6
+    janeiro = next(p for p in body[0]["pontos"] if p["ano"] == 2026 and p["mes"] == 1)
+    assert Decimal(janeiro["total"]) == Decimal("100.00")
+
+
+def test_user_does_not_see_other_users_tendencia(client, db_session):
+    other = User(google_sub="google-3", email="c@example.com", name="Carol")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    _transaction(db_session, other, valor="-999.00", tipo=PluggyTransactionTipo.debito)
+
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+
+    tendencia = client.get(
+        "/dashboards/tendencia", params={"ano": 2026, "mes": 1, "meses": 3}
+    ).json()
+    assert all(Decimal(p["despesa"]) == Decimal("0") for p in tendencia)
+
+    tendencia_categoria = client.get(
+        "/dashboards/por-categoria/tendencia",
+        params={"tipo": "debito", "ano": 2026, "mes": 1, "meses": 3},
+    ).json()
+    assert tendencia_categoria == []

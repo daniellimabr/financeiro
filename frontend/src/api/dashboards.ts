@@ -20,12 +20,37 @@ export interface CategoriaTotal {
   subcategory_id: number;
   subcategory_nome: string;
   total: string;
+  percentual: string;
 }
 
 export interface MeioPagamentoTotal {
   account_tipo: string;
   total: string;
+  percentual: string;
 }
+
+export interface TendenciaMes {
+  ano: number;
+  mes: number;
+  receita: string;
+  despesa: string;
+  saldo: string;
+}
+
+export interface PontoTendencia {
+  ano: number;
+  mes: number;
+  total: string;
+}
+
+export interface TendenciaCategoria {
+  subcategory_id: number;
+  subcategory_nome: string;
+  pontos: PontoTendencia[];
+}
+
+// Período histórico oferecido pelo seletor de tendência (3/6/12 meses).
+export type PeriodoHistorico = 3 | 6 | 12;
 
 export interface PeriodoFilter {
   ano?: number;
@@ -59,5 +84,20 @@ export function fetchDashboardPorMeioPagamento(
   const { categoriaId, ...periodo } = filter;
   return apiFetch<MeioPagamentoTotal[]>(
     `/dashboards/por-meio-pagamento${buildQuery({ tipo, ...periodo, categoria_id: categoriaId })}`
+  );
+}
+
+export function fetchDashboardTendencia(
+  filter: Required<PeriodoFilter> & { meses: PeriodoHistorico }
+): Promise<TendenciaMes[]> {
+  return apiFetch<TendenciaMes[]>(`/dashboards/tendencia${buildQuery({ ...filter })}`);
+}
+
+export function fetchDashboardPorCategoriaTendencia(
+  tipo: TransacaoTipo,
+  filter: Required<PeriodoFilter> & { meses: PeriodoHistorico }
+): Promise<TendenciaCategoria[]> {
+  return apiFetch<TendenciaCategoria[]>(
+    `/dashboards/por-categoria/tendencia${buildQuery({ tipo, ...filter })}`
   );
 }

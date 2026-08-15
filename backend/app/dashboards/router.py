@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -6,7 +6,13 @@ from app.dashboards import service
 from app.db import get_db
 from app.models.pluggy import PluggyTransactionTipo
 from app.models.user import User
-from app.schemas.dashboards import CategoriaTotalOut, MeioPagamentoTotalOut, SummaryOut
+from app.schemas.dashboards import (
+    CategoriaTotalOut,
+    MeioPagamentoTotalOut,
+    SummaryOut,
+    TendenciaCategoriaOut,
+    TendenciaMesOut,
+)
 
 router = APIRouter(prefix="/dashboards")
 
@@ -43,4 +49,29 @@ def get_por_meio_pagamento(
 ):
     return service.get_por_meio_pagamento(
         db, current_user.id, tipo=tipo, ano=ano, mes=mes, categoria_id=categoria_id
+    )
+
+
+@router.get("/tendencia", response_model=list[TendenciaMesOut])
+def get_tendencia(
+    ano: int,
+    mes: int,
+    meses: int = Query(6, ge=1, le=24),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.get_tendencia(db, current_user.id, ano=ano, mes=mes, meses=meses)
+
+
+@router.get("/por-categoria/tendencia", response_model=list[TendenciaCategoriaOut])
+def get_por_categoria_tendencia(
+    tipo: PluggyTransactionTipo,
+    ano: int,
+    mes: int,
+    meses: int = Query(6, ge=1, le=24),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.get_tendencia_por_categoria(
+        db, current_user.id, tipo=tipo, ano=ano, mes=mes, meses=meses
     )

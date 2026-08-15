@@ -22,6 +22,7 @@ class CategoriaTotalOut(BaseModel):
     subcategory_id: int
     subcategory_nome: str
     total: Decimal
+    percentual: Decimal
 
 
 class MeioPagamentoTotalOut(BaseModel):
@@ -29,3 +30,30 @@ class MeioPagamentoTotalOut(BaseModel):
 
     account_tipo: PluggyAccountTipo
     total: Decimal
+    percentual: Decimal
+
+
+class TendenciaMesOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    ano: int
+    mes: int
+    receita: Decimal
+    despesa: Decimal
+    saldo: Decimal
+
+
+class PontoTendenciaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    ano: int
+    mes: int
+    total: Decimal
+
+
+class TendenciaCategoriaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    subcategory_id: int
+    subcategory_nome: str
+    pontos: list[PontoTendenciaOut]
