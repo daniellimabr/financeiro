@@ -1,6 +1,6 @@
 # Arquitetura — Visão Geral
 
-> Stack abaixo reflete [ADR-001](adr/ADR-001-stack.md), **aprovado pelo CEO em 2026-08-03**. Este doc é atualizado a cada mudança estrutural relevante (regra de doc viva). **Atualizado em 2026-08-15 após Sprint 9 + revisão pós-entrega** — cards Ativos/Passivos/Saldo no Dashboard, `liability_id` espelhando `asset_id`, funil sem nível "meio de pagamento" (ícone ao lado do valor) mas com um novo nível Categoria>Tipo (cores distintas por nível), tabelas ordenáveis (incl. %), tooltip nos gráficos, saldo de cartão mostrando fatura atual + limite entre parênteses. E6 (Dashboards analíticos) fechado. Ver seção própria abaixo.
+> Stack abaixo reflete [ADR-001](adr/ADR-001-stack.md), **aprovado pelo CEO em 2026-08-03**. Este doc é atualizado a cada mudança estrutural relevante (regra de doc viva). **Atualizado em 2026-08-15 após Sprint 10** — investigação NuTag (achado sistêmico: cartão de crédito em `credito` nunca é receita), tela de Gestão de Passivos nova, edição inline de descrição/categoria/ativo no drill-down do Dashboard/Ativos/Passivos, drill-down do card Patrimônio, tooltip do sparkline sem "v:", filtros novos e motor de sugestão de ativo em 3 camadas na tela de Categorização, menu sem aba Início. Ver seção própria abaixo.
 
 ## Visão de alto nível
 
@@ -49,6 +49,7 @@ Uma VM Oracle Free Tier (163.176.0.135, Ubuntu 24.04.4 LTS) roda tudo via Docker
 4. Na VM de dev: `git pull` + `docker compose pull` + `docker compose up -d` (**sem** `--build` — a VM só baixa a imagem pronta, não compila nada)
 5. Logs: `docker compose logs -f api` ou similar
 6. **Se o `Caddyfile` mudou:** `docker compose up -d` sozinho não recarrega o Caddy — é um arquivo montado como volume (`./Caddyfile:/etc/caddy/Caddyfile:ro`), não faz parte da imagem, então o compose não detecta mudança nele. Precisa de `docker compose restart caddy` explícito (aprendido na Sprint 2).
+7. **Nunca rodar `alembic upgrade head` manualmente logo após `docker compose up -d`:** o entrypoint do container `api` já roda a migration sozinho ao subir (`command: sh -c "alembic upgrade head && ..."`). Um `docker compose exec api alembic upgrade head` manual disparado enquanto esse entrypoint ainda está de pé cria uma corrida de dois processos `alembic upgrade head` concorrentes — o segundo falha com `IntegrityError` (nome de sequência/tabela duplicado) e derruba o container (aprendido na Sprint 10, migration `0011`; a tabela e o `alembic_version` ficaram corretos, só o processo do container morreu — resolvido com `docker compose up -d api` de novo). Se precisar confirmar que a migration rodou, checar `docker compose logs api` ou `alembic_version` direto no Postgres, não reexecutar a migration.
 
 Pré-requisito único, feito uma vez: a VM precisa estar autenticada no GHCR (`docker login ghcr.io`) para conseguir puxar as imagens, já que o pacote é privado — ver [ssh-workflow.md](../infra/ssh-workflow.md).
 
@@ -401,10 +402,125 @@ mesmo padrão da revisão de escopo da Sprint 8.
   (Sprint 3+) reaproveitados; migrations `0009` (liability) e `0010`
   (creditData) acima.
 
-## Qualidade (Sprint 1 → Sprint 9)
+## Revisão de UX e Gestão de Passivos (Sprint 10)
 
-- **Testes backend:** 278 testes, 98% cobertura total. Auth (Sprint 1), dados mestres (Sprint 2, 97%), Pluggy (Sprint 3, 98%), categorização (Sprint 4, paginação/filtro ano-mes pós-Sprint 6) — ver histórico nos relatórios de sprint. Dashboards (Sprint 5+6, 100% em `app/dashboards/`): período vazio, período só com "Transferência interna" (totais zerados), misto débito/crédito, sinal do saldo de `cartao_credito` na fórmula de patrimônio, ativos/passivos inativos excluídos, borda de mês (`data_competencia` no limite entre meses), soma de `/por-categoria` batendo com `/summary`, isolamento entre usuários; tendência terminando no mês filtrado (não no calendário), mês sem transação aparecendo zerado, tendência por categoria com bucket "Não categorizado", percentual somando 100% (menos arredondamento) e retornando `0` com denominador zero. Categorização/Pluggy (Sprint 7, 99%): filtro status/tipo em todas as combinações, bulk-confirm parcial (linha inválida não bloqueia as demais), `set_category` em transação já confirmada, propagação de descrição (match normalizado + mesma categoria, isolamento por usuário, "primeira grava, segunda não sobrescreve"), `sync_item`/`sync_items` pulando conta com `sync_enabled=False`, `apelido` preservado em resync. Gestão de Ativos (Sprint 8, 100% em `app/assets/` e `app/dashboards/`): `get_por_ativo` filtrando por `tipo` (período vazio, ativo sem transação vinculada, isolamento), `get_tendencia_por_ativo` zero-preenchendo meses sem transação e isolado por `tipo`/usuário, filtro `asset_id`/`tipo` em `/pluggy/transactions` combinados com outros filtros, `delete_asset` desassociando transações vinculadas em vez de falhar. Ativos/Passivos no Dashboard (Sprint 9, 100% em `app/dashboards/`): `suggest_liability` (substring, isolamento, sem match), `set_transaction_liability` (sets/clears, 404 cross-user), `delete_liability` desassociando (crítico, mirror de `delete_asset`), `get_por_passivo`/`get_tendencia_por_passivo` (nunca soma crédito, zero-preenchida, isolamento), `get_saldo_por_conta` (apelido→nome, isolamento), `summary.ativos`/`summary.passivos` batendo com a mesma base de `patrimonio`, filtro `liability_id` combinado com outros filtros, `account_tipo` na resposta de `/pluggy/transactions`. Revisão pós-entrega: `_upsert_account` persistindo/deixando `None` os campos de `creditData`, `get_saldo_por_conta` de cartão somando a janela da fatura (limite, exclui fora da janela, nunca soma crédito, cai pro saldo bruto sem `fatura_vencimento`), `_subtract_month` (rollover de ano, clamp de dia).
-- **Testes frontend:** 77 testes (Vitest + Testing Library) — renderização condicional, tratamento de 401, mock fetch, widget Pluggy Connect mockado. Dashboards (Sprint 5+6): cards a partir de dado mockado, refetch ao trocar filtro ano/mês, sparkline a partir de tendência mockada, refetch ao trocar seletor de período histórico, sanfona expandindo múltiplos níveis sem esconder os anteriores (e mantendo duas categorias expandidas ao mesmo tempo), percentual exibido em cada nível, estado vazio. Categorização (Sprint 7): filtro tipo/status disparando refetch, seleção em lote + "Aprovar marcadas" chamando bulk-confirm, edição de descrição + propagação chamando o endpoint certo, aceitar sugestão de descrição. Gestão de Contas (Sprint 7): apelido/sync_enabled salvos via PUT, diálogo de sincronização unificada pré-selecionado a partir de `sync_enabled` e confirmando com os `item_ids` corretos, fluxo de conexão via widget Pluggy Connect. Gestão de Ativos (Sprint 8): listar ativos/baixados, criar/editar/vender (idempotência refletindo o 400 do backend)/excluir, drill-down abrindo fora do card mostrando total+transações, toggle despesa/receita refazendo as chamadas com o `tipo` selecionado, sparkline no card quando há dado de tendência; `PeriodFilter` isolado disparando `onChange` ao trocar mês/ano. Ativos/Passivos no Dashboard (Sprint 9): cards Ativos (com toggle)/Passivos (sem toggle) abrindo o drill-down correto, card Saldo ignorando o filtro ano/mês, ícone de meio de pagamento por linha, ordenação por coluna (clique no cabeçalho, alterna asc/desc), `CardSparkline`/`TrendChart`/`useTableSort` isolados; `AssetsPage.test.tsx` sem mudança de assertion pós-refactor. Revisão pós-entrega: funil Categoria>Tipo>Transação (sanfona nos dois níveis, percentual em cada nível contra o total do nível acima), ícone dentro da célula Valor, coluna % ordenável, limite de crédito entre parênteses no card do cartão, `categoryColors.test.ts` isolado (atribuição estável por id, wrap após 8 grupos, fallback neutro, tint por grupo).
+Sprint cross-epic disparada por 8 ajustes que o CEO levantou usando o app
+na prática pós-Sprint 9 (não coberta por PRD anterior) — ver
+[PRD-010](../prd/PRD-010-revisao-ux-e-passivos.md).
+
+- **Investigação NuTag — achado sistêmico, não isolado:** consulta via SSH
+  às transações reais do usuário confirmou que `tipo` está correto
+  (`PluggyTransaction.tipo` já reflete fielmente o dado bruto da Pluggy);
+  o problema real é que a agregação de receita/despesa (`_sum_tipo`/
+  `_base_query` em `app/dashboards/service.py`) somava toda transação
+  `tipo=credito` como receita, sem considerar o tipo de conta. Em conta de
+  **cartão de crédito**, `credito` é **sempre** pagamento de fatura ou
+  estorno/reversão de compra — confirmado empiricamente (100% das 43
+  transações `cartao_credito`+`credito` da conta real do CEO têm `valor`
+  negativo, contra 100% dos `debito` com `valor` positivo, mesma
+  convenção de sinal já validada na Sprint 5 para saldo/fatura), nunca
+  receita real. NuTag era só o caso mais visível (pedágio recorrente);
+  o mesmo padrão afetava "Pagamento recebido" (-R$31.119 histórico),
+  estornos de NuPay, IOF de assinatura, créditos de devolução de compra
+  etc. **Fix:** `_base_query` passa a excluir `cartao_credito`+`credito`
+  da agregação de receita/despesa — filtro de query, **sem mutar dado
+  bruto** (flipar `tipo` nas linhas quebraria o cálculo de fatura/saldo
+  já validado, que depende do sinal de `credito` nesse tipo de conta).
+  Decisão de escopo (confirmada com o CEO durante a execução, dado que a
+  causa raiz não era isolada como o PRD original assumia): aplicar a
+  correção sistêmica completa agora, não só nas linhas de NuTag.
+- **`asset_categorization_rules` (migration `0011`):** mirror exato de
+  `categorization_rules` trocando `subcategory_id` por `asset_id`.
+  `suggest_asset`/`suggest_asset_from_index` (`app/categorization/
+  engine.py`) reescritos pro mesmo padrão de 3 camadas de
+  `suggest_category` (regra exata > histórico confirmado exato >
+  similaridade `difflib >= 0.86`) — antes era só "contains" simples.
+  Tabela começa vazia (diferente de `categorization_rules`, que já tem
+  328 regras herdadas do v1); a sugestão de ativo depende mais da camada
+  de histórico até o usuário confirmar itens suficientes.
+- **`has_asset`/`group_id` em `GET /categorization/transactions`:**
+  filtros independentes e combináveis com os já existentes
+  (`status`/`tipo`/`ano`/`mes`, todos `AND`). `group_id` filtra pela
+  subcategoria pertencer ao grupo (join direto `Subcategory.group_id`,
+  sem precisar de `CategoryGroup`).
+- **`GET /dashboards/patrimonio/breakdown`:** expõe as 4 partes que
+  `_calcula_patrimonio` já somava internamente (ativos, passivos, saldo
+  de contas não-cartão, saldo de cartões) — `_calcula_patrimonio`
+  refatorado com helper `_patrimonio_breakdown` (mesmo padrão de reuso de
+  `_ativos_e_passivos` na Sprint 9), nunca diverge do `patrimonio` de
+  `GET /dashboards/summary`.
+- **`PluggyTransactionOut` ganha `descricao_usuario`/`descricao_sugerida`/
+  `subcategoria_sugerida_id`/`asset_id`/`asset_sugerido_id`** — campos que
+  já existiam no model desde a Sprint 4/7, mas nunca eram expostos por
+  `GET /pluggy/transactions`; necessário pra edição inline funcionar nos
+  drill-downs do Dashboard/Ativos/Passivos (que usam esse endpoint, não
+  `/categorization/transactions`, por causa dos filtros específicos de
+  cada drill-down — `subcategory_id`/`asset_id`/`liability_id`/
+  `competencia`).
+- **Frontend — componentes de edição compartilhados
+  (`TransactionEditCells.tsx`):** `DescriptionCell`/`CategorySelectCell`/
+  `AssetSelectCell` extraídos de `CategorizationReviewPage.tsx`,
+  reaproveitados em `TransacoesPanel` (Dashboard) e nos drill-downs de
+  Ativos/Passivos (`AssetDrilldown`/`LiabilityDrilldown`). `CategorySelectCell`
+  fica de fora da extração em `CategorizationReviewPage` — a fila de
+  pendentes tem um workflow de confirmação em lote (seleção não salva
+  sozinha, fica pendente de "Confirmar"/aprovação em lote) que diverge do
+  auto-save do componente compartilhado; forçar essa asimetria dentro do
+  componente compartilhado teria sido uma abstração vazando, não uma
+  simplificação real.
+- **Mutations de edição de transação invalidam o Dashboard também:**
+  `useSetCategory`/`useSetTransactionAsset`/`useUpdateDescription`/
+  `useSetTransactionLiability` passam a chamar
+  `invalidateAfterTransactionEdit` (novo `hooks/invalidateDashboardQueries.ts`)
+  — invalida `categorizationTransactions`/`pluggyTransactions` mais
+  qualquer query cuja chave comece com `"dashboard"` ou seja
+  `"saldoPorConta"` (via `predicate`, não lista fixa) — uma edição feita a
+  partir do drill-down do Dashboard atualiza a própria tela sem F5.
+- **`CardSparkline.tsx`:** prop `values: number[]` → `pontos:
+  {ano,mes,total}[]` (mesmo formato de `PontoTendencia`/`TrendChart`).
+  Tooltip mostrava `"v:"` (nome da série interno) sem mês/ano; agora
+  mostra `"MM/AAAA"` (via `XAxis dataKey` + `name="Valor"` no `<Line>`,
+  sem `labelFormatter` suprimindo o rótulo), `itemStyle`/`labelStyle`
+  com `fontSize: 12` explícito (consistente com `TrendChart`).
+- **`DashboardsPage.tsx` — card Patrimônio clicável:** novo
+  `PatrimonioBreakdownPanel` (tabela de 4 linhas + total, cada linha
+  linkando pro drill-down já existente de Ativos/Passivos/Saldo via
+  `abrirFunil`, sem duplicar UI).
+- **`LiabilitiesPage.tsx` nova** (mirror 1:1 de `AssetsPage.tsx`) — o
+  backend de CRUD (`app/liabilities/`) já existia completo e testado
+  desde a Sprint 2, só nunca tinha ganhado UI. Sem toggle despesa/receita
+  (passivo é sempre débito) e sem `data_aquisicao`; ação "Quitar"
+  (confirmação via `window.confirm`, sem form) no lugar de "Vender".
+- **`CategorizationReviewPage.tsx`:** filtros novos "associado a ativo"
+  (todos/sim/não) e "categoria" (grupo, dropdown); `TransactionTipoIcon`
+  novo (mesmo padrão visual de `AccountTipoIcon` — SVG inline 14x14,
+  `aria-hidden`) ao lado do valor de cada linha, indicando débito/crédito
+  — reduz a chance da confusão do NuTag se repetir.
+- **`ProtectedPage.tsx` — nav:** aba "Início" (stub sem dado próprio)
+  removida, "Dashboards" vira a aba inicial; aba "Passivos" nova; "Gestão
+  de Contas" move pro final. Ordem final: Dashboards, Categorizar,
+  Ativos, Passivos, Gestão de Contas.
+- **QA visual (`scripts/browser-check/check-sprint10.mjs`):** confirmado
+  contra dado real da conta do CEO na VM de dev — nav sem Início/com
+  Passivos/ordem final, tooltip do sparkline mostrando "05/2026" (não
+  "v:"), breakdown de Patrimônio com as 4 partes batendo com o total,
+  controles de edição inline presentes no drill-down do Dashboard
+  (verificados só por presença — os selects salvam ao trocar, sem
+  diálogo de confirmação, então o script nunca dispara `onChange`
+  neles), filtros novos de Categorização, CRUD+drill-down de Passivos
+  (único mutador do script, desfeito no final). Confirmação empírica do
+  fix do NuTag: Receita de agosto/2026 caiu de um valor inflado por
+  pagamento de fatura/estornos de cartão pra R$56,40 (só receita real).
+- **Migration `0011`** (reversível): `asset_categorization_rules` nova.
+  Nenhuma mudança de schema em `PluggyTransaction`/`Asset`/`Liability` —
+  todos os campos usados já existiam desde Sprint 4/9. Correção do NuTag
+  não precisou de migration nem `UPDATE` em dado — é fix de lógica de
+  agregação, não de dado armazenado.
+
+## Qualidade (Sprint 1 → Sprint 10)
+
+- **Testes backend:** 297 testes, 98% cobertura total. Sprint 10 (100% em `app/dashboards/` e `app/categorization/`): `suggest_asset` mirror completo dos testes de categoria (regra > histórico exato > similaridade `>=0.86`, isolamento); `has_asset`/`group_id` isolados e combinados entre si e com filtros existentes; `get_patrimonio_breakdown` batendo exatamente com `summary.patrimonio`; `cartao_credito`+`credito` excluído da receita (o achado do NuTag) enquanto `corrente`+`credito` continua contando normalmente; `GET /dashboards/patrimonio/breakdown` isolado por usuário, 401 sem cookie. Auth (Sprint 1), dados mestres (Sprint 2, 97%), Pluggy (Sprint 3, 98%), categorização (Sprint 4, paginação/filtro ano-mes pós-Sprint 6) — ver histórico nos relatórios de sprint. Dashboards (Sprint 5+6, 100% em `app/dashboards/`): período vazio, período só com "Transferência interna" (totais zerados), misto débito/crédito, sinal do saldo de `cartao_credito` na fórmula de patrimônio, ativos/passivos inativos excluídos, borda de mês (`data_competencia` no limite entre meses), soma de `/por-categoria` batendo com `/summary`, isolamento entre usuários; tendência terminando no mês filtrado (não no calendário), mês sem transação aparecendo zerado, tendência por categoria com bucket "Não categorizado", percentual somando 100% (menos arredondamento) e retornando `0` com denominador zero. Categorização/Pluggy (Sprint 7, 99%): filtro status/tipo em todas as combinações, bulk-confirm parcial (linha inválida não bloqueia as demais), `set_category` em transação já confirmada, propagação de descrição (match normalizado + mesma categoria, isolamento por usuário, "primeira grava, segunda não sobrescreve"), `sync_item`/`sync_items` pulando conta com `sync_enabled=False`, `apelido` preservado em resync. Gestão de Ativos (Sprint 8, 100% em `app/assets/` e `app/dashboards/`): `get_por_ativo` filtrando por `tipo` (período vazio, ativo sem transação vinculada, isolamento), `get_tendencia_por_ativo` zero-preenchendo meses sem transação e isolado por `tipo`/usuário, filtro `asset_id`/`tipo` em `/pluggy/transactions` combinados com outros filtros, `delete_asset` desassociando transações vinculadas em vez de falhar. Ativos/Passivos no Dashboard (Sprint 9, 100% em `app/dashboards/`): `suggest_liability` (substring, isolamento, sem match), `set_transaction_liability` (sets/clears, 404 cross-user), `delete_liability` desassociando (crítico, mirror de `delete_asset`), `get_por_passivo`/`get_tendencia_por_passivo` (nunca soma crédito, zero-preenchida, isolamento), `get_saldo_por_conta` (apelido→nome, isolamento), `summary.ativos`/`summary.passivos` batendo com a mesma base de `patrimonio`, filtro `liability_id` combinado com outros filtros, `account_tipo` na resposta de `/pluggy/transactions`. Revisão pós-entrega: `_upsert_account` persistindo/deixando `None` os campos de `creditData`, `get_saldo_por_conta` de cartão somando a janela da fatura (limite, exclui fora da janela, nunca soma crédito, cai pro saldo bruto sem `fatura_vencimento`), `_subtract_month` (rollover de ano, clamp de dia).
+- **Testes frontend:** 92 testes (Vitest + Testing Library) — renderização condicional, tratamento de 401, mock fetch, widget Pluggy Connect mockado. Sprint 10: `LiabilitiesPage.test.tsx` (mirror de `AssetsPage.test.tsx` — listar ativos/quitados, criar/editar/quitar+idempotência 400/excluir, drill-down com edição inline), `CardSparkline.test.tsx` atualizado pra `pontos`, `ProtectedPage.test.tsx` (nav sem Início, ordem final, troca de aba), filtros novos e ícone débito/crédito em `CategorizationReviewPage.test.tsx`, edição inline no drill-down do Dashboard invalidando `dashboardSummary` em `DashboardsPage.test.tsx`. Dashboards (Sprint 5+6): cards a partir de dado mockado, refetch ao trocar filtro ano/mês, sparkline a partir de tendência mockada, refetch ao trocar seletor de período histórico, sanfona expandindo múltiplos níveis sem esconder os anteriores (e mantendo duas categorias expandidas ao mesmo tempo), percentual exibido em cada nível, estado vazio. Categorização (Sprint 7): filtro tipo/status disparando refetch, seleção em lote + "Aprovar marcadas" chamando bulk-confirm, edição de descrição + propagação chamando o endpoint certo, aceitar sugestão de descrição. Gestão de Contas (Sprint 7): apelido/sync_enabled salvos via PUT, diálogo de sincronização unificada pré-selecionado a partir de `sync_enabled` e confirmando com os `item_ids` corretos, fluxo de conexão via widget Pluggy Connect. Gestão de Ativos (Sprint 8): listar ativos/baixados, criar/editar/vender (idempotência refletindo o 400 do backend)/excluir, drill-down abrindo fora do card mostrando total+transações, toggle despesa/receita refazendo as chamadas com o `tipo` selecionado, sparkline no card quando há dado de tendência; `PeriodFilter` isolado disparando `onChange` ao trocar mês/ano. Ativos/Passivos no Dashboard (Sprint 9): cards Ativos (com toggle)/Passivos (sem toggle) abrindo o drill-down correto, card Saldo ignorando o filtro ano/mês, ícone de meio de pagamento por linha, ordenação por coluna (clique no cabeçalho, alterna asc/desc), `CardSparkline`/`TrendChart`/`useTableSort` isolados; `AssetsPage.test.tsx` sem mudança de assertion pós-refactor. Revisão pós-entrega: funil Categoria>Tipo>Transação (sanfona nos dois níveis, percentual em cada nível contra o total do nível acima), ícone dentro da célula Valor, coluna % ordenável, limite de crédito entre parênteses no card do cartão, `categoryColors.test.ts` isolado (atribuição estável por id, wrap após 8 grupos, fallback neutro, tint por grupo).
 - **Lint:** ruff (Python), eslint (TypeScript) — suíte 100% verde
 - **Pre-commit:** ruff, eslint, detect-secrets (baseline) — executado local antes de push
 - **CI:** GitHub Actions — jobs `backend` (ruff check/format, pytest) e `frontend` (eslint, prettier, tsc, vitest) — roda em push/PR para `main`

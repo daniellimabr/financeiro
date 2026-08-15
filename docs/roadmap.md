@@ -261,26 +261,30 @@ Relatório: [SPRINT-009-dashboards-ativos-passivos-report.md](sprints/SPRINT-009
 
 Inserida antes da sprint "tabela moderna" (que passa a ser Sprint 11) a
 partir de uma lista de ajustes que o CEO levantou usando o app na prática
-pós-Sprint 9. Cobre 8 frentes: investigação + correção pontual de
-transações "NuTag" contando como receita (achado da pesquisa: não existe
-hoje campo de categoria que controle receita/despesa — só
-`PluggyTransaction.tipo`, vindo do sync da Pluggy, sem override manual;
-decisão do CEO foi corrigir o dado, não construir uma feature de
-override); fusão da aba "Início" (stub sem dado próprio) em "Dashboards";
-fix do tooltip dos gráficos (mostrava "v:" em vez de mês/ano, fonte
-grande); drill-down do card "Patrimônio" com a composição do cálculo
-(ativos/passivos/saldo de contas/saldo de cartões); edição inline de
-descrição/categoria/ativo a partir do drill-down do Dashboard (reaproveita
-os endpoints já usados na tela de Categorização); tela nova de Gestão de
-Passivos (CRUD + quitação — o backend já existia completo desde a
-Sprint 2, só nunca ganhou UI); filtros novos na tela de Categorização
-(associado a ativo, categoria/grupo) e motor de sugestão de ativo elevado
-ao mesmo padrão de 3 camadas (regra + histórico + similaridade) já usado
-para categoria; reordenação do menu ("Gestão de Contas" passa a ser o
-último item).
+pós-Sprint 9. Cobre 8 frentes: investigação de transações "NuTag"
+contando como receita — a causa raiz, descoberta só com dado real na
+execução, não era isolada como o PRD original supunha: em conta de
+cartão de crédito, `tipo=credito` é *sempre* pagamento de fatura ou
+estorno (nunca receita), mas a agregação somava toda transação `credito`
+como receita sem considerar o tipo de conta. Corrigido na agregação
+(`_base_query`, sem mutar dado bruto), com o aval do CEO pra aplicar o
+fix completo (não só nas linhas de NuTag) durante a própria execução;
+fusão da aba "Início" (stub sem dado próprio) em "Dashboards"; fix do
+tooltip dos gráficos (mostrava "v:" em vez de mês/ano, fonte grande);
+drill-down do card "Patrimônio" com a composição do cálculo (ativos/
+passivos/saldo de contas/saldo de cartões); edição inline de descrição/
+categoria/ativo a partir do drill-down do Dashboard/Ativos/Passivos
+(reaproveita os endpoints já usados na tela de Categorização); tela nova
+de Gestão de Passivos (CRUD + quitação — o backend já existia completo
+desde a Sprint 2, só nunca ganhou UI); filtros novos na tela de
+Categorização (associado a ativo, categoria/grupo) e motor de sugestão de
+ativo elevado ao mesmo padrão de 3 camadas (regra + histórico +
+similaridade) já usado para categoria; reordenação do menu ("Gestão de
+Contas" passa a ser o último item).
 
 PRD: [PRD-010-revisao-ux-e-passivos.md](prd/PRD-010-revisao-ux-e-passivos.md).
 Plano: [SPRINT-010-revisao-ux-e-passivos-plan.md](sprints/SPRINT-010-revisao-ux-e-passivos-plan.md).
+Relatório: [SPRINT-010-revisao-ux-e-passivos-report.md](sprints/SPRINT-010-revisao-ux-e-passivos-report.md).
 
 ### Sprint 11 — Categorização: tabela moderna (E3, polish)
 *Escopo ainda não detalhado em PRD/plano — planejar em sessão própria.*
