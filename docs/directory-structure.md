@@ -205,7 +205,7 @@ Financeiro v3/
 │   │   │   └── useAssetGastos.ts             # GET /dashboards/por-ativo, com período (Sprint 8)
 │   │   └── pages/
 │   │       ├── LoginPage.tsx       # botão "Entrar com Google" (link para /auth/google/login)
-│   │       ├── ProtectedPage.tsx   # nome/e-mail do usuário + abas Início/Dashboards/Categorizar/Gestão de contas (Sprint 5; aba Transações removida, Conectar conta renomeada na Sprint 7)
+│   │       ├── ProtectedPage.tsx   # nome/e-mail do usuário + abas Início/Dashboards/Categorizar/Gestão de contas/Ativos (Sprint 5; aba Transações removida e Conectar conta renomeada na Sprint 7; aba Ativos na Sprint 8)
 │   │       ├── DashboardsPage.tsx  # filtro ano/mês, 4 cards com sparkline, funil de drill-down em sanfona + Recharts (Sprint 5, sanfona/tendência/percentual na Sprint 6)
 │   │       ├── AccountManagementPage.tsx  # Gestão de Contas — lista contas conectadas, apelido/sync_enabled editáveis, diálogo "Sincronizar MeuPluggy" com pré-seleção (Sprint 7, renomeado de ConnectAccountPage.tsx)
 │   │       ├── CategorizationReviewPage.tsx  # listagem única de transações (substitui TransactionsPage) — filtro tipo/status, lote, categoria editável em confirmada, descrição inline + propagação (Sprint 4; paginação pós-Sprint 6; rework completo na Sprint 7)

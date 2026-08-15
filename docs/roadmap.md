@@ -171,7 +171,7 @@ em `delete_asset`. Testes backend (232 passed, 98% cobertura) + frontend
 drill-down, desktop/mobile, 3 test assets criados na VM como side effect.
 PRD: [PRD-008-gestao-de-ativos.md](prd/PRD-008-gestao-de-ativos.md).
 Plano: [SPRINT-008-gestao-de-ativos-plan.md](sprints/SPRINT-008-gestao-de-ativos-plan.md).
-Relatório: [SPRINT-008-gestao-de-ativos-report.md](sprints/SPRINT-008-gestao-de-ativos-report.md) — aprovado pelo CEO em 2026-08-15.
+Relatório: [SPRINT-008-gestao-de-ativos-report.md](sprints/SPRINT-008-gestao-de-ativos-report.md).
 
 ### Sprint 9 — Dashboard analítico: Ativos/Passivos e refinamentos (E6, parte 3)
 *Escopo ainda não detalhado em PRD/plano — planejar em sessão própria.*

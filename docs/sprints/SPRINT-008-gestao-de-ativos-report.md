@@ -86,7 +86,7 @@ npx prettier --check . → All matched files use Prettier code style!
 
 2. **Sem bucket "sem ativo" em `/dashboards/por-ativo`** — conforme PRD-008 §Regras de negócio, a maioria das despesas não tem `asset_id` (é esperado, não pendência de revisão). Endpoint só retorna ativos com pelo menos uma transação vinculada no período.
 
-3. **`PeriodFilter` como componente novo** — duplicação de `<select>` ano/mês existia em `DashboardsPage` e `CategorizationReviewPage`; terceira cópia idêntica entraria em `AssetsPage`, justificando extração. Componente sem estado próprio (props `year`/`month`/`onChange`), permite reutilização sem trava de implementação.
+3. **`PeriodFilter` como componente novo** — duplicação de `<select>` ano/mês existia em `DashboardsPage` e `CategorizationReviewPage`; terceira cópia idêntica entraria em `AssetsPage`, justificando extração. Componente sem estado próprio (props `ano`/`mes`/`onChange`), permite reutilização sem trava de implementação.
 
 4. **Bug de locator no script QA corrigido durante a sprint** — `check-ativos.mjs` original reusava locator "Ver gasto" após toggle ("Fechar gasto"), causando timeout no segundo clique. Fixo com re-query por label dinâmico (commit bca449f, não requer redeploy, é ferramental).
 
@@ -127,4 +127,4 @@ Modernização visual da tabela de Categorização (hoje HTML puro) reaproveitan
 
 ---
 
-**Aprovado pelo CEO em 2026-08-15.** Documentação viva atualizada; pronto para próxima sessão.
+Aguardando revisão e aprovação do CEO.
