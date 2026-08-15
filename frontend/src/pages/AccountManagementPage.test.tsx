@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -171,9 +171,7 @@ describe("AccountManagementPage", () => {
     expect((checkboxes[0] as HTMLInputElement).checked).toBe(true);
     expect((checkboxes[1] as HTMLInputElement).checked).toBe(false);
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "Confirmar sincronização" }, { container: dialog })
-    );
+    await userEvent.click(within(dialog).getByRole("button", { name: "Confirmar sincronização" }));
 
     await waitFor(() => {
       const call = fetchMock.mock.calls.find(

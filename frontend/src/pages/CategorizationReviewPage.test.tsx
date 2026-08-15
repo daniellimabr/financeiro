@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { CategorizedTransaction } from "../api/categorization";
 import { CategorizationReviewPage } from "./CategorizationReviewPage";
 
 const GROUP_FIXTURE = {
@@ -22,7 +23,7 @@ const SUBCATEGORY_FIXTURE = {
   updated_at: "2026-08-14T00:00:00Z",
 };
 
-const BASE_TRANSACTION = {
+const BASE_TRANSACTION: CategorizedTransaction = {
   id: 1,
   account_id: 1,
   user_id: 1,
@@ -59,18 +60,15 @@ function renderWithQueryClient(ui: ReactNode) {
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
-function transactionsPage(items: (typeof BASE_TRANSACTION)[], total = items.length) {
+function transactionsPage(items: CategorizedTransaction[], total = items.length) {
   return { items, total, page: 1, page_size: 20 };
 }
 
-function baseHandlers(fetchMock: ReturnType<typeof vi.fn>) {
-  return (url: string) => {
-    if (url === "/category-groups") return Promise.resolve(jsonResponse([GROUP_FIXTURE]));
-    if (url === "/subcategories") return Promise.resolve(jsonResponse([SUBCATEGORY_FIXTURE]));
-    if (url === "/assets") return Promise.resolve(jsonResponse([]));
-    void fetchMock;
-    return null;
-  };
+function baseHandlers(url: string): Promise<Response> | null {
+  if (url === "/category-groups") return Promise.resolve(jsonResponse([GROUP_FIXTURE]));
+  if (url === "/subcategories") return Promise.resolve(jsonResponse([SUBCATEGORY_FIXTURE]));
+  if (url === "/assets") return Promise.resolve(jsonResponse([]));
+  return null;
 }
 
 describe("CategorizationReviewPage", () => {
@@ -81,7 +79,7 @@ describe("CategorizationReviewPage", () => {
   it("renders the pending transaction with the suggested category pre-selected", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
-      const base = baseHandlers(fetchMock)(url);
+      const base = baseHandlers(url);
       if (base) return base;
       if (url.startsWith("/categorization/transactions"))
         return Promise.resolve(jsonResponse(transactionsPage([BASE_TRANSACTION])));
@@ -101,7 +99,7 @@ describe("CategorizationReviewPage", () => {
   it("defaults to status=pendente in the request", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
-      const base = baseHandlers(fetchMock)(url);
+      const base = baseHandlers(url);
       if (base) return base;
       if (url.startsWith("/categorization/transactions"))
         return Promise.resolve(jsonResponse(transactionsPage([BASE_TRANSACTION])));
@@ -121,7 +119,7 @@ describe("CategorizationReviewPage", () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
-      const base = baseHandlers(fetchMock)(url);
+      const base = baseHandlers(url);
       if (base) return base;
 
       if (url.startsWith("/categorization/transactions") && method === "GET") {
@@ -152,7 +150,7 @@ describe("CategorizationReviewPage", () => {
   it("refetches with the mes filter when the select changes", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
-      const base = baseHandlers(fetchMock)(url);
+      const base = baseHandlers(url);
       if (base) return base;
       if (url.startsWith("/categorization/transactions"))
         return Promise.resolve(jsonResponse(transactionsPage([BASE_TRANSACTION])));
@@ -176,7 +174,7 @@ describe("CategorizationReviewPage", () => {
   it("advances to the next page and requests page=2", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
-      const base = baseHandlers(fetchMock)(url);
+      const base = baseHandlers(url);
       if (base) return base;
       if (url.startsWith("/categorization/transactions"))
         return Promise.resolve(jsonResponse(transactionsPage([BASE_TRANSACTION], 25)));
@@ -204,7 +202,7 @@ describe("CategorizationReviewPage", () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
-      const base = baseHandlers(fetchMock)(url);
+      const base = baseHandlers(url);
       if (base) return base;
 
       if (url.startsWith("/categorization/transactions") && method === "GET")
@@ -240,7 +238,7 @@ describe("CategorizationReviewPage", () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
-      const base = baseHandlers(fetchMock)(url);
+      const base = baseHandlers(url);
       if (base) return base;
 
       if (url.startsWith("/categorization/transactions") && method === "GET")
@@ -282,7 +280,7 @@ describe("CategorizationReviewPage", () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
-      const base = baseHandlers(fetchMock)(url);
+      const base = baseHandlers(url);
       if (base) return base;
 
       if (url.startsWith("/categorization/transactions") && method === "GET")
