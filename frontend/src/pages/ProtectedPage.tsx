@@ -12,26 +12,57 @@ interface ProtectedPageProps {
 
 type Tab = "inicio" | "dashboards" | "conectar" | "transacoes" | "categorizar";
 
+const NAV_ITEMS: { tab: Tab; label: string }[] = [
+  { tab: "inicio", label: "Início" },
+  { tab: "dashboards", label: "Dashboards" },
+  { tab: "transacoes", label: "Transações" },
+  { tab: "categorizar", label: "Categorizar" },
+  { tab: "conectar", label: "Conectar conta" },
+];
+
 export function ProtectedPage({ user }: ProtectedPageProps) {
   const [tab, setTab] = useState<Tab>("inicio");
 
   return (
-    <main>
-      <h1>Bem-vindo, {user.name}</h1>
-      <p>{user.email}</p>
+    <div className="app-shell">
+      <aside className="app-sidebar">
+        <p className="app-brand">Financeiro</p>
 
-      <nav>
-        <button onClick={() => setTab("inicio")}>Início</button>
-        <button onClick={() => setTab("dashboards")}>Dashboards</button>
-        <button onClick={() => setTab("conectar")}>Conectar conta</button>
-        <button onClick={() => setTab("transacoes")}>Transações</button>
-        <button onClick={() => setTab("categorizar")}>Categorizar</button>
-      </nav>
+        <nav className="app-nav" aria-label="Navegação principal">
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.tab}
+              type="button"
+              className={item.tab === tab ? "active" : undefined}
+              aria-current={item.tab === tab ? "page" : undefined}
+              onClick={() => setTab(item.tab)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
 
-      {tab === "dashboards" && <DashboardsPage />}
-      {tab === "conectar" && <ConnectAccountPage />}
-      {tab === "transacoes" && <TransactionsPage />}
-      {tab === "categorizar" && <CategorizationReviewPage />}
-    </main>
+        <div className="app-user">
+          <p className="app-user-name">{user.name}</p>
+          <p className="app-user-email">{user.email}</p>
+        </div>
+      </aside>
+
+      <main className="app-main">
+        {tab === "inicio" && (
+          <section className="app-home">
+            <h1>Bem-vindo, {user.name}</h1>
+            <p>
+              Use <strong>Dashboards</strong> para ver receita, despesa, saldo e patrimônio do mês,
+              ou <strong>Transações</strong> para conferir o extrato sincronizado.
+            </p>
+          </section>
+        )}
+        {tab === "dashboards" && <DashboardsPage />}
+        {tab === "conectar" && <ConnectAccountPage />}
+        {tab === "transacoes" && <TransactionsPage />}
+        {tab === "categorizar" && <CategorizationReviewPage />}
+      </main>
+    </div>
   );
 }

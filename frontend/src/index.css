@@ -123,6 +123,23 @@ p {
 button {
   font: inherit;
   cursor: pointer;
+  background: var(--surface);
+  color: var(--text-h);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: var(--space-2) var(--space-4);
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+button:hover {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 a {
@@ -134,9 +151,62 @@ a {
   outline-offset: 2px;
 }
 
+section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
 table {
   border-collapse: collapse;
   width: 100%;
+}
+
+th,
+td {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+
+thead th {
+  color: var(--text);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+}
+
+ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+li {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+
+select,
+input {
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-h);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: var(--space-2) var(--space-3);
+}
+
+.dash-list li {
+  padding: 0;
+  border-bottom: none;
 }
 
 .login-hero {
@@ -166,6 +236,134 @@ table {
 
 .login-hero a:hover {
   border-color: var(--accent);
+}
+
+/* ==================== App shell ==================== */
+
+.app-shell {
+  display: flex;
+  min-height: 100svh;
+}
+
+.app-sidebar {
+  flex: 0 0 240px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: var(--space-5);
+}
+
+.app-brand {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-h);
+  margin: 0;
+}
+
+.app-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+}
+
+.app-nav button {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text);
+}
+
+.app-nav button:hover {
+  background: var(--accent-bg);
+  color: var(--text-h);
+}
+
+.app-nav button.active {
+  background: var(--accent-bg);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.app-user {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.app-user-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.app-user-email {
+  font-size: var(--text-xs);
+  color: var(--text);
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  padding: var(--space-6);
+  overflow-y: auto;
+}
+
+.app-home {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 60ch;
+}
+
+.app-home p {
+  color: var(--text);
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    flex-direction: column;
+  }
+
+  .app-sidebar {
+    flex: none;
+    flex-direction: row;
+    align-items: center;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    gap: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .app-nav {
+    flex-direction: row;
+    flex: none;
+    overflow-x: auto;
+  }
+
+  .app-nav button {
+    white-space: nowrap;
+  }
+
+  .app-user {
+    border-top: none;
+    padding-top: 0;
+    margin-left: auto;
+    text-align: right;
+  }
 }
 
 /* ==================== Dashboards ==================== */

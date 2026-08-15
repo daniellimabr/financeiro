@@ -161,9 +161,14 @@ align in columns without extra markup.
 
 ## Layout
 
-Single-column, content-centered layout, `max-width: 880px`, generous
-`24px` page padding. The summary tiles form a responsive grid
-(`repeat(auto-fit, minmax(180px, 1fr))`) that reflows from 4-across on
+The app lives inside a persistent two-column shell — `240px` sidebar,
+fluid main content — described under Components → Navigation. Every screen
+renders inside the shell's main area; no screen owns its own top-level
+chrome or repeats the nav.
+
+Within the main area, screens are single-column, content-centered,
+`max-width: 880px`, generous `24px` page padding. The summary tiles form a
+responsive grid (`repeat(auto-fit, minmax(180px, 1fr))`) that reflows from 4-across on
 desktop to 2-across on narrow viewports without a breakpoint query. The
 funnel (categoria → meio de pagamento → linha de extrato) renders as one
 persistent panel below the summary, replacing its own contents per drill
@@ -196,12 +201,32 @@ read as "a form field" rather than "a bubble."
 ## Components
 
 ### Buttons
-- **Shape:** `8px` radius, 1px border, flat.
-- **Secondary** (`.dash-back`, filter chrome): `var(--surface)` background,
-  `var(--text-h)` label, border shifts to `var(--accent)` on hover — no
-  background fill change.
-- **Ghost** (breadcrumb crumbs): no border, underlined `var(--accent-text)`
-  label, used only for in-place navigation, never for a primary action.
+- **Shape:** `8px` radius, 1px border, flat. This is the base `button`
+  element style in `index.css` — every button in the app inherits it by
+  default; a page never needs to hand-style a plain action button.
+- **Default/Secondary** (sync, confirm, connect actions; `.dash-back`,
+  filter chrome): `var(--surface)` background, `var(--text-h)` label,
+  border shifts to `var(--accent)` on hover — no background fill change.
+  `disabled` drops to `0.5` opacity with a not-allowed cursor.
+- **Ghost** (breadcrumb crumbs, sidebar nav items): no border, background
+  transparent at rest. Breadcrumb crumbs underline in `var(--accent-text)`;
+  nav items instead fill `var(--accent-bg)` on hover/active — see
+  Navigation below for why the two ghost variants differ.
+- **The One Button Rule.** There is exactly one visual button system in the
+  app. A page that needs a button reaches for the base element, never a
+  bespoke class — `TransactionsPage`'s sync button and `DashboardsPage`'s
+  clickable tile share the same `border-radius`/`border`/`hover` contract
+  even though one is plain and one is a `.dash-tile`.
+
+### Cards / Containers ("tiles")
+- **Corner Style:** `12px` radius.
+- **Background:** `var(--surface)`, 1px `var(--border)`.
+- **Shadow Strategy:** none — see Elevation & Depth.
+- **Interactive variant** (Receita/Despesa summary tiles): identical to the
+  static tile, but the border brightens to `var(--accent)` on hover/focus,
+  and the tile is a real `<button>` — the only visual delta between a
+  drillable and a static total is that one border-color change, deliberately
+  subtle rather than a competing color block.
 
 ### Cards / Containers ("tiles")
 - **Corner Style:** `12px` radius.
@@ -222,10 +247,30 @@ inline bar echoes the Recharts chart above it at a glance-able, scannable
 grain; the chart gives shape, the row gives the exact number and the click
 target.
 
-### Navigation (breadcrumb)
-Plain text trail (`Despesa / Alimentação / Cartão de crédito`), each prior
-step an underlined ghost button, the current step un-clickable bold text.
-No pill/chip styling — this is a path, not a filter state.
+### Navigation
+
+**App shell (sidebar):** the whole app lives inside a two-column shell
+(`.app-shell`) — a fixed `240px` sidebar (`var(--surface)`, right border)
+holding the brand mark, the primary nav, and the signed-in user's
+name/email pinned to the bottom; the rest of the viewport is the scrolling
+main content area (`var(--bg)`). Below `720px` the sidebar rotates into a
+horizontal top bar with a scrollable nav row — the same five items, never a
+hamburger menu, since this is a 5-item nav for a 2-person household, not an
+app large enough to earn a drawer.
+
+Nav items are full-width ghost buttons, left-aligned, `44px` minimum touch
+height. At rest they carry no background; hovering or being the active tab
+fills `var(--accent-bg)` — active additionally sets `var(--accent-text)`
+and `font-weight: 600`, and carries `aria-current="page"`. This is
+deliberately a filled-background state, not the breadcrumb's underline —
+**the Two Ghosts Rule**: an underline marks "you can leave this level and
+return," a filled background marks "you are here now." Never swap the two
+vocabularies between the sidebar and the breadcrumb.
+
+**Breadcrumb (drill-down trail):** plain text trail (`Despesa / Alimentação
+/ Cartão de crédito`), each prior step an underlined ghost button, the
+current step un-clickable bold text. No pill/chip styling — this is a path,
+not a filter state.
 
 ### Table (linha de extrato)
 Bottom-bordered rows, uppercase 12px labels for headers, no zebra striping,
