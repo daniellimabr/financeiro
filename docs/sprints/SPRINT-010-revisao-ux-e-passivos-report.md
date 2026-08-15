@@ -1,7 +1,9 @@
 # SPRINT-010: Revisão de UX (Dashboard/Categorização) e Gestão de Passivos — Relatório
 
 - **Plano:** [SPRINT-010-revisao-ux-e-passivos-plan.md](./SPRINT-010-revisao-ux-e-passivos-plan.md)
+- **PRD:** [PRD-010-revisao-ux-e-passivos.md](../prd/PRD-010-revisao-ux-e-passivos.md)
 - **Data do relatório:** 2026-08-15
+- **Status:** aprovado pelo CEO em 2026-08-15
 
 ## Resumo
 
@@ -186,3 +188,32 @@ proporcionalmente menos.
   qualquer período é agregado (sem alterar dado armazenado).
 - Sprint 11 ("Categorização: tabela moderna") segue sem PRD/plano —
   próxima a planejar quando o CEO priorizar.
+
+## Revisão pós-entrega (mesmo dia, feedback do CEO)
+
+CEO testou o Dashboard já em produção (VM de dev) e reportou percentuais
+sem sentido (ex.: 1124.2%) no drill-down Despesa > Categoria > Tipo, com
+estornos de cartão aparecendo junto de uma despesa real na mesma
+subcategoria "Receitas / Estornos". Investigação encontrou um bug
+pré-existente da Sprint 9 (não introduzido nesta sprint): `SubcategoriaAccordion`
+nunca repassava a prop `tipo` pro `TransacoesPanel` do nível de
+transação — invisível até uma subcategoria ter transações de débito e
+crédito ao mesmo tempo, como "Estornos". Sem o filtro, a lista buscava
+todas as transações da subcategoria (os 2 tipos), enquanto o total usado
+pro cálculo de % continuava vindo só do tipo do funil aberto. Corrigido
+(`tipo` agora propagado corretamente), testado (93 testes frontend,
++1 regressão) e validado contra dado real (`GET /pluggy/transactions?
+subcategory_id=28&tipo=debito` retorna só a transação débito esperada).
+
+Duas ideias levantadas pelo CEO na mesma revisão, ambas resolvidas sem
+implementação nova:
+- **Override manual de débito/crédito por transação:** com o bug acima
+  corrigido, o CEO confirmou que não precisa mais dessa feature —
+  mantém a decisão original do PRD-010 de não construir.
+- **Camada "Ativo" no funil Categoria>Tipo>Transação:** CEO confirmou
+  que é só uma ideia pra registrar, não pra planejar agora — anotada em
+  [roadmap.md](../roadmap.md#registro-de-reavaliações-futuras).
+
+---
+
+**Sprint aprovada pelo CEO em 2026-08-15.**
