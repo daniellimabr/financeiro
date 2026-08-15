@@ -713,6 +713,16 @@ input {
   .dash-row .nm {
     flex-basis: 96px;
   }
+
+  /* Linha ganhou tendência + percentual na Sprint 6 — em telas estreitas,
+     6 elementos (chevron/nome/tendência/barra/valor/%) espremiam o valor e
+     cortavam o percentual na borda (achado real via browser-check). Barra e
+     tendência já são reforço visual do gráfico acima; nome/valor/% seguem
+     visíveis e são o essencial pra ler a linha. */
+  .dash-row .trend,
+  .dash-row .track {
+    display: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
