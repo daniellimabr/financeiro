@@ -22,8 +22,36 @@ export interface PendingTransaction {
   updated_at: string;
 }
 
-export function fetchPendingCategorizations(): Promise<PendingTransaction[]> {
-  return apiFetch<PendingTransaction[]>("/categorization/pending");
+export interface PendingTransactionsPage {
+  items: PendingTransaction[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface PendingCategorizationsFilter {
+  ano?: number;
+  mes?: number;
+  page?: number;
+  pageSize?: number;
+}
+
+function buildQuery(params: Record<string, string | number | undefined>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) search.set(key, String(value));
+  }
+  const query = search.toString();
+  return query ? `?${query}` : "";
+}
+
+export function fetchPendingCategorizations(
+  filter: PendingCategorizationsFilter = {}
+): Promise<PendingTransactionsPage> {
+  const { ano, mes, page, pageSize } = filter;
+  return apiFetch<PendingTransactionsPage>(
+    `/categorization/pending${buildQuery({ ano, mes, page, page_size: pageSize })}`
+  );
 }
 
 export function confirmCategorization(

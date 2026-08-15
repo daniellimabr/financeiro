@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -10,14 +10,25 @@ from app.schemas.categorization import (
     AssetAssociationIn,
     CategorizationConfirmIn,
     PendingTransactionOut,
+    PendingTransactionsPageOut,
 )
 
 router = APIRouter(prefix="/categorization")
 
 
-@router.get("/pending", response_model=list[PendingTransactionOut])
-def list_pending(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return service.list_pending_transactions(db, current_user.id)
+@router.get("/pending", response_model=PendingTransactionsPageOut)
+def list_pending(
+    ano: int | None = None,
+    mes: int | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    items, total = service.list_pending_transactions(
+        db, current_user.id, ano=ano, mes=mes, page=page, page_size=page_size
+    )
+    return PendingTransactionsPageOut(items=items, total=total, page=page, page_size=page_size)
 
 
 @router.post("/pending/{transaction_id}/confirm", response_model=PendingTransactionOut)

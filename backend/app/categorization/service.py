@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.categorization import engine
@@ -9,22 +10,39 @@ from app.models.category import Subcategory
 from app.models.pluggy import PluggyTransaction, PluggyTransactionCategorizacaoStatus
 
 
-def list_pending_transactions(db: Session, user_id: int) -> list[PluggyTransaction]:
+def list_pending_transactions(
+    db: Session,
+    user_id: int,
+    *,
+    ano: int | None = None,
+    mes: int | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> tuple[list[PluggyTransaction], int]:
+    query = db.query(PluggyTransaction).filter(
+        PluggyTransaction.user_id == user_id,
+        PluggyTransaction.categorizacao_status == PluggyTransactionCategorizacaoStatus.pendente,
+    )
+    if ano is not None:
+        query = query.filter(func.extract("year", PluggyTransaction.data) == ano)
+    if mes is not None:
+        query = query.filter(func.extract("month", PluggyTransaction.data) == mes)
+
+    total = query.count()
     pending = (
-        db.query(PluggyTransaction)
-        .filter(
-            PluggyTransaction.user_id == user_id,
-            PluggyTransaction.categorizacao_status == PluggyTransactionCategorizacaoStatus.pendente,
-        )
-        .order_by(PluggyTransaction.data.desc())
+        query.order_by(PluggyTransaction.data.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
         .all()
     )
 
     if pending:
-        # Regras/histórico/ativos são buscados uma única vez para todo o lote —
-        # antes eram requeridos do banco a cada transação pendente (O(P×H) de
-        # round-trips + comparações de similaridade), o que tornava a fila
-        # praticamente inutilizável com centenas de pendências reais.
+        # Regras/histórico/ativos são buscados uma única vez por chamada, e a
+        # paginação limita quantas transações têm sugestão recalculada por
+        # chamada (antes recalculava a fila inteira a cada refetch, inclusive
+        # logo após um "Confirmar" — com centenas de pendências reais isso é
+        # que tornava a tela "eternamente" lenta mesmo após a correção do
+        # N+1 original).
         rules_by_pattern = engine.build_rules_index(db, user_id)
         historico = engine.build_historico_index(db, user_id)
         assets = engine.build_assets_index(db, user_id)
@@ -34,7 +52,7 @@ def list_pending_transactions(db: Session, user_id: int) -> list[PluggyTransacti
         for tx in pending:
             db.refresh(tx)
 
-    return pending
+    return pending, total
 
 
 def _apply_suggestions(

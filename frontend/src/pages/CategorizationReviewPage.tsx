@@ -7,8 +7,31 @@ import { usePendingCategorizations } from "../hooks/usePendingCategorizations";
 import { useSetTransactionAsset } from "../hooks/useSetTransactionAsset";
 import { useSubcategories } from "../hooks/useSubcategories";
 
+const MESES = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
+
+const PAGE_SIZE = 20;
+
 export function CategorizationReviewPage() {
-  const { data: pending, isLoading } = usePendingCategorizations();
+  const now = new Date();
+  const [ano, setAno] = useState(now.getFullYear());
+  const [mes, setMes] = useState(now.getMonth() + 1);
+  const [page, setPage] = useState(1);
+
+  const { data, isLoading } = usePendingCategorizations({ ano, mes, page, pageSize: PAGE_SIZE });
+  const pending = data?.items;
   const { data: groups } = useCategoryGroups();
   const { data: subcategories } = useSubcategories();
   const { data: assets } = useAssets();
@@ -19,6 +42,14 @@ export function CategorizationReviewPage() {
     Record<number, number | undefined>
   >({});
   const [selectedAsset, setSelectedAsset] = useState<Record<number, number | undefined>>({});
+
+  const totalPaginas = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
+
+  function mudarFiltro(novoAno: number, novoMes: number) {
+    setAno(novoAno);
+    setMes(novoMes);
+    setPage(1);
+  }
 
   function subcategoryLabel(subcategoryId: number): string {
     const subcategory = subcategories?.find((s) => s.id === subcategoryId);
@@ -31,8 +62,39 @@ export function CategorizationReviewPage() {
     <section>
       <h2>Categorização</h2>
 
+      <div className="dash-filter">
+        <label>
+          Mês
+          <select
+            aria-label="Mês"
+            value={mes}
+            onChange={(event) => mudarFiltro(ano, Number(event.target.value))}
+          >
+            {MESES.map((nome, index) => (
+              <option key={nome} value={index + 1}>
+                {nome}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Ano
+          <select
+            aria-label="Ano"
+            value={ano}
+            onChange={(event) => mudarFiltro(Number(event.target.value), mes)}
+          >
+            {[ano - 1, ano, ano + 1].map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
       {isLoading && <p>Carregando...</p>}
-      {pending?.length === 0 && <p>Nenhuma transação pendente.</p>}
+      {data && data.total === 0 && <p>Nenhuma transação pendente.</p>}
       {confirmCategorization.isError && <p role="alert">Não foi possível confirmar a categoria.</p>}
 
       <table>
@@ -113,6 +175,28 @@ export function CategorizationReviewPage() {
           })}
         </tbody>
       </table>
+
+      {data && data.total > 0 && (
+        <div className="dash-filter">
+          <button
+            type="button"
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+            disabled={page <= 1}
+          >
+            ← Anterior
+          </button>
+          <span>
+            Página {page} de {totalPaginas} ({data.total} pendências)
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((current) => Math.min(totalPaginas, current + 1))}
+            disabled={page >= totalPaginas}
+          >
+            Próxima →
+          </button>
+        </div>
+      )}
     </section>
   );
 }

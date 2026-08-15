@@ -98,11 +98,47 @@ def test_list_pending_returns_transaction_with_suggestion_and_never_confirms(cli
 
     assert response.status_code == 200
     body = response.json()
-    assert len(body) == 1
-    assert body[0]["id"] == tx.id
-    assert body[0]["subcategory_id"] is None
-    assert body[0]["categorizacao_status"] == "pendente"
+    assert body["total"] == 1
+    assert body["page"] == 1
+    assert body["page_size"] == 20
+    assert len(body["items"]) == 1
+    assert body["items"][0]["id"] == tx.id
+    assert body["items"][0]["subcategory_id"] is None
+    assert body["items"][0]["categorizacao_status"] == "pendente"
     del subcategory
+
+
+def test_list_pending_filters_by_ano_mes(client, db_session):
+    user = _authenticate(client, db_session)
+    tx_jan = _pending_transaction(db_session, user, "Compra janeiro")
+    tx_jan.data = date(2026, 1, 10)
+    tx_fev = _pending_transaction(db_session, user, "Compra fevereiro")
+    tx_fev.data = date(2026, 2, 10)
+    db_session.commit()
+
+    response = client.get("/categorization/pending", params={"ano": 2026, "mes": 1})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 1
+    assert [item["id"] for item in body["items"]] == [tx_jan.id]
+
+
+def test_list_pending_paginates(client, db_session):
+    user = _authenticate(client, db_session)
+    for i in range(5):
+        _pending_transaction(db_session, user, f"Pendente {i}")
+
+    first_page = client.get("/categorization/pending", params={"page": 1, "page_size": 2}).json()
+    second_page = client.get("/categorization/pending", params={"page": 2, "page_size": 2}).json()
+
+    assert first_page["total"] == 5
+    assert second_page["total"] == 5
+    assert len(first_page["items"]) == 2
+    assert len(second_page["items"]) == 2
+    first_ids = {item["id"] for item in first_page["items"]}
+    second_ids = {item["id"] for item in second_page["items"]}
+    assert first_ids.isdisjoint(second_ids)
 
 
 def test_user_a_does_not_see_or_confirm_user_bs_transactions(client, db_session):
@@ -116,7 +152,7 @@ def test_user_a_does_not_see_or_confirm_user_bs_transactions(client, db_session)
     del user_a
 
     list_response = client.get("/categorization/pending")
-    assert list_response.json() == []
+    assert list_response.json()["items"] == []
 
     confirm_response = client.post(
         f"/categorization/pending/{tx_b.id}/confirm",
@@ -141,7 +177,7 @@ def test_confirm_categorization_removes_from_pending_and_reedit_works(client, db
     assert confirm_response.json()["subcategory_id"] == subcategory.id
     assert confirm_response.json()["categorizacao_status"] == "confirmada"
 
-    assert client.get("/categorization/pending").json() == []
+    assert client.get("/categorization/pending").json()["items"] == []
 
     reedit_response = client.post(
         f"/categorization/pending/{tx.id}/confirm", json={"subcategory_id": other_subcategory.id}

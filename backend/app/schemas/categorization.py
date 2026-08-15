@@ -34,6 +34,13 @@ class PendingTransactionOut(BaseModel):
     updated_at: datetime
 
 
+class PendingTransactionsPageOut(BaseModel):
+    items: list[PendingTransactionOut]
+    total: int
+    page: int
+    page_size: int
+
+
 class CategorizationConfirmIn(BaseModel):
     subcategory_id: int
 

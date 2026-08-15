@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -61,11 +61,15 @@ describe("CategorizationReviewPage", () => {
     vi.unstubAllGlobals();
   });
 
+  function pendingPage(items: (typeof PENDING_TRANSACTION_FIXTURE)[], total = items.length) {
+    return { items, total, page: 1, page_size: 20 };
+  }
+
   it("renders the pending transaction with the suggested category pre-selected", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
-      if (url === "/categorization/pending")
-        return Promise.resolve(jsonResponse([PENDING_TRANSACTION_FIXTURE]));
+      if (url.startsWith("/categorization/pending"))
+        return Promise.resolve(jsonResponse(pendingPage([PENDING_TRANSACTION_FIXTURE])));
       if (url === "/category-groups") return Promise.resolve(jsonResponse([GROUP_FIXTURE]));
       if (url === "/subcategories") return Promise.resolve(jsonResponse([SUBCATEGORY_FIXTURE]));
       if (url === "/assets") return Promise.resolve(jsonResponse([]));
@@ -88,10 +92,12 @@ describe("CategorizationReviewPage", () => {
       const url = String(input);
       const method = init?.method ?? "GET";
 
-      if (url === "/categorization/pending" && method === "GET") {
+      if (url.startsWith("/categorization/pending") && method === "GET") {
         pendingCallCount += 1;
         return Promise.resolve(
-          jsonResponse(pendingCallCount === 1 ? [PENDING_TRANSACTION_FIXTURE] : [])
+          jsonResponse(
+            pendingCallCount === 1 ? pendingPage([PENDING_TRANSACTION_FIXTURE]) : pendingPage([])
+          )
         );
       }
       if (url === "/category-groups") return Promise.resolve(jsonResponse([GROUP_FIXTURE]));
@@ -112,5 +118,56 @@ describe("CategorizationReviewPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Confirmar" }));
 
     expect(await screen.findByText("Nenhuma transação pendente.")).toBeInTheDocument();
+  });
+
+  it("refetches with the ano/mes filter when the selects change", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/categorization/pending"))
+        return Promise.resolve(jsonResponse(pendingPage([PENDING_TRANSACTION_FIXTURE])));
+      if (url === "/category-groups") return Promise.resolve(jsonResponse([GROUP_FIXTURE]));
+      if (url === "/subcategories") return Promise.resolve(jsonResponse([SUBCATEGORY_FIXTURE]));
+      if (url === "/assets") return Promise.resolve(jsonResponse([]));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<CategorizationReviewPage />);
+    await screen.findByText("Mercado Sao Joao");
+
+    await userEvent.selectOptions(screen.getByLabelText("Mês"), "Janeiro");
+
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls.map((call) => String(call[0]));
+      expect(
+        calls.some((url) => url.startsWith("/categorization/pending") && url.includes("mes=1"))
+      ).toBe(true);
+    });
+  });
+
+  it("advances to the next page and requests page=2", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/categorization/pending"))
+        return Promise.resolve(jsonResponse(pendingPage([PENDING_TRANSACTION_FIXTURE], 25)));
+      if (url === "/category-groups") return Promise.resolve(jsonResponse([GROUP_FIXTURE]));
+      if (url === "/subcategories") return Promise.resolve(jsonResponse([SUBCATEGORY_FIXTURE]));
+      if (url === "/assets") return Promise.resolve(jsonResponse([]));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<CategorizationReviewPage />);
+    await screen.findByText("Mercado Sao Joao");
+    expect(await screen.findByText(/Página 1 de 2/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Próxima →" }));
+
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls.map((call) => String(call[0]));
+      expect(
+        calls.some((url) => url.startsWith("/categorization/pending") && url.includes("page=2"))
+      ).toBe(true);
+    });
   });
 });

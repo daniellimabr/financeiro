@@ -120,7 +120,8 @@ def test_list_pending_transactions_applies_suggestion_but_never_confirms(
     tx = _pending_transaction(db_session, user, "Mercado Sao Joao")
 
     for _ in range(2):
-        pending = service.list_pending_transactions(db_session, user.id)
+        pending, total = service.list_pending_transactions(db_session, user.id)
+        assert total == 1
         assert len(pending) == 1
         result = pending[0]
         assert result.id == tx.id
@@ -134,7 +135,39 @@ def test_list_pending_transactions_applies_suggestion_but_never_confirms(
 def test_list_pending_transactions_isolated_by_user_and_status(db_session, user, other_user):
     _pending_transaction(db_session, other_user, "Outra transacao")
 
-    assert service.list_pending_transactions(db_session, user.id) == []
+    pending, total = service.list_pending_transactions(db_session, user.id)
+    assert pending == []
+    assert total == 0
+
+
+def test_list_pending_transactions_filters_by_ano_mes(db_session, user):
+    tx_jan = _pending_transaction(db_session, user, "Compra janeiro")
+    tx_jan.data = date(2026, 1, 10)
+    tx_fev = _pending_transaction(db_session, user, "Compra fevereiro")
+    tx_fev.data = date(2026, 2, 10)
+    db_session.commit()
+
+    pending, total = service.list_pending_transactions(db_session, user.id, ano=2026, mes=1)
+
+    assert total == 1
+    assert [tx.id for tx in pending] == [tx_jan.id]
+    del tx_fev
+
+
+def test_list_pending_transactions_paginates(db_session, user):
+    for i in range(5):
+        _pending_transaction(db_session, user, f"Pendente {i}")
+
+    first_page, total = service.list_pending_transactions(db_session, user.id, page=1, page_size=2)
+    second_page, total_again = service.list_pending_transactions(
+        db_session, user.id, page=2, page_size=2
+    )
+
+    assert total == 5
+    assert total_again == 5
+    assert len(first_page) == 2
+    assert len(second_page) == 2
+    assert {tx.id for tx in first_page}.isdisjoint({tx.id for tx in second_page})
 
 
 def _confirmed_transaction(db_session, user, subcategory, descricao):
@@ -201,19 +234,20 @@ def test_list_pending_transactions_query_count_does_not_scale_with_pending_count
 
     event.listen(bind, "before_cursor_execute", _count_selects)
     try:
-        result = service.list_pending_transactions(db_session, user.id)
+        result, total = service.list_pending_transactions(db_session, user.id, page_size=20)
     finally:
         event.remove(bind, "before_cursor_execute", _count_selects)
 
-    # Custo esperado: 1 query para a lista de pendentes + 3 para os índices
-    # de regras/histórico/ativos (buscados uma única vez para o lote
-    # inteiro) + 1 SELECT de refresh por transação (necessário para pegar
-    # `updated_at` gerado pelo banco) — ou seja, ~1x por pendência, nunca
-    # ~4x. Antes da correção cada pendência também requeria seu próprio
-    # histórico/regras/ativos, então o total ficava perto de 4x por
+    # Custo esperado: 1 query de COUNT + 1 query para a página de pendentes +
+    # 3 para os índices de regras/histórico/ativos (buscados uma única vez
+    # por chamada) + 1 SELECT de refresh por transação (necessário para
+    # pegar `updated_at` gerado pelo banco) — ou seja, ~1x por pendência,
+    # nunca ~4x. Antes da correção cada pendência também requeria seu
+    # próprio histórico/regras/ativos, então o total ficava perto de 4x por
     # pendência (~81 para 20 pendências); o limite abaixo falha nesse
     # cenário antigo e passa no atual.
     assert len(result) == 20
+    assert total == 20
     assert select_count["n"] < 2 * len(result) + 10
 
 
@@ -224,7 +258,9 @@ def test_confirm_categorization_sets_fields_and_removes_from_pending(db_session,
 
     assert confirmed.subcategory_id == subcategory.id
     assert confirmed.categorizacao_status == PluggyTransactionCategorizacaoStatus.confirmada
-    assert service.list_pending_transactions(db_session, user.id) == []
+    pending, total = service.list_pending_transactions(db_session, user.id)
+    assert pending == []
+    assert total == 0
 
 
 def test_confirm_categorization_can_be_reedited_with_different_subcategory(
