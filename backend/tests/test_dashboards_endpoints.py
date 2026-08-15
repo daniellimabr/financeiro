@@ -108,7 +108,14 @@ def test_por_meio_pagamento_without_cookie_returns_401(client):
 
 
 def test_por_ativo_without_cookie_returns_401(client):
-    assert client.get("/dashboards/por-ativo").status_code == 401
+    assert client.get("/dashboards/por-ativo", params={"tipo": "debito"}).status_code == 401
+
+
+def test_por_ativo_tendencia_without_cookie_returns_401(client):
+    response = client.get(
+        "/dashboards/por-ativo/tendencia", params={"tipo": "debito", "ano": 2026, "mes": 1}
+    )
+    assert response.status_code == 401
 
 
 def test_summary_returns_totals_for_period(client, db_session):
@@ -172,7 +179,7 @@ def test_por_ativo_returns_totals_for_period(client, db_session):
         asset_id=asset.id,
     )
 
-    response = client.get("/dashboards/por-ativo", params={"ano": 2026, "mes": 1})
+    response = client.get("/dashboards/por-ativo", params={"tipo": "debito", "ano": 2026, "mes": 1})
 
     assert response.status_code == 200
     body = response.json()
@@ -198,7 +205,60 @@ def test_por_ativo_isolated_by_user(client, db_session):
 
     _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
 
-    response = client.get("/dashboards/por-ativo", params={"ano": 2026, "mes": 1})
+    response = client.get("/dashboards/por-ativo", params={"tipo": "debito", "ano": 2026, "mes": 1})
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_por_ativo_tendencia_returns_series_zero_filled(client, db_session):
+    user = _authenticate(client, db_session)
+    asset = _asset(db_session, user)
+    _transaction(
+        db_session,
+        user,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        asset_id=asset.id,
+        data=date(2026, 1, 15),
+    )
+
+    response = client.get(
+        "/dashboards/por-ativo/tendencia",
+        params={"tipo": "debito", "ano": 2026, "mes": 1, "meses": 3},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["asset_id"] == asset.id
+    assert len(body[0]["pontos"]) == 3
+    janeiro = next(p for p in body[0]["pontos"] if p["ano"] == 2026 and p["mes"] == 1)
+    assert Decimal(janeiro["total"]) == Decimal("100.00")
+
+
+def test_por_ativo_tendencia_isolated_by_user(client, db_session):
+    other = User(
+        google_sub="google-tendencia-ativo", email="tendencia-ativo@example.com", name="Bob"
+    )
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    other_asset = _asset(db_session, other, nome="Moto")
+    _transaction(
+        db_session,
+        other,
+        valor="-999.00",
+        tipo=PluggyTransactionTipo.debito,
+        asset_id=other_asset.id,
+    )
+
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+
+    response = client.get(
+        "/dashboards/por-ativo/tendencia",
+        params={"tipo": "debito", "ano": 2026, "mes": 1, "meses": 3},
+    )
 
     assert response.status_code == 200
     assert response.json() == []

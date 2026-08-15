@@ -111,6 +111,7 @@ export interface PluggyTransactionFilters {
   subcategoryId?: number;
   accountTipo?: string;
   assetId?: number;
+  tipo?: string;
   competencia?: boolean;
 }
 
@@ -125,6 +126,7 @@ export function fetchPluggyTransactions(
   }
   if (filters.accountTipo !== undefined) params.set("account_tipo", filters.accountTipo);
   if (filters.assetId !== undefined) params.set("asset_id", String(filters.assetId));
+  if (filters.tipo !== undefined) params.set("tipo", filters.tipo);
   if (filters.competencia) params.set("competencia", "true");
 
   const query = params.toString();

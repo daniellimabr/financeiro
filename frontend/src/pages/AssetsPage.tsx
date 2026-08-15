@@ -1,9 +1,16 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
+import { Line, LineChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 
 import type { Asset, AssetInput, AssetTipo } from "../api/assets";
-import type { PeriodoFilter } from "../api/dashboards";
+import type {
+  PeriodoFilter,
+  PeriodoHistorico,
+  PontoTendencia,
+  TransacaoTipo,
+} from "../api/dashboards";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { useAssetGastos } from "../hooks/useAssetGastos";
+import { useAssetGastosTendencia } from "../hooks/useAssetGastosTendencia";
 import { useAssets } from "../hooks/useAssets";
 import { useCreateAsset } from "../hooks/useCreateAsset";
 import { useDeleteAsset } from "../hooks/useDeleteAsset";
@@ -25,6 +32,8 @@ const EMPTY_FORM: AssetInput = {
   dataAquisicao: "",
 };
 
+const PERIODO_HISTORICO: PeriodoHistorico = 6;
+
 function hoje(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -35,11 +44,14 @@ export function AssetsPage() {
   const [mes, setMes] = useState(now.getMonth() + 1);
   const filter: PeriodoFilter = { ano, mes };
 
+  const [drillTipo, setDrillTipo] = useState<TransacaoTipo>("debito");
+
   const assetsQuery = useAssets();
   const createAsset = useCreateAsset();
   const updateAsset = useUpdateAsset();
   const sellAsset = useSellAsset();
   const deleteAsset = useDeleteAsset();
+  const tendenciaQuery = useAssetGastosTendencia(drillTipo, ano, mes, PERIODO_HISTORICO);
 
   const [editingAssetId, setEditingAssetId] = useState<number | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -48,12 +60,21 @@ export function AssetsPage() {
   const [sellingAssetId, setSellingAssetId] = useState<number | null>(null);
   const [sellForm, setSellForm] = useState({ valorVenda: "", dataVenda: hoje() });
 
-  const [expandedAssetId, setExpandedAssetId] = useState<number | null>(null);
+  const [selectedAssetId, setSelectedAssetId] = useState<number | null>(null);
 
   const assets = assetsQuery.data ?? [];
   const ativos = assets.filter((asset) => asset.status === "ativo");
   const baixados = assets.filter((asset) => asset.status === "baixado");
   const sellingAsset = assets.find((asset) => asset.id === sellingAssetId) ?? null;
+  const selectedAsset = assets.find((asset) => asset.id === selectedAssetId) ?? null;
+
+  const trendByAsset = useMemo(() => {
+    const map = new Map<number, PontoTendencia[]>();
+    for (const item of tendenciaQuery.data ?? []) map.set(item.asset_id, item.pontos);
+    return map;
+  }, [tendenciaQuery.data]);
+
+  const trendColor = drillTipo === "credito" ? "var(--receita)" : "var(--despesa)";
 
   function openCreateForm() {
     setEditingAssetId(null);
@@ -106,11 +127,12 @@ export function AssetsPage() {
       )
     ) {
       deleteAsset.mutate(assetId);
+      if (selectedAssetId === assetId) setSelectedAssetId(null);
     }
   }
 
   function toggleDrilldown(assetId: number) {
-    setExpandedAssetId((prev) => (prev === assetId ? null : assetId));
+    setSelectedAssetId((prev) => (prev === assetId ? null : assetId));
   }
 
   return (
@@ -126,6 +148,22 @@ export function AssetsPage() {
             if (next.mes !== undefined) setMes(next.mes);
           }}
         />
+        <div className="dash-toggle" role="group" aria-label="Tipo de transação">
+          <button
+            type="button"
+            aria-pressed={drillTipo === "debito"}
+            onClick={() => setDrillTipo("debito")}
+          >
+            Despesa
+          </button>
+          <button
+            type="button"
+            aria-pressed={drillTipo === "credito"}
+            onClick={() => setDrillTipo("credito")}
+          >
+            Receita
+          </button>
+        </div>
         <button type="button" onClick={openCreateForm}>
           Novo ativo
         </button>
@@ -253,13 +291,17 @@ export function AssetsPage() {
             <span className="v">{formatCurrency(asset.valor_atual)}</span>
             <strong>{asset.nome}</strong>
             <span className="tag">Adquirido em {asset.data_aquisicao}</span>
+            <CardSparkline
+              values={trendByAsset.get(asset.id)?.map((p) => Number(p.total))}
+              color={trendColor}
+            />
             <div className="dash-filter">
               <button
                 type="button"
-                aria-expanded={expandedAssetId === asset.id}
+                aria-expanded={selectedAssetId === asset.id}
                 onClick={() => toggleDrilldown(asset.id)}
               >
-                {expandedAssetId === asset.id ? "Fechar gasto" : "Ver gasto no período"}
+                {selectedAssetId === asset.id ? "Fechar gasto" : "Ver gasto no período"}
               </button>
               <button type="button" onClick={() => openEditForm(asset)}>
                 Editar
@@ -271,10 +313,26 @@ export function AssetsPage() {
                 Excluir
               </button>
             </div>
-            {expandedAssetId === asset.id && <AssetDrilldown assetId={asset.id} filter={filter} />}
           </div>
         ))}
       </div>
+
+      {selectedAsset && (
+        <div className="dash-funnel">
+          <div className="dash-funnel-head">
+            <h2>{selectedAsset.nome}</h2>
+            <button type="button" className="dash-back" onClick={() => setSelectedAssetId(null)}>
+              Fechar
+            </button>
+          </div>
+          <AssetDrilldown
+            assetId={selectedAsset.id}
+            tipo={drillTipo}
+            filter={filter}
+            pontos={trendByAsset.get(selectedAsset.id)}
+          />
+        </div>
+      )}
 
       <h3>Baixados</h3>
       {baixados.length === 0 ? (
@@ -300,17 +358,78 @@ export function AssetsPage() {
   );
 }
 
-function AssetDrilldown({ assetId, filter }: { assetId: number; filter: PeriodoFilter }) {
-  const gastosQuery = useAssetGastos(filter);
+function CardSparkline({ values, color }: { values: number[] | undefined; color: string }) {
+  if (!values || values.length < 2) return null;
+  const data = values.map((v, i) => ({ i, v }));
+  return (
+    <span className="spark" aria-hidden="true">
+      <ResponsiveContainer width="100%" height={28}>
+        <LineChart data={data} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+          <Line
+            type="monotone"
+            dataKey="v"
+            stroke={color}
+            strokeWidth={2}
+            dot={false}
+            isAnimationActive={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </span>
+  );
+}
+
+function AssetTrendChart({ pontos, color }: { pontos: PontoTendencia[]; color: string }) {
+  const data = pontos.map((p) => ({ nome: `${p.mes}/${p.ano}`, total: Number(p.total) }));
+  return (
+    <div className="dash-chart" aria-hidden="true">
+      <ResponsiveContainer width="100%" height={140}>
+        <LineChart data={data} margin={{ top: 8, right: 16, bottom: 4, left: 4 }}>
+          <XAxis
+            dataKey="nome"
+            tick={{ fontSize: 12, fill: "var(--text)" }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis hide />
+          <Line
+            type="monotone"
+            dataKey="total"
+            stroke={color}
+            strokeWidth={2}
+            dot={{ r: 3 }}
+            isAnimationActive={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function AssetDrilldown({
+  assetId,
+  tipo,
+  filter,
+  pontos,
+}: {
+  assetId: number;
+  tipo: TransacaoTipo;
+  filter: PeriodoFilter;
+  pontos: PontoTendencia[] | undefined;
+}) {
+  const gastosQuery = useAssetGastos(tipo, filter);
   const transactionsQuery = usePluggyTransactions({
     ano: filter.ano,
     mes: filter.mes,
     assetId,
+    tipo,
     competencia: true,
   });
 
   const total = gastosQuery.data?.find((item) => item.asset_id === assetId)?.total ?? "0";
   const transacoes = transactionsQuery.data ?? [];
+  const color = tipo === "credito" ? "var(--receita)" : "var(--despesa)";
+  const rotulo = tipo === "credito" ? "Receita" : "Gasto";
 
   if (gastosQuery.isLoading || transactionsQuery.isLoading) return <p>Carregando...</p>;
   if (gastosQuery.isError || transactionsQuery.isError) {
@@ -318,9 +437,10 @@ function AssetDrilldown({ assetId, filter }: { assetId: number; filter: PeriodoF
   }
 
   return (
-    <div className="dash-accordion-panel">
+    <>
+      {pontos && pontos.length > 1 && <AssetTrendChart pontos={pontos} color={color} />}
       <p>
-        Gasto no período: <strong>{formatCurrency(total)}</strong>
+        {rotulo} no período: <strong style={{ color }}>{formatCurrency(total)}</strong>
       </p>
       {transacoes.length === 0 ? (
         <p className="dash-empty">Nenhuma transação vinculada neste período.</p>
@@ -346,6 +466,6 @@ function AssetDrilldown({ assetId, filter }: { assetId: number; filter: PeriodoF
           </table>
         </div>
       )}
-    </div>
+    </>
   );
 }

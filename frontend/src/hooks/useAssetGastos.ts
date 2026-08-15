@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { fetchDashboardPorAtivo, type PeriodoFilter } from "../api/dashboards";
+import { fetchDashboardPorAtivo, type PeriodoFilter, type TransacaoTipo } from "../api/dashboards";
 
-export function useAssetGastos(filter: PeriodoFilter) {
+export function useAssetGastos(tipo: TransacaoTipo, filter: PeriodoFilter) {
   return useQuery({
-    queryKey: ["dashboardPorAtivo", filter.ano, filter.mes],
-    queryFn: () => fetchDashboardPorAtivo(filter),
+    queryKey: ["dashboardPorAtivo", tipo, filter.ano, filter.mes],
+    queryFn: () => fetchDashboardPorAtivo(tipo, filter),
   });
 }

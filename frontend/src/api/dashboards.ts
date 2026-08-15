@@ -55,6 +55,12 @@ export interface AtivoTotal {
   total: string;
 }
 
+export interface TendenciaAtivo {
+  asset_id: number;
+  asset_nome: string;
+  pontos: PontoTendencia[];
+}
+
 // Período histórico oferecido pelo seletor de tendência (3/6/12 meses).
 export type PeriodoHistorico = 3 | 6 | 12;
 
@@ -108,6 +114,18 @@ export function fetchDashboardPorCategoriaTendencia(
   );
 }
 
-export function fetchDashboardPorAtivo(filter: PeriodoFilter = {}): Promise<AtivoTotal[]> {
-  return apiFetch<AtivoTotal[]>(`/dashboards/por-ativo${buildQuery({ ...filter })}`);
+export function fetchDashboardPorAtivo(
+  tipo: TransacaoTipo,
+  filter: PeriodoFilter = {}
+): Promise<AtivoTotal[]> {
+  return apiFetch<AtivoTotal[]>(`/dashboards/por-ativo${buildQuery({ tipo, ...filter })}`);
+}
+
+export function fetchDashboardPorAtivoTendencia(
+  tipo: TransacaoTipo,
+  filter: Required<PeriodoFilter> & { meses: PeriodoHistorico }
+): Promise<TendenciaAtivo[]> {
+  return apiFetch<TendenciaAtivo[]>(
+    `/dashboards/por-ativo/tendencia${buildQuery({ tipo, ...filter })}`
+  );
 }

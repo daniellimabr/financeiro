@@ -65,3 +65,11 @@ class AtivoTotalOut(BaseModel):
     asset_id: int
     asset_nome: str
     total: Decimal
+
+
+class TendenciaAtivoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    asset_id: int
+    asset_nome: str
+    pontos: list[PontoTendenciaOut]

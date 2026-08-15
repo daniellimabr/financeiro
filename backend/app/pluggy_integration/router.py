@@ -5,7 +5,7 @@ from app.auth.deps import get_current_user
 from app.config import settings
 from app.db import get_db
 from app.exceptions import InvalidStateError, NotFoundError
-from app.models.pluggy import PluggyAccountTipo
+from app.models.pluggy import PluggyAccountTipo, PluggyTransactionTipo
 from app.models.user import User
 from app.pluggy_integration import service
 from app.pluggy_integration.client import PluggyClient
@@ -125,6 +125,7 @@ def list_transactions(
     subcategory_id: int | None = None,
     account_tipo: PluggyAccountTipo | None = None,
     asset_id: int | None = None,
+    tipo: PluggyTransactionTipo | None = None,
     competencia: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -137,5 +138,6 @@ def list_transactions(
         subcategory_id=subcategory_id,
         account_tipo=account_tipo,
         asset_id=asset_id,
+        tipo=tipo,
         competencia=competencia,
     )

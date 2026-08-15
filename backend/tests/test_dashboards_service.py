@@ -588,7 +588,9 @@ def _asset(db_session, user, nome="Carro"):
 
 
 def test_get_por_ativo_no_transactions_returns_empty_list(db_session, user):
-    por_ativo = service.get_por_ativo(db_session, user.id, ano=2026, mes=1)
+    por_ativo = service.get_por_ativo(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
 
     assert por_ativo == []
 
@@ -605,7 +607,9 @@ def test_get_por_ativo_asset_without_linked_transaction_is_absent(db_session, us
         data=date(2026, 1, 10),
     )
 
-    por_ativo = service.get_por_ativo(db_session, user.id, ano=2026, mes=1)
+    por_ativo = service.get_por_ativo(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
 
     assert por_ativo == []
 
@@ -625,7 +629,9 @@ def test_get_por_ativo_sums_expenses_and_excludes_asset_without_transaction(db_s
     tx.asset_id = asset_com_gasto.id
     db_session.commit()
 
-    por_ativo = service.get_por_ativo(db_session, user.id, ano=2026, mes=1)
+    por_ativo = service.get_por_ativo(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
 
     assert len(por_ativo) == 1
     assert por_ativo[0].asset_id == asset_com_gasto.id
@@ -633,23 +639,40 @@ def test_get_por_ativo_sums_expenses_and_excludes_asset_without_transaction(db_s
     assert por_ativo[0].total == Decimal("300.00")
 
 
-def test_get_por_ativo_excludes_credito(db_session, user):
+def test_get_por_ativo_filters_by_tipo(db_session, user):
     account = _account(db_session, user)
-    asset = _asset(db_session, user)
-    tx = _transaction(
+    asset_despesa = _asset(db_session, user, nome="Carro")
+    asset_receita = _asset(db_session, user, nome="Apartamento alugado")
+    tx_despesa = _transaction(
         db_session,
         user,
         account,
-        valor="1000.00",
-        tipo=PluggyTransactionTipo.credito,
+        valor="-300.00",
+        tipo=PluggyTransactionTipo.debito,
         data=date(2026, 1, 10),
     )
-    tx.asset_id = asset.id
+    tx_despesa.asset_id = asset_despesa.id
+    tx_receita = _transaction(
+        db_session,
+        user,
+        account,
+        valor="1500.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 1, 12),
+    )
+    tx_receita.asset_id = asset_receita.id
     db_session.commit()
 
-    por_ativo = service.get_por_ativo(db_session, user.id, ano=2026, mes=1)
+    despesas = service.get_por_ativo(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
+    receitas = service.get_por_ativo(
+        db_session, user.id, tipo=PluggyTransactionTipo.credito, ano=2026, mes=1
+    )
 
-    assert por_ativo == []
+    assert [a.asset_id for a in despesas] == [asset_despesa.id]
+    assert [a.asset_id for a in receitas] == [asset_receita.id]
+    assert receitas[0].total == Decimal("1500.00")
 
 
 def test_get_por_ativo_isolated_by_user(db_session, user):
@@ -671,9 +694,101 @@ def test_get_por_ativo_isolated_by_user(db_session, user):
     tx.asset_id = asset.id
     db_session.commit()
 
-    por_ativo = service.get_por_ativo(db_session, user.id, ano=2026, mes=1)
+    por_ativo = service.get_por_ativo(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
 
     assert por_ativo == []
+
+
+def test_get_tendencia_por_ativo_zero_fills_months_without_transaction(db_session, user):
+    account = _account(db_session, user)
+    asset = _asset(db_session, user, nome="Carro")
+    tx_jan = _transaction(
+        db_session,
+        user,
+        account,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+    )
+    tx_jan.asset_id = asset.id
+    tx_mar = _transaction(
+        db_session,
+        user,
+        account,
+        valor="-50.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 3, 5),
+    )
+    tx_mar.asset_id = asset.id
+    db_session.commit()
+
+    tendencia = service.get_tendencia_por_ativo(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=3, meses=3
+    )
+
+    assert len(tendencia) == 1
+    ativo = tendencia[0]
+    assert ativo.asset_id == asset.id
+    assert ativo.asset_nome == "Carro"
+    pontos = {(p.ano, p.mes): p.total for p in ativo.pontos}
+    assert pontos[(2026, 1)] == Decimal("100.00")
+    assert pontos[(2026, 2)] == Decimal("0")
+    assert pontos[(2026, 3)] == Decimal("50.00")
+
+
+def test_get_tendencia_por_ativo_filters_by_tipo(db_session, user):
+    account = _account(db_session, user)
+    asset = _asset(db_session, user)
+    tx = _transaction(
+        db_session,
+        user,
+        account,
+        valor="1000.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 1, 10),
+    )
+    tx.asset_id = asset.id
+    db_session.commit()
+
+    despesas = service.get_tendencia_por_ativo(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1, meses=3
+    )
+    receitas = service.get_tendencia_por_ativo(
+        db_session, user.id, tipo=PluggyTransactionTipo.credito, ano=2026, mes=1, meses=3
+    )
+
+    assert despesas == []
+    assert len(receitas) == 1
+
+
+def test_get_tendencia_por_ativo_isolated_by_user(db_session, user):
+    other = User(
+        google_sub="google-tendencia-ativo-other", email="other-ta@example.com", name="Bob"
+    )
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+
+    account = _account(db_session, other)
+    asset = _asset(db_session, other)
+    tx = _transaction(
+        db_session,
+        other,
+        account,
+        valor="-999.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+    )
+    tx.asset_id = asset.id
+    db_session.commit()
+
+    tendencia = service.get_tendencia_por_ativo(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1, meses=3
+    )
+
+    assert tendencia == []
 
 
 def test_tendencia_isolated_by_user(db_session, user):

@@ -71,6 +71,13 @@ class AtivoTotal:
     total: Decimal
 
 
+@dataclass
+class TendenciaAtivo:
+    asset_id: int
+    asset_nome: str
+    pontos: list[PontoTendencia]
+
+
 def _to_decimal(value) -> Decimal:
     return Decimal(str(value))
 
@@ -356,15 +363,20 @@ def get_tendencia_por_categoria(
 
 
 def get_por_ativo(
-    db: Session, user_id: int, *, ano: int | None = None, mes: int | None = None
+    db: Session,
+    user_id: int,
+    *,
+    tipo: PluggyTransactionTipo,
+    ano: int | None = None,
+    mes: int | None = None,
 ) -> list[AtivoTotal]:
-    # Só despesas — venda de ativo é tratada à parte (valor_venda), não entra
-    # na agregação de transações. Sem bucket "sem ativo": a maioria das
-    # despesas não tem asset_id, e isso é esperado (ver PRD-008).
+    # Venda de ativo é tratada à parte (valor_venda), nunca entra na
+    # agregação de transações. Sem bucket "sem ativo": a maioria das
+    # transações não tem asset_id, e isso é esperado (ver PRD-008).
     query = (
         _base_query(db, user_id)
         .join(Asset, PluggyTransaction.asset_id == Asset.id)
-        .filter(PluggyTransaction.tipo == PluggyTransactionTipo.debito)
+        .filter(PluggyTransaction.tipo == tipo)
     )
     query = _apply_periodo(query, ano=ano, mes=mes)
     rows = (
@@ -375,4 +387,61 @@ def get_por_ativo(
     return [
         AtivoTotal(asset_id=asset_id, asset_nome=asset_nome, total=_to_decimal(total))
         for asset_id, asset_nome, total in rows
+    ]
+
+
+def get_tendencia_por_ativo(
+    db: Session,
+    user_id: int,
+    *,
+    tipo: PluggyTransactionTipo,
+    ano: int,
+    mes: int,
+    meses: int = 6,
+) -> list[TendenciaAtivo]:
+    periodo = _month_range(ano, mes, meses)
+    inicio, fim = _date_bounds(periodo)
+
+    query = (
+        _base_query(db, user_id)
+        .join(Asset, PluggyTransaction.asset_id == Asset.id)
+        .filter(PluggyTransaction.tipo == tipo)
+        .filter(
+            PluggyTransaction.data_competencia >= inicio,
+            PluggyTransaction.data_competencia < fim,
+        )
+    )
+    rows = (
+        query.with_entities(
+            Asset.id,
+            Asset.nome,
+            func.extract("year", PluggyTransaction.data_competencia),
+            func.extract("month", PluggyTransaction.data_competencia),
+            func.sum(func.abs(PluggyTransaction.valor)),
+        )
+        .group_by(
+            Asset.id,
+            Asset.nome,
+            func.extract("year", PluggyTransaction.data_competencia),
+            func.extract("month", PluggyTransaction.data_competencia),
+        )
+        .all()
+    )
+
+    por_ativo: dict[int, dict] = {}
+    for asset_id, asset_nome, y, m, total in rows:
+        if asset_id not in por_ativo:
+            por_ativo[asset_id] = {
+                "nome": asset_nome,
+                "pontos": {chave: Decimal("0") for chave in periodo},
+            }
+        por_ativo[asset_id]["pontos"][(int(y), int(m))] = _to_decimal(total)
+
+    return [
+        TendenciaAtivo(
+            asset_id=asset_id,
+            asset_nome=dado["nome"],
+            pontos=[PontoTendencia(ano=y, mes=m, total=dado["pontos"][(y, m)]) for y, m in periodo],
+        )
+        for asset_id, dado in por_ativo.items()
     ]

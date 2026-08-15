@@ -418,6 +418,37 @@ def test_list_transactions_combined_filters_isolated_by_user(client, db_session)
     assert Decimal(body[0]["valor"]) == Decimal("-10.00")
 
 
+def test_list_transactions_filters_by_tipo_combined_with_asset_id(client, db_session):
+    user = _authenticate(client, db_session)
+    asset = _asset(db_session, user)
+    _transaction(
+        db_session,
+        user,
+        valor="-10.00",
+        tipo=PluggyTransactionTipo.debito,
+        asset_id=asset.id,
+    )
+    _transaction(
+        db_session,
+        user,
+        valor="500.00",
+        tipo=PluggyTransactionTipo.credito,
+        asset_id=asset.id,
+    )
+
+    despesas = client.get(
+        "/pluggy/transactions", params={"asset_id": asset.id, "tipo": "debito"}
+    ).json()
+    receitas = client.get(
+        "/pluggy/transactions", params={"asset_id": asset.id, "tipo": "credito"}
+    ).json()
+
+    assert len(despesas) == 1
+    assert Decimal(despesas[0]["valor"]) == Decimal("-10.00")
+    assert len(receitas) == 1
+    assert Decimal(receitas[0]["valor"]) == Decimal("500.00")
+
+
 def test_list_transactions_filters_by_asset_id(client, db_session):
     user = _authenticate(client, db_session)
     asset = _asset(db_session, user)

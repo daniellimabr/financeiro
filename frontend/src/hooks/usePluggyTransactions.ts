@@ -14,6 +14,7 @@ export function usePluggyTransactions(
       filters.subcategoryId,
       filters.accountTipo,
       filters.assetId,
+      filters.tipo,
       filters.competencia,
     ],
     queryFn: () => fetchPluggyTransactions(filters),

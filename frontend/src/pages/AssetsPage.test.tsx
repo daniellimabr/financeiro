@@ -63,6 +63,13 @@ function renderWithQueryClient(ui: ReactNode) {
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
+// Toda renderização de AssetsPage dispara /dashboards/por-ativo/tendencia (sparkline
+// dos cards) mesmo sem nenhum card expandido — helper cobre essa rota em todo teste.
+function baseHandlers(url: string): Promise<Response> | null {
+  if (url.startsWith("/dashboards/por-ativo/tendencia")) return Promise.resolve(jsonResponse([]));
+  return null;
+}
+
 describe("AssetsPage", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -72,6 +79,8 @@ describe("AssetsPage", () => {
   it("lists active assets in the grid and sold assets in the baixados section", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
+      const base = baseHandlers(url);
+      if (base) return base;
       if (url === "/assets") return Promise.resolve(jsonResponse([ASSET_ATIVO, ASSET_BAIXADO]));
       throw new Error(`Unexpected fetch: ${url}`);
     });
@@ -90,6 +99,8 @@ describe("AssetsPage", () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
+      const base = baseHandlers(url);
+      if (base) return base;
       if (url === "/assets" && method === "GET") return Promise.resolve(jsonResponse([]));
       if (url === "/assets" && method === "POST") {
         return Promise.resolve(jsonResponse({ ...ASSET_ATIVO, nome: "Apartamento" }, 201));
@@ -128,6 +139,8 @@ describe("AssetsPage", () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
+      const base = baseHandlers(url);
+      if (base) return base;
       if (url === "/assets" && method === "GET")
         return Promise.resolve(jsonResponse([ASSET_ATIVO]));
       if (url === "/assets/1" && method === "PUT") {
@@ -160,6 +173,8 @@ describe("AssetsPage", () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
+      const base = baseHandlers(url);
+      if (base) return base;
       if (url === "/assets" && method === "GET")
         return Promise.resolve(jsonResponse([ASSET_ATIVO]));
       if (url === "/assets/1/sell" && method === "POST") {
@@ -188,14 +203,12 @@ describe("AssetsPage", () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
+      const base = baseHandlers(url);
+      if (base) return base;
       if (url === "/assets" && method === "GET")
         return Promise.resolve(jsonResponse([ASSET_ATIVO]));
       if (url === "/assets/1" && method === "DELETE")
         return Promise.resolve(jsonResponse(null, 204));
-      if (url === "/pluggy/transactions" && method === "GET")
-        return Promise.resolve(jsonResponse([]));
-      if (url === "/dashboards/por-ativo" && method === "GET")
-        return Promise.resolve(jsonResponse([]));
       throw new Error(`Unexpected fetch: ${method} ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -213,17 +226,21 @@ describe("AssetsPage", () => {
     });
   });
 
-  it("expands the drilldown showing the period's gasto total and linked transactions", async () => {
+  it("opens the drilldown outside the card showing the period's gasto total and linked transactions", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
+      const base = baseHandlers(url);
+      if (base) return base;
       if (url === "/assets") return Promise.resolve(jsonResponse([ASSET_ATIVO]));
       if (url.startsWith("/dashboards/por-ativo")) {
+        expect(url).toContain("tipo=debito");
         return Promise.resolve(
           jsonResponse([{ asset_id: 1, asset_nome: "Carro", total: "300.00" }])
         );
       }
       if (url.startsWith("/pluggy/transactions")) {
         expect(url).toContain("asset_id=1");
+        expect(url).toContain("tipo=debito");
         return Promise.resolve(jsonResponse([TRANSACAO_FIXTURE]));
       }
       throw new Error(`Unexpected fetch: ${url}`);
@@ -233,9 +250,78 @@ describe("AssetsPage", () => {
     renderWithQueryClient(<AssetsPage />);
     await screen.findByText("Carro");
 
-    await userEvent.click(screen.getByRole("button", { name: "Ver gasto no período" }));
+    const grid = screen.getByText("Carro").closest(".dash-tile") as HTMLElement;
+    await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
 
     expect(await screen.findByText("R$ 300,00")).toBeInTheDocument();
     expect(screen.getByText("Posto Ipiranga")).toBeInTheDocument();
+    // o funil renderiza fora do card, como painel próprio da página
+    const funnel = screen.getByText("Posto Ipiranga").closest(".dash-funnel");
+    expect(funnel).not.toBeNull();
+    expect(grid.contains(funnel)).toBe(false);
+  });
+
+  it("toggling despesa/receita refetches por-ativo and the drilldown with the selected tipo", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url === "/assets") return Promise.resolve(jsonResponse([ASSET_ATIVO]));
+      if (url.startsWith("/dashboards/por-ativo")) {
+        const tipo = url.includes("tipo=credito") ? "credito" : "debito";
+        const total = tipo === "credito" ? "900.00" : "300.00";
+        return Promise.resolve(jsonResponse([{ asset_id: 1, asset_nome: "Carro", total }]));
+      }
+      if (url.startsWith("/pluggy/transactions")) return Promise.resolve(jsonResponse([]));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<AssetsPage />);
+    await screen.findByText("Carro");
+
+    const grid = screen.getByText("Carro").closest(".dash-tile") as HTMLElement;
+    await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
+    expect(await screen.findByText("R$ 300,00")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Receita" }));
+
+    expect(await screen.findByText("R$ 900,00")).toBeInTheDocument();
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls.map((call) => String(call[0]));
+      expect(
+        calls.some((url) => url.includes("/pluggy/transactions") && url.includes("tipo=credito"))
+      ).toBe(true);
+    });
+  });
+
+  it("renders a sparkline on the card when trend data is available", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/assets") return Promise.resolve(jsonResponse([ASSET_ATIVO]));
+      if (url.startsWith("/dashboards/por-ativo/tendencia")) {
+        return Promise.resolve(
+          jsonResponse([
+            {
+              asset_id: 1,
+              asset_nome: "Carro",
+              pontos: [
+                { ano: 2025, mes: 12, total: "100.00" },
+                { ano: 2026, mes: 1, total: "300.00" },
+              ],
+            },
+          ])
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container } = renderWithQueryClient(<AssetsPage />);
+    await screen.findByText("Carro");
+
+    await waitFor(() => {
+      expect(container.querySelectorAll(".dash-tile .spark").length).toBeGreaterThan(0);
+    });
   });
 });

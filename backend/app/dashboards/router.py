@@ -11,6 +11,7 @@ from app.schemas.dashboards import (
     CategoriaTotalOut,
     MeioPagamentoTotalOut,
     SummaryOut,
+    TendenciaAtivoOut,
     TendenciaCategoriaOut,
     TendenciaMesOut,
 )
@@ -80,9 +81,24 @@ def get_por_categoria_tendencia(
 
 @router.get("/por-ativo", response_model=list[AtivoTotalOut])
 def get_por_ativo(
+    tipo: PluggyTransactionTipo,
     ano: int | None = None,
     mes: int | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.get_por_ativo(db, current_user.id, ano=ano, mes=mes)
+    return service.get_por_ativo(db, current_user.id, tipo=tipo, ano=ano, mes=mes)
+
+
+@router.get("/por-ativo/tendencia", response_model=list[TendenciaAtivoOut])
+def get_por_ativo_tendencia(
+    tipo: PluggyTransactionTipo,
+    ano: int,
+    mes: int,
+    meses: int = Query(6, ge=1, le=24),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.get_tendencia_por_ativo(
+        db, current_user.id, tipo=tipo, ano=ano, mes=mes, meses=meses
+    )
