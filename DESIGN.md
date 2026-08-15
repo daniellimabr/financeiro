@@ -190,12 +190,12 @@ fluid main content — described under Components → Navigation. Every screen
 renders inside the shell's main area; no screen owns its own top-level
 chrome or repeats the nav.
 
-Within the main area, screens are single-column, content-centered,
-`max-width: 1800px` (widened in Sprint 6 from an `880px` column that left
-wide viewports empty, widened again post-Sprint-11 from `1440px` on
-CEO feedback that wide viewports still had too much empty margin —
-content itself still reads left-aligned, not stretched to fill),
-generous `24px` page padding. The summary tiles form a
+Within the main area, screens run edge-to-edge (no `max-width` cap) with
+generous `24px` page padding — widened in Sprint 6 from an `880px`
+centered column, then again post-Sprint-11 (first to `1800px`, then to
+uncapped) on repeated CEO feedback that wide viewports still had too much
+empty margin. Content still reads left-aligned, not centered. The summary
+tiles form a
 responsive grid (`repeat(auto-fit, minmax(180px, 1fr))`) that reflows from 4-across on
 desktop to 2-across on narrow viewports without a breakpoint query. The
 funnel (categoria → meio de pagamento → linha de extrato) renders as one

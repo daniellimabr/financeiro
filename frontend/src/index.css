@@ -447,7 +447,6 @@ input {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
-  max-width: 1800px;
   width: 100%;
   margin: 0 auto;
   padding: var(--space-5);
@@ -954,11 +953,11 @@ input {
 }
 
 .cat-review-table td:nth-child(4) button {
-  max-width: 340px;
+  max-width: 520px;
 }
 
 .cat-review-table td:nth-child(5) .cat-combobox-input {
-  max-width: 280px;
+  max-width: 400px;
 }
 
 .cat-review-table td:nth-child(6) select {
