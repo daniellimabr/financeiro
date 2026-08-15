@@ -11,7 +11,7 @@ Fases em épicos, derivados do escopo funcional do bootstrap. PRDs individuais s
 | E3 | Categorização ✅ | Regras + memória de revisão manual; associação despesa↔ativo (item 2) — concluído na Sprint 4 (2026-08-14) |
 | E4 | Gestão de dados mestres ✅ | Categorias/subcategorias/natureza (item 10); ativos/passivos (item 9) — concluído na Sprint 2 (2026-08-06) |
 | E5 | Dashboards core ✅ | Receita/despesa/saldo/patrimônio com drill-down; filtros ano/mês (itens 3, 7) — concluído na Sprint 5 (2026-08-14) |
-| E6 | Dashboards analíticos | Despesas por natureza; despesas por ativo; patrimônio e evolução de investimentos (itens 4, 5, 6) |
+| E6 | Dashboards analíticos | Tendência histórica, percentual de representatividade, despesas por ativo (itens 4, 5, 6) — dividido em Sprint 6 (tendência/percentual/design system) e Sprint 7 (Ativos); patrimônio/evolução de investimentos adiado por falta de série histórica no schema |
 | E7 | Conta e perfil | Perfil de usuário, logout, multiusuário (item 11) |
 | E8 | Migração de dados legados ✅ | Import de categorias (Sprint 2) + memória de classificação do v1 (Sprint 4) — concluído em 2026-08-14 |
 
@@ -68,7 +68,60 @@ calibrar contra transações reais, que só existem depois de E2 concluída.
 - 151 testes backend (98% cobertura, 100% nos módulos novos) + 24 testes frontend.
 - PRD: [PRD-005-dashboards-core.md](prd/PRD-005-dashboards-core.md). Plano: [SPRINT-005-dashboards-core-plan.md](sprints/SPRINT-005-dashboards-core-plan.md). Relatório: [SPRINT-005-dashboards-core-report.md](sprints/SPRINT-005-dashboards-core-report.md).
 
-Sprints seguintes (E6, E7) serão detalhadas quando E5 estiver validada pelo CEO.
+**Correções pós-Sprint 5 (2026-08-14, mesma sessão, antes do plano da Sprint 6):**
+validação visual real do CEO no navegador revelou que só `DashboardsPage`
+tinha recebido os tokens do design system — `ProtectedPage` (nav do app)
+seguia HTML sem estilo. Corrigido: `ProtectedPage` virou app shell com
+sidebar, `button` base ganhou estilo sistêmico (`index.css`). Dois bugs
+visuais reais só visíveis em screenshot também corrigidos: herança de
+`line-height` percentual sobrepondo texto de heading, overflow de nav
+mobile. Ferramenta nova `scripts/browser-check/` (Playwright headless)
+instalada para QA visual real em sprints futuras — detalhes em
+[SPRINT-005-report](sprints/SPRINT-005-dashboards-core-report.md). Na
+mesma leva, a fila de Categorização (E3) tinha um N+1 real (recomputava
+histórico/regras/ativos do zero a cada transação pendente) — corrigido,
+~2,6x mais rápido contra dado real (8,48s → 3,29s); o restante da
+lentidão (centenas de UPDATEs individuais por página cheia) fica para a
+Sprint 8, que paginará o endpoint.
+
+### Sprint 6 — Dashboards analíticos: tendência e percentual (E6, parte 1)
+- Design system: tipografia própria (escolhida por comparação visual real,
+  não só descrita) + layout que aproveita a largura da tela, em vez da
+  coluna estreita centralizada da Sprint 5.
+- Tendência histórica (3/6/12 meses) nos cards de Receita/Despesa/Saldo e,
+  num modelo visual mais simples, em cada linha do drill-down de
+  categoria. Patrimônio fica de fora — não há série histórica de
+  saldo/valor de ativo no schema (mesma limitação já registrada na Sprint
+  5).
+- Percentual de representatividade em cada nível do funil (categoria % do
+  total do período; meio de pagamento % da categoria; linha de extrato %
+  do meio de pagamento, calculado no frontend).
+- Drill-down em formato sanfona — expandir um nível não esconde os
+  anteriores, diferente do comportamento de "substituir tela" da Sprint 5.
+- PRD: [PRD-006-dashboards-analiticos.md](prd/PRD-006-dashboards-analiticos.md). Plano: [SPRINT-006-dashboards-analiticos-plan.md](sprints/SPRINT-006-dashboards-analiticos-plan.md).
+
+### Sprint 7 — Ativos: gestão e custos (E6, parte 2)
+*Escopo ainda não detalhado em PRD/plano — planejar em sessão própria,
+depois que a Sprint 6 estabelecer a fundação de design system.*
+
+Tela `AssetsPage.tsx`: cards por ativo (reaproveitando `.dash-tile`),
+botão/formulário para cadastrar ativo novo (backend de CRUD já existe em
+`app/assets/` desde a Sprint 2 — falta só mutation hooks no frontend, hoje
+só há leitura via `fetchAssets`). Clicar num card abre drill-down de custos
+relacionados: total gasto + lista de transações vinculadas (via `asset_id`
+confirmado em `pluggy_transactions`, associação já existente desde a
+Sprint 4). Versão simples confirmada pelo CEO — sem tendência/percentual
+nesta primeira versão da tela.
+
+### Sprint 8 — Categorização: tabela moderna e paginação (E3, polish)
+*Escopo ainda não detalhado em PRD/plano — planejar em sessão própria.*
+
+A lentidão em si (N+1 na busca de sugestões) já foi corrigida fora de
+sprint formal (ver nota acima). Falta: paginar `GET /categorization/pending`
+(hoje recomputa sugestão para todas as pendências a cada chamada — paginar
+limita esse custo a uma página por vez, resolvendo o restante da lentidão
+observada mesmo após o fix de N+1) e modernizar a tabela reaproveitando a
+fundação de design system da Sprint 6.
 
 ## Registro de reavaliações futuras
 

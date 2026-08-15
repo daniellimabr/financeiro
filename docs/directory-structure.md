@@ -30,7 +30,8 @@ Financeiro v3/
 │   │   ├── PRD-002-dados-mestres-migracao-legado.md  # Sprint 2 — categorias/ativos/passivos + import
 │   │   ├── PRD-003-integracao-pluggy.md  # Sprint 3 — contas/transações via Pluggy (E2)
 │   │   ├── PRD-004-categorizacao-automatica.md  # Sprint 4 — categorização + associação despesa↔ativo (E3)
-│   │   └── PRD-005-dashboards-core.md    # Sprint 5 — dashboards core, drill-down (E5)
+│   │   ├── PRD-005-dashboards-core.md    # Sprint 5 — dashboards core, drill-down (E5)
+│   │   └── PRD-006-dashboards-analiticos.md  # Sprint 6 — tendência, percentual, design system (E6)
 │   ├── sprints/
 │   │   ├── SPRINT-001-fundacao-tecnica-plan.md       # Plano Sprint 1 (2026-08-04)
 │   │   ├── SPRINT-001-fundacao-tecnica-report.md     # Relatório Sprint 1 (2026-08-04)
@@ -40,7 +41,8 @@ Financeiro v3/
 │   │   ├── SPRINT-004-categorizacao-automatica-plan.md    # Plano Sprint 4 (2026-08-14)
 │   │   ├── SPRINT-004-categorizacao-automatica-report.md  # Relatório Sprint 4 (2026-08-14)
 │   │   ├── SPRINT-005-dashboards-core-plan.md        # Plano Sprint 5 (2026-08-14)
-│   │   └── SPRINT-005-dashboards-core-report.md      # Relatório Sprint 5 (2026-08-14)
+│   │   ├── SPRINT-005-dashboards-core-report.md      # Relatório Sprint 5 (2026-08-14)
+│   │   └── SPRINT-006-dashboards-analiticos-plan.md  # Plano Sprint 6 (2026-08-14)
 │   ├── roadmap.md                  # épicos + sprints
 │   ├── directory-structure.md      # este arquivo — atualizado em Sprint 3
 │   ├── infra/
