@@ -709,6 +709,24 @@ input {
   color: var(--text);
 }
 
+/* Categorização (Sprint 7): descrição/categoria/ativo têm largura intrínseca
+   grande (nomes de subcategoria longos, texto livre da descrição) — sem um
+   teto, a linha ultrapassa a largura da viewport e o botão "Confirmar"
+   (última coluna) fica invisível fora da área rolável de .dash-table-wrap,
+   sem nenhum indício visual de que há mais conteúdo à direita. Achado real
+   via browser-check contra dado da VM de dev. */
+.dash-table select {
+  max-width: 200px;
+  text-overflow: ellipsis;
+}
+
+.dash-table td button,
+.dash-table td input:not([type="checkbox"]) {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 @media (max-width: 640px) {
   /* Linha ganhou tendência + percentual na Sprint 6 — em telas estreitas,
      6 elementos (chevron/nome/tendência/barra/valor/%) espremiam o valor e
