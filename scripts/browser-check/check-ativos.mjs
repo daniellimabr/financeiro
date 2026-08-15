@@ -67,17 +67,30 @@ async function run(browser, viewport, label) {
     fullPage: true,
   });
 
-  // drill-down de gasto no período filtrado
+  // drill-down de gasto no período filtrado — agora fora do card, painel
+  // dash-funnel abaixo da grid (mesmo padrão do funil de Dashboards)
   const verGasto = page.getByRole("button", { name: "Ver gasto no período" }).first();
   if (await verGasto.count()) {
     await verGasto.click();
     await page.waitForTimeout(500);
     await page.screenshot({
-      path: path.join(shotsDir, `${label}-sprint8-04-drilldown-gasto.png`),
+      path: path.join(shotsDir, `${label}-sprint8-04-drilldown-despesa.png`),
       fullPage: true,
     });
-    // o botão troca de rótulo para "Fechar gasto" ao expandir — refaz o locator
-    await page.getByRole("button", { name: "Fechar gasto" }).first().click();
+
+    // toggle despesa/receita — troca o total, a lista de transações e a
+    // sparkline dos cards simultaneamente
+    await page.getByRole("button", { name: "Receita" }).click();
+    await page.waitForTimeout(500);
+    await page.screenshot({
+      path: path.join(shotsDir, `${label}-sprint8-05-drilldown-receita.png`),
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "Despesa" }).click();
+    await page.waitForTimeout(300);
+
+    await page.getByRole("button", { name: "Fechar", exact: true }).click();
+    await page.waitForTimeout(300);
   }
 
   // vender — abre o diálogo, cancela sem submeter (não muta dado real)
@@ -86,7 +99,7 @@ async function run(browser, viewport, label) {
     await vender.click();
     await page.waitForTimeout(300);
     await page.screenshot({
-      path: path.join(shotsDir, `${label}-sprint8-05-dialogo-vender.png`),
+      path: path.join(shotsDir, `${label}-sprint8-06-dialogo-vender.png`),
       fullPage: true,
     });
     await page.getByRole("button", { name: "Cancelar" }).click();
