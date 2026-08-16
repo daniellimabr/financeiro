@@ -434,6 +434,27 @@ novos), suíte completa verde. Deploy na VM de dev e validação ao vivo via
 `check-sprint12.mjs` — mesmo padrão da remoção de `check-sanfona.mjs` na
 Sprint 9), desktop+mobile, sem erros de console.
 
+**Revisão pós-entrega (mesma sessão, 4 rodadas de feedback do CEO usando
+as telas ao vivo na VM de dev):** `CategoryCombobox` fechava ao rolar a
+própria lista (listener de scroll em `window`/`capture:true` também
+disparava no scroll interno do popup — scroll não borbulha, só passa pela
+captura); Categoria/Ativo ganharam sort (`assetLabel` extraída pra
+`utils/transactionEdit.ts`); 4 ajustes de padronização visual (teto de
+30% na coluna Descrição do funil de Dashboards, fonte das tabelas reduzida
+mais um nível — `--text-2xs` novo —, texto de Descrição sempre à esquerda
+— `<button>` centraliza por padrão do user-agent —, Categorização abrindo
+em "Todas" por padrão); causa raiz de fonte/largura de campo não
+padronizados entre tabelas/colunas identificada e corrigida na base de
+`.dash-table` (`max-width:200px`/fonte própria por elemento, herdados da
+Sprint 7 quando só `.cat-review-table` tinha colgroup, ficaram incoerentes
+agora que todo `.dash-table` tem — resolveu de uma vez a fonte
+inconsistente, a caixa de edição de Descrição encolhendo, e os
+drill-downs do Dashboard não parecendo usar o mesmo "tema" de
+Categorização); funcionalidade de sugestão de descrição removida (banner
+quebrava o layout da coluna Descrição e não funcionava — decisão do CEO
+de remover em vez de debugar agora, sem tocar o backend). 132 testes
+frontend ao final. **Sprint aprovada pelo CEO em 2026-08-16.**
+
 PRD: [PRD-013-natureza-funil-e-redesign-tabelas.md](prd/PRD-013-natureza-funil-e-redesign-tabelas.md).
 Plano: [SPRINT-013-natureza-funil-e-redesign-tabelas-plan.md](sprints/SPRINT-013-natureza-funil-e-redesign-tabelas-plan.md).
 Relatório: [SPRINT-013-natureza-funil-e-redesign-tabelas-report.md](sprints/SPRINT-013-natureza-funil-e-redesign-tabelas-report.md).

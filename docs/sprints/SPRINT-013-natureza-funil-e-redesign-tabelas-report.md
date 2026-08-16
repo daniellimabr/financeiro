@@ -2,6 +2,7 @@
 
 - **Plano:** [SPRINT-013-natureza-funil-e-redesign-tabelas-plan.md](./SPRINT-013-natureza-funil-e-redesign-tabelas-plan.md)
 - **Data do relatório:** 2026-08-16
+- **Status:** aprovado pelo CEO em 2026-08-16, após uma rodada de revisão ao vivo na VM de dev (ver "Revisão pós-entrega")
 
 ## Resumo
 
@@ -50,13 +51,13 @@ regressão, conforme previsto no plano):
 TOTAL                                 1625     33    98%
 ```
 
-Frontend:
+Frontend (após a revisão pós-entrega — ver essa seção para o delta de 131→132):
 
 ```
  Test Files  20 passed (20)
-      Tests  131 passed (131)
-   Start at  14:57:57
-   Duration  20.31s
+      Tests  132 passed (132)
+   Start at  16:52:36
+   Duration  9.52s
 ```
 
 Cobertura de lógica de negócio: backend 98% (sem mudança, meta ≥80%
@@ -125,6 +126,70 @@ Python tocado nesta sprint).
    reordenar só dentro de cada grupo sem tocar a ordem dos grupos.
    Implementado com 2 `useState` + um `useMemo` dedicado, comentado
    explicando por que não reaproveita o hook.
+
+## Revisão pós-entrega
+
+Depois da entrega inicial (commits até `d6a8c94`), o CEO usou as telas ao
+vivo na VM de dev e trouxe 4 rodadas de feedback real, todas corrigidas,
+testadas e redeployadas na mesma sessão antes da aprovação final:
+
+1. **`CategoryCombobox` fechava ao rolar a própria lista.** O listener de
+   fechamento em scroll (`window`, `capture: true`) existia pra fechar o
+   popup quando a página rola por baixo dele, mas scroll não borbulha — só
+   passa pela fase de captura — então rolar a lista do próprio popup (roda
+   do mouse ou arrastando a barra de rolagem, que tem `overflow-y: auto`)
+   também disparava esse listener e fechava o dropdown no meio do gesto.
+   Corrigido ignorando scroll cujo alvo está dentro do popup/input, mesmo
+   padrão já usado em `handlePointerDown`/`handleBlur`. Categoria e Ativo
+   também ganharam sort (não estavam na lista original de colunas
+   ordenáveis do plano) — `assetLabel` extraída pra
+   `utils/transactionEdit.ts` ao lado de `subcategoryLabel`.
+2. **4 ajustes de padronização visual:** coluna Descrição do funil de
+   Dashboards sem teto de largura (`table-layout: fixed` dava todo o
+   espaço restante pra ela) — aplicado o mesmo teto de 30% que
+   `.cat-review-table` já usava; fonte das tabelas reduzida mais um nível
+   (token novo `--text-2xs`, 11px, pros headers); texto de Descrição
+   centralizado em tabelas que esticam o botão pra 100% da coluna
+   (`<button>` centraliza texto por padrão do user-agent); Categorização
+   passou a abrir com status "Todas" por padrão (era "Pendentes").
+3. **Tamanho de fonte/largura de campo não padronizados entre
+   tabelas/colunas — causa raiz.** `select`/`input`/combobox de célula
+   carregavam um teto `max-width: 200px` e fonte própria (`var(--text-sm)`)
+   herdados da Sprint 7, quando `.cat-review-table` era a única tabela com
+   colgroup — incoerente agora que `table-layout: fixed` + colgroup é
+   universal (toda coluna já tem largura própria). Isso causava 3 sintomas
+   que pareciam bugs separados mas tinham a mesma origem: fonte
+   inconsistente entre colunas, a caixa de edição de Descrição encolhendo
+   ao entrar em modo de edição (só o botão de exibição tinha override pra
+   100%), e os drill-downs do Dashboard/Natureza/Ativos/Passivos não
+   parecendo usar o mesmo "tema" de `.cat-review-table`. Corrigido na regra
+   base (`width: 100%`/`max-width: none`/`font-size: inherit`), removendo
+   os overrides por `:nth-child` que replicavam isso tabela a tabela. Um
+   segundo achado no mesmo fio (`<input>` do modo de edição ainda em
+   13.5px — a regra global de formulário vencia a herança) exigiu um
+   segundo commit de correção. `vertical-align: middle` também estava
+   faltando só em `.txn-table` (as outras duas variantes já tinham),
+   consolidado na regra base.
+4. **Funcionalidade de sugestão de descrição removida.** O banner
+   "Sugestão: ... / Aceitar / Descartar" em `DescriptionCell` não
+   funcionava e quebrava o layout da coluna Descrição nos drill-downs
+   (texto "Descartar" cortado pela coluna Ativo ao lado) — decisão
+   explícita do CEO de remover em vez de debugar agora. Removida a UI e a
+   plumbing morta que só ela usava (hooks `useConfirmDescriptionSuggestion`/
+   `useDismissDescriptionSuggestion`, deletados; funções de API
+   `confirmDescriptionSuggestion`/`dismissDescriptionSuggestion`).
+   Deliberadamente não tocou o backend — os campos
+   `descricao_sugerida`/`descricao_sugestao_origem_id` continuam no tipo
+   `CategorizedTransaction`/`PluggyTransaction` (o backend ainda os
+   retorna), só pararam de acionar UI; remoção completa da feature
+   (migration/endpoint/service) fica como decisão maior pra discutir à
+   parte se for o caso.
+
+132 testes frontend ao final (era 131 no fechamento inicial — 3 testes
+novos de sort de Categoria/Ativo, 2 removidos da feature de sugestão, mais
+o teto original), suíte completa verde após cada rodada. Cada correção foi
+redeployada na VM de dev e revalidada com `check-sprint13.mjs`
+(desktop+mobile, sem erros de console) antes da próxima.
 
 ## Critérios de aceite do PRD — verificação item a item
 
