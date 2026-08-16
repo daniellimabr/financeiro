@@ -3,7 +3,7 @@
 - **Plano:** [SPRINT-011-categorizacao-tabela-moderna-plan.md](./SPRINT-011-categorizacao-tabela-moderna-plan.md)
 - **PRD:** [PRD-011-categorizacao-tabela-moderna.md](../prd/PRD-011-categorizacao-tabela-moderna.md)
 - **Data do relatório:** 2026-08-15
-- **Status:** implementado e testado; aguardando validação ao vivo na VM de dev e aprovação do CEO (ver "Pendências")
+- **Status:** aprovado pelo CEO em 2026-08-15
 
 ## Resumo
 
@@ -13,14 +13,17 @@ visualmente por categoria, com navegação por teclado e padrão ARIA
 combobox+listbox completo. O mesmo componente foi encaixado dentro de
 `CategorySelectCell`, então os drill-downs de Dashboard/Ativos/Passivos
 ganharam o combobox automaticamente, sem tocar nesses três call sites.
-Status de cada linha (Pendente/Confirmada) virou um badge visual. Toda a
-lógica de negócio existente (mutation imediata em linha confirmada,
-estado local bufferizado em linha pendente até "Confirmar"/"Aprovar
-marcadas") foi preservada e testada. 109 testes frontend passam (17
-arquivos), suíte 100% verde, sem regressão nas telas que reaproveitam o
-componente. Validação ao vivo contra a fila real da VM de dev (achado de
-performance da Sprint 6 foi nesta mesma tela) **não foi executada nesta
-sessão** — decisão do CEO, ver "Pendências".
+Status de cada linha (Pendente/Confirmada) virou um ícone SVG
+(`StatusIcon`, forma diferente por estado, não só cor). Toda a lógica de
+negócio existente (mutation imediata em linha confirmada, estado local
+bufferizado em linha pendente até "Confirmar"/"Aprovar marcadas") foi
+preservada e testada. 109 testes frontend passam (17 arquivos), suíte
+100% verde, sem regressão nas telas que reaproveitam o componente. Depois
+da entrega inicial, o CEO revisou a tela ao vivo na VM de dev em 3
+rodadas de feedback e pegou 3 problemas reais de renderização (badge de
+texto em vez de ícone, página não aproveitando o espaço disponível,
+`table-layout: auto` cortando Descrição/Categoria) — todos corrigidos,
+testados e redeployados; ver "Revisão pós-implementação".
 
 ## Itens do plano vs. entregue
 
@@ -33,8 +36,8 @@ sessão** — decisão do CEO, ver "Pendências".
 | 5 | `CategorizationReviewPage` usa `CategoryCombobox` + badges reais | feito | Estado local bufferizado preservado. |
 | 6 | Polish visual da tabela de Categorização | feito | Classe aditiva `cat-review-table` (hover, alinhamento do checkbox), só nesta tela. |
 | 7 | Testes (`CategoryCombobox`, `TransactionEditCells`, atualização de `CategorizationReviewPage`/`DashboardsPage`/`LiabilitiesPage`) | feito | `LiabilitiesPage.test.tsx` não tinha teste do `<select>` de categoria — nada para atualizar lá; auditado, sem asserts dependentes do `<select>` nativo de categoria. |
-| 8 | Validação manual contra fila real da VM de dev | **não feito** | CEO optou por pular a validação ao vivo nesta sessão (sem token de sessão disponível) — ver "Pendências". |
-| 9 | Atualizar `check-categorizacao.mjs` | feito | Cobre abrir/digitar/filtrar/navegar por teclado/selecionar + badge de status + medição de tempo de abertura; roda numa linha pendente de propósito (não muta nada real). Script pronto, ainda não executado (depende do item 8). |
+| 8 | Validação manual contra fila real da VM de dev | feito (por outra via) | Script automatizado não rodou (sem token), mas o CEO validou ao vivo na VM de dev em 3 rodadas de feedback, achando e confirmando a correção de 3 problemas reais de renderização — ver "Revisão pós-implementação" e "Pendências". |
+| 9 | Atualizar `check-categorizacao.mjs` | feito | Cobre abrir/digitar/filtrar/navegar por teclado/selecionar + indicador de status + medição de tempo de abertura; roda numa linha pendente de propósito (não muta nada real). Script pronto, execução automatizada fica de follow-up (item já coberto por validação manual — ver item 8). |
 | 10 | Docs vivos | feito | `OVERVIEW.md`, `directory-structure.md`, `roadmap.md`. |
 | 11 | Relatório de sprint | feito | Este documento. |
 
@@ -132,7 +135,7 @@ All matched files use Prettier code style!
 | 4. Linha pendente: escolha fica em estado local até confirmação/lote | sim | `CategorizationReviewPage.test.tsx`: "choosing a category on a pending row buffers locally instead of saving immediately" (nenhum PUT disparado). |
 | 5. Linha confirmada: mudança salva imediatamente via `useSetCategory` | sim | `TransactionEditCells.test.tsx`: "selecting a new option mutates immediately" (PUT com body correto). |
 | 6. Mesmo combobox no drill-down do Dashboard/Ativos/Passivos, mutation imediata idêntica | sim | `DashboardsPage.test.tsx`: "editing a transaction's category from the drilldown invalidates the dashboard summary" (interação via combobox, mesmo teste de invalidação de antes). `CategorySelectCell` é o único ponto de integração — Ativos/Passivos herdam pela mesma via, sem teste redundante por tela. |
-| 7. Status como badge visual, cores neutras/accent, nunca terracota | sim | CSS usa só `--border`/`--text` (pendente) e `--accent`/`--accent-bg` (confirmada); `CategorizationReviewPage.test.tsx`: "shows a status badge for pending and confirmed rows". |
+| 7. Status como indicador visual, cores neutras/accent, nunca terracota | sim | Entregue primeiro como badge de texto, depois trocado por `StatusIcon` (ícone SVG) em revisão pós-implementação — forma (relógio/check) distingue os dois estados, não só cor; `--text` (pendente) e `--accent-text` (confirmada). `CategorizationReviewPage.test.tsx`: "shows a status icon for pending and confirmed rows". |
 | 8. ARIA combobox completo, preserva `aria-label` existente | sim | `CategoryCombobox.test.tsx`: "exposes the expected ARIA combobox pattern"; `ariaLabel` continua `Categoria de {descrição}` em ambos os consumidores. |
 | 9. CI/suíte frontend passa, sem regressão em Dashboards/Liabilities | sim | 109/109 testes verdes (ver "Evidência de testes"); sem ferramenta de cobertura numérica no frontend (lacuna pré-existente, não desta sprint). |
 
@@ -157,30 +160,27 @@ Sprint 10).
 
 ## Pendências e próximos passos sugeridos
 
-- **Validação ao vivo contra a fila real da VM de dev (task 8 do plano)
-  não foi executada** — decisão explícita do CEO nesta sessão (perguntado
-  via `AskUserQuestion`, resposta: "Pular validação ao vivo por agora").
-  Isso deixa duas coisas sem confirmação empírica antes do deploy:
-  (a) que renderizar um `CategoryCombobox` por linha não reintroduz a
-  lentidão da Sprint 6 numa fila de centenas de pendências; (b) o visual
-  real do combobox/badge fora do ambiente de teste (jsdom). Ambos têm
-  forte evidência indireta (109 testes cobrindo toda a lógica de
-  interação; CSS usa só tokens já validados visualmente em sprints
-  anteriores) mas nenhuma confirmação ao vivo. `check-categorizacao.mjs`
-  já está atualizado e pronto — falta só um `FINANCEIRO_SESSION_TOKEN`
-  válido para rodar.
-- **`/impeccable audit`, sugerido no plano ("de praxe em sprints que
-  tocam frontend")**, também não rodou — mesma causa raiz (precisa do app
-  renderizado de verdade; sem Docker/Postgres/OAuth neste desktop, só a
-  VM de dev serve esse propósito, e sem token disponível).
-- Recomendo, antes do deploy em produção: (1) rodar
-  `.\scripts\ssh-vm.ps1 dev "cd ~/financeiro && git pull && docker compose pull && docker compose up -d"` pra levar este código pra VM de dev; (2)
-  gerar/passar um `FINANCEIRO_SESSION_TOKEN` válido; (3) rodar
-  `node scripts/browser-check/check-categorizacao.mjs` contra a VM de
-  dev; (4) só então aprovar o relatório e seguir pro deploy de produção.
-- Nenhuma pendência de código deixada solta — a implementação em si está
-  completa e testada; o que falta é evidência empírica ao vivo, não
-  trabalho de implementação.
+- **Validação ao vivo (task 8 do plano) acabou acontecendo — não pelo
+  script, pelo próprio CEO.** A sessão inicial pulou o
+  `check-categorizacao.mjs` contra a VM de dev por falta de
+  `FINANCEIRO_SESSION_TOKEN` (decisão explícita via `AskUserQuestion`),
+  mas o CEO revisou a tela ao vivo na VM de dev por conta própria em 3
+  rodadas de feedback (ver "Revisão pós-implementação" acima) e pegou 3
+  problemas reais que só apareceriam num navegador de verdade: badge de
+  texto em vez de ícone, página não aproveitando espaço disponível, e o
+  efeito de `table-layout: auto` cortando o conteúdo de Descrição/Categoria
+  mesmo com mais espaço alocado. Todos corrigidos, testados (109/109) e
+  redeployados — confirmados rodando na VM (`git log`/`docker inspect`
+  batendo com o commit aprovado, `/health` 200). Isso cobre a substância
+  da validação ao vivo que a task 8 pedia, mesmo sem o script automatizado.
+- **`check-categorizacao.mjs` e `/impeccable audit` continuam sem rodar**
+  — não bloquearam a aprovação porque a revisão manual do CEO já cobriu
+  o mesmo território, mas ficam como follow-up de baixo risco: rodar o
+  script quando houver um `FINANCEIRO_SESSION_TOKEN` disponível, só pra
+  ter a checagem automatizada (tempo de abertura do combobox, ausência de
+  erros de console) registrada formalmente.
+- Nenhuma pendência de código deixada solta — a implementação está
+  completa, testada e rodando na VM de dev.
 
 ## Revisão pós-implementação (mesmo dia, feedback do CEO antes da aprovação)
 
@@ -269,6 +269,12 @@ none` + `width: 100%`) — agora a caixa de texto sempre ocupa a coluna
 inteira, que por sua vez sempre reivindica sua fatia (%) do espaço
 disponível, não só quando o conteúdo específico da página é longo.
 
-Mesma pendência de antes: nenhuma das três rodadas foi vista renderizada
-de verdade — validação ao vivo na VM de dev segue bloqueada por falta de
-`FINANCEIRO_SESSION_TOKEN`.
+As três rodadas foram vistas renderizadas de verdade pelo próprio CEO,
+direto na VM de dev — cada rodada de feedback partiu de algo que ele
+observou ao vivo, não de leitura de código. `check-categorizacao.mjs`
+automatizado segue sem rodar (sem `FINANCEIRO_SESSION_TOKEN`), mas isso
+não bloqueou a validação real da funcionalidade.
+
+---
+
+**Sprint aprovada pelo CEO em 2026-08-15.**

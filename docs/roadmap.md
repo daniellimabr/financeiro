@@ -311,13 +311,17 @@ outros `<select>`s do app, e restilizar o chrome das tabelas de
 drill-down.
 
 Implementada em sessão própria (2026-08-15): `CategoryCombobox` novo,
-`CategorySelectCell`/`CategorizationReviewPage` migrados, badge de status,
-polish de linha, 109 testes frontend verdes (suíte completa, sem
-regressão). Validação ao vivo contra a fila real da VM de dev e
-`/impeccable audit` ficaram pendentes — sem token de sessão disponível
-nesta sessão e sem Docker/Postgres localmente para rodar o stack
-completo; script de QA (`check-categorizacao.mjs`) já atualizado e pronto
-para essa validação de follow-up (ver relatório).
+`CategorySelectCell`/`CategorizationReviewPage` migrados, status vira
+`StatusIcon` (SVG, não texto), colunas reordenadas
+(Status/Data/Descrição/Categoria/Ativo/Valor), `.dash-page` sem teto de
+largura (ocupa a tela toda, padronizado nas 5 telas) e
+`cat-review-table` com `table-layout: fixed` (Descrição/Categoria
+reivindicam sua fatia do espaço sempre, não só quando o conteúdo da
+página é longo) — as 3 últimas vieram de feedback do CEO usando a tela
+ao vivo na VM de dev, em 3 rodadas pós-implementação. 109 testes
+frontend verdes (suíte completa, sem regressão). CEO validou tudo ao
+vivo na própria VM de dev (não pelo script automatizado, que segue
+pendente de token) e aprovou a sprint no mesmo dia.
 
 PRD: [PRD-011-categorizacao-tabela-moderna.md](prd/PRD-011-categorizacao-tabela-moderna.md).
 Plano: [SPRINT-011-categorizacao-tabela-moderna-plan.md](sprints/SPRINT-011-categorizacao-tabela-moderna-plan.md).
