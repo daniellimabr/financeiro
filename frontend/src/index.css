@@ -939,26 +939,37 @@ input {
   font-weight: 400;
 }
 
-/* Categorização (Sprint 7): descrição/categoria/ativo têm largura intrínseca
-   grande (nomes de subcategoria longos, texto livre da descrição) — sem um
-   teto, a linha ultrapassa a largura da viewport e o botão "Confirmar"
-   (última coluna) fica invisível fora da área rolável de .dash-table-wrap,
-   sem nenhum indício visual de que há mais conteúdo à direita. Achado real
-   via browser-check contra dado da VM de dev. */
+/* Toda variante de .dash-table usa table-layout:fixed + <colgroup> desde a
+   Sprint 13 — a coluna já tem largura própria, então o campo/botão/select
+   de dentro dela deve sempre preencher 100% da coluna, nunca um teto fixo
+   independente do layout. Um max-width:200px genérico (herdado da Sprint 7,
+   quando .cat-review-table era a única tabela com colgroup) causava 3 bugs
+   reais achados pelo CEO ao vivo: (1) tamanho inconsistente entre colunas —
+   uma coluna de 320px com campo travado em 200px sobra vazio, outra mais
+   estreita trunca cedo demais; (2) a caixa de edição de Descrição
+   (`<input>`) encolhia em relação ao botão de exibição, que uma regra
+   específica por tabela já esticava pra 100% — o teto batia só no modo de
+   edição; (3) os drill-downs do Dashboard/Natureza/Ativos/Passivos não
+   pareciam a mesma "tabela" que Categorização, porque só essa última tinha
+   os campos preenchendo a coluna inteira. Preencher 100% por padrão resolve
+   os 3 de uma vez e elimina a necessidade de overrides por :nth-child em
+   cada tabela (removidos abaixo). */
 .dash-table select {
-  max-width: 200px;
+  width: 100%;
+  max-width: none;
   text-overflow: ellipsis;
+  font-size: inherit;
 }
 
 .dash-table td button,
 .dash-table td input:not([type="checkbox"]) {
-  max-width: 200px;
+  width: 100%;
+  max-width: none;
   overflow: hidden;
   text-overflow: ellipsis;
   /* <button> centraliza texto por padrão do user-agent — invisível
      enquanto o botão só é tão largo quanto o próprio texto, mas evidente
-     assim que uma tabela estica o botão pra 100% da coluna (Descrição em
-     .cat-review-table/.txn-table). Achado real do CEO ao vivo. */
+     assim que uma tabela estica o botão pra 100% da coluna. */
   text-align: left;
 }
 
@@ -975,8 +986,10 @@ input {
 
 .cat-combobox-input {
   width: 100%;
+  /* font-size deliberadamente não fixado aqui — herda do <td> que o
+     contém (sempre dentro de uma variante de .dash-table), pra bater com
+     o tamanho de fonte do resto da linha em vez de um valor fixo próprio. */
   font: inherit;
-  font-size: var(--text-sm);
   color: var(--text-h);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1017,7 +1030,10 @@ input {
 
 .cat-combobox-option {
   padding: var(--space-2) var(--space-3);
-  font-size: var(--text-sm);
+  /* Explícito (não herdado) — o popup vai por portal pra document.body,
+     fora da árvore DOM da tabela, então não herda o font-size do <td>
+     como o input consegue. var(--text-xs) casa com o corpo da tabela. */
+  font-size: var(--text-xs);
   color: var(--text-h);
   cursor: pointer;
 }
@@ -1033,7 +1049,7 @@ input {
 
 .cat-combobox-empty {
   padding: var(--space-2) var(--space-3);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--text);
 }
 
@@ -1105,26 +1121,6 @@ input {
   text-align: center;
 }
 
-/* .dash-table td button/input/select carregam max-width:200px genérico
-   (pensado pras tabelas de drill-down) — cancelado aqui porque o
-   <colgroup> acima já é quem decide a largura real de cada coluna nesta
-   tabela; sem isso, o teto de 200px vencia o width:100% abaixo e a caixa
-   nunca ocupava a coluna inteira. */
-.cat-review-table td:nth-child(4) button {
-  width: 100%;
-  max-width: none;
-}
-
-.cat-review-table td:nth-child(5) .cat-combobox-input {
-  width: 100%;
-  max-width: none;
-}
-
-.cat-review-table td:nth-child(6) select {
-  width: 100%;
-  max-width: none;
-}
-
 /* Tabela de classificação de Natureza (Sprint 12) — agrupada por
    CategoryGroup via rowSpan na 1a coluna. Densidade/hover/table-layout:fixed
    vêm de .dash-table; aqui só as larguras de coluna. */
@@ -1148,11 +1144,6 @@ input {
   color: var(--text);
   font-weight: 600;
   border-right: 1px solid var(--border);
-}
-
-.nat-table td:nth-child(3) select {
-  width: 100%;
-  max-width: none;
 }
 
 .cat-review-table th:nth-child(7),
@@ -1190,19 +1181,6 @@ input {
 
 .txn-table .col-percentual {
   width: 70px;
-}
-
-/* .dash-table select/input carregam max-width:200px genérico (pensado pras
-   tabelas sem colgroup) — cancelado aqui pelo mesmo motivo já documentado
-   em .cat-review-table: com table-layout:fixed, o <td> não recorta
-   conteúdo que excede a largura da coluna por conta própria, então um
-   select mais largo que 140px (nome de ativo longo, ex. "AP Floripa Loft
-   103") vazava visualmente por cima da coluna Valor seguinte — achado real
-   via browser-check contra dado da VM de dev. */
-.txn-table td select,
-.txn-table .cat-combobox-input {
-  width: 100%;
-  max-width: none;
 }
 
 /* Breakdown de Patrimônio (DashboardsPage) — 3 colunas fixas, 5 linhas. */
