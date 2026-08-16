@@ -1,3 +1,4 @@
+import type { Asset } from "../api/assets";
 import type { CategoryGroup, Subcategory } from "../api/categories";
 
 // Forma mínima compartilhada entre `CategorizedTransaction` (api/categorization.ts)
@@ -26,4 +27,12 @@ export function subcategoryLabel(
   if (!subcategory) return `Subcategoria ${subcategoryId}`;
   const group = groups?.find((g) => g.id === subcategory.group_id);
   return group ? `${group.nome} / ${subcategory.nome}` : subcategory.nome;
+}
+
+export function assetLabel(
+  assetId: number | null | undefined,
+  assets: Asset[] | undefined
+): string {
+  if (assetId === null || assetId === undefined) return "";
+  return assets?.find((asset) => asset.id === assetId)?.nome ?? "";
 }

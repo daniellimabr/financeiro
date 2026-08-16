@@ -19,14 +19,14 @@ import { useSetCategory } from "../hooks/useSetCategory";
 import { useSubcategories } from "../hooks/useSubcategories";
 import { useTableSort } from "../hooks/useTableSort";
 import { formatCurrency } from "../utils/format";
-import { descricaoExibida } from "../utils/transactionEdit";
+import { assetLabel, descricaoExibida, subcategoryLabel } from "../utils/transactionEdit";
 
 const PAGE_SIZE = 20;
 
 type HasAssetFilter = "todos" | "sim" | "nao";
 // Sort client-side, só na página atual (paginação é server-side, 20 itens) —
 // limitação conhecida, não é bug (ver PRD-013, "Regras de negócio").
-type CategorizationSortKey = "data" | "descricao" | "valor";
+type CategorizationSortKey = "data" | "descricao" | "categoria" | "ativo" | "valor";
 
 export function CategorizationReviewPage() {
   const now = new Date();
@@ -76,6 +76,13 @@ export function CategorizationReviewPage() {
           return item.data;
         case "descricao":
           return item.descricao;
+        case "categoria": {
+          const subcategoryId =
+            selectedSubcategory[item.id] ?? item.subcategoria_sugerida_id ?? item.subcategory_id;
+          return subcategoryId ? subcategoryLabel(subcategoryId, subcategories, groups) : "";
+        }
+        case "ativo":
+          return assetLabel(item.asset_sugerido_id ?? item.asset_id, assets);
       }
     },
     "data",
@@ -261,8 +268,20 @@ export function CategorizationReviewPage() {
                 direction={direction}
                 onClick={() => toggleSort("descricao")}
               />
-              <th>Categoria</th>
-              <th>Ativo</th>
+              <SortableHeader
+                label="Categoria"
+                sortKeyName="categoria"
+                currentKey={sortKey}
+                direction={direction}
+                onClick={() => toggleSort("categoria")}
+              />
+              <SortableHeader
+                label="Ativo"
+                sortKeyName="ativo"
+                currentKey={sortKey}
+                direction={direction}
+                onClick={() => toggleSort("ativo")}
+              />
               <SortableHeader
                 label="Valor"
                 sortKeyName="valor"

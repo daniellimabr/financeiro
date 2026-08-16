@@ -368,6 +368,92 @@ describe("AssetsPage", () => {
     expect(rowsInOrder()[0]).toContain("Zona Azul"); // -30 é o maior valor (desc)
   });
 
+  it("the drilldown table can be sorted by Categoria", async () => {
+    const GROUPS = [
+      {
+        id: 1,
+        nome: "Alimentação",
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      },
+      {
+        id: 2,
+        nome: "Transporte",
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      },
+    ];
+    const SUBCATEGORIES = [
+      {
+        id: 10,
+        group_id: 1,
+        nome: "Mercado",
+        natureza: null,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      },
+      {
+        id: 20,
+        group_id: 2,
+        nome: "Combustível",
+        natureza: null,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      },
+    ];
+    const TX_A = {
+      ...TRANSACAO_FIXTURE,
+      id: 1,
+      descricao: "Posto Ipiranga",
+      subcategory_id: 20,
+    };
+    const TX_B = {
+      ...TRANSACAO_FIXTURE,
+      id: 2,
+      descricao: "Zona Azul",
+      subcategory_id: 10,
+    };
+
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url === "/assets") return Promise.resolve(jsonResponse([ASSET_ATIVO]));
+      if (url.startsWith("/dashboards/por-ativo")) {
+        return Promise.resolve(
+          jsonResponse([{ asset_id: 1, asset_nome: "Carro", total: "180.00" }])
+        );
+      }
+      if (url.startsWith("/pluggy/transactions"))
+        return Promise.resolve(jsonResponse([TX_A, TX_B]));
+      if (url === "/subcategories") return Promise.resolve(jsonResponse(SUBCATEGORIES));
+      if (url === "/category-groups") return Promise.resolve(jsonResponse(GROUPS));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<AssetsPage />);
+    await screen.findByText("Carro");
+
+    const grid = screen.getByText("Carro").closest(".dash-tile") as HTMLElement;
+    await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
+    await screen.findByText("Posto Ipiranga");
+
+    const table = screen.getByText("Posto Ipiranga").closest("table") as HTMLElement;
+    const rowsInOrder = () =>
+      within(table)
+        .getAllByRole("row")
+        .slice(1)
+        .map((row) => row.textContent);
+
+    await userEvent.click(within(table).getByRole("button", { name: "Categoria" }));
+    // "Alimentação / Mercado" (Zona Azul) vem antes de "Transporte / Combustível" (Posto Ipiranga) — asc
+    expect(rowsInOrder()[0]).toContain("Zona Azul");
+
+    await userEvent.click(within(table).getByRole("button", { name: "Categoria" }));
+    expect(rowsInOrder()[0]).toContain("Posto Ipiranga"); // desc
+  });
+
   it("renders a sparkline on the card when trend data is available", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);

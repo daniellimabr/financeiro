@@ -492,4 +492,80 @@ describe("CategorizationReviewPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /Valor/ }));
     expect(rowsInOrder()[0]).toContain("Compra B"); // -50 é o maior valor (desc)
   });
+
+  it("sorts the current page by Categoria/Ativo when a sortable header is clicked", async () => {
+    const groupB = {
+      id: 2,
+      nome: "Transporte",
+      created_at: "2026-08-14T00:00:00Z",
+      updated_at: "2026-08-14T00:00:00Z",
+    };
+    const subB = {
+      id: 20,
+      group_id: 2,
+      nome: "Combustível",
+      natureza: "variavel",
+      created_at: "2026-08-14T00:00:00Z",
+      updated_at: "2026-08-14T00:00:00Z",
+    };
+    const assetA = {
+      id: 1,
+      user_id: 1,
+      nome: "Carro",
+      tipo: "veiculo",
+      valor_atual: "1",
+      data_aquisicao: "2020-01-01",
+      status: "ativo",
+      data_venda: null,
+      valor_venda: null,
+      created_at: "2026-08-14T00:00:00Z",
+      updated_at: "2026-08-14T00:00:00Z",
+    };
+    const txA: CategorizedTransaction = {
+      ...BASE_TRANSACTION,
+      id: 1,
+      descricao: "Compra A",
+      subcategoria_sugerida_id: 10,
+      asset_id: null,
+      asset_sugerido_id: null,
+    };
+    const txB: CategorizedTransaction = {
+      ...BASE_TRANSACTION,
+      id: 2,
+      descricao: "Compra B",
+      subcategoria_sugerida_id: 20,
+      asset_id: assetA.id,
+      asset_sugerido_id: null,
+    };
+
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/category-groups") return Promise.resolve(jsonResponse([GROUP_FIXTURE, groupB]));
+      if (url === "/subcategories")
+        return Promise.resolve(jsonResponse([SUBCATEGORY_FIXTURE, subB]));
+      if (url === "/assets") return Promise.resolve(jsonResponse([assetA]));
+      if (url.startsWith("/categorization/transactions"))
+        return Promise.resolve(jsonResponse(transactionsPage([txA, txB])));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<CategorizationReviewPage />);
+    await screen.findByText("Compra A");
+
+    const table = screen.getByText("Compra A").closest("table") as HTMLElement;
+    const rowsInOrder = () =>
+      Array.from(table.querySelectorAll("tbody tr")).map((row) => row.textContent);
+
+    await userEvent.click(screen.getByRole("button", { name: "Categoria" }));
+    // "Alimentação / Supermercado" (Compra A) vem antes de "Transporte / Combustível" (Compra B) — asc
+    expect(rowsInOrder()[0]).toContain("Compra A");
+
+    await userEvent.click(screen.getByRole("button", { name: "Categoria" }));
+    expect(rowsInOrder()[0]).toContain("Compra B"); // desc
+
+    await userEvent.click(screen.getByRole("button", { name: "Ativo" }));
+    // Compra A não tem ativo ("" vazio), Compra B tem "Carro" — "" vem antes (asc)
+    expect(rowsInOrder()[0]).toContain("Compra A");
+  });
 });

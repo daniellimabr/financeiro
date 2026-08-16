@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -70,6 +70,26 @@ describe("CategoryCombobox", () => {
     expect(screen.getByText("Alimentação")).toBeInTheDocument();
     expect(screen.getByText("Transporte")).toBeInTheDocument();
     expect(input).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("scrolling inside the popup's own list does not close it (regression: window scroll listener misfired on the popup's own overflow-y:auto)", async () => {
+    renderCombobox();
+    const input = screen.getByLabelText("Categoria de Mercado São João");
+    await userEvent.click(input);
+
+    fireEvent.scroll(screen.getByRole("listbox"));
+
+    expect(input).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("scrolling outside the popup closes it", async () => {
+    renderCombobox();
+    const input = screen.getByLabelText("Categoria de Mercado São João");
+    await userEvent.click(input);
+
+    fireEvent.scroll(document);
+
+    expect(input).toHaveAttribute("aria-expanded", "false");
   });
 
   it("opens via keyboard navigation (focus)", async () => {

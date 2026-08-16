@@ -6,6 +6,7 @@ import { usePluggyTransactions } from "../hooks/usePluggyTransactions";
 import { useSubcategories } from "../hooks/useSubcategories";
 import { useTableSort } from "../hooks/useTableSort";
 import { formatCurrency } from "../utils/format";
+import { assetLabel, subcategoryLabel } from "../utils/transactionEdit";
 import { AccountTipoIcon } from "./AccountTipoIcon";
 import { SortableHeader } from "./SortableHeader";
 import { AssetSelectCell, CategorySelectCell, DescriptionCell } from "./TransactionEditCells";
@@ -14,7 +15,7 @@ function formatPercent(value: number): string {
   return `${value.toFixed(1)}%`;
 }
 
-type TransacaoSortKey = "data" | "descricao" | "valor" | "percentual";
+type TransacaoSortKey = "data" | "descricao" | "categoria" | "ativo" | "valor" | "percentual";
 
 // Tabela de transação unificada (Sprint 13) — substitui as 3 implementações
 // divergentes que existiam antes (TransacoesPanel em Dashboard/Natureza,
@@ -75,6 +76,12 @@ export function TransactionsTable({
           return item.data;
         case "descricao":
           return item.descricao;
+        case "categoria": {
+          const subcategoryId = item.subcategoria_sugerida_id ?? item.subcategory_id;
+          return subcategoryId ? subcategoryLabel(subcategoryId, subcategories, groups) : "";
+        }
+        case "ativo":
+          return assetLabel(item.asset_sugerido_id ?? item.asset_id, assets);
       }
     },
     "data",
@@ -112,8 +119,24 @@ export function TransactionsTable({
               direction={direction}
               onClick={() => toggleSort("descricao")}
             />
-            {showCategoria && <th>Categoria</th>}
-            {showAtivo && <th>Ativo</th>}
+            {showCategoria && (
+              <SortableHeader
+                label="Categoria"
+                sortKeyName="categoria"
+                currentKey={sortKey}
+                direction={direction}
+                onClick={() => toggleSort("categoria")}
+              />
+            )}
+            {showAtivo && (
+              <SortableHeader
+                label="Ativo"
+                sortKeyName="ativo"
+                currentKey={sortKey}
+                direction={direction}
+                onClick={() => toggleSort("ativo")}
+              />
+            )}
             <SortableHeader
               label="Valor"
               sortKeyName="valor"

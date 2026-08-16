@@ -82,7 +82,15 @@ export function CategoryCombobox({
 
   useEffect(() => {
     if (!open) return;
-    function handleScroll() {
+    // Scroll não borbulha — só passa pela fase de captura — então este
+    // listener em `window` também dispara quando o próprio popup (que tem
+    // overflow-y:auto) é rolado via roda do mouse ou pela barra de rolagem,
+    // fechando o dropdown no meio do scroll. Precisa ignorar scroll que se
+    // origina de dentro do popup/input, mesmo padrão de handlePointerDown.
+    function handleScroll(event: Event) {
+      const target = event.target as Node;
+      if (popupRef.current?.contains(target)) return;
+      if (rootRef.current?.contains(target)) return;
       setOpen(false);
       setQuery("");
     }
