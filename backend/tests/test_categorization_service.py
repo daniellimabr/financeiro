@@ -67,6 +67,19 @@ def _subcategory(db_session, nome="Comer fora"):
     return s
 
 
+def _salario_subcategory(db_session):
+    group = db_session.query(CategoryGroup).filter(CategoryGroup.nome == "Receitas").one_or_none()
+    if group is None:
+        group = CategoryGroup(nome="Receitas")
+        db_session.add(group)
+        db_session.flush()
+    s = Subcategory(group_id=group.id, nome="Salário")
+    db_session.add(s)
+    db_session.commit()
+    db_session.refresh(s)
+    return s
+
+
 def _transaction(
     db_session,
     user,
@@ -750,6 +763,93 @@ def test_dismiss_description_suggestion_without_pending_raises_invalid_state(db_
 
     with pytest.raises(InvalidStateError):
         service.dismiss_description_suggestion(db_session, user.id, tx.id)
+
+
+# --- competência de salário (set_category / bulk_confirm) -------------------
+
+
+def test_set_category_salario_at_or_above_cutoff_shifts_data_competencia(db_session, user):
+    salario = _salario_subcategory(db_session)
+    tx = _pending_transaction(db_session, user)
+    tx.data = date(2026, 1, 25)
+    db_session.commit()
+
+    confirmed = service.set_category(db_session, user.id, tx.id, salario.id)
+
+    assert confirmed.data_competencia == date(2026, 2, 25)
+
+
+def test_set_category_salario_below_cutoff_keeps_same_month(db_session, user):
+    salario = _salario_subcategory(db_session)
+    tx = _pending_transaction(db_session, user)
+    tx.data = date(2026, 1, 10)
+    db_session.commit()
+
+    confirmed = service.set_category(db_session, user.id, tx.id, salario.id)
+
+    assert confirmed.data_competencia == date(2026, 1, 10)
+
+
+def test_set_category_non_salario_sets_competencia_equal_to_data(db_session, user, subcategory):
+    tx = _pending_transaction(db_session, user)
+    tx.data = date(2026, 1, 25)
+    db_session.commit()
+
+    confirmed = service.set_category(db_session, user.id, tx.id, subcategory.id)
+
+    assert confirmed.data_competencia == date(2026, 1, 25)
+
+
+def test_set_category_recategorizing_out_of_salario_resets_competencia(
+    db_session, user, subcategory
+):
+    salario = _salario_subcategory(db_session)
+    tx = _pending_transaction(db_session, user)
+    tx.data = date(2026, 1, 30)
+    db_session.commit()
+    confirmed = service.set_category(db_session, user.id, tx.id, salario.id)
+    assert confirmed.data_competencia == date(2026, 2, 28)
+
+    reverted = service.set_category(db_session, user.id, tx.id, subcategory.id)
+
+    assert reverted.data_competencia == date(2026, 1, 30)
+
+
+def test_set_category_salario_uses_user_specific_cutoff(db_session, user, other_user):
+    salario = _salario_subcategory(db_session)
+    user.salario_competencia_cutoff_dia = 5
+    db_session.commit()
+    tx_user = _pending_transaction(db_session, user)
+    tx_user.data = date(2026, 1, 10)
+    tx_other = _pending_transaction(db_session, other_user)
+    tx_other.data = date(2026, 1, 10)
+    db_session.commit()
+
+    confirmed_user = service.set_category(db_session, user.id, tx_user.id, salario.id)
+    confirmed_other = service.set_category(db_session, other_user.id, tx_other.id, salario.id)
+
+    # user tem cutoff=5 (10 >= 5 desloca); other_user usa o default 25 (10 < 25 não desloca).
+    assert confirmed_user.data_competencia == date(2026, 2, 10)
+    assert confirmed_other.data_competencia == date(2026, 1, 10)
+
+
+def test_bulk_confirm_shifts_competencia_for_salario_rows_only(db_session, user, subcategory):
+    salario = _salario_subcategory(db_session)
+    tx_salario = _pending_transaction(db_session, user, "Salário mensal")
+    tx_salario.data = date(2026, 1, 28)
+    tx_outra = _pending_transaction(db_session, user, "Mercado")
+    tx_outra.data = date(2026, 1, 28)
+    db_session.commit()
+
+    results = service.bulk_confirm(
+        db_session, user.id, [(tx_salario.id, salario.id), (tx_outra.id, subcategory.id)]
+    )
+
+    assert all(r.success for r in results)
+    db_session.refresh(tx_salario)
+    db_session.refresh(tx_outra)
+    assert tx_salario.data_competencia == date(2026, 2, 28)
+    assert tx_outra.data_competencia == date(2026, 1, 28)
 
 
 def test_confirm_description_suggestion_other_users_transaction_raises_not_found(

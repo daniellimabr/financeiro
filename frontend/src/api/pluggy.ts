@@ -30,6 +30,7 @@ export interface PluggyAccount {
   saldo: string;
   moeda: string;
   sync_enabled: boolean;
+  saldo_inicial: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -93,6 +94,43 @@ export function updatePluggyAccount(
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ apelido: payload.apelido, sync_enabled: payload.syncEnabled }),
+  });
+}
+
+export function updatePluggyAccountSaldoInicial(
+  accountId: number,
+  saldoInicial: string | null
+): Promise<PluggyAccount> {
+  return apiFetch<PluggyAccount>(`/pluggy/accounts/${accountId}/saldo-inicial`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ saldo_inicial: saldoInicial }),
+  });
+}
+
+export interface SalarioAjusteDezembro {
+  account_id: number;
+  data: string;
+  valor: string;
+}
+
+export function fetchSalarioAjusteDezembro(): Promise<SalarioAjusteDezembro | null> {
+  return apiFetch<SalarioAjusteDezembro | null>("/pluggy/ajuste-salario-dezembro");
+}
+
+export function updateSalarioAjusteDezembro(payload: {
+  accountId: number;
+  data: string;
+  valor: string | null;
+}): Promise<SalarioAjusteDezembro | null> {
+  return apiFetch<SalarioAjusteDezembro | null>("/pluggy/ajuste-salario-dezembro", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      account_id: payload.accountId,
+      data: payload.data,
+      valor: payload.valor,
+    }),
   });
 }
 

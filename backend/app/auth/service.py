@@ -16,3 +16,10 @@ def upsert_user_from_google(db: Session, *, google_sub: str, email: str, name: s
     db.commit()
     db.refresh(user)
     return user
+
+
+def update_settings(db: Session, user: User, *, cutoff_dia: int) -> User:
+    user.salario_competencia_cutoff_dia = cutoff_dia
+    db.commit()
+    db.refresh(user)
+    return user

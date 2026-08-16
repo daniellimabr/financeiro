@@ -66,20 +66,11 @@ def _liability(db_session, user, nome="Financiamento"):
     return liability
 
 
-def _transaction(
-    db_session,
-    user,
-    *,
-    valor,
-    tipo,
-    subcategory_id=None,
-    data=date(2026, 1, 15),
-    asset_id=None,
-    liability_id=None,
-):
+def _account(db_session, user, *, tipo=PluggyAccountTipo.corrente, saldo_inicial=None):
+    n = id(object())
     item = PluggyItem(
         user_id=user.id,
-        pluggy_item_id=f"item-{user.id}-{valor}-{tipo}",
+        pluggy_item_id=f"item-acc-{user.id}-{n}",
         connector_id=1,
         connector_name="Banco Fake",
         status=PluggyItemStatus.updated,
@@ -90,17 +81,55 @@ def _transaction(
     account = PluggyAccount(
         item_id=item.id,
         user_id=user.id,
-        pluggy_account_id=f"acc-{user.id}-{valor}-{tipo}",
-        tipo=PluggyAccountTipo.corrente,
+        pluggy_account_id=f"acc-{user.id}-{n}",
+        tipo=tipo,
         nome="Conta",
         saldo=Decimal("0"),
+        saldo_inicial=saldo_inicial,
     )
     db_session.add(account)
-    db_session.flush()
+    db_session.commit()
+    db_session.refresh(account)
+    return account
+
+
+def _transaction(
+    db_session,
+    user,
+    *,
+    valor,
+    tipo,
+    subcategory_id=None,
+    data=date(2026, 1, 15),
+    asset_id=None,
+    liability_id=None,
+    account=None,
+):
+    if account is None:
+        item = PluggyItem(
+            user_id=user.id,
+            pluggy_item_id=f"item-{user.id}-{valor}-{tipo}",
+            connector_id=1,
+            connector_name="Banco Fake",
+            status=PluggyItemStatus.updated,
+            cutoff_date=date(2026, 1, 1),
+        )
+        db_session.add(item)
+        db_session.flush()
+        account = PluggyAccount(
+            item_id=item.id,
+            user_id=user.id,
+            pluggy_account_id=f"acc-{user.id}-{valor}-{tipo}",
+            tipo=PluggyAccountTipo.corrente,
+            nome="Conta",
+            saldo=Decimal("0"),
+        )
+        db_session.add(account)
+        db_session.flush()
     tx = PluggyTransaction(
         account_id=account.id,
         user_id=user.id,
-        pluggy_transaction_id=f"tx-{user.id}-{valor}-{tipo}",
+        pluggy_transaction_id=f"tx-{user.id}-{valor}-{tipo}-{id(object())}",
         descricao="Transacao",
         valor=Decimal(valor),
         tipo=tipo,
@@ -809,3 +838,89 @@ def test_projecao_isolated_by_user(client, db_session):
 
     assert response.status_code == 200
     assert all(Decimal(p["despesa"]) == Decimal("0") for p in response.json())
+
+
+# --- GET /dashboards/evolucao-saldo-por-conta ---------------------------------
+
+
+def test_evolucao_saldo_por_conta_without_cookie_returns_401(client):
+    response = client.get("/dashboards/evolucao-saldo-por-conta", params={"ano": 2026, "mes": 1})
+    assert response.status_code == 401
+
+
+def test_evolucao_saldo_por_conta_accumulates_and_excludes_accounts_without_saldo_inicial(
+    client, db_session
+):
+    user = _authenticate(client, db_session)
+    conta_com_saldo = _account(db_session, user, saldo_inicial=Decimal("1000.00"))
+    _account(db_session, user, saldo_inicial=None)
+    _transaction(
+        db_session,
+        user,
+        valor="500.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 1, 10),
+        account=conta_com_saldo,
+    )
+
+    response = client.get(
+        "/dashboards/evolucao-saldo-por-conta", params={"ano": 2026, "mes": 1, "meses": 1}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["account_id"] == conta_com_saldo.id
+    assert Decimal(body[0]["pontos"][0]["total"]) == Decimal("1500.00")
+
+
+def test_evolucao_saldo_por_conta_isolated_by_user(client, db_session):
+    other = User(google_sub="google-evolucao", email="evolucao@example.com", name="Bob")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    _account(db_session, other, saldo_inicial=Decimal("999.00"))
+
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+
+    response = client.get(
+        "/dashboards/evolucao-saldo-por-conta", params={"ano": 2026, "mes": 1, "meses": 3}
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+# --- GET /dashboards/saldo-acumulado ------------------------------------------
+
+
+def test_saldo_acumulado_without_cookie_returns_401(client):
+    response = client.get("/dashboards/saldo-acumulado", params={"ano": 2026, "mes": 1})
+    assert response.status_code == 401
+
+
+def test_saldo_acumulado_anchors_on_saldo_inicial_sum(client, db_session):
+    user = _authenticate(client, db_session)
+    _account(db_session, user, saldo_inicial=Decimal("1000.00"))
+    _account(db_session, user, saldo_inicial=Decimal("500.00"))
+
+    response = client.get("/dashboards/saldo-acumulado", params={"ano": 2026, "mes": 1, "meses": 1})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert Decimal(body[0]["total"]) == Decimal("1500.00")
+
+
+def test_saldo_acumulado_isolated_by_user(client, db_session):
+    other = User(google_sub="google-acumulado", email="acumulado@example.com", name="Bob")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    _account(db_session, other, saldo_inicial=Decimal("999.00"))
+
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+
+    response = client.get("/dashboards/saldo-acumulado", params={"ano": 2026, "mes": 1, "meses": 1})
+
+    assert response.status_code == 200
+    assert Decimal(response.json()[0]["total"]) == Decimal("0")

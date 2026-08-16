@@ -13,10 +13,13 @@ from app.schemas.pluggy import (
     ConnectTokenIn,
     ConnectTokenOut,
     PluggyAccountOut,
+    PluggyAccountSaldoInicialIn,
     PluggyAccountUpdateIn,
     PluggyItemIn,
     PluggyItemOut,
     PluggyTransactionOut,
+    SalarioAjusteDezembroIn,
+    SalarioAjusteDezembroOut,
     SyncItemResultOut,
     SyncItemsIn,
     SyncItemsOut,
@@ -100,6 +103,53 @@ def update_account(
         )
     except NotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.put("/accounts/{account_id}/saldo-inicial", response_model=PluggyAccountOut)
+def update_saldo_inicial(
+    account_id: int,
+    payload: PluggyAccountSaldoInicialIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return service.update_saldo_inicial(
+            db, current_user.id, account_id, saldo_inicial=payload.saldo_inicial
+        )
+    except NotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get("/ajuste-salario-dezembro", response_model=SalarioAjusteDezembroOut | None)
+def get_ajuste_salario_dezembro(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    tx = service.get_salario_ajuste_dez_2025(db, current_user.id)
+    if tx is None:
+        return None
+    return SalarioAjusteDezembroOut(account_id=tx.account_id, data=tx.data, valor=tx.valor)
+
+
+@router.put("/ajuste-salario-dezembro", response_model=SalarioAjusteDezembroOut | None)
+def update_ajuste_salario_dezembro(
+    payload: SalarioAjusteDezembroIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        tx = service.upsert_salario_ajuste_dez_2025(
+            db,
+            current_user.id,
+            account_id=payload.account_id,
+            data=payload.data,
+            valor=payload.valor,
+            cutoff_dia=current_user.salario_competencia_cutoff_dia,
+        )
+    except NotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    if tx is None:
+        return None
+    return SalarioAjusteDezembroOut(account_id=tx.account_id, data=tx.data, valor=tx.valor)
 
 
 @router.post("/sync", response_model=SyncItemsOut)

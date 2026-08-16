@@ -41,10 +41,12 @@ import { AccountTipoIcon } from "../components/AccountTipoIcon";
 import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { TransactionsTable } from "../components/TransactionsTable";
+import { TrendChart } from "../components/TrendChart";
 import { useAssetGastos } from "../hooks/useAssetGastos";
 import { useCategoryGroups } from "../hooks/useCategoryGroups";
 import { useDashboardByCategoria } from "../hooks/useDashboardByCategoria";
 import { useDashboardCategoriaTendencia } from "../hooks/useDashboardCategoriaTendencia";
+import { useDashboardSaldoAcumulado } from "../hooks/useDashboardSaldoAcumulado";
 import { useDashboardSummary } from "../hooks/useDashboardSummary";
 import { useDashboardTendencia } from "../hooks/useDashboardTendencia";
 import { useLiabilityGastos } from "../hooks/useLiabilityGastos";
@@ -75,10 +77,18 @@ interface PeriodoFiltro {
   mes: number;
 }
 
-type DrillKind = "receita" | "despesa" | "ativos" | "passivos" | "saldo" | "patrimonio";
+type DrillKind =
+  "receita" | "despesa" | "ativos" | "passivos" | "saldo" | "patrimonio" | "saldoAcumulado";
 
 function toggleId(list: number[], id: number): number[] {
   return list.includes(id) ? list.filter((existing) => existing !== id) : [...list, id];
+}
+
+// Rollover de ano incluído — dezembro do ano anterior é um "mês anterior"
+// válido para todo filtro exceto jan/2026 (início do registro histórico,
+// tratado à parte no clique do card "Saldo Anterior").
+function mesAnterior(ano: number, mes: number): { ano: number; mes: number } {
+  return mes === 1 ? { ano: ano - 1, mes: 12 } : { ano, mes: mes - 1 };
 }
 
 interface DrillState {
@@ -104,6 +114,17 @@ export function DashboardsPage() {
 
   const summaryQuery = useDashboardSummary(filter);
   const tendenciaQuery = useDashboardTendencia(ano, mes, periodoHistorico);
+  const saldoAcumuladoQuery = useDashboardSaldoAcumulado(ano, mes, periodoHistorico);
+
+  // A série vem com um ponto a mais no início (ver useDashboardSaldoAcumulado)
+  // — esse ponto extra é só o valor do "mês anterior", usado pelo card
+  // "Saldo Anterior"; o restante (mesmo tamanho de periodoHistorico) alimenta
+  // o card "Saldo Acumulado" e seu drill-down, igual às outras tendências.
+  const saldoAcumuladoSerie = saldoAcumuladoQuery.data ?? [];
+  const saldoAcumuladoAtual = saldoAcumuladoSerie.at(-1);
+  const saldoAnterior = saldoAcumuladoSerie.length >= 2 ? saldoAcumuladoSerie.at(-2) : undefined;
+  const saldoAcumuladoSparkline =
+    saldoAcumuladoSerie.length > 1 ? saldoAcumuladoSerie.slice(1) : undefined;
 
   function abrirFunil(kind: DrillKind) {
     setDrill((prev) =>
@@ -140,7 +161,20 @@ export function DashboardsPage() {
     passivos: "Passivos",
     saldo: "Saldo",
     patrimonio: "Patrimônio",
+    saldoAcumulado: "Saldo Acumulado",
   };
+
+  function clicarSaldoAnterior() {
+    if (ano === 2026 && mes === 1) {
+      window.alert(
+        "Início do registro histórico — não há dado de saldo acumulado antes de janeiro/2026."
+      );
+      return;
+    }
+    const anterior = mesAnterior(ano, mes);
+    setAno(anterior.ano);
+    setMes(anterior.mes);
+  }
 
   return (
     <section className="dash-page">
@@ -174,6 +208,14 @@ export function DashboardsPage() {
 
       {summaryQuery.data && (
         <div className="dash-summary">
+          <button type="button" className="dash-tile clickable" onClick={clicarSaldoAnterior}>
+            <span className="k">
+              Saldo Anterior
+              {saldoAnterior &&
+                ` (${String(saldoAnterior.mes).padStart(2, "0")}/${saldoAnterior.ano})`}
+            </span>
+            <span className="v">{saldoAnterior ? formatCurrency(saldoAnterior.total) : "—"}</span>
+          </button>
           <button
             type="button"
             className="dash-tile clickable"
@@ -213,6 +255,17 @@ export function DashboardsPage() {
               pontos={tendenciaQuery.data?.map((p) => ({ ano: p.ano, mes: p.mes, total: p.saldo }))}
               color="var(--accent)"
             />
+          </button>
+          <button
+            type="button"
+            className="dash-tile clickable"
+            onClick={() => abrirFunil("saldoAcumulado")}
+          >
+            <span className="k">Saldo Acumulado</span>
+            <span className="v">
+              {saldoAcumuladoAtual ? formatCurrency(saldoAcumuladoAtual.total) : "—"}
+            </span>
+            <CardSparkline pontos={saldoAcumuladoSparkline} color="var(--accent)" />
           </button>
           <button
             type="button"
@@ -303,6 +356,13 @@ export function DashboardsPage() {
           {drill.kind === "patrimonio" && (
             <PatrimonioBreakdownPanel onNavigate={(kind) => abrirFunil(kind)} />
           )}
+
+          {drill.kind === "saldoAcumulado" &&
+            (saldoAcumuladoSparkline && saldoAcumuladoSparkline.length > 0 ? (
+              <TrendChart pontos={saldoAcumuladoSparkline} color="var(--accent)" />
+            ) : (
+              <p className="dash-empty">Nenhuma conta com saldo inicial informado.</p>
+            ))}
         </div>
       )}
     </section>

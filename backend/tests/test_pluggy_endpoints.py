@@ -687,3 +687,135 @@ def test_sync_endpoint_reports_failure_for_invalid_item_without_blocking_others(
     results = {r["item_id"]: r for r in response.json()["results"]}
     assert results[item["id"]]["success"] is True
     assert results[999]["success"] is False
+
+
+# --- PUT /pluggy/accounts/{id}/saldo-inicial ---------------------------------
+
+
+def test_update_saldo_inicial_without_cookie_returns_401(client):
+    response = client.put("/pluggy/accounts/1/saldo-inicial", json={"saldo_inicial": "100.00"})
+    assert response.status_code == 401
+
+
+def test_update_saldo_inicial_sets_and_returns_value(client, db_session):
+    _authenticate(client, db_session)
+    _item, account, _fake_client = _connect_account(client, db_session)
+
+    response = client.put(
+        f"/pluggy/accounts/{account['id']}/saldo-inicial", json={"saldo_inicial": "1500.00"}
+    )
+
+    assert response.status_code == 200
+    assert Decimal(response.json()["saldo_inicial"]) == Decimal("1500.00")
+
+
+def test_update_saldo_inicial_nonexistent_account_returns_404(client, db_session):
+    _authenticate(client, db_session)
+
+    response = client.put("/pluggy/accounts/999/saldo-inicial", json={"saldo_inicial": "100.00"})
+
+    assert response.status_code == 404
+
+
+def test_update_saldo_inicial_other_users_account_returns_404(client, db_session):
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    _item, account, _fake_client = _connect_account(client, db_session)
+
+    client.cookies.clear()
+    _authenticate(client, db_session, google_sub="google-2", email="b@example.com")
+
+    response = client.put(
+        f"/pluggy/accounts/{account['id']}/saldo-inicial", json={"saldo_inicial": "100.00"}
+    )
+
+    assert response.status_code == 404
+
+
+# --- GET/PUT /pluggy/ajuste-salario-dezembro ----------------------------------
+
+
+def _salario_subcategory(db_session):
+    group = CategoryGroup(nome="Receitas")
+    db_session.add(group)
+    db_session.flush()
+    subcategory = Subcategory(group_id=group.id, nome="Salário")
+    db_session.add(subcategory)
+    db_session.commit()
+    db_session.refresh(subcategory)
+    return subcategory
+
+
+def test_ajuste_salario_dezembro_without_cookie_returns_401(client):
+    assert client.get("/pluggy/ajuste-salario-dezembro").status_code == 401
+    assert (
+        client.put(
+            "/pluggy/ajuste-salario-dezembro",
+            json={"account_id": 1, "data": "2025-12-30", "valor": "100.00"},
+        ).status_code
+        == 401
+    )
+
+
+def test_get_ajuste_salario_dezembro_returns_null_when_absent(client, db_session):
+    _authenticate(client, db_session)
+
+    response = client.get("/pluggy/ajuste-salario-dezembro")
+
+    assert response.status_code == 200
+    assert response.json() is None
+
+
+def test_put_ajuste_salario_dezembro_creates_and_reflects_in_summary(client, db_session):
+    _authenticate(client, db_session)
+    _salario_subcategory(db_session)
+    _item, account, _fake_client = _connect_account(client, db_session)
+
+    response = client.put(
+        "/pluggy/ajuste-salario-dezembro",
+        json={"account_id": account["id"], "data": "2025-12-30", "valor": "5000.00"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert Decimal(body["valor"]) == Decimal("5000.00")
+    assert body["data"] == "2025-12-30"
+
+    get_response = client.get("/pluggy/ajuste-salario-dezembro")
+    assert Decimal(get_response.json()["valor"]) == Decimal("5000.00")
+
+    summary = client.get("/dashboards/summary", params={"ano": 2026, "mes": 1}).json()
+    assert Decimal(summary["receita"]) == Decimal("5000.00")
+
+
+def test_put_ajuste_salario_dezembro_valor_none_deletes(client, db_session):
+    _authenticate(client, db_session)
+    _salario_subcategory(db_session)
+    _item, account, _fake_client = _connect_account(client, db_session)
+    client.put(
+        "/pluggy/ajuste-salario-dezembro",
+        json={"account_id": account["id"], "data": "2025-12-30", "valor": "5000.00"},
+    )
+
+    response = client.put(
+        "/pluggy/ajuste-salario-dezembro",
+        json={"account_id": account["id"], "data": "2025-12-30", "valor": None},
+    )
+
+    assert response.status_code == 200
+    assert response.json() is None
+    assert client.get("/pluggy/ajuste-salario-dezembro").json() is None
+
+
+def test_put_ajuste_salario_dezembro_other_users_account_returns_404(client, db_session):
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    _item, account, _fake_client = _connect_account(client, db_session)
+
+    client.cookies.clear()
+    _authenticate(client, db_session, google_sub="google-2", email="b@example.com")
+
+    response = client.put(
+        "/pluggy/ajuste-salario-dezembro",
+        json={"account_id": account["id"], "data": "2025-12-30", "valor": "100.00"},
+    )
+
+    assert response.status_code == 404

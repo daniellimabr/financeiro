@@ -135,6 +135,15 @@ class SaldoConta:
     limite_credito: Decimal | None = None
 
 
+@dataclass
+class EvolucaoSaldoConta:
+    account_id: int
+    account_nome: str
+    account_tipo: PluggyAccountTipo
+    saldo_inicial: Decimal
+    pontos: list[PontoTendencia]
+
+
 def _to_decimal(value) -> Decimal:
     return Decimal(str(value))
 
@@ -353,10 +362,12 @@ def get_por_meio_pagamento(
     ]
 
 
-def get_tendencia(
-    db: Session, user_id: int, *, ano: int, mes: int, meses: int = 6
-) -> list[TendenciaMes]:
-    periodo = _month_range(ano, mes, meses)
+def _receita_despesa_por_periodo(
+    db: Session, user_id: int, periodo: list[tuple[int, int]]
+) -> dict[tuple[int, int], dict[str, Decimal]]:
+    """Soma receita/despesa por mês (por competência) num range arbitrário de
+    meses — reaproveitado por get_tendencia (últimos N meses terminando no
+    filtro) e get_saldo_acumulado (range fixo desde jan/2026)."""
     inicio, fim = _date_bounds(periodo)
 
     query = _base_query(db, user_id).filter(
@@ -382,6 +393,14 @@ def get_tendencia(
     for y, m, tipo, total in rows:
         campo = "receita" if tipo == PluggyTransactionTipo.credito else "despesa"
         totais[(int(y), int(m))][campo] = _to_decimal(total)
+    return totais
+
+
+def get_tendencia(
+    db: Session, user_id: int, *, ano: int, mes: int, meses: int = 6
+) -> list[TendenciaMes]:
+    periodo = _month_range(ano, mes, meses)
+    totais = _receita_despesa_por_periodo(db, user_id, periodo)
 
     return [
         TendenciaMes(
@@ -827,4 +846,135 @@ def get_saldo_por_conta(db: Session, user_id: int) -> list[SaldoConta]:
             limite_credito=account.limite_credito,
         )
         for account in accounts
+    ]
+
+
+# Data fixa e implícita, ligada à decisão de corte do projeto (CLAUDE.md,
+# "Corte de dados") — saldo_inicial das contas e a auditoria mensal (D) são
+# ambos ancorados em 31/12/2025.
+_INICIO_EVOLUCAO_SALDO = date(2026, 1, 1)
+
+
+# Mesmo id determinístico usado em
+# pluggy_integration.service._salario_ajuste_dez_2025_pluggy_transaction_id —
+# duplicado aqui (string de 1 linha) para não acoplar dashboards a
+# pluggy_integration por causa de um único lookup.
+def _salario_ajuste_dez_2025_pluggy_transaction_id(user_id: int) -> str:
+    return f"manual-salario-dez2025-user{user_id}"
+
+
+def _months_between(inicio: tuple[int, int], fim: tuple[int, int]) -> list[tuple[int, int]]:
+    """Todos os meses de `inicio` até `fim` (inclusive), em ordem cronológica."""
+    y, m = inicio
+    periodo = []
+    while (y, m) <= fim:
+        periodo.append((y, m))
+        m += 1
+        if m == 13:
+            m = 1
+            y += 1
+    return periodo
+
+
+def get_evolucao_saldo_por_conta(
+    db: Session, user_id: int, *, ano: int, mes: int, meses: int = 6
+) -> list[EvolucaoSaldoConta]:
+    # Ferramenta de auditoria bancária (D) — usa `data` real (não
+    # `data_competencia`) e não reaproveita `_base_query`/`_apply_periodo`
+    # (aquelas filtram por competência e excluem cartão-crédito+crédito, o
+    # que é errado aqui: reconciliar com extrato real exige que todo
+    # movimento conte, sem exclusão nenhuma).
+    janela = [p for p in _month_range(ano, mes, meses) if p >= (2026, 1)]
+    if not janela:
+        return []
+
+    fim_exclusivo = _date_bounds([janela[-1]])[1]
+    range_completo = _months_between((2026, 1), janela[-1])
+
+    accounts = (
+        db.query(PluggyAccount)
+        .filter(PluggyAccount.user_id == user_id, PluggyAccount.saldo_inicial.isnot(None))
+        .order_by(PluggyAccount.nome)
+        .all()
+    )
+
+    resultado = []
+    for account in accounts:
+        rows = (
+            db.query(
+                func.extract("year", PluggyTransaction.data),
+                func.extract("month", PluggyTransaction.data),
+                func.sum(PluggyTransaction.valor),
+            )
+            .filter(
+                PluggyTransaction.account_id == account.id,
+                PluggyTransaction.data >= _INICIO_EVOLUCAO_SALDO,
+                PluggyTransaction.data < fim_exclusivo,
+            )
+            .group_by(
+                func.extract("year", PluggyTransaction.data),
+                func.extract("month", PluggyTransaction.data),
+            )
+            .all()
+        )
+        movimento_por_mes = {(int(y), int(m)): _to_decimal(v) for y, m, v in rows}
+
+        saldo = account.saldo_inicial
+        saldo_por_mes: dict[tuple[int, int], Decimal] = {}
+        for y, m in range_completo:
+            saldo += movimento_por_mes.get((y, m), Decimal("0"))
+            saldo_por_mes[(y, m)] = saldo
+
+        resultado.append(
+            EvolucaoSaldoConta(
+                account_id=account.id,
+                account_nome=account.apelido or account.nome,
+                account_tipo=account.tipo,
+                saldo_inicial=account.saldo_inicial,
+                pontos=[
+                    PontoTendencia(ano=y, mes=m, total=saldo_por_mes[(y, m)]) for y, m in janela
+                ],
+            )
+        )
+    return resultado
+
+
+def get_saldo_acumulado(
+    db: Session, user_id: int, *, ano: int, mes: int, meses: int = 6
+) -> list[PontoTendencia]:
+    # Âncora ("saldo acumulado de dez/2025") = soma de saldo_inicial das
+    # contas menos o valor da transação sentinela de salário de dez/2025 (se
+    # existir) — ver regra de negócio no PRD-015: saldo_inicial já inclui
+    # fisicamente esse dinheiro, mas por competência ele "pertence" a
+    # jan/2026 e já entra de volta sozinho na receita desse mês.
+    soma_saldo_inicial = (
+        db.query(func.coalesce(func.sum(PluggyAccount.saldo_inicial), 0))
+        .filter(PluggyAccount.user_id == user_id, PluggyAccount.saldo_inicial.isnot(None))
+        .scalar()
+    )
+    valor_sentinela = (
+        db.query(PluggyTransaction.valor)
+        .filter(
+            PluggyTransaction.user_id == user_id,
+            PluggyTransaction.pluggy_transaction_id
+            == _salario_ajuste_dez_2025_pluggy_transaction_id(user_id),
+        )
+        .scalar()
+    )
+    ancora = _to_decimal(soma_saldo_inicial) - (
+        _to_decimal(valor_sentinela) if valor_sentinela is not None else Decimal("0")
+    )
+
+    range_completo = _months_between((2026, 1), (ano, mes))
+    totais = _receita_despesa_por_periodo(db, user_id, range_completo)
+
+    saldo = ancora
+    saldo_por_mes: dict[tuple[int, int], Decimal] = {}
+    for y, m in range_completo:
+        saldo += totais[(y, m)]["receita"] - totais[(y, m)]["despesa"]
+        saldo_por_mes[(y, m)] = saldo
+
+    janela = _month_range(ano, mes, meses)
+    return [
+        PontoTendencia(ano=y, mes=m, total=saldo_por_mes.get((y, m), ancora)) for y, m in janela
     ]

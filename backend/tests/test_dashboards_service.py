@@ -1653,3 +1653,192 @@ def test_get_tendencia_por_natureza_isolated_by_user(db_session, user):
     )
 
     assert all(p.total == Decimal("0") for t in tendencia for p in t.pontos)
+
+
+# --- get_evolucao_saldo_por_conta -------------------------------------------
+
+
+def test_get_evolucao_saldo_por_conta_accumulates_by_data_real(db_session, user):
+    account = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    account.saldo_inicial = Decimal("1000.00")
+    db_session.flush()
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="500.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 1, 10),
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-200.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 2, 5),
+    )
+    db_session.commit()
+
+    evolucao = service.get_evolucao_saldo_por_conta(db_session, user.id, ano=2026, mes=2, meses=2)
+
+    assert len(evolucao) == 1
+    conta = evolucao[0]
+    assert conta.saldo_inicial == Decimal("1000.00")
+    pontos = {(p.ano, p.mes): p.total for p in conta.pontos}
+    assert pontos[(2026, 1)] == Decimal("1500.00")
+    assert pontos[(2026, 2)] == Decimal("1300.00")
+
+
+def test_get_evolucao_saldo_por_conta_credit_card_direction_is_opposite(db_session, user):
+    account = _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito)
+    account.saldo_inicial = Decimal("0")
+    db_session.flush()
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-300.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+    )
+    db_session.commit()
+
+    evolucao = service.get_evolucao_saldo_por_conta(db_session, user.id, ano=2026, mes=1, meses=1)
+
+    assert evolucao[0].pontos[0].total == Decimal("-300.00")
+
+
+def test_get_evolucao_saldo_por_conta_excludes_account_without_saldo_inicial(db_session, user):
+    _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+
+    evolucao = service.get_evolucao_saldo_por_conta(db_session, user.id, ano=2026, mes=1, meses=3)
+
+    assert evolucao == []
+
+
+def test_get_evolucao_saldo_por_conta_uses_data_real_not_competencia(db_session, user):
+    account = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    account.saldo_inicial = Decimal("0")
+    db_session.flush()
+    # data real em janeiro, mas competência deslocada pra fevereiro (ex.:
+    # regra de salário) — auditoria por conta soma pela data real.
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="1000.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 1, 30),
+        data_competencia=date(2026, 2, 28),
+    )
+    db_session.commit()
+
+    evolucao = service.get_evolucao_saldo_por_conta(db_session, user.id, ano=2026, mes=2, meses=2)
+
+    pontos = {(p.ano, p.mes): p.total for p in evolucao[0].pontos}
+    assert pontos[(2026, 1)] == Decimal("1000.00")
+    assert pontos[(2026, 2)] == Decimal("1000.00")
+
+
+def test_get_evolucao_saldo_por_conta_isolated_by_user(db_session, user):
+    other = User(google_sub="google-evolucao-other", email="other-evo@example.com", name="Bob")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    other_account = _account(db_session, other)
+    other_account.saldo_inicial = Decimal("999.00")
+    db_session.commit()
+
+    evolucao = service.get_evolucao_saldo_por_conta(db_session, user.id, ano=2026, mes=1, meses=3)
+
+    assert evolucao == []
+
+
+# --- get_saldo_acumulado -----------------------------------------------------
+
+
+def test_get_saldo_acumulado_anchor_without_salario_sentinela(db_session, user):
+    account = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    account.saldo_inicial = Decimal("1000.00")
+    db_session.commit()
+
+    pontos = service.get_saldo_acumulado(db_session, user.id, ano=2026, mes=1, meses=2)
+
+    por_mes = {(p.ano, p.mes): p.total for p in pontos}
+    assert por_mes[(2025, 12)] == Decimal("1000.00")
+    assert por_mes[(2026, 1)] == Decimal("1000.00")
+
+
+def test_get_saldo_acumulado_subtracts_salario_sentinela_from_anchor(db_session, user):
+    account = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    account.saldo_inicial = Decimal("1000.00")
+    db_session.flush()
+    # transação sentinela de salário de dez/2025 (competência jan/2026) —
+    # o valor já entra de volta na receita de jan/2026 abaixo.
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="500.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2025, 12, 30),
+        data_competencia=date(2026, 1, 30),
+        subcategory_id=None,
+    )
+    db_session.commit()
+    tx = db_session.query(PluggyTransaction).one()
+    tx.pluggy_transaction_id = f"manual-salario-dez2025-user{user.id}"
+    db_session.commit()
+
+    pontos = service.get_saldo_acumulado(db_session, user.id, ano=2026, mes=1, meses=2)
+
+    por_mes = {(p.ano, p.mes): p.total for p in pontos}
+    # Âncora de dez/2025 = 1000 (saldo_inicial) - 500 (sentinela) = 500.
+    assert por_mes[(2025, 12)] == Decimal("500.00")
+    # jan/2026 = âncora (500) + receita de jan/2026 (a própria sentinela, 500).
+    assert por_mes[(2026, 1)] == Decimal("1000.00")
+
+
+def test_get_saldo_acumulado_accumulates_receita_menos_despesa_month_over_month(db_session, user):
+    account = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    account.saldo_inicial = Decimal("0")
+    db_session.flush()
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="1000.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 1, 10),
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-400.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 2, 5),
+    )
+    db_session.commit()
+
+    pontos = service.get_saldo_acumulado(db_session, user.id, ano=2026, mes=2, meses=3)
+
+    por_mes = {(p.ano, p.mes): p.total for p in pontos}
+    assert por_mes[(2025, 12)] == Decimal("0")
+    assert por_mes[(2026, 1)] == Decimal("1000.00")
+    assert por_mes[(2026, 2)] == Decimal("600.00")
+
+
+def test_get_saldo_acumulado_isolated_by_user(db_session, user):
+    other = User(google_sub="google-acumulado-other", email="other-acu@example.com", name="Bob")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    other_account = _account(db_session, other)
+    other_account.saldo_inicial = Decimal("999.00")
+    db_session.commit()
+
+    pontos = service.get_saldo_acumulado(db_session, user.id, ano=2026, mes=1, meses=1)
+
+    assert pontos[0].total == Decimal("0")

@@ -1,9 +1,9 @@
 import { useState } from "react";
 
 import type { CurrentUser } from "../api/auth";
-import { AccountManagementPage } from "./AccountManagementPage";
 import { AssetsPage } from "./AssetsPage";
 import { CategorizationReviewPage } from "./CategorizationReviewPage";
+import { ConfiguracoesPage } from "./ConfiguracoesPage";
 import { DashboardsPage } from "./DashboardsPage";
 import { LiabilitiesPage } from "./LiabilitiesPage";
 import { NaturezaPage } from "./NaturezaPage";
@@ -14,7 +14,7 @@ interface ProtectedPageProps {
 }
 
 type Tab =
-  "dashboards" | "categorizar" | "ativos" | "passivos" | "natureza" | "projecao" | "contas";
+  "dashboards" | "categorizar" | "ativos" | "passivos" | "natureza" | "projecao" | "configuracoes";
 
 const NAV_ITEMS: { tab: Tab; label: string }[] = [
   { tab: "dashboards", label: "Dashboards" },
@@ -23,7 +23,7 @@ const NAV_ITEMS: { tab: Tab; label: string }[] = [
   { tab: "passivos", label: "Passivos" },
   { tab: "natureza", label: "Natureza" },
   { tab: "projecao", label: "Projeção" },
-  { tab: "contas", label: "Gestão de contas" },
+  { tab: "configuracoes", label: "Configurações" },
 ];
 
 export function ProtectedPage({ user }: ProtectedPageProps) {
@@ -61,7 +61,7 @@ export function ProtectedPage({ user }: ProtectedPageProps) {
         {tab === "passivos" && <LiabilitiesPage />}
         {tab === "natureza" && <NaturezaPage />}
         {tab === "projecao" && <ProjecaoPage />}
-        {tab === "contas" && <AccountManagementPage />}
+        {tab === "configuracoes" && <ConfiguracoesPage user={user} />}
       </main>
     </div>
   );

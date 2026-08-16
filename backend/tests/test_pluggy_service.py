@@ -3,7 +3,10 @@ from decimal import Decimal
 
 import pytest
 
+from app.categorization.service import salario_subcategory_id
+from app.dashboards import service as dashboards_service
 from app.exceptions import InvalidStateError, NotFoundError
+from app.models.category import CategoryGroup, Subcategory
 from app.models.pluggy import PluggyAccount, PluggyTransaction
 from app.models.user import User
 from app.pluggy_integration import service
@@ -408,3 +411,197 @@ def test_sync_items_filter_does_not_bypass_sync_enabled_per_account(db_session, 
 
     reloaded = service.list_accounts(db_session, user.id)[0]
     assert reloaded.saldo == Decimal("100.50")
+
+
+def _synced_account(db_session, user):
+    client = FakePluggyClient(item=_item_raw(), accounts=[_account_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    return service.list_accounts(db_session, user.id)[0]
+
+
+def _salario_subcategory(db_session):
+    group = CategoryGroup(nome="Receitas")
+    db_session.add(group)
+    db_session.flush()
+    subcategory = Subcategory(group_id=group.id, nome="Salário")
+    db_session.add(subcategory)
+    db_session.commit()
+    db_session.refresh(subcategory)
+    return subcategory
+
+
+# --- update_saldo_inicial ----------------------------------------------------
+
+
+def test_update_saldo_inicial_sets_value(db_session, user):
+    account = _synced_account(db_session, user)
+
+    updated = service.update_saldo_inicial(
+        db_session, user.id, account.id, saldo_inicial=Decimal("1500.00")
+    )
+
+    assert updated.saldo_inicial == Decimal("1500.00")
+
+
+def test_update_saldo_inicial_can_clear_value(db_session, user):
+    account = _synced_account(db_session, user)
+    service.update_saldo_inicial(db_session, user.id, account.id, saldo_inicial=Decimal("1500.00"))
+
+    cleared = service.update_saldo_inicial(db_session, user.id, account.id, saldo_inicial=None)
+
+    assert cleared.saldo_inicial is None
+
+
+def test_update_saldo_inicial_other_users_account_raises_not_found(db_session, user, other_user):
+    account = _synced_account(db_session, user)
+
+    with pytest.raises(NotFoundError):
+        service.update_saldo_inicial(
+            db_session, other_user.id, account.id, saldo_inicial=Decimal("100.00")
+        )
+
+
+# --- upsert_salario_ajuste_dez_2025 ------------------------------------------
+
+
+def test_upsert_salario_ajuste_creates_confirmed_transaction_with_competencia(db_session, user):
+    _salario_subcategory(db_session)
+    account = _synced_account(db_session, user)
+
+    tx = service.upsert_salario_ajuste_dez_2025(
+        db_session,
+        user.id,
+        account_id=account.id,
+        data=date(2025, 12, 30),
+        valor=Decimal("5000.00"),
+        cutoff_dia=25,
+    )
+
+    assert tx is not None
+    assert tx.valor == Decimal("5000.00")
+    assert tx.data == date(2025, 12, 30)
+    assert tx.data_competencia == date(2026, 1, 30)
+    assert tx.categorizacao_status.value == "confirmada"
+    assert tx.subcategory_id == salario_subcategory_id(db_session)
+    assert tx.tipo.value == "credito"
+
+
+def test_upsert_salario_ajuste_called_twice_updates_instead_of_duplicating(db_session, user):
+    _salario_subcategory(db_session)
+    account = _synced_account(db_session, user)
+    service.upsert_salario_ajuste_dez_2025(
+        db_session,
+        user.id,
+        account_id=account.id,
+        data=date(2025, 12, 30),
+        valor=Decimal("5000.00"),
+        cutoff_dia=25,
+    )
+
+    updated = service.upsert_salario_ajuste_dez_2025(
+        db_session,
+        user.id,
+        account_id=account.id,
+        data=date(2025, 12, 28),
+        valor=Decimal("5200.00"),
+        cutoff_dia=25,
+    )
+
+    assert db_session.query(PluggyTransaction).count() == 1
+    assert updated.valor == Decimal("5200.00")
+    assert updated.data == date(2025, 12, 28)
+
+
+def test_upsert_salario_ajuste_valor_none_deletes_existing_row(db_session, user):
+    _salario_subcategory(db_session)
+    account = _synced_account(db_session, user)
+    service.upsert_salario_ajuste_dez_2025(
+        db_session,
+        user.id,
+        account_id=account.id,
+        data=date(2025, 12, 30),
+        valor=Decimal("5000.00"),
+        cutoff_dia=25,
+    )
+
+    result = service.upsert_salario_ajuste_dez_2025(
+        db_session,
+        user.id,
+        account_id=account.id,
+        data=date(2025, 12, 30),
+        valor=None,
+        cutoff_dia=25,
+    )
+
+    assert result is None
+    assert db_session.query(PluggyTransaction).count() == 0
+
+
+def test_upsert_salario_ajuste_valor_none_without_existing_row_is_noop(db_session, user):
+    account = _synced_account(db_session, user)
+
+    result = service.upsert_salario_ajuste_dez_2025(
+        db_session,
+        user.id,
+        account_id=account.id,
+        data=date(2025, 12, 30),
+        valor=None,
+        cutoff_dia=25,
+    )
+
+    assert result is None
+    assert db_session.query(PluggyTransaction).count() == 0
+
+
+def test_upsert_salario_ajuste_isolated_by_user(db_session, user, other_user):
+    _salario_subcategory(db_session)
+    account_user = _synced_account(db_session, user)
+
+    with pytest.raises(NotFoundError):
+        service.upsert_salario_ajuste_dez_2025(
+            db_session,
+            other_user.id,
+            account_id=account_user.id,
+            data=date(2025, 12, 30),
+            valor=Decimal("5000.00"),
+            cutoff_dia=25,
+        )
+
+
+def test_get_salario_ajuste_dez_2025_returns_none_when_absent(db_session, user):
+    assert service.get_salario_ajuste_dez_2025(db_session, user.id) is None
+
+
+# --- regressão: sentinela de salário flui por get_summary/get_tendencia/    -
+# --- get_por_categoria sem nenhum código especial nessas três funções -------
+
+
+def test_salario_ajuste_flows_through_dashboards_aggregations_without_special_case(
+    db_session, user
+):
+    from app.models.pluggy import PluggyTransactionTipo
+
+    salario = _salario_subcategory(db_session)
+    account = _synced_account(db_session, user)
+
+    tx = service.upsert_salario_ajuste_dez_2025(
+        db_session,
+        user.id,
+        account_id=account.id,
+        data=date(2025, 12, 30),
+        valor=Decimal("5000.00"),
+        cutoff_dia=25,
+    )
+    assert tx.data_competencia == date(2026, 1, 30)
+
+    summary = dashboards_service.get_summary(db_session, user.id, ano=2026, mes=1)
+    tendencia = dashboards_service.get_tendencia(db_session, user.id, ano=2026, mes=1, meses=1)
+    por_categoria = dashboards_service.get_por_categoria(
+        db_session, user.id, tipo=PluggyTransactionTipo.credito, ano=2026, mes=1
+    )
+
+    assert summary.receita == Decimal("5000.00")
+    assert tendencia[0].receita == Decimal("5000.00")
+    salario_bucket = next(c for c in por_categoria if c.subcategory_id == salario.id)
+    assert salario_bucket.total == Decimal("5000.00")

@@ -10,6 +10,7 @@ const USER: CurrentUser = {
   id: 1,
   email: "alice@example.com",
   name: "Alice",
+  salario_competencia_cutoff_dia: 25,
   created_at: "2026-01-01T00:00:00Z",
 };
 
@@ -75,7 +76,7 @@ describe("ProtectedPage navigation", () => {
     expect(screen.getByRole("button", { name: "Passivos" })).toBeInTheDocument();
   });
 
-  it("orders the nav as Dashboards, Categorizar, Ativos, Passivos, Natureza, Projeção, Gestão de contas", () => {
+  it("orders the nav as Dashboards, Categorizar, Ativos, Passivos, Natureza, Projeção, Configurações", () => {
     vi.stubGlobal("fetch", catchAllFetchMock());
 
     renderProtectedPage();
@@ -92,8 +93,22 @@ describe("ProtectedPage navigation", () => {
       "Passivos",
       "Natureza",
       "Projeção",
-      "Gestão de contas",
+      "Configurações",
     ]);
+  });
+
+  it("switches to the Configurações tab and renders ConfiguracoesPage", async () => {
+    vi.stubGlobal("fetch", catchAllFetchMock());
+
+    renderProtectedPage();
+
+    await userEvent.click(screen.getByRole("button", { name: "Configurações" }));
+
+    expect(await screen.findByRole("heading", { name: "Configurações" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Configurações" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
   });
 
   it("switches to the Passivos tab and renders LiabilitiesPage", async () => {

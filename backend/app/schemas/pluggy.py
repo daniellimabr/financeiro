@@ -53,6 +53,7 @@ class PluggyAccountOut(BaseModel):
     saldo: Decimal
     moeda: str
     sync_enabled: bool
+    saldo_inicial: Decimal | None
     created_at: datetime
     updated_at: datetime
 
@@ -60,6 +61,24 @@ class PluggyAccountOut(BaseModel):
 class PluggyAccountUpdateIn(BaseModel):
     apelido: str | None = None
     sync_enabled: bool = True
+
+
+class PluggyAccountSaldoInicialIn(BaseModel):
+    saldo_inicial: Decimal | None = None
+
+
+class SalarioAjusteDezembroIn(BaseModel):
+    account_id: int
+    data: date
+    valor: Decimal | None = None
+
+
+class SalarioAjusteDezembroOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    account_id: int
+    data: date
+    valor: Decimal
 
 
 class SyncItemsIn(BaseModel):

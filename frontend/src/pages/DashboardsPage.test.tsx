@@ -110,6 +110,19 @@ const PASSIVO_FIXTURE = [
   { liability_id: 1, liability_nome: "Financiamento carro", total: "500.00" },
 ];
 
+// 7 pontos (histórico default de 6 meses + 1 ponto extra pro card "Saldo
+// Anterior", ver useDashboardSaldoAcumulado) — o penúltimo ponto (dez/2025,
+// 11500.00) é o "mês anterior" ao último (jan/2026, 12000.00, mês filtrado).
+const SALDO_ACUMULADO_FIXTURE = [
+  { ano: 2025, mes: 7, total: "9000.00" },
+  { ano: 2025, mes: 8, total: "9500.00" },
+  { ano: 2025, mes: 9, total: "10000.00" },
+  { ano: 2025, mes: 10, total: "10500.00" },
+  { ano: 2025, mes: 11, total: "11000.00" },
+  { ano: 2025, mes: 12, total: "11500.00" },
+  { ano: 2026, mes: 1, total: "12000.00" },
+];
+
 const SALDO_FIXTURE = [
   {
     account_id: 1,
@@ -234,6 +247,8 @@ function routedFetchMock() {
       return Promise.resolve(jsonResponse(PASSIVO_FIXTURE));
     if (url.startsWith("/dashboards/saldo-por-conta"))
       return Promise.resolve(jsonResponse(SALDO_FIXTURE));
+    if (url.startsWith("/dashboards/saldo-acumulado"))
+      return Promise.resolve(jsonResponse(SALDO_ACUMULADO_FIXTURE));
     if (url.startsWith("/category-groups")) return Promise.resolve(jsonResponse(GROUPS_FIXTURE));
     if (url.startsWith("/subcategories"))
       return Promise.resolve(jsonResponse(SUBCATEGORIES_FIXTURE));
@@ -410,6 +425,8 @@ describe("DashboardsPage", () => {
       if (url.startsWith("/dashboards/tendencia"))
         return Promise.resolve(jsonResponse(TENDENCIA_FIXTURE));
       if (url.startsWith("/dashboards/por-categoria")) return Promise.resolve(jsonResponse([]));
+      if (url.startsWith("/dashboards/saldo-acumulado"))
+        return Promise.resolve(jsonResponse(SALDO_ACUMULADO_FIXTURE));
       if (url.startsWith("/category-groups")) return Promise.resolve(jsonResponse(GROUPS_FIXTURE));
       if (url.startsWith("/subcategories"))
         return Promise.resolve(jsonResponse(SUBCATEGORIES_FIXTURE));
@@ -520,7 +537,7 @@ describe("DashboardsPage", () => {
     renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
 
-    await userEvent.click(screen.getByRole("button", { name: /Saldo/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^SaldoR\$/ }));
     expect(await screen.findByText("R$ 1.200,00")).toBeInTheDocument();
 
     await userEvent.selectOptions(screen.getByLabelText("Mês"), "Janeiro");
@@ -637,8 +654,65 @@ describe("DashboardsPage", () => {
     renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
 
-    await userEvent.click(screen.getByRole("button", { name: /Saldo/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^SaldoR\$/ }));
 
     expect(await screen.findByText(/limite R\$ 5\.000,00/)).toBeInTheDocument();
+  });
+
+  it("renders Saldo Acumulado (last point) and Saldo Anterior (penultimate point, labeled) cards", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    expect(await screen.findByText("R$ 12.000,00")).toBeInTheDocument();
+    expect(screen.getByText("R$ 11.500,00")).toBeInTheDocument();
+    expect(screen.getByText(/Saldo Anterior \(12\/2025\)/)).toBeInTheDocument();
+  });
+
+  it("clicking Saldo Anterior in January/2026 alerts instead of navigating", async () => {
+    const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+    await userEvent.selectOptions(screen.getByLabelText("Ano"), "2026");
+    await userEvent.selectOptions(screen.getByLabelText("Mês"), "Janeiro");
+
+    await userEvent.click(screen.getByRole("button", { name: /Saldo Anterior/ }));
+
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect((screen.getByLabelText("Mês") as HTMLSelectElement).value).toBe("1");
+    alertSpy.mockRestore();
+  });
+
+  it("clicking Saldo Anterior outside January/2026 navigates the filter to the previous month", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+    await userEvent.selectOptions(screen.getByLabelText("Ano"), "2026");
+    await userEvent.selectOptions(screen.getByLabelText("Mês"), "Março");
+
+    await userEvent.click(screen.getByRole("button", { name: /Saldo Anterior/ }));
+
+    await waitFor(() => {
+      expect((screen.getByLabelText("Mês") as HTMLSelectElement).value).toBe("2");
+    });
+    expect((screen.getByLabelText("Ano") as HTMLSelectElement).value).toBe("2026");
+  });
+
+  it("opens the Saldo Acumulado drilldown with a trend chart when the card is clicked", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    const { container } = renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /^Saldo Acumulado/ }));
+
+    expect(await screen.findByRole("heading", { name: "Saldo Acumulado" })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(container.querySelector(".dash-chart")).not.toBeNull();
+    });
   });
 });

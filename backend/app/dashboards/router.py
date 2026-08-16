@@ -9,11 +9,13 @@ from app.models.user import User
 from app.schemas.dashboards import (
     AtivoTotalOut,
     CategoriaTotalOut,
+    EvolucaoSaldoContaOut,
     MeioPagamentoTotalOut,
     NaturezaTotalOut,
     PassivoTotalOut,
     PatrimonioBreakdownOut,
     PontoProjecaoOut,
+    PontoTendenciaOut,
     SaldoContaOut,
     SummaryOut,
     TendenciaAtivoOut,
@@ -190,3 +192,25 @@ def get_saldo_por_conta(
     current_user: User = Depends(get_current_user),
 ):
     return service.get_saldo_por_conta(db, current_user.id)
+
+
+@router.get("/evolucao-saldo-por-conta", response_model=list[EvolucaoSaldoContaOut])
+def get_evolucao_saldo_por_conta(
+    ano: int,
+    mes: int,
+    meses: int = Query(6, ge=1, le=24),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.get_evolucao_saldo_por_conta(db, current_user.id, ano=ano, mes=mes, meses=meses)
+
+
+@router.get("/saldo-acumulado", response_model=list[PontoTendenciaOut])
+def get_saldo_acumulado(
+    ano: int,
+    mes: int,
+    meses: int = Query(6, ge=1, le=24),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.get_saldo_acumulado(db, current_user.id, ano=ano, mes=mes, meses=meses)

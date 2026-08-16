@@ -4,6 +4,8 @@ from decimal import Decimal
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
+from app.categorization.competencia import competencia_salario
+from app.categorization.service import salario_subcategory_id
 from app.config import settings
 from app.exceptions import InvalidStateError, NotFoundError
 from app.models.category import SEM_CATEGORIA_ID
@@ -13,10 +15,18 @@ from app.models.pluggy import (
     PluggyItem,
     PluggyItemStatus,
     PluggyTransaction,
+    PluggyTransactionCategorizacaoStatus,
     PluggyTransactionStatus,
     PluggyTransactionTipo,
 )
 from app.pluggy_integration.client import PluggyClient
+
+_SALARIO_AJUSTE_DEZ_2025_DESCRICAO = "Salário (ajuste dez/2025)"
+
+
+def _salario_ajuste_dez_2025_pluggy_transaction_id(user_id: int) -> str:
+    return f"manual-salario-dez2025-user{user_id}"
+
 
 NOT_SYNCABLE_STATUSES = {
     PluggyItemStatus.updating,
@@ -104,6 +114,73 @@ def update_account(
     db.commit()
     db.refresh(account)
     return account
+
+
+def update_saldo_inicial(
+    db: Session, user_id: int, account_id: int, *, saldo_inicial: Decimal | None
+) -> PluggyAccount:
+    account = get_account(db, user_id, account_id)
+    account.saldo_inicial = saldo_inicial
+    db.commit()
+    db.refresh(account)
+    return account
+
+
+def get_salario_ajuste_dez_2025(db: Session, user_id: int) -> PluggyTransaction | None:
+    return (
+        db.query(PluggyTransaction)
+        .filter(
+            PluggyTransaction.user_id == user_id,
+            PluggyTransaction.pluggy_transaction_id
+            == _salario_ajuste_dez_2025_pluggy_transaction_id(user_id),
+        )
+        .one_or_none()
+    )
+
+
+def upsert_salario_ajuste_dez_2025(
+    db: Session,
+    user_id: int,
+    *,
+    account_id: int,
+    data: date,
+    valor: Decimal | None,
+    cutoff_dia: int,
+) -> PluggyTransaction | None:
+    account = get_account(db, user_id, account_id)
+    tx = get_salario_ajuste_dez_2025(db, user_id)
+
+    if valor is None:
+        if tx is not None:
+            db.delete(tx)
+            db.commit()
+        return None
+
+    subcategory_id = salario_subcategory_id(db)
+    if subcategory_id is None:
+        raise NotFoundError("Subcategoria 'Salário' não encontrada no catálogo")
+
+    if tx is None:
+        tx = PluggyTransaction(
+            account_id=account.id,
+            user_id=user_id,
+            pluggy_transaction_id=_salario_ajuste_dez_2025_pluggy_transaction_id(user_id),
+        )
+        db.add(tx)
+    else:
+        tx.account_id = account.id
+
+    tx.descricao = _SALARIO_AJUSTE_DEZ_2025_DESCRICAO
+    tx.valor = valor
+    tx.tipo = PluggyTransactionTipo.credito
+    tx.data = data
+    tx.data_competencia = competencia_salario(data, cutoff_dia)
+    tx.subcategory_id = subcategory_id
+    tx.status = PluggyTransactionStatus.efetivada
+    tx.categorizacao_status = PluggyTransactionCategorizacaoStatus.confirmada
+    db.commit()
+    db.refresh(tx)
+    return tx
 
 
 def list_transactions(

@@ -1,15 +1,15 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
 from app.auth.google import oauth
 from app.auth.jwt import COOKIE_NAME, create_access_token
-from app.auth.service import upsert_user_from_google
+from app.auth.service import update_settings, upsert_user_from_google
 from app.config import settings
 from app.db import get_db
 from app.models.user import User
-from app.schemas.user import UserOut
+from app.schemas.user import UserOut, UserSettingsIn
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -48,3 +48,17 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserOut)
 def me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(response: Response, current_user: User = Depends(get_current_user)):
+    response.delete_cookie(key=COOKIE_NAME, samesite="lax", secure=settings.cookie_secure)
+
+
+@router.put("/me/settings", response_model=UserOut)
+def update_my_settings(
+    payload: UserSettingsIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return update_settings(db, current_user, cutoff_dia=payload.cutoff_dia)

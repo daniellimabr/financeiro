@@ -137,3 +137,13 @@ class SaldoContaOut(BaseModel):
     account_tipo: PluggyAccountTipo
     saldo: Decimal
     limite_credito: Decimal | None
+
+
+class EvolucaoSaldoContaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    account_id: int
+    account_nome: str
+    account_tipo: PluggyAccountTipo
+    saldo_inicial: Decimal
+    pontos: list[PontoTendenciaOut]

@@ -2,17 +2,44 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.categorization import engine
+from app.categorization.competencia import competencia_salario
 from app.categorization.normalize import normalize_description
 from app.exceptions import InvalidStateError, NotFoundError
 from app.models.asset import Asset
 from app.models.categorization import AssetCategorizationRule, CategorizationRule
-from app.models.category import Subcategory
+from app.models.category import CategoryGroup, Subcategory
 from app.models.liability import Liability
 from app.models.pluggy import (
     PluggyTransaction,
     PluggyTransactionCategorizacaoStatus,
     PluggyTransactionTipo,
 )
+from app.models.user import User
+
+_SALARIO_SUBCATEGORY_NOME = "Salário"
+_SALARIO_GROUP_NOME = "Receitas"
+
+
+def salario_subcategory_id(db: Session) -> int | None:
+    row = (
+        db.query(Subcategory.id)
+        .join(CategoryGroup, Subcategory.group_id == CategoryGroup.id)
+        .filter(
+            Subcategory.nome == _SALARIO_SUBCATEGORY_NOME,
+            CategoryGroup.nome == _SALARIO_GROUP_NOME,
+        )
+        .one_or_none()
+    )
+    return row[0] if row else None
+
+
+def _recompute_data_competencia(
+    tx: PluggyTransaction, subcategory_id: int, salario_id: int | None, cutoff_dia: int
+) -> None:
+    if salario_id is not None and subcategory_id == salario_id:
+        tx.data_competencia = competencia_salario(tx.data, cutoff_dia)
+    else:
+        tx.data_competencia = tx.data
 
 
 def list_transactions(
@@ -156,8 +183,12 @@ def set_category(
     if subcategory is None:
         raise NotFoundError(f"Subcategoria {subcategory_id} não encontrada")
 
+    user = db.get(User, user_id)
+    salario_id = salario_subcategory_id(db)
+
     tx.subcategory_id = subcategory_id
     tx.categorizacao_status = PluggyTransactionCategorizacaoStatus.confirmada
+    _recompute_data_competencia(tx, subcategory_id, salario_id, user.salario_competencia_cutoff_dia)
     db.commit()
     db.refresh(tx)
     return tx
@@ -173,6 +204,9 @@ class BulkConfirmResult:
 def bulk_confirm(
     db: Session, user_id: int, items: list[tuple[int, int]]
 ) -> list[BulkConfirmResult]:
+    user = db.get(User, user_id)
+    salario_id = salario_subcategory_id(db)
+
     results: list[BulkConfirmResult] = []
     for transaction_id, subcategory_id in items:
         tx = (
@@ -199,6 +233,9 @@ def bulk_confirm(
 
         tx.subcategory_id = subcategory_id
         tx.categorizacao_status = PluggyTransactionCategorizacaoStatus.confirmada
+        _recompute_data_competencia(
+            tx, subcategory_id, salario_id, user.salario_competencia_cutoff_dia
+        )
         results.append(BulkConfirmResult(transaction_id, True))
 
     db.commit()

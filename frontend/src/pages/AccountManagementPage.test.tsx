@@ -33,6 +33,7 @@ const ACCOUNT_FIXTURE = {
   saldo: "100.50",
   moeda: "BRL",
   sync_enabled: true,
+  saldo_inicial: null,
   created_at: "2026-08-07T00:00:00Z",
   updated_at: "2026-08-07T00:00:00Z",
 };
@@ -72,6 +73,8 @@ describe("AccountManagementPage", () => {
       const url = String(input);
       if (url === "/pluggy/items") return Promise.resolve(jsonResponse([ITEM_FIXTURE]));
       if (url === "/pluggy/accounts") return Promise.resolve(jsonResponse([ACCOUNT_FIXTURE]));
+      if (url.startsWith("/dashboards/evolucao-saldo-por-conta"))
+        return Promise.resolve(jsonResponse([]));
       throw new Error(`Unexpected fetch: ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -94,6 +97,8 @@ describe("AccountManagementPage", () => {
       if (url === "/pluggy/accounts/1" && method === "PUT") {
         return Promise.resolve(jsonResponse({ ...ACCOUNT_FIXTURE, apelido: "Conta principal" }));
       }
+      if (url.startsWith("/dashboards/evolucao-saldo-por-conta"))
+        return Promise.resolve(jsonResponse([]));
       throw new Error(`Unexpected fetch: ${method} ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -101,7 +106,7 @@ describe("AccountManagementPage", () => {
     renderWithQueryClient(<AccountManagementPage />);
     await screen.findByText(/Conta Corrente/);
 
-    await userEvent.click(screen.getByRole("button", { name: "Editar" }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Editar" })[0]);
     const input = screen.getByLabelText("Apelido de Conta Corrente");
     await userEvent.clear(input);
     await userEvent.type(input, "Conta principal");
@@ -127,6 +132,8 @@ describe("AccountManagementPage", () => {
       if (url === "/pluggy/accounts/1" && method === "PUT") {
         return Promise.resolve(jsonResponse({ ...ACCOUNT_FIXTURE, sync_enabled: false }));
       }
+      if (url.startsWith("/dashboards/evolucao-saldo-por-conta"))
+        return Promise.resolve(jsonResponse([]));
       throw new Error(`Unexpected fetch: ${method} ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -157,6 +164,8 @@ describe("AccountManagementPage", () => {
       if (url === "/pluggy/sync" && method === "POST") {
         return Promise.resolve(jsonResponse({ results: [] }));
       }
+      if (url.startsWith("/dashboards/evolucao-saldo-por-conta"))
+        return Promise.resolve(jsonResponse([]));
       throw new Error(`Unexpected fetch: ${method} ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -197,6 +206,8 @@ describe("AccountManagementPage", () => {
       if (url === "/pluggy/items" && method === "POST") {
         return Promise.resolve(jsonResponse(ITEM_FIXTURE, 201));
       }
+      if (url.startsWith("/dashboards/evolucao-saldo-por-conta"))
+        return Promise.resolve(jsonResponse([]));
       throw new Error(`Unexpected fetch: ${method} ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -212,5 +223,77 @@ describe("AccountManagementPage", () => {
       );
       expect(call).toBeDefined();
     });
+  });
+
+  it("editing the saldo inicial saves it via PUT /pluggy/accounts/{id}/saldo-inicial", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      if (url === "/pluggy/items") return Promise.resolve(jsonResponse([ITEM_FIXTURE]));
+      if (url === "/pluggy/accounts" && method === "GET")
+        return Promise.resolve(jsonResponse([ACCOUNT_FIXTURE]));
+      if (url === "/pluggy/accounts/1/saldo-inicial" && method === "PUT") {
+        return Promise.resolve(jsonResponse({ ...ACCOUNT_FIXTURE, saldo_inicial: "1500.00" }));
+      }
+      if (url.startsWith("/dashboards/evolucao-saldo-por-conta"))
+        return Promise.resolve(jsonResponse([]));
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<AccountManagementPage />);
+    await screen.findByText(/Conta Corrente/);
+    expect(screen.getByText(/não informado/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Editar" })[1]);
+    const input = screen.getByLabelText("Saldo inicial de Conta Corrente");
+    await userEvent.type(input, "1500");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (c) =>
+          String(c[0]) === "/pluggy/accounts/1/saldo-inicial" &&
+          (c[1] as RequestInit)?.method === "PUT"
+      );
+      expect(call).toBeDefined();
+      const body = JSON.parse((call?.[1] as RequestInit).body as string);
+      expect(body).toEqual({ saldo_inicial: "1500" });
+    });
+  });
+
+  it("renders the monthly audit table from evolucao-saldo-por-conta data", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/pluggy/items") return Promise.resolve(jsonResponse([ITEM_FIXTURE]));
+      if (url === "/pluggy/accounts")
+        return Promise.resolve(jsonResponse([{ ...ACCOUNT_FIXTURE, saldo_inicial: "1000.00" }]));
+      if (url.startsWith("/dashboards/evolucao-saldo-por-conta")) {
+        return Promise.resolve(
+          jsonResponse([
+            {
+              account_id: 1,
+              account_nome: "Conta Corrente",
+              account_tipo: "corrente",
+              saldo_inicial: "1000.00",
+              pontos: [
+                { ano: 2026, mes: 1, total: "1500.00" },
+                { ano: 2026, mes: 2, total: "1300.00" },
+              ],
+            },
+          ])
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<AccountManagementPage />);
+
+    expect(await screen.findByText("01/2026")).toBeInTheDocument();
+    expect(screen.getByText("02/2026")).toBeInTheDocument();
+    expect(screen.getByText("R$ 1.500,00")).toBeInTheDocument();
+    expect(screen.getByText("R$ 1.300,00")).toBeInTheDocument();
+    expect(screen.getAllByText(/Conta Corrente/)).toHaveLength(2);
   });
 });

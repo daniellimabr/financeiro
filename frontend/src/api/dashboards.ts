@@ -110,6 +110,14 @@ export interface SaldoConta {
   limite_credito: string | null;
 }
 
+export interface EvolucaoSaldoConta {
+  account_id: number;
+  account_nome: string;
+  account_tipo: string;
+  saldo_inicial: string;
+  pontos: PontoTendencia[];
+}
+
 // Período histórico oferecido pelo seletor de tendência (3/6/12 meses).
 export type PeriodoHistorico = 3 | 6 | 12;
 
@@ -226,4 +234,18 @@ export function fetchSaldoPorConta(): Promise<SaldoConta[]> {
 
 export function fetchPatrimonioBreakdown(): Promise<PatrimonioBreakdown> {
   return apiFetch<PatrimonioBreakdown>("/dashboards/patrimonio/breakdown");
+}
+
+export function fetchEvolucaoSaldoPorConta(
+  filter: Required<PeriodoFilter> & { meses?: number }
+): Promise<EvolucaoSaldoConta[]> {
+  return apiFetch<EvolucaoSaldoConta[]>(
+    `/dashboards/evolucao-saldo-por-conta${buildQuery({ ...filter })}`
+  );
+}
+
+export function fetchSaldoAcumulado(
+  filter: Required<PeriodoFilter> & { meses?: number }
+): Promise<PontoTendencia[]> {
+  return apiFetch<PontoTendencia[]>(`/dashboards/saldo-acumulado${buildQuery({ ...filter })}`);
 }
