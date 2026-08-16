@@ -195,6 +195,16 @@ export function CategorizationReviewPage() {
 
       <div className="dash-table-wrap">
         <table className="dash-table cat-review-table">
+          <colgroup>
+            <col className="col-check" />
+            <col className="col-status" />
+            <col className="col-data" />
+            <col className="col-descricao" />
+            <col className="col-categoria" />
+            <col className="col-ativo" />
+            <col className="col-valor" />
+            <col className="col-acoes" />
+          </colgroup>
           <thead>
             <tr>
               <th>

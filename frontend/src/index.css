@@ -917,11 +917,21 @@ input {
 
 /* Polish de linha e densidade só na tabela de Categorização (superfície de
    trabalho primária, diferente do nível "terminal" das tabelas de
-   drill-down) — classe aditiva sobre .dash-table, não um fork. Ordem das
-   colunas: checkbox, Status, Data, Descrição, Categoria, Ativo, Valor,
-   Ações — Descrição/Categoria (texto livre/nome composto "grupo /
-   subcategoria") ganham mais espaço; Status/Data/Valor são curtos por
-   natureza e não precisam do teto de 200px genérico de .dash-table. */
+   drill-down) — classe aditiva sobre .dash-table, não um fork.
+   table-layout: fixed + <colgroup> em vez de auto: com auto, o navegador
+   dimensiona cada coluna só pelo conteúdo atual da página (uma Descrição
+   curta na tela não "puxa" espaço livre do restante da tabela, mesmo com
+   .dash-page sem teto de largura) — o teto de 520px testado antes nunca
+   era alcançado de verdade, e Ativo/Valor sobravam com espaço desproporcional.
+   Com largura fixa por coluna, Descrição/Categoria reivindicam sua fatia
+   (%) do espaço disponível sempre, e Ativo/Valor ficam justos ao conteúdo
+   real deles. Ordem: checkbox, Status, Data, Descrição, Categoria, Ativo,
+   Valor, Ações. */
+.cat-review-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
 .cat-review-table tbody tr:hover {
   background: var(--accent-bg);
 }
@@ -935,33 +945,66 @@ input {
   vertical-align: middle;
 }
 
+.cat-review-table .col-check {
+  width: 40px;
+}
+
+.cat-review-table .col-status {
+  width: 40px;
+}
+
+.cat-review-table .col-data {
+  width: 100px;
+}
+
+.cat-review-table .col-descricao {
+  width: 32%;
+}
+
+.cat-review-table .col-categoria {
+  width: 26%;
+}
+
+.cat-review-table .col-ativo {
+  width: 140px;
+}
+
+.cat-review-table .col-valor {
+  width: 110px;
+}
+
+.cat-review-table .col-acoes {
+  width: 110px;
+}
+
 .cat-review-table th:first-child,
 .cat-review-table td:first-child {
-  width: 40px;
   text-align: center;
 }
 
 .cat-review-table th:nth-child(2),
 .cat-review-table td:nth-child(2) {
-  width: 40px;
   text-align: center;
 }
 
-.cat-review-table th:nth-child(3),
-.cat-review-table td:nth-child(3) {
-  width: 96px;
-}
-
+/* .dash-table td button/input/select carregam max-width:200px genérico
+   (pensado pras tabelas de drill-down) — cancelado aqui porque o
+   <colgroup> acima já é quem decide a largura real de cada coluna nesta
+   tabela; sem isso, o teto de 200px vencia o width:100% abaixo e a caixa
+   nunca ocupava a coluna inteira. */
 .cat-review-table td:nth-child(4) button {
-  max-width: 520px;
+  width: 100%;
+  max-width: none;
 }
 
 .cat-review-table td:nth-child(5) .cat-combobox-input {
-  max-width: 400px;
+  width: 100%;
+  max-width: none;
 }
 
 .cat-review-table td:nth-child(6) select {
-  max-width: 160px;
+  width: 100%;
+  max-width: none;
 }
 
 .cat-review-table th:nth-child(7),
