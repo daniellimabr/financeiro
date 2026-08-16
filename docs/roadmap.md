@@ -510,7 +510,7 @@ nova).
 
 PRD: [PRD-014-projecao-custos-hipoteticas.md](prd/PRD-014-projecao-custos-hipoteticas.md).
 Plano: [SPRINT-014-projecao-custos-hipoteticas-plan.md](sprints/SPRINT-014-projecao-custos-hipoteticas-plan.md).
-Relatório: [SPRINT-014-projecao-custos-hipoteticas-report.md](sprints/SPRINT-014-projecao-custos-hipoteticas-report.md).
+Relatório: [SPRINT-014-projecao-custos-hipoteticas-report.md](sprints/SPRINT-014-projecao-custos-hipoteticas-report.md) — aprovado pelo CEO em 2026-08-16.
 
 ## Registro de reavaliações futuras
 

@@ -2,6 +2,7 @@
 
 - **Plano:** [SPRINT-014-projecao-custos-hipoteticas-plan.md](./SPRINT-014-projecao-custos-hipoteticas-plan.md)
 - **Data do relatório:** 2026-08-16
+- **Status:** aprovado pelo CEO em 2026-08-16
 
 ## Resumo
 
@@ -127,11 +128,7 @@ porte médio anteriores (ex.: Sprint 12), sem necessidade de sessão adicional.
 
 ## Pendências e próximos passos sugeridos
 
-- Nenhum bloqueio técnico. Aguardando validação/aprovação do CEO — sugerido
-  usar a própria tela "Projeção" na VM de dev (`http://financeirov2.duckdns.org:8080`)
-  com dado real, especialmente conferir se a leitura "linha tracejada = projeção
-  plana, sem tendência" fica clara sem parecer bug (risco já registrado no
-  plano da sprint).
+- Nenhum bloqueio técnico. Sprint aprovada pelo CEO em 2026-08-16.
 - Persistência de hipotéticas como cenários salvos segue registrada como
   candidata futura sem sprint numerada (`docs/roadmap.md`, "Registro de
   reavaliações futuras").
