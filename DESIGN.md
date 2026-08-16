@@ -130,6 +130,21 @@ of a number — never used as decoration.
   expense bar fills, expense chart bars only. Never used for chrome, nav, or
   buttons — see the One Meaning Rule below.
 
+### Tertiary — Natureza (Sprint 12)
+A third semantic axis, separate from money direction (receita/despesa) and
+from open-ended category identity (the 8-hue `--cat-*` palette): "how
+predictable is this spend." Deliberately desaturated relative to `--cat-*`
+so it reads as structural, not as a 9th category slot competing for the
+same attention. Same contrast band as `--despesa` (≥4.5:1 on `--surface`),
+safe for direct use as text/numeral color.
+- **Slate** (`--nat-fixa`, `#3d5a80` light / `#7fa3c9` dark): Fixo
+  recorrente — the most "planted" of the three, cool and steady.
+- **Ochre** (`--nat-variavel`, `#7a6420` light / `#c9ac5c` dark): Variável
+  recorrente — recurring but not fixed in amount.
+- **Plum** (`--nat-eventual`, `#7a5580` light / `#b98cc4` dark): Custo
+  eventual — the default for anything unclassified, least "anchored" of
+  the three.
+
 ### Neutral
 - **Sage Mist** (`#f5f6f1` light / `#18181b` dark): page background.
 - **Surface White** (`#ffffff` light / `#212024` dark): cards, tiles, the

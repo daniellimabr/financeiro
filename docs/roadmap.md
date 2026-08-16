@@ -14,7 +14,7 @@ Fases em épicos, derivados do escopo funcional do bootstrap. PRDs individuais s
 | E6 | Dashboards analíticos ✅ | Tendência histórica, percentual de representatividade, despesas por ativo (itens 4, 5, 6) — parte 1 (tendência/percentual/design system) ✅ Sprint 6; parte 2 (Gestão de Ativos) ✅ Sprint 8; parte 3 (cards Ativos/Passivos, drilldowns, refinamentos de Dashboard) ✅ Sprint 9 — épico fechado. Patrimônio/evolução de investimentos segue adiado por falta de série histórica no schema |
 | E7 | Conta e perfil | Perfil de usuário, logout, multiusuário (item 11); tela de Configurações (absorve Gestão de Contas) + regra de competência de salário — planejada como Sprint 14 |
 | E8 | Migração de dados legados ✅ | Import de categorias (Sprint 2) + memória de classificação do v1 (Sprint 4) — concluído em 2026-08-14 |
-| E9 | Natureza e projeção de custos | Classificação de subcategoria por natureza (fixo recorrente/variável recorrente/custo eventual) + dashboard de visibilidade — Sprint 12; projeção de custos futuros com despesas hipotéticas — Sprint 13 (planejada, sem `/plan` própria ainda) |
+| E9 | Natureza e projeção de custos | Classificação de subcategoria por natureza (fixo recorrente/variável recorrente/custo eventual) + dashboard de visibilidade — ✅ Sprint 12 (2026-08-16); projeção de custos futuros com despesas hipotéticas — Sprint 13 (planejada, sem `/plan` própria ainda) — épico segue aberto até Sprint 13 fechar |
 
 Backlog futuro (não desenhar agora): sync Pluggy agendada, otimização para comercialização/escala >10 usuários, reavaliação do plugin Understand Anything quando o codebase passar de ~100 arquivos.
 
@@ -364,6 +364,20 @@ linha. Backend: `GET /dashboards/por-natureza` e `/tendencia`, espelhando
 
 PRD: [PRD-012-natureza-classificacao-dashboard.md](prd/PRD-012-natureza-classificacao-dashboard.md).
 Plano: [SPRINT-012-natureza-classificacao-dashboard-plan.md](sprints/SPRINT-012-natureza-classificacao-dashboard-plan.md).
+Relatório: [SPRINT-012-natureza-classificacao-dashboard-report.md](sprints/SPRINT-012-natureza-classificacao-dashboard-report.md).
+
+Implementada em sessão própria (2026-08-16): `GET /dashboards/por-natureza`
+e `.../tendencia` (sempre 3 buckets zero-preenchidos, diferente do padrão
+dinâmico de `por-categoria`), nova tela `NaturezaPage.tsx` (cards +
+drill-down + tabela de classificação, entre "Passivos" e "Gestão de
+contas"), `updateSubcategory` novo em `api/categories.ts` (primeiro `PUT`
+desse recurso no frontend), 3 tons de cor novos via skill `impeccable`
+(`--nat-fixa`/`--nat-variavel`/`--nat-eventual`). 313 testes backend (100%
+em `app/dashboards/`) + 122 testes frontend, suíte completa verde. Deploy
+na VM de dev e validação ao vivo via `scripts/browser-check/check-sprint12.mjs`
+(desktop+mobile, sem erros de console) — primeira sprint com
+`FINANCEIRO_SESSION_TOKEN` disponível desde a pendência registrada na
+Sprint 11, minerado via SSH na própria VM de dev.
 
 ## Registro de reavaliações futuras
 
