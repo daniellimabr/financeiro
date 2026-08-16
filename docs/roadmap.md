@@ -12,9 +12,9 @@ Fases em épicos, derivados do escopo funcional do bootstrap. PRDs individuais s
 | E4 | Gestão de dados mestres ✅ | Categorias/subcategorias/natureza (item 10); ativos/passivos (item 9) — concluído na Sprint 2 (2026-08-06) |
 | E5 | Dashboards core ✅ | Receita/despesa/saldo/patrimônio com drill-down; filtros ano/mês (itens 3, 7) — concluído na Sprint 5 (2026-08-14) |
 | E6 | Dashboards analíticos ✅ | Tendência histórica, percentual de representatividade, despesas por ativo (itens 4, 5, 6) — parte 1 (tendência/percentual/design system) ✅ Sprint 6; parte 2 (Gestão de Ativos) ✅ Sprint 8; parte 3 (cards Ativos/Passivos, drilldowns, refinamentos de Dashboard) ✅ Sprint 9 — épico fechado. Patrimônio/evolução de investimentos segue adiado por falta de série histórica no schema |
-| E7 | Conta e perfil | Perfil de usuário, logout, multiusuário (item 11); tela de Configurações (absorve Gestão de Contas) + regra de competência de salário — planejada como Sprint 14 |
+| E7 | Conta e perfil | Perfil de usuário, logout, multiusuário (item 11); tela de Configurações (absorve Gestão de Contas) + regra de competência de salário — planejada como Sprint 15 |
 | E8 | Migração de dados legados ✅ | Import de categorias (Sprint 2) + memória de classificação do v1 (Sprint 4) — concluído em 2026-08-14 |
-| E9 | Natureza e projeção de custos | Classificação de subcategoria por natureza (fixo recorrente/variável recorrente/custo eventual) + dashboard de visibilidade — ✅ Sprint 12 (2026-08-16); projeção de custos futuros com despesas hipotéticas — Sprint 13 (planejada, sem `/plan` própria ainda) — épico segue aberto até Sprint 13 fechar |
+| E9 | Natureza e projeção de custos | Classificação de subcategoria por natureza (fixo recorrente/variável recorrente/eventual) + dashboard de visibilidade — ✅ Sprint 12 (2026-08-16); rótulo "Eventual", funil Natureza>Categoria>Subcategoria>Transação e redesign de tabelas/botões do app — Sprint 13 (planejada, ver abaixo); projeção de custos futuros com despesas hipotéticas — Sprint 14 (planejada, sem `/plan` própria ainda) — épico segue aberto até Sprint 14 fechar |
 
 Backlog futuro (não desenhar agora): sync Pluggy agendada, otimização para comercialização/escala >10 usuários, reavaliação do plugin Understand Anything quando o codebase passar de ~100 arquivos.
 
@@ -348,7 +348,10 @@ futuros, tela de Configurações + regra de competência de salário) —
 dividido em 3 sprints sequenciais nesta sessão de planejamento, mesmo
 padrão da divisão 7/8/9: Sprint 12 (esta), Sprint 13 (projeção de custos,
 E9) e Sprint 14 (Configurações + competência de salário, E7), ambas ainda
-sem `/plan` própria.
+sem `/plan` própria. **Nota:** a Sprint 13 planejada aqui (projeção de
+custos) foi empurrada para **Sprint 14**, e a Sprint 14 (Configurações)
+para **Sprint 15** — ver Sprint 13 abaixo, que entrou na frente da fila
+numa sessão de planejamento posterior (2026-08-16).
 
 Escopo: reaproveita `Subcategory.natureza` (enum `fixa`/`variavel`/
 `eventual`, dormente desde a Sprint 2 — sem UI, sem uso em dashboard, apesar
@@ -378,6 +381,37 @@ na VM de dev e validação ao vivo via `scripts/browser-check/check-sprint12.mjs
 (desktop+mobile, sem erros de console) — primeira sprint com
 `FINANCEIRO_SESSION_TOKEN` disponível desde a pendência registrada na
 Sprint 11, minerado via SSH na própria VM de dev.
+
+### Sprint 13 — Natureza: rótulo, funil completo, e redesign de tabelas/botões (E9, cross-epic)
+
+Planejada em sessão própria (2026-08-16). CEO usou a tela "Natureza"
+(Sprint 12) na prática e trouxe 3 pontos: (a) rótulo "Custo eventual"
+implica despesa, mas natureza já se aplica igualmente a receita (toggle
+despesa/receita já funciona ponta a ponta desde a Sprint 12) — vira só
+"Eventual"; (b) o funil da tela (`Natureza → Subcategoria → Transação`)
+não tem o nível Categoria (grupo) que o funil de Dashboards já tem — corte
+de escopo explícito do PRD-012 (critério de aceite 2), não bug, corrigido
+nesta sprint para `Natureza → Categoria → Subcategoria → Transação`; (c) a
+tabela de classificação de Natureza, e praticamente toda tabela/lista do
+app, está com tratamento visual inconsistente — achado confirmado nos
+planos das Sprints 10→11→12, que registraram pelo menos 3 vezes a decisão
+de adiar "restilizar chrome de drill-down" e "generalizar o combobox para
+outros selects".
+
+Decidido em sessão, via perguntas diretas ao CEO (não presumido pelo CTO):
+sprint única cobrindo os 3 pontos juntos; redesign valendo para todas as
+tabelas do app, inclusive drill-downs passivos, reabrindo a regra do
+`DESIGN.md` de que a tabela é "o nível mais plano do funil por design"; e,
+ao unificar as 3 implementações divergentes de tabela de transação
+(Dashboard/Natureza, Ativos, Passivos) num componente compartilhado, o
+drill-down de Ativos ganha colunas Categoria/Ativo editáveis que hoje não
+tem — mudança de comportamento aceita explicitamente, não só visual. Maior
+sprint do projeto até agora (estimativa comparável a Sprint 10 + Sprint 11
+somadas) — empurra "projeção de custos futuros" (E9) para **Sprint 14** e
+"Configurações + competência de salário" (E7) para **Sprint 15**.
+
+PRD: [PRD-013-natureza-funil-e-redesign-tabelas.md](prd/PRD-013-natureza-funil-e-redesign-tabelas.md).
+Plano: [SPRINT-013-natureza-funil-e-redesign-tabelas-plan.md](sprints/SPRINT-013-natureza-funil-e-redesign-tabelas-plan.md).
 
 ## Registro de reavaliações futuras
 
