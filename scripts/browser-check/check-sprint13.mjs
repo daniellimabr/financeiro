@@ -66,7 +66,14 @@ async function run(browser, viewport, label) {
 
   // ---- 1. Natureza: rótulo "Eventual", nunca "Custo eventual" ----
   await navButton(page, "Natureza").click();
-  await page.waitForTimeout(600);
+  // waitForTimeout fixo (600ms) se mostrou frágil — em ao menos uma rodada
+  // mobile o card ainda não tinha chegado (query em voo), dando falso
+  // negativo. Espera o card real aparecer em vez de um tempo fixo.
+  await page.locator(".dash-summary").getByRole("button", { name: /Eventual/ }).waitFor({
+    state: "visible",
+    timeout: 10000,
+  });
+  await page.waitForTimeout(300);
   await page.screenshot({
     path: path.join(shotsDir, `${label}-sprint13-01-natureza.png`),
     fullPage: true,
@@ -84,6 +91,7 @@ async function run(browser, viewport, label) {
   // opções do <select> de natureza na tabela de classificação — o rename
   // trocou 3 <option> hardcoded por um .map(), checar que nenhuma sobrou
   // com o texto antigo mesmo sem estar selecionada.
+  await page.locator(".nat-table tbody tr").first().waitFor({ state: "visible", timeout: 10000 });
   const selectOptionTexts = await page
     .locator(".nat-table select")
     .first()
