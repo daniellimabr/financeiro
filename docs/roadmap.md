@@ -12,8 +12,9 @@ Fases em épicos, derivados do escopo funcional do bootstrap. PRDs individuais s
 | E4 | Gestão de dados mestres ✅ | Categorias/subcategorias/natureza (item 10); ativos/passivos (item 9) — concluído na Sprint 2 (2026-08-06) |
 | E5 | Dashboards core ✅ | Receita/despesa/saldo/patrimônio com drill-down; filtros ano/mês (itens 3, 7) — concluído na Sprint 5 (2026-08-14) |
 | E6 | Dashboards analíticos ✅ | Tendência histórica, percentual de representatividade, despesas por ativo (itens 4, 5, 6) — parte 1 (tendência/percentual/design system) ✅ Sprint 6; parte 2 (Gestão de Ativos) ✅ Sprint 8; parte 3 (cards Ativos/Passivos, drilldowns, refinamentos de Dashboard) ✅ Sprint 9 — épico fechado. Patrimônio/evolução de investimentos segue adiado por falta de série histórica no schema |
-| E7 | Conta e perfil | Perfil de usuário, logout, multiusuário (item 11) |
+| E7 | Conta e perfil | Perfil de usuário, logout, multiusuário (item 11); tela de Configurações (absorve Gestão de Contas) + regra de competência de salário — planejada como Sprint 14 |
 | E8 | Migração de dados legados ✅ | Import de categorias (Sprint 2) + memória de classificação do v1 (Sprint 4) — concluído em 2026-08-14 |
+| E9 | Natureza e projeção de custos | Classificação de subcategoria por natureza (fixo recorrente/variável recorrente/custo eventual) + dashboard de visibilidade — Sprint 12; projeção de custos futuros com despesas hipotéticas — Sprint 13 (planejada, sem `/plan` própria ainda) |
 
 Backlog futuro (não desenhar agora): sync Pluggy agendada, otimização para comercialização/escala >10 usuários, reavaliação do plugin Understand Anything quando o codebase passar de ~100 arquivos.
 
@@ -338,6 +339,31 @@ adicionando filtro `ano`/`mes`; frontend ganhou o mesmo seletor ano/mês da
 `DashboardsPage` + navegação Anterior/Próxima. Validado contra dado real:
 refetch completo pós-confirmação caiu de vários segundos para ~250ms.
 Ferramenta nova `scripts/browser-check/check-categorizacao.mjs`.
+
+### Sprint 12 — Natureza: classificação e dashboard de visibilidade (E9, novo)
+
+Planejada em sessão própria (2026-08-15). CEO trouxe um pedido cobrindo 3
+frentes grandes (natureza + tela de visibilidade, projeção de custos
+futuros, tela de Configurações + regra de competência de salário) —
+dividido em 3 sprints sequenciais nesta sessão de planejamento, mesmo
+padrão da divisão 7/8/9: Sprint 12 (esta), Sprint 13 (projeção de custos,
+E9) e Sprint 14 (Configurações + competência de salário, E7), ambas ainda
+sem `/plan` própria.
+
+Escopo: reaproveita `Subcategory.natureza` (enum `fixa`/`variavel`/
+`eventual`, dormente desde a Sprint 2 — sem UI, sem uso em dashboard, apesar
+de `PRD-005` já ter registrado "quebra por natureza" como pendência de E6,
+nunca entregue). Sem migration. Nova tela "Natureza" combina (a) dashboard
+de visibilidade — 3 cards (Fixo recorrente/Variável recorrente/Custo
+eventual, este último o default de exibição para subcategoria não
+classificada) com drill-down até transação, mesmo padrão de
+Dashboard/Ativos/Passivos — e (b) a primeira UI de edição de `natureza` do
+projeto, tabela de subcategorias agrupada por categoria com seletor por
+linha. Backend: `GET /dashboards/por-natureza` e `/tendencia`, espelhando
+`por-categoria`.
+
+PRD: [PRD-012-natureza-classificacao-dashboard.md](prd/PRD-012-natureza-classificacao-dashboard.md).
+Plano: [SPRINT-012-natureza-classificacao-dashboard-plan.md](sprints/SPRINT-012-natureza-classificacao-dashboard-plan.md).
 
 ## Registro de reavaliações futuras
 
