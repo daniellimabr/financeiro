@@ -1181,6 +1181,19 @@ input {
   width: 70px;
 }
 
+/* .dash-table select/input carregam max-width:200px genérico (pensado pras
+   tabelas sem colgroup) — cancelado aqui pelo mesmo motivo já documentado
+   em .cat-review-table: com table-layout:fixed, o <td> não recorta
+   conteúdo que excede a largura da coluna por conta própria, então um
+   select mais largo que 140px (nome de ativo longo, ex. "AP Floripa Loft
+   103") vazava visualmente por cima da coluna Valor seguinte — achado real
+   via browser-check contra dado da VM de dev. */
+.txn-table td select,
+.txn-table .cat-combobox-input {
+  width: 100%;
+  max-width: none;
+}
+
 /* Breakdown de Patrimônio (DashboardsPage) — 3 colunas fixas, 5 linhas. */
 .patrimonio-table .col-componente {
   width: 55%;
