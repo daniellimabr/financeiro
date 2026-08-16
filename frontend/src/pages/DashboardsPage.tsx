@@ -930,7 +930,7 @@ function SortableHeader({
   );
 }
 
-function Row({
+export function Row({
   nome,
   total,
   percentual,

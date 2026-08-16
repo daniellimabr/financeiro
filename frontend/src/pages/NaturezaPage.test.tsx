@@ -46,6 +46,14 @@ let subcategoriesFixture = [
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
   },
+  {
+    id: 13,
+    group_id: 1,
+    nome: "Condomínio",
+    natureza: "eventual",
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  },
 ];
 
 const CATEGORIA_FIXTURE = [
@@ -71,6 +79,14 @@ const CATEGORIA_FIXTURE = [
     subcategory_id: 12,
     subcategory_nome: "Restaurante",
     total: "200.00",
+    percentual: "0",
+  },
+  {
+    group_id: 1,
+    group_nome: "Moradia",
+    subcategory_id: 13,
+    subcategory_nome: "Condomínio",
+    total: "150.00",
     percentual: "0",
   },
 ];
@@ -182,6 +198,14 @@ describe("NaturezaPage", () => {
         created_at: "2026-01-01T00:00:00Z",
         updated_at: "2026-01-01T00:00:00Z",
       },
+      {
+        id: 13,
+        group_id: 1,
+        nome: "Condomínio",
+        natureza: "eventual",
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      },
     ];
   });
 
@@ -194,13 +218,13 @@ describe("NaturezaPage", () => {
 
     expect(summary.getByText("Fixo recorrente")).toBeInTheDocument();
     expect(summary.getByText("Variável recorrente")).toBeInTheDocument();
-    expect(summary.getByText("Custo eventual")).toBeInTheDocument();
+    expect(summary.getByText("Eventual")).toBeInTheDocument();
     expect(summary.getByText("R$ 1.000,00")).toBeInTheDocument();
     expect(summary.getByText("R$ 300,00")).toBeInTheDocument();
     expect(summary.getByText("R$ 200,00")).toBeInTheDocument();
   });
 
-  it("clicking a card opens the drilldown with subcategories of that natureza, including unclassified as eventual", async () => {
+  it("clicking a card opens the drilldown with the Categoria level first, then Subcategoria, including unclassified as eventual", async () => {
     vi.stubGlobal("fetch", routedFetchMock());
 
     const { container } = renderWithQueryClient(<NaturezaPage />);
@@ -209,11 +233,49 @@ describe("NaturezaPage", () => {
 
     await userEvent.click(summary.getByRole("button", { name: /Fixo recorrente/ }));
     const funnel = () => within(container.querySelector(".dash-funnel") as HTMLElement);
+    expect(await funnel().findByText("Moradia")).toBeInTheDocument();
+    expect(funnel().queryByText("Aluguel")).not.toBeInTheDocument();
+
+    await userEvent.click(
+      (await funnel().findByText("Moradia")).closest("button.dash-row") as HTMLElement
+    );
     expect(await funnel().findByText("Aluguel")).toBeInTheDocument();
 
-    await userEvent.click(summary.getByRole("button", { name: /Custo eventual/ }));
-    // Restaurante tem natureza=null no fixture — deve cair no funil de eventual.
+    await userEvent.click(summary.getByRole("button", { name: /Eventual/ }));
+    // Restaurante tem natureza=null no fixture — deve cair no funil de eventual,
+    // agrupado sob "Alimentação".
+    await userEvent.click(
+      (await funnel().findByText("Alimentação")).closest("button.dash-row") as HTMLElement
+    );
     expect(await funnel().findByText("Restaurante")).toBeInTheDocument();
+  });
+
+  it("Categoria percentuais somam 100% do total da natureza, e mais de uma categoria pode ficar expandida ao mesmo tempo", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    const { container } = renderWithQueryClient(<NaturezaPage />);
+    await screen.findByText("R$ 1.000,00");
+    const summary = within(container.querySelector(".dash-summary") as HTMLElement);
+    const funnel = () => within(container.querySelector(".dash-funnel") as HTMLElement);
+
+    await userEvent.click(summary.getByRole("button", { name: /Eventual/ }));
+    // Eventual tem 2 grupos: Alimentação (Restaurante, 200) e Moradia
+    // (Condomínio, 150) — total 350, percentuais 57.1%/42.9%.
+    expect(await funnel().findByText("Alimentação")).toBeInTheDocument();
+    expect(funnel().getByText("Moradia")).toBeInTheDocument();
+    expect(funnel().getByText("57.1%")).toBeInTheDocument();
+    expect(funnel().getByText("42.9%")).toBeInTheDocument();
+
+    await userEvent.click(
+      funnel().getByText("Alimentação").closest("button.dash-row") as HTMLElement
+    );
+    await userEvent.click(funnel().getByText("Moradia").closest("button.dash-row") as HTMLElement);
+
+    // Ambos os grupos seguem abertos ao mesmo tempo (sanfona multi-nível) —
+    // cada um tem 1 única subcategoria, então 100% do total do grupo.
+    expect(await funnel().findByText("Restaurante")).toBeInTheDocument();
+    expect(funnel().getByText("Condomínio")).toBeInTheDocument();
+    expect(funnel().getAllByText("100.0%")).toHaveLength(2);
   });
 
   it("clicking a subcategoria in the drilldown shows its transactions", async () => {
@@ -225,6 +287,10 @@ describe("NaturezaPage", () => {
 
     await userEvent.click(summary.getByRole("button", { name: /Fixo recorrente/ }));
     const funnel = within(container.querySelector(".dash-funnel") as HTMLElement);
+    const grupoRow = (await funnel.findByText("Moradia")).closest(
+      "button.dash-row"
+    ) as HTMLElement;
+    await userEvent.click(grupoRow);
     const subcategoriaRow = (await funnel.findByText("Aluguel")).closest(
       "button.dash-row"
     ) as HTMLElement;

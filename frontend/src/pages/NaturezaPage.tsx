@@ -16,6 +16,7 @@ import { useDashboardByNatureza } from "../hooks/useDashboardByNatureza";
 import { useDashboardNaturezaTendencia } from "../hooks/useDashboardNaturezaTendencia";
 import { useSubcategories } from "../hooks/useSubcategories";
 import { useUpdateSubcategoryNatureza } from "../hooks/useUpdateSubcategoryNatureza";
+import { groupCategoriaTotalsByGrupo } from "../utils/categoriaGrouping";
 import { formatCurrency } from "../utils/format";
 import {
   NATUREZA_ORDER,
@@ -23,7 +24,11 @@ import {
   naturezaLabel,
   type NaturezaValue,
 } from "../utils/naturezaLabels";
-import { TransacoesPanel } from "./DashboardsPage";
+import { Row, TransacoesPanel } from "./DashboardsPage";
+
+function toggleId(list: number[], id: number): number[] {
+  return list.includes(id) ? list.filter((existing) => existing !== id) : [...list, id];
+}
 
 const PERIODO_HISTORICO: PeriodoHistorico = 6;
 
@@ -49,7 +54,8 @@ export function NaturezaPage() {
   const [mes, setMes] = useState(now.getMonth() + 1);
   const [tipo, setTipo] = useState<TransacaoTipo>("debito");
   const [selectedNatureza, setSelectedNatureza] = useState<NaturezaValue | null>(null);
-  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<number | null>(null);
+  const [expandedGrupos, setExpandedGrupos] = useState<number[]>([]);
+  const [expandedSubcategorias, setExpandedSubcategorias] = useState<number[]>([]);
 
   const filter: { ano: number; mes: number } = { ano, mes };
 
@@ -99,11 +105,16 @@ export function NaturezaPage() {
 
   function toggleNatureza(natureza: NaturezaValue) {
     setSelectedNatureza((prev) => (prev === natureza ? null : natureza));
-    setSelectedSubcategoryId(null);
+    setExpandedGrupos([]);
+    setExpandedSubcategorias([]);
+  }
+
+  function toggleGrupo(id: number) {
+    setExpandedGrupos((prev) => toggleId(prev, id));
   }
 
   function toggleSubcategoria(id: number) {
-    setSelectedSubcategoryId((prev) => (prev === id ? null : id));
+    setExpandedSubcategorias((prev) => toggleId(prev, id));
   }
 
   return (
@@ -175,13 +186,15 @@ export function NaturezaPage() {
             <p role="alert">Não foi possível carregar as subcategorias.</p>
           )}
 
-          <NaturezaSubcategoriaList
+          <NaturezaGrupoAccordion
             natureza={selectedNatureza}
             itens={subcategoriasPorNatureza.get(selectedNatureza) ?? []}
             isLoading={categoriaQuery.isLoading}
             filter={filter}
             tipo={tipo}
-            selectedSubcategoryId={selectedSubcategoryId}
+            expandedGrupos={expandedGrupos}
+            expandedSubcategorias={expandedSubcategorias}
+            onToggleGrupo={toggleGrupo}
             onToggleSubcategoria={toggleSubcategoria}
           />
         </div>
@@ -189,7 +202,7 @@ export function NaturezaPage() {
 
       <h3>Classificar subcategorias</h3>
       <p className="dash-empty">
-        Subcategorias sem classificação contam como Custo eventual nos cards acima.
+        Subcategorias sem classificação contam como Eventual nos cards acima.
       </p>
 
       {updateNatureza.isError && <p role="alert">Não foi possível salvar a natureza.</p>}
@@ -222,9 +235,11 @@ export function NaturezaPage() {
                         updateNatureza.mutate({ subcategory: sub, natureza: event.target.value })
                       }
                     >
-                      <option value="fixa">Fixo recorrente</option>
-                      <option value="variavel">Variável recorrente</option>
-                      <option value="eventual">Custo eventual</option>
+                      {NATUREZA_ORDER.map((natureza) => (
+                        <option key={natureza} value={natureza}>
+                          {naturezaLabel(natureza)}
+                        </option>
+                      ))}
                     </select>
                   </td>
                 </tr>
@@ -237,13 +252,15 @@ export function NaturezaPage() {
   );
 }
 
-function NaturezaSubcategoriaList({
+function NaturezaGrupoAccordion({
   natureza,
   itens,
   isLoading,
   filter,
   tipo,
-  selectedSubcategoryId,
+  expandedGrupos,
+  expandedSubcategorias,
+  onToggleGrupo,
   onToggleSubcategoria,
 }: {
   natureza: NaturezaValue;
@@ -251,43 +268,94 @@ function NaturezaSubcategoriaList({
   isLoading: boolean;
   filter: { ano: number; mes: number };
   tipo: TransacaoTipo;
-  selectedSubcategoryId: number | null;
+  expandedGrupos: number[];
+  expandedSubcategorias: number[];
+  onToggleGrupo: (id: number) => void;
   onToggleSubcategoria: (id: number) => void;
 }) {
-  if (!isLoading && itens.length === 0) {
+  const grupos = useMemo(() => groupCategoriaTotalsByGrupo(itens), [itens]);
+
+  if (!isLoading && grupos.length === 0) {
     return <p className="dash-empty">Nenhuma transação nesta natureza no período.</p>;
   }
 
-  const totalNatureza = itens.reduce((sum, item) => sum + Number(item.total), 0);
-  const max = Number(itens[0]?.total ?? 1);
+  // Cor de natureza é constante em todo o funil (grupo e subcategoria) —
+  // deliberadamente dessaturada pra não competir com a paleta categórica
+  // (--cat-N) usada no funil espelho de Dashboards (ver PRD-013).
   const color = naturezaColorVar(natureza);
+  const max = grupos[0]?.total ?? 1;
 
   return (
     <ul className="dash-list dash-accordion">
-      {itens.map((item) => {
+      {grupos.map((grupo) => (
+        <li key={grupo.group_id}>
+          <div className="dash-accordion-item">
+            <Row
+              nome={grupo.group_nome}
+              total={String(grupo.total)}
+              percentual={grupo.percentual.toFixed(2)}
+              max={max}
+              color={color}
+              expanded={expandedGrupos.includes(grupo.group_id)}
+              onClick={() => onToggleGrupo(grupo.group_id)}
+            />
+            {expandedGrupos.includes(grupo.group_id) && (
+              <div className="dash-accordion-panel">
+                <NaturezaSubcategoriaAccordion
+                  color={color}
+                  grupoTotal={grupo.total}
+                  subcategorias={grupo.subcategorias}
+                  filter={filter}
+                  tipo={tipo}
+                  expandedSubcategorias={expandedSubcategorias}
+                  onToggleSubcategoria={onToggleSubcategoria}
+                />
+              </div>
+            )}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function NaturezaSubcategoriaAccordion({
+  color,
+  grupoTotal,
+  subcategorias,
+  filter,
+  tipo,
+  expandedSubcategorias,
+  onToggleSubcategoria,
+}: {
+  color: string;
+  grupoTotal: number;
+  subcategorias: CategoriaTotal[];
+  filter: { ano: number; mes: number };
+  tipo: TransacaoTipo;
+  expandedSubcategorias: number[];
+  onToggleSubcategoria: (id: number) => void;
+}) {
+  const max = Number(subcategorias[0]?.total ?? 1);
+
+  return (
+    <ul className="dash-list dash-accordion">
+      {subcategorias.map((item) => {
         const percentual =
-          totalNatureza > 0 ? ((Number(item.total) / totalNatureza) * 100).toFixed(2) : "0.00";
-        const pct = max > 0 ? Math.max(4, (Number(item.total) / max) * 100) : 0;
-        const expanded = selectedSubcategoryId === item.subcategory_id;
+          grupoTotal > 0 ? ((Number(item.total) / grupoTotal) * 100).toFixed(2) : "0.00";
+        const expanded = expandedSubcategorias.includes(item.subcategory_id);
         return (
           <li key={item.subcategory_id}>
             <div className="dash-accordion-item">
-              <button
-                type="button"
-                className={`dash-row${expanded ? " expanded" : ""}`}
+              <Row
+                nome={item.subcategory_nome}
+                total={item.total}
+                percentual={percentual}
+                max={max}
+                color={color}
+                expanded={expanded}
                 onClick={() => onToggleSubcategoria(item.subcategory_id)}
-                aria-expanded={expanded}
-              >
-                <span className="chev" aria-hidden="true">
-                  ›
-                </span>
-                <span className="nm">{item.subcategory_nome}</span>
-                <span className="track">
-                  <span className="fillbar" style={{ width: `${pct}%`, background: color }} />
-                </span>
-                <span className="amt">{formatCurrency(item.total)}</span>
-                <span className="pct">{formatPercent(percentual)}</span>
-              </button>
+              />
               {expanded && (
                 <div className="dash-accordion-panel">
                   <TransacoesPanel
