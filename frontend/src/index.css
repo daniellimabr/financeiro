@@ -967,6 +967,10 @@ input {
   max-width: none;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* <button> já herda font-size do <td> (sem override próprio); <input>
+     tem font-size:var(--text-sm) fixado na regra global de formulário —
+     precisa do inherit explícito aqui pra bater com o resto da linha. */
+  font-size: inherit;
   /* <button> centraliza texto por padrão do user-agent — invisível
      enquanto o botão só é tão largo quanto o próprio texto, mas evidente
      assim que uma tabela estica o botão pra 100% da coluna. */
