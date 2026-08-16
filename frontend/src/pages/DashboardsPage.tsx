@@ -765,7 +765,7 @@ function PatrimonioBreakdownPanel({
 
 type TransacaoSortKey = "data" | "descricao" | "valor" | "percentual";
 
-function TransacoesPanel({
+export function TransacoesPanel({
   filter,
   categoriaId,
   assetId,

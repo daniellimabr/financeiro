@@ -6,18 +6,20 @@ import { AssetsPage } from "./AssetsPage";
 import { CategorizationReviewPage } from "./CategorizationReviewPage";
 import { DashboardsPage } from "./DashboardsPage";
 import { LiabilitiesPage } from "./LiabilitiesPage";
+import { NaturezaPage } from "./NaturezaPage";
 
 interface ProtectedPageProps {
   user: CurrentUser;
 }
 
-type Tab = "dashboards" | "categorizar" | "ativos" | "passivos" | "contas";
+type Tab = "dashboards" | "categorizar" | "ativos" | "passivos" | "natureza" | "contas";
 
 const NAV_ITEMS: { tab: Tab; label: string }[] = [
   { tab: "dashboards", label: "Dashboards" },
   { tab: "categorizar", label: "Categorizar" },
   { tab: "ativos", label: "Ativos" },
   { tab: "passivos", label: "Passivos" },
+  { tab: "natureza", label: "Natureza" },
   { tab: "contas", label: "Gestão de contas" },
 ];
 
@@ -54,6 +56,7 @@ export function ProtectedPage({ user }: ProtectedPageProps) {
         {tab === "categorizar" && <CategorizationReviewPage />}
         {tab === "ativos" && <AssetsPage />}
         {tab === "passivos" && <LiabilitiesPage />}
+        {tab === "natureza" && <NaturezaPage />}
         {tab === "contas" && <AccountManagementPage />}
       </main>
     </div>

@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchDashboardPorCategoria,
   fetchDashboardPorMeioPagamento,
+  fetchDashboardPorNatureza,
+  fetchDashboardPorNaturezaTendencia,
   fetchDashboardSummary,
 } from "./dashboards";
 
@@ -63,5 +65,25 @@ describe("dashboards api", () => {
     await fetchDashboardPorMeioPagamento("credito", { ano: 2026 });
 
     expect(fetchMock.mock.calls[0][0]).toBe("/dashboards/por-meio-pagamento?tipo=credito&ano=2026");
+  });
+
+  it("fetchDashboardPorNatureza includes tipo and filters", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchDashboardPorNatureza("debito", { ano: 2026, mes: 1 });
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/dashboards/por-natureza?tipo=debito&ano=2026&mes=1");
+  });
+
+  it("fetchDashboardPorNaturezaTendencia includes tipo, periodo and meses", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchDashboardPorNaturezaTendencia("credito", { ano: 2026, mes: 1, meses: 3 });
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/dashboards/por-natureza/tendencia?tipo=credito&ano=2026&mes=1&meses=3"
+    );
   });
 });

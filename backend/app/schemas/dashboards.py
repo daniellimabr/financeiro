@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict
 
+from app.models.category import Natureza
 from app.models.pluggy import PluggyAccountTipo
 
 
@@ -58,6 +59,21 @@ class TendenciaCategoriaOut(BaseModel):
 
     subcategory_id: int
     subcategory_nome: str
+    pontos: list[PontoTendenciaOut]
+
+
+class NaturezaTotalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    natureza: Natureza
+    total: Decimal
+    percentual: Decimal
+
+
+class TendenciaNaturezaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    natureza: Natureza
     pontos: list[PontoTendenciaOut]
 
 

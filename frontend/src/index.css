@@ -64,6 +64,24 @@
   --cat-7: #4a3aa7; /* violeta */
   --cat-8: #e34948; /* vermelho */
 
+  /* Natureza (Sprint 12) — 3 tons novos p/ os cards Fixo recorrente/
+     Variável recorrente/Custo eventual, deliberadamente fora da paleta
+     categórica (--cat-1..8) e da semântica receita/despesa: mesma faixa de
+     luma/contraste de --despesa (~4.8:1+ em branco) para uso direto como
+     cor de texto/numeral, mas dessaturados (mais "estruturais" que
+     "categóricos") para não competir com o funil de categoria quando as
+     duas aparecem na mesma tela. Ordem lida como um gradiente de certeza:
+     slate azul (planejado/estável) → ocre oliva (recorrente mas variável)
+     → ameixa (sem padrão fixo).
+     Contraste checado manualmente (fórmula WCAG) contra --surface e
+     --surface-dark: light 7.07:1/5.72:1/6.10:1, dark 6.15:1/7.35:1/5.87:1. */
+  --nat-fixa: #3d5a80;
+  --nat-variavel: #7a6420;
+  --nat-eventual: #7a5580;
+  --nat-fixa-bg: rgba(61, 90, 128, 0.1);
+  --nat-variavel-bg: rgba(122, 100, 32, 0.1);
+  --nat-eventual-bg: rgba(122, 85, 128, 0.1);
+
   /* Par de tipografia — Sprint 6, escolhido por comparação visual real
      (ver docs/sprints/SPRINT-006-...-report.md). Archivo (grotesca
      industrial, auto-hospedada) carrega display/headline/números de
@@ -125,6 +143,13 @@
     --cat-6: #008300;
     --cat-7: #9085e9;
     --cat-8: #e66767;
+
+    --nat-fixa: #7fa3c9;
+    --nat-variavel: #c9ac5c;
+    --nat-eventual: #b98cc4;
+    --nat-fixa-bg: rgba(127, 163, 201, 0.14);
+    --nat-variavel-bg: rgba(201, 172, 92, 0.14);
+    --nat-eventual-bg: rgba(185, 140, 196, 0.14);
   }
 }
 
@@ -151,6 +176,13 @@
   --cat-6: #008300;
   --cat-7: #9085e9;
   --cat-8: #e66767;
+
+  --nat-fixa: #7fa3c9;
+  --nat-variavel: #c9ac5c;
+  --nat-eventual: #b98cc4;
+  --nat-fixa-bg: rgba(127, 163, 201, 0.14);
+  --nat-variavel-bg: rgba(201, 172, 92, 0.14);
+  --nat-eventual-bg: rgba(185, 140, 196, 0.14);
 }
 
 * {
@@ -1003,6 +1035,41 @@ input {
 }
 
 .cat-review-table td:nth-child(6) select {
+  width: 100%;
+  max-width: none;
+}
+
+/* Tabela de classificação de Natureza (Sprint 12) — agrupada por
+   CategoryGroup via rowSpan na 1a coluna, mesma técnica table-layout:fixed
+   + colgroup da tabela de Categorização, com só 3 colunas. */
+.nat-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.nat-table .col-grupo {
+  width: 28%;
+}
+
+.nat-table .col-subcategoria {
+  width: 42%;
+}
+
+.nat-table .col-natureza {
+  width: 30%;
+}
+
+.nat-table td {
+  vertical-align: middle;
+}
+
+.nat-table td:first-child {
+  color: var(--text);
+  font-weight: 600;
+  border-right: 1px solid var(--border);
+}
+
+.nat-table td:nth-child(3) select {
   width: 100%;
   max-width: none;
 }

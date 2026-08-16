@@ -75,7 +75,7 @@ describe("ProtectedPage navigation", () => {
     expect(screen.getByRole("button", { name: "Passivos" })).toBeInTheDocument();
   });
 
-  it("orders the nav as Dashboards, Categorizar, Ativos, Passivos, Gestão de contas", () => {
+  it("orders the nav as Dashboards, Categorizar, Ativos, Passivos, Natureza, Gestão de contas", () => {
     vi.stubGlobal("fetch", catchAllFetchMock());
 
     renderProtectedPage();
@@ -85,7 +85,14 @@ describe("ProtectedPage navigation", () => {
       .getAllByRole("button")
       .map((button) => button.textContent);
 
-    expect(labels).toEqual(["Dashboards", "Categorizar", "Ativos", "Passivos", "Gestão de contas"]);
+    expect(labels).toEqual([
+      "Dashboards",
+      "Categorizar",
+      "Ativos",
+      "Passivos",
+      "Natureza",
+      "Gestão de contas",
+    ]);
   });
 
   it("switches to the Passivos tab and renders LiabilitiesPage", async () => {
@@ -97,6 +104,20 @@ describe("ProtectedPage navigation", () => {
 
     expect(await screen.findByRole("heading", { name: "Passivos" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Passivos" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+  });
+
+  it("switches to the Natureza tab and renders NaturezaPage", async () => {
+    vi.stubGlobal("fetch", catchAllFetchMock());
+
+    renderProtectedPage();
+
+    await userEvent.click(screen.getByRole("button", { name: "Natureza" }));
+
+    expect(await screen.findByRole("heading", { name: "Natureza" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Natureza" })).toHaveAttribute(
       "aria-current",
       "page"
     );

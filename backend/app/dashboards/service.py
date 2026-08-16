@@ -7,7 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Query, Session
 
 from app.models.asset import Asset, AssetStatus
-from app.models.category import SEM_CATEGORIA_ID, CategoryGroup, Subcategory
+from app.models.category import SEM_CATEGORIA_ID, CategoryGroup, Natureza, Subcategory
 from app.models.liability import Liability, LiabilityStatus
 from app.models.pluggy import (
     PluggyAccount,
@@ -64,6 +64,19 @@ class PontoTendencia:
 class TendenciaCategoria:
     subcategory_id: int
     subcategory_nome: str
+    pontos: list[PontoTendencia]
+
+
+@dataclass
+class NaturezaTotal:
+    natureza: Natureza
+    total: Decimal
+    percentual: Decimal
+
+
+@dataclass
+class TendenciaNatureza:
+    natureza: Natureza
     pontos: list[PontoTendencia]
 
 
@@ -428,6 +441,94 @@ def get_tendencia_por_categoria(
             pontos=[PontoTendencia(ano=y, mes=m, total=dado["pontos"][(y, m)]) for y, m in periodo],
         )
         for cat_id, dado in por_categoria.items()
+    ]
+
+
+_NATUREZA_ORDEM = (Natureza.fixa, Natureza.variavel, Natureza.eventual)
+
+
+def get_por_natureza(
+    db: Session,
+    user_id: int,
+    *,
+    tipo: PluggyTransactionTipo,
+    ano: int | None = None,
+    mes: int | None = None,
+) -> list[NaturezaTotal]:
+    # Domínio fixo de 3 naturezas (diferente de categoria, que é aberto) —
+    # sempre retorna as 3 zero-filled, para os cards da tela Natureza não
+    # precisarem de lógica de fallback no frontend.
+    natureza_expr = func.coalesce(Subcategory.natureza, Natureza.eventual)
+    query = _base_query(db, user_id).filter(PluggyTransaction.tipo == tipo)
+    query = _apply_periodo(query, ano=ano, mes=mes)
+    rows = (
+        query.with_entities(natureza_expr, func.sum(func.abs(PluggyTransaction.valor)))
+        .group_by(natureza_expr)
+        .all()
+    )
+    totais_por_natureza = {natureza: _to_decimal(total) for natureza, total in rows}
+    total_geral = sum(totais_por_natureza.values(), Decimal("0"))
+    return [
+        NaturezaTotal(
+            natureza=natureza,
+            total=totais_por_natureza.get(natureza, Decimal("0")),
+            percentual=_percentual(totais_por_natureza.get(natureza, Decimal("0")), total_geral),
+        )
+        for natureza in _NATUREZA_ORDEM
+    ]
+
+
+def get_tendencia_por_natureza(
+    db: Session,
+    user_id: int,
+    *,
+    tipo: PluggyTransactionTipo,
+    ano: int,
+    mes: int,
+    meses: int = 6,
+) -> list[TendenciaNatureza]:
+    periodo = _month_range(ano, mes, meses)
+    inicio, fim = _date_bounds(periodo)
+    natureza_expr = func.coalesce(Subcategory.natureza, Natureza.eventual)
+
+    query = (
+        _base_query(db, user_id)
+        .filter(PluggyTransaction.tipo == tipo)
+        .filter(
+            PluggyTransaction.data_competencia >= inicio,
+            PluggyTransaction.data_competencia < fim,
+        )
+    )
+    rows = (
+        query.with_entities(
+            natureza_expr,
+            func.extract("year", PluggyTransaction.data_competencia),
+            func.extract("month", PluggyTransaction.data_competencia),
+            func.sum(func.abs(PluggyTransaction.valor)),
+        )
+        .group_by(
+            natureza_expr,
+            func.extract("year", PluggyTransaction.data_competencia),
+            func.extract("month", PluggyTransaction.data_competencia),
+        )
+        .all()
+    )
+
+    pontos_por_natureza = {
+        natureza: {chave: Decimal("0") for chave in periodo} for natureza in _NATUREZA_ORDEM
+    }
+    for natureza, y, m, total in rows:
+        pontos_por_natureza[natureza][(int(y), int(m))] = _to_decimal(total)
+
+    return [
+        TendenciaNatureza(
+            natureza=natureza,
+            pontos=[
+                PontoTendencia(ano=y, mes=m, total=pontos_por_natureza[natureza][(y, m)])
+                for y, m in periodo
+            ],
+        )
+        for natureza in _NATUREZA_ORDEM
     ]
 
 

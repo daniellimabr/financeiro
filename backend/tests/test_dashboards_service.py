@@ -5,7 +5,7 @@ import pytest
 
 from app.dashboards import service
 from app.models.asset import Asset, AssetStatus, AssetTipo
-from app.models.category import CategoryGroup, Subcategory
+from app.models.category import CategoryGroup, Natureza, Subcategory
 from app.models.liability import Liability, LiabilityStatus, LiabilityTipo
 from app.models.pluggy import (
     PluggyAccount,
@@ -38,9 +38,9 @@ def _group(db_session, nome=None, excluir_de_totais=False):
     return group
 
 
-def _subcategory(db_session, group=None, nome=None):
+def _subcategory(db_session, group=None, nome=None, natureza=None):
     group = group or _group(db_session)
-    s = Subcategory(group_id=group.id, nome=nome or f"Sub {next(_SEQ)}")
+    s = Subcategory(group_id=group.id, nome=nome or f"Sub {next(_SEQ)}", natureza=natureza)
     db_session.add(s)
     db_session.flush()
     return s
@@ -1223,3 +1223,241 @@ def test_get_saldo_por_conta_isolated_by_user(db_session, user):
     saldos = service.get_saldo_por_conta(db_session, user.id)
 
     assert saldos == []
+
+
+def test_get_por_natureza_groups_by_fixa_variavel_eventual(db_session, user):
+    account = _account(db_session, user)
+    sub_fixa = _subcategory(db_session, nome="Aluguel", natureza=Natureza.fixa)
+    sub_variavel = _subcategory(db_session, nome="Mercado", natureza=Natureza.variavel)
+    sub_eventual = _subcategory(db_session, nome="Viagem", natureza=Natureza.eventual)
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-1000.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 5),
+        subcategory_id=sub_fixa.id,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-300.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 6),
+        subcategory_id=sub_variavel.id,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-200.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 7),
+        subcategory_id=sub_eventual.id,
+    )
+
+    por_natureza = service.get_por_natureza(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
+
+    totais = {n.natureza: n.total for n in por_natureza}
+    assert totais[Natureza.fixa] == Decimal("1000.00")
+    assert totais[Natureza.variavel] == Decimal("300.00")
+    assert totais[Natureza.eventual] == Decimal("200.00")
+
+
+def test_get_por_natureza_null_natureza_falls_back_to_eventual(db_session, user):
+    account = _account(db_session, user)
+    sub_sem_natureza = _subcategory(db_session, nome="Diversos", natureza=None)
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-50.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 5),
+        subcategory_id=sub_sem_natureza.id,
+    )
+
+    por_natureza = service.get_por_natureza(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
+
+    totais = {n.natureza: n.total for n in por_natureza}
+    assert totais[Natureza.eventual] == Decimal("50.00")
+    assert totais[Natureza.fixa] == Decimal("0")
+    assert totais[Natureza.variavel] == Decimal("0")
+
+
+def test_get_por_natureza_transaction_without_subcategory_falls_back_to_eventual(db_session, user):
+    account = _account(db_session, user)
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-40.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 5),
+        subcategory_id=None,
+    )
+
+    por_natureza = service.get_por_natureza(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
+
+    totais = {n.natureza: n.total for n in por_natureza}
+    assert totais[Natureza.eventual] == Decimal("40.00")
+
+
+def test_get_por_natureza_excludes_excluir_de_totais_group(db_session, user):
+    account = _account(db_session, user)
+    transferencia = _group(db_session, nome="Transferência interna", excluir_de_totais=True)
+    sub = _subcategory(
+        db_session, group=transferencia, nome="Pagamento de Fatura", natureza=Natureza.fixa
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-500.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+        subcategory_id=sub.id,
+    )
+
+    por_natureza = service.get_por_natureza(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
+
+    assert all(n.total == Decimal("0") for n in por_natureza)
+
+
+def test_get_por_natureza_isolated_by_user(db_session, user):
+    other = User(google_sub="google-natureza-other", email="other-nat@example.com", name="Bob")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    other_account = _account(db_session, other)
+    sub = _subcategory(db_session, nome="Aluguel", natureza=Natureza.fixa)
+    _transaction(
+        db_session,
+        other,
+        other_account,
+        valor="-999.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 5),
+        subcategory_id=sub.id,
+    )
+
+    por_natureza = service.get_por_natureza(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
+
+    assert all(n.total == Decimal("0") for n in por_natureza)
+
+
+def test_get_por_natureza_always_returns_three_buckets_when_no_data(db_session, user):
+    por_natureza = service.get_por_natureza(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
+
+    assert {n.natureza for n in por_natureza} == {
+        Natureza.fixa,
+        Natureza.variavel,
+        Natureza.eventual,
+    }
+    assert all(n.total == Decimal("0") for n in por_natureza)
+    assert all(n.percentual == Decimal("0") for n in por_natureza)
+
+
+def test_get_por_natureza_percentual_sums_to_100(db_session, user):
+    account = _account(db_session, user)
+    sub_fixa = _subcategory(db_session, nome="Aluguel", natureza=Natureza.fixa)
+    sub_variavel = _subcategory(db_session, nome="Mercado", natureza=Natureza.variavel)
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-750.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 5),
+        subcategory_id=sub_fixa.id,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-250.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 6),
+        subcategory_id=sub_variavel.id,
+    )
+
+    por_natureza = service.get_por_natureza(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
+
+    assert sum(n.percentual for n in por_natureza) == Decimal("100.00")
+    totais = {n.natureza: n.percentual for n in por_natureza}
+    assert totais[Natureza.fixa] == Decimal("75.00")
+    assert totais[Natureza.variavel] == Decimal("25.00")
+
+
+def test_get_tendencia_por_natureza_groups_across_months_zero_filled(db_session, user):
+    account = _account(db_session, user)
+    sub_fixa = _subcategory(db_session, nome="Aluguel", natureza=Natureza.fixa)
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-1000.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 5),
+        subcategory_id=sub_fixa.id,
+    )
+
+    tendencia = service.get_tendencia_por_natureza(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1, meses=3
+    )
+
+    assert {t.natureza for t in tendencia} == {
+        Natureza.fixa,
+        Natureza.variavel,
+        Natureza.eventual,
+    }
+    fixa = next(t for t in tendencia if t.natureza == Natureza.fixa)
+    assert len(fixa.pontos) == 3
+    janeiro = next(p for p in fixa.pontos if p.ano == 2026 and p.mes == 1)
+    assert janeiro.total == Decimal("1000.00")
+    variavel = next(t for t in tendencia if t.natureza == Natureza.variavel)
+    assert all(p.total == Decimal("0") for p in variavel.pontos)
+
+
+def test_get_tendencia_por_natureza_isolated_by_user(db_session, user):
+    other = User(
+        google_sub="google-tendencia-natureza-other",
+        email="other-tn@example.com",
+        name="Bob",
+    )
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    other_account = _account(db_session, other)
+    sub = _subcategory(db_session, nome="Aluguel", natureza=Natureza.fixa)
+    _transaction(
+        db_session,
+        other,
+        other_account,
+        valor="-999.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 5),
+        subcategory_id=sub.id,
+    )
+
+    tendencia = service.get_tendencia_por_natureza(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1, meses=3
+    )
+
+    assert all(p.total == Decimal("0") for t in tendencia for p in t.pontos)

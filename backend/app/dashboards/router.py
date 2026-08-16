@@ -10,6 +10,7 @@ from app.schemas.dashboards import (
     AtivoTotalOut,
     CategoriaTotalOut,
     MeioPagamentoTotalOut,
+    NaturezaTotalOut,
     PassivoTotalOut,
     PatrimonioBreakdownOut,
     SaldoContaOut,
@@ -17,6 +18,7 @@ from app.schemas.dashboards import (
     TendenciaAtivoOut,
     TendenciaCategoriaOut,
     TendenciaMesOut,
+    TendenciaNaturezaOut,
     TendenciaPassivoOut,
 )
 
@@ -87,6 +89,31 @@ def get_por_categoria_tendencia(
     current_user: User = Depends(get_current_user),
 ):
     return service.get_tendencia_por_categoria(
+        db, current_user.id, tipo=tipo, ano=ano, mes=mes, meses=meses
+    )
+
+
+@router.get("/por-natureza", response_model=list[NaturezaTotalOut])
+def get_por_natureza(
+    tipo: PluggyTransactionTipo,
+    ano: int | None = None,
+    mes: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.get_por_natureza(db, current_user.id, tipo=tipo, ano=ano, mes=mes)
+
+
+@router.get("/por-natureza/tendencia", response_model=list[TendenciaNaturezaOut])
+def get_por_natureza_tendencia(
+    tipo: PluggyTransactionTipo,
+    ano: int,
+    mes: int,
+    meses: int = Query(6, ge=1, le=24),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.get_tendencia_por_natureza(
         db, current_user.id, tipo=tipo, ano=ano, mes=mes, meses=meses
     )
 

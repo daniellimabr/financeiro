@@ -51,6 +51,17 @@ export interface TendenciaCategoria {
   pontos: PontoTendencia[];
 }
 
+export interface NaturezaTotal {
+  natureza: string;
+  total: string;
+  percentual: string;
+}
+
+export interface TendenciaNatureza {
+  natureza: string;
+  pontos: PontoTendencia[];
+}
+
 export interface AtivoTotal {
   asset_id: number;
   asset_nome: string;
@@ -141,6 +152,22 @@ export function fetchDashboardPorCategoriaTendencia(
 ): Promise<TendenciaCategoria[]> {
   return apiFetch<TendenciaCategoria[]>(
     `/dashboards/por-categoria/tendencia${buildQuery({ tipo, ...filter })}`
+  );
+}
+
+export function fetchDashboardPorNatureza(
+  tipo: TransacaoTipo,
+  filter: PeriodoFilter = {}
+): Promise<NaturezaTotal[]> {
+  return apiFetch<NaturezaTotal[]>(`/dashboards/por-natureza${buildQuery({ tipo, ...filter })}`);
+}
+
+export function fetchDashboardPorNaturezaTendencia(
+  tipo: TransacaoTipo,
+  filter: Required<PeriodoFilter> & { meses: PeriodoHistorico }
+): Promise<TendenciaNatureza[]> {
+  return apiFetch<TendenciaNatureza[]>(
+    `/dashboards/por-natureza/tendencia${buildQuery({ tipo, ...filter })}`
   );
 }
 
