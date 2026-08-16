@@ -94,6 +94,14 @@ export interface PatrimonioBreakdown {
   total: string;
 }
 
+export interface PontoProjecao {
+  ano: number;
+  mes: number;
+  receita: string;
+  despesa: string;
+  saldo: string;
+}
+
 export interface SaldoConta {
   account_id: number;
   account_nome: string;
@@ -196,6 +204,19 @@ export function fetchDashboardPorPassivoTendencia(
 ): Promise<TendenciaPassivo[]> {
   return apiFetch<TendenciaPassivo[]>(
     `/dashboards/por-passivo/tendencia${buildQuery({ ...filter })}`
+  );
+}
+
+export function fetchDashboardProjecao(
+  filter: Required<PeriodoFilter> & { mesesFuturos: PeriodoHistorico; janelaMedia?: number }
+): Promise<PontoProjecao[]> {
+  const { mesesFuturos, janelaMedia, ...periodo } = filter;
+  return apiFetch<PontoProjecao[]>(
+    `/dashboards/projecao${buildQuery({
+      ...periodo,
+      meses_futuros: mesesFuturos,
+      janela_media: janelaMedia,
+    })}`
   );
 }
 

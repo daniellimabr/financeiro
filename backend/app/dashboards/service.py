@@ -118,6 +118,15 @@ class PatrimonioBreakdown:
 
 
 @dataclass
+class PontoProjecao:
+    ano: int
+    mes: int
+    receita: Decimal
+    despesa: Decimal
+    saldo: Decimal
+
+
+@dataclass
 class SaldoConta:
     account_id: int
     account_nome: str
@@ -700,6 +709,64 @@ def get_tendencia_por_passivo(
             pontos=[PontoTendencia(ano=y, mes=m, total=dado["pontos"][(y, m)]) for y, m in periodo],
         )
         for liability_id, dado in por_passivo.items()
+    ]
+
+
+def _future_month_range(ano: int, mes: int, meses_futuros: int) -> list[tuple[int, int]]:
+    """Próximos `meses_futuros` meses após (ano, mes), em ordem cronológica."""
+    periodo = []
+    y, m = ano, mes
+    for _ in range(meses_futuros):
+        m += 1
+        if m == 13:
+            m = 1
+            y += 1
+        periodo.append((y, m))
+    return periodo
+
+
+def get_projecao(
+    db: Session,
+    user_id: int,
+    *,
+    ano: int,
+    mes: int,
+    meses_futuros: int = 6,
+    janela_media: int = 3,
+) -> list[PontoProjecao]:
+    # Base da média: só subcategorias `fixa`/`variavel` (exclusão direta, sem
+    # COALESCE — diferente de get_por_natureza, que precisa de um bucket
+    # "eventual" pros 3 cards zero-filled; aqui `eventual`/sem natureza
+    # simplesmente não entram na projeção, mesma premissa de não recorrência).
+    janela = _month_range(ano, mes, janela_media)
+    inicio, fim = _date_bounds(janela)
+
+    query = (
+        _base_query(db, user_id)
+        .filter(Subcategory.natureza.in_([Natureza.fixa, Natureza.variavel]))
+        .filter(
+            PluggyTransaction.data_competencia >= inicio,
+            PluggyTransaction.data_competencia < fim,
+        )
+    )
+    rows = (
+        query.with_entities(PluggyTransaction.tipo, func.sum(func.abs(PluggyTransaction.valor)))
+        .group_by(PluggyTransaction.tipo)
+        .all()
+    )
+    totais = {tipo: _to_decimal(total) for tipo, total in rows}
+    divisor = Decimal(janela_media)
+    receita_media = (totais.get(PluggyTransactionTipo.credito, Decimal("0")) / divisor).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    despesa_media = (totais.get(PluggyTransactionTipo.debito, Decimal("0")) / divisor).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    saldo_media = receita_media - despesa_media
+
+    return [
+        PontoProjecao(ano=y, mes=m, receita=receita_media, despesa=despesa_media, saldo=saldo_media)
+        for y, m in _future_month_range(ano, mes, meses_futuros)
     ]
 
 

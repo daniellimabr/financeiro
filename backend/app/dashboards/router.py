@@ -13,6 +13,7 @@ from app.schemas.dashboards import (
     NaturezaTotalOut,
     PassivoTotalOut,
     PatrimonioBreakdownOut,
+    PontoProjecaoOut,
     SaldoContaOut,
     SummaryOut,
     TendenciaAtivoOut,
@@ -162,6 +163,25 @@ def get_por_passivo_tendencia(
     current_user: User = Depends(get_current_user),
 ):
     return service.get_tendencia_por_passivo(db, current_user.id, ano=ano, mes=mes, meses=meses)
+
+
+@router.get("/projecao", response_model=list[PontoProjecaoOut])
+def get_projecao(
+    ano: int,
+    mes: int,
+    meses_futuros: int = Query(6, ge=1, le=24),
+    janela_media: int = Query(3, ge=1, le=24),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.get_projecao(
+        db,
+        current_user.id,
+        ano=ano,
+        mes=mes,
+        meses_futuros=meses_futuros,
+        janela_media=janela_media,
+    )
 
 
 @router.get("/saldo-por-conta", response_model=list[SaldoContaOut])

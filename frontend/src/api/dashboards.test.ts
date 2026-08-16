@@ -5,6 +5,7 @@ import {
   fetchDashboardPorMeioPagamento,
   fetchDashboardPorNatureza,
   fetchDashboardPorNaturezaTendencia,
+  fetchDashboardProjecao,
   fetchDashboardSummary,
 } from "./dashboards";
 
@@ -84,6 +85,26 @@ describe("dashboards api", () => {
 
     expect(fetchMock.mock.calls[0][0]).toBe(
       "/dashboards/por-natureza/tendencia?tipo=credito&ano=2026&mes=1&meses=3"
+    );
+  });
+
+  it("fetchDashboardProjecao includes ano/mes and meses_futuros", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchDashboardProjecao({ ano: 2026, mes: 1, mesesFuturos: 6 });
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/dashboards/projecao?ano=2026&mes=1&meses_futuros=6");
+  });
+
+  it("fetchDashboardProjecao includes janela_media when provided", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchDashboardProjecao({ ano: 2026, mes: 1, mesesFuturos: 3, janelaMedia: 6 });
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/dashboards/projecao?ano=2026&mes=1&meses_futuros=3&janela_media=6"
     );
   });
 });

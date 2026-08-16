@@ -119,6 +119,16 @@ class PatrimonioBreakdownOut(BaseModel):
     total: Decimal
 
 
+class PontoProjecaoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    ano: int
+    mes: int
+    receita: Decimal
+    despesa: Decimal
+    saldo: Decimal
+
+
 class SaldoContaOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

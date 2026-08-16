@@ -14,7 +14,7 @@ Fases em épicos, derivados do escopo funcional do bootstrap. PRDs individuais s
 | E6 | Dashboards analíticos ✅ | Tendência histórica, percentual de representatividade, despesas por ativo (itens 4, 5, 6) — parte 1 (tendência/percentual/design system) ✅ Sprint 6; parte 2 (Gestão de Ativos) ✅ Sprint 8; parte 3 (cards Ativos/Passivos, drilldowns, refinamentos de Dashboard) ✅ Sprint 9 — épico fechado. Patrimônio/evolução de investimentos segue adiado por falta de série histórica no schema |
 | E7 | Conta e perfil | Perfil de usuário, logout, multiusuário (item 11); tela de Configurações (absorve Gestão de Contas) + regra de competência de salário — planejada como Sprint 15 |
 | E8 | Migração de dados legados ✅ | Import de categorias (Sprint 2) + memória de classificação do v1 (Sprint 4) — concluído em 2026-08-14 |
-| E9 | Natureza e projeção de custos | Classificação de subcategoria por natureza (fixo recorrente/variável recorrente/eventual) + dashboard de visibilidade — ✅ Sprint 12 (2026-08-16); rótulo "Eventual", funil Natureza>Categoria>Subcategoria>Transação e redesign de tabelas/botões do app — ✅ Sprint 13 (2026-08-16); projeção de custos futuros com despesas hipotéticas — Sprint 14 (planejada, sem `/plan` própria ainda) — épico segue aberto até Sprint 14 fechar |
+| E9 | Natureza e projeção de custos | Classificação de subcategoria por natureza (fixo recorrente/variável recorrente/eventual) + dashboard de visibilidade — ✅ Sprint 12 (2026-08-16); rótulo "Eventual", funil Natureza>Categoria>Subcategoria>Transação e redesign de tabelas/botões do app — ✅ Sprint 13 (2026-08-16); projeção de custos futuros (receita/despesa/saldo) com simulação efêmera de hipotéticas — Sprint 14 (planejada, `/plan` própria em 2026-08-16) — épico fecha ao término da Sprint 14 |
 
 Backlog futuro (não desenhar agora): sync Pluggy agendada, otimização para comercialização/escala >10 usuários, reavaliação do plugin Understand Anything quando o codebase passar de ~100 arquivos.
 
@@ -459,8 +459,39 @@ PRD: [PRD-013-natureza-funil-e-redesign-tabelas.md](prd/PRD-013-natureza-funil-e
 Plano: [SPRINT-013-natureza-funil-e-redesign-tabelas-plan.md](sprints/SPRINT-013-natureza-funil-e-redesign-tabelas-plan.md).
 Relatório: [SPRINT-013-natureza-funil-e-redesign-tabelas-report.md](sprints/SPRINT-013-natureza-funil-e-redesign-tabelas-report.md).
 
+### Sprint 14 — Projeção de custos futuros com despesas hipotéticas (E9, fecha o épico)
+
+Planejada em sessão própria (2026-08-16), a partir de um título de roadmap
+sem PRD (herdado da divisão Sprint 12/13/14 feita na sessão de planejamento
+da Sprint 12). Decisões de produto resolvidas com o CEO nesta sessão, via
+perguntas diretas (não presumidas pelo CTO): despesas/receitas hipotéticas
+são uma **simulação efêmera** (sem persistência, sem CRUD, sem tabela nova
+— somem ao recarregar a página); escopo cobre **despesa e receita**,
+chegando a um saldo projetado (não só "custo" como o nome do épico sugere);
+base do cálculo é a **média dos últimos 3 meses** de subcategorias `fixa`/
+`variavel` (mesma janela default do seletor de tendência desde a Sprint 6);
+fica em **tela nova "Projeção"**, não dentro de "Natureza" (que já acumula
+2 propósitos desde a Sprint 12).
+
+Escopo: `get_projecao()` em `app/dashboards/service.py` — projeta receita/
+despesa/saldo como valor constante (média dos últimos 3 meses de
+subcategorias fixo/variável recorrente, despesa e receita) repetido em cada
+um dos N meses futuros (horizonte 3/6/12, mesmo padrão do seletor de
+tendência); `eventual` e subcategoria sem `natureza`/sem categoria ficam
+fora da base, por exclusão direta (`Subcategory.natureza.in_([fixa,
+variavel])`), sem precisar de `COALESCE` como em `get_por_natureza`. Novo
+endpoint `GET /dashboards/projecao`. Tela nova "Projeção": gráfico
+combinando histórico real (linha sólida) e projeção (linha tracejada),
+3 cards (Receita/Despesa/Saldo projetados), painel de simulação
+"hipotéticas" (linhas ad-hoc única ou mensal, recalcula cards/gráfico no
+cliente sem chamada de API). Sem migration.
+
+PRD: [PRD-014-projecao-custos-hipoteticas.md](prd/PRD-014-projecao-custos-hipoteticas.md).
+Plano: [SPRINT-014-projecao-custos-hipoteticas-plan.md](sprints/SPRINT-014-projecao-custos-hipoteticas-plan.md).
+
 ## Registro de reavaliações futuras
 
 - **Understand Anything:** reavaliar instalação quando o codebase ultrapassar ~100 arquivos (ver ADR-002-plugins).
 - **Sync Pluggy agendada:** só entra no roadmap se o CEO priorizar explicitamente.
 - **Ativo como nova camada do funil Categoria>Tipo>Transação (Dashboard):** ideia levantada pelo CEO na revisão pós-Sprint 10 (2026-08-15) — quando uma subcategoria (Tipo) tem transações vinculadas a um ativo, o drill-down ganharia um nível "Ativo" entre Tipo e Transação, agrupando por ativo antes de chegar na lista de transações. Registrada como candidata; requer sessão de `/plan` própria (decisões em aberto: só aparece quando há ≥1 transação com asset_id na subcategoria? bucket "sem ativo" pras demais? mesmo padrão pro funil de Passivos?) — sem PRD/plano ainda.
+- **Persistir despesas/receitas hipotéticas como cenários salvos:** decisão explícita do CEO na sessão de planejamento da Sprint 14 (2026-08-16) — a simulação da tela "Projeção" fica efêmera (sem CRUD, sem tabela) por ora. Se o CEO quiser voltar a um cenário entre sessões (ex.: comparar "com reforma" vs. "sem reforma" ao longo de semanas), viraria candidata a sprint futura com tabela nova + CRUD — sem PRD/plano ainda.

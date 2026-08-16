@@ -75,7 +75,7 @@ describe("ProtectedPage navigation", () => {
     expect(screen.getByRole("button", { name: "Passivos" })).toBeInTheDocument();
   });
 
-  it("orders the nav as Dashboards, Categorizar, Ativos, Passivos, Natureza, Gestão de contas", () => {
+  it("orders the nav as Dashboards, Categorizar, Ativos, Passivos, Natureza, Projeção, Gestão de contas", () => {
     vi.stubGlobal("fetch", catchAllFetchMock());
 
     renderProtectedPage();
@@ -91,6 +91,7 @@ describe("ProtectedPage navigation", () => {
       "Ativos",
       "Passivos",
       "Natureza",
+      "Projeção",
       "Gestão de contas",
     ]);
   });
@@ -118,6 +119,20 @@ describe("ProtectedPage navigation", () => {
 
     expect(await screen.findByRole("heading", { name: "Natureza" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Natureza" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+  });
+
+  it("switches to the Projeção tab and renders ProjecaoPage", async () => {
+    vi.stubGlobal("fetch", catchAllFetchMock());
+
+    renderProtectedPage();
+
+    await userEvent.click(screen.getByRole("button", { name: "Projeção" }));
+
+    expect(await screen.findByRole("heading", { name: "Projeção" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Projeção" })).toHaveAttribute(
       "aria-current",
       "page"
     );

@@ -1435,6 +1435,198 @@ def test_get_tendencia_por_natureza_groups_across_months_zero_filled(db_session,
     assert all(p.total == Decimal("0") for p in variavel.pontos)
 
 
+def test_future_month_range_returns_months_after_base():
+    assert service._future_month_range(2026, 10, 3) == [(2026, 11), (2026, 12), (2027, 1)]
+
+
+def test_future_month_range_wraps_year_boundary():
+    assert service._future_month_range(2026, 12, 2) == [(2027, 1), (2027, 2)]
+
+
+def test_get_projecao_averages_last_janela_meses_of_fixa_variavel(db_session, user):
+    account = _account(db_session, user)
+    sub_fixa = _subcategory(db_session, nome="Aluguel", natureza=Natureza.fixa)
+    sub_variavel = _subcategory(db_session, nome="Mercado", natureza=Natureza.variavel)
+    # 3 meses de janela (nov/dez/jan), média deve ser (1000+900+800)/3=900 despesa,
+    # (2000+2000+2000)/3=2000 receita.
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-1000.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2025, 11, 5),
+        subcategory_id=sub_fixa.id,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-900.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2025, 12, 5),
+        subcategory_id=sub_fixa.id,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-800.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 5),
+        subcategory_id=sub_fixa.id,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="2000.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2025, 11, 6),
+        subcategory_id=sub_variavel.id,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="2000.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2025, 12, 6),
+        subcategory_id=sub_variavel.id,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="2000.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 1, 6),
+        subcategory_id=sub_variavel.id,
+    )
+
+    projecao = service.get_projecao(
+        db_session, user.id, ano=2026, mes=1, meses_futuros=3, janela_media=3
+    )
+
+    assert [(p.ano, p.mes) for p in projecao] == [(2026, 2), (2026, 3), (2026, 4)]
+    assert all(p.despesa == Decimal("900.00") for p in projecao)
+    assert all(p.receita == Decimal("2000.00") for p in projecao)
+    assert all(p.saldo == Decimal("1100.00") for p in projecao)
+
+
+def test_get_projecao_excludes_eventual_and_null_natureza(db_session, user):
+    account = _account(db_session, user)
+    sub_eventual = _subcategory(db_session, nome="Viagem", natureza=Natureza.eventual)
+    sub_sem_natureza = _subcategory(db_session, nome="Diversos", natureza=None)
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-500.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 5),
+        subcategory_id=sub_eventual.id,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-300.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 6),
+        subcategory_id=sub_sem_natureza.id,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 7),
+        subcategory_id=None,
+    )
+
+    projecao = service.get_projecao(db_session, user.id, ano=2026, mes=1)
+
+    assert all(p.despesa == Decimal("0") for p in projecao)
+
+
+def test_get_projecao_excludes_excluir_de_totais_and_cartao_credito_credito(db_session, user):
+    transferencia = _group(db_session, nome="Transferência interna", excluir_de_totais=True)
+    sub_transf = _subcategory(
+        db_session, group=transferencia, nome="Pagamento de Fatura", natureza=Natureza.fixa
+    )
+    conta_normal = _account(db_session, user)
+    _transaction(
+        db_session,
+        user,
+        conta_normal,
+        valor="-500.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 5),
+        subcategory_id=sub_transf.id,
+    )
+
+    sub_fixa = _subcategory(db_session, nome="Estorno", natureza=Natureza.fixa)
+    cartao = _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito)
+    _transaction(
+        db_session,
+        user,
+        cartao,
+        valor="-200.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 1, 6),
+        subcategory_id=sub_fixa.id,
+    )
+
+    projecao = service.get_projecao(db_session, user.id, ano=2026, mes=1)
+
+    assert all(p.receita == Decimal("0") and p.despesa == Decimal("0") for p in projecao)
+
+
+def test_get_projecao_meses_futuros_and_janela_media_parametrizable(db_session, user):
+    account = _account(db_session, user)
+    sub_fixa = _subcategory(db_session, nome="Aluguel", natureza=Natureza.fixa)
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-1200.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 5),
+        subcategory_id=sub_fixa.id,
+    )
+
+    projecao = service.get_projecao(
+        db_session, user.id, ano=2026, mes=1, meses_futuros=12, janela_media=1
+    )
+
+    assert len(projecao) == 12
+    assert projecao[0].despesa == Decimal("1200.00")
+
+
+def test_get_projecao_isolated_by_user(db_session, user):
+    other = User(google_sub="google-projecao-other", email="other-proj@example.com", name="Bob")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    other_account = _account(db_session, other)
+    sub = _subcategory(db_session, nome="Aluguel", natureza=Natureza.fixa)
+    _transaction(
+        db_session,
+        other,
+        other_account,
+        valor="-999.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 5),
+        subcategory_id=sub.id,
+    )
+
+    projecao = service.get_projecao(db_session, user.id, ano=2026, mes=1)
+
+    assert all(p.despesa == Decimal("0") for p in projecao)
+
+
 def test_get_tendencia_por_natureza_isolated_by_user(db_session, user):
     other = User(
         google_sub="google-tendencia-natureza-other",
