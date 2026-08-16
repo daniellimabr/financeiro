@@ -14,7 +14,7 @@ Fases em épicos, derivados do escopo funcional do bootstrap. PRDs individuais s
 | E6 | Dashboards analíticos ✅ | Tendência histórica, percentual de representatividade, despesas por ativo (itens 4, 5, 6) — parte 1 (tendência/percentual/design system) ✅ Sprint 6; parte 2 (Gestão de Ativos) ✅ Sprint 8; parte 3 (cards Ativos/Passivos, drilldowns, refinamentos de Dashboard) ✅ Sprint 9 — épico fechado. Patrimônio/evolução de investimentos segue adiado por falta de série histórica no schema |
 | E7 | Conta e perfil | Perfil de usuário, logout, multiusuário (item 11); tela de Configurações (absorve Gestão de Contas) + regra de competência de salário — planejada como Sprint 15 |
 | E8 | Migração de dados legados ✅ | Import de categorias (Sprint 2) + memória de classificação do v1 (Sprint 4) — concluído em 2026-08-14 |
-| E9 | Natureza e projeção de custos | Classificação de subcategoria por natureza (fixo recorrente/variável recorrente/eventual) + dashboard de visibilidade — ✅ Sprint 12 (2026-08-16); rótulo "Eventual", funil Natureza>Categoria>Subcategoria>Transação e redesign de tabelas/botões do app — Sprint 13 (planejada, ver abaixo); projeção de custos futuros com despesas hipotéticas — Sprint 14 (planejada, sem `/plan` própria ainda) — épico segue aberto até Sprint 14 fechar |
+| E9 | Natureza e projeção de custos | Classificação de subcategoria por natureza (fixo recorrente/variável recorrente/eventual) + dashboard de visibilidade — ✅ Sprint 12 (2026-08-16); rótulo "Eventual", funil Natureza>Categoria>Subcategoria>Transação e redesign de tabelas/botões do app — ✅ Sprint 13 (2026-08-16); projeção de custos futuros com despesas hipotéticas — Sprint 14 (planejada, sem `/plan` própria ainda) — épico segue aberto até Sprint 14 fechar |
 
 Backlog futuro (não desenhar agora): sync Pluggy agendada, otimização para comercialização/escala >10 usuários, reavaliação do plugin Understand Anything quando o codebase passar de ~100 arquivos.
 
@@ -382,7 +382,7 @@ na VM de dev e validação ao vivo via `scripts/browser-check/check-sprint12.mjs
 `FINANCEIRO_SESSION_TOKEN` disponível desde a pendência registrada na
 Sprint 11, minerado via SSH na própria VM de dev.
 
-### Sprint 13 — Natureza: rótulo, funil completo, e redesign de tabelas/botões (E9, cross-epic)
+### Sprint 13 — Natureza: rótulo, funil completo, e redesign de tabelas/botões (E9, cross-epic) ✅ concluída em 2026-08-16
 
 Planejada em sessão própria (2026-08-16). CEO usou a tela "Natureza"
 (Sprint 12) na prática e trouxe 3 pontos: (a) rótulo "Custo eventual"
@@ -410,8 +410,33 @@ sprint do projeto até agora (estimativa comparável a Sprint 10 + Sprint 11
 somadas) — empurra "projeção de custos futuros" (E9) para **Sprint 14** e
 "Configurações + competência de salário" (E7) para **Sprint 15**.
 
+Implementada em sessão própria (2026-08-16): rename completo (nenhuma
+ocorrência de "Custo eventual" fora do log histórico de PRD-012/SPRINT-012);
+funil de 4 níveis com `categoriaGrouping.ts` novo (aritmética de agrupamento
+extraída de `GrupoAccordion`) e sanfona multi-nível na tela Natureza.
+Redesign de tabela decidido via rodada `impeccable` (Artifact, 2 candidatas
+de densidade/hover + 2 de hierarquia de botão) — o CEO pediu um híbrido
+após ver as candidatas renderizadas (densidade compacta + hover de
+preenchimento simples, sem o indicador de borda lateral testado, que criava
+uma linha falsa entre colunas), e uma 3ª rodada introduziu `--danger`
+(vinho, primeira cor destrutiva do app) só depois de ver a opção.
+`TransactionsTable.tsx`/`SortableHeader.tsx` novos unificam as 3
+implementações de tabela de transação — `AssetDrilldown` ganha Categoria
+editável e sort que não tinha. `table-layout: fixed` + `<colgroup>` em toda
+tabela do app; achado real via browser-check (select/combobox vazando por
+cima da coluna Valor) corrigido antes de fechar. `.btn-ghost`/`.btn-danger`
+novos, hierarquia de botão nos cards de Ativos/Passivos (só "Ver gasto no
+período" fica Default). `.simple-list` em Gestão de Contas. `DESIGN.md`
+reescrito (Table/Buttons/nova seção Simple lists). 313 testes backend
+(zero mudança, confirma ausência de regressão) + 131 testes frontend (9
+novos), suíte completa verde. Deploy na VM de dev e validação ao vivo via
+`scripts/browser-check/check-sprint13.mjs` (novo, substitui
+`check-sprint12.mjs` — mesmo padrão da remoção de `check-sanfona.mjs` na
+Sprint 9), desktop+mobile, sem erros de console.
+
 PRD: [PRD-013-natureza-funil-e-redesign-tabelas.md](prd/PRD-013-natureza-funil-e-redesign-tabelas.md).
 Plano: [SPRINT-013-natureza-funil-e-redesign-tabelas-plan.md](sprints/SPRINT-013-natureza-funil-e-redesign-tabelas-plan.md).
+Relatório: [SPRINT-013-natureza-funil-e-redesign-tabelas-report.md](sprints/SPRINT-013-natureza-funil-e-redesign-tabelas-report.md).
 
 ## Registro de reavaliações futuras
 

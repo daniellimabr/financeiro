@@ -675,7 +675,96 @@ na prática pós-Sprint 9 (não coberta por PRD anterior) — ver
   indistinguíveis no `<select>`) e restaurada por `PUT` direto em
   `finally`, mesmo mecanismo de limpeza de `check-ativos.mjs`.
 
-## Qualidade (Sprint 1 → Sprint 12)
+## Redesign de tabelas/botões e funil completo de Natureza (Sprint 13)
+
+Sem mudança de backend/schema/endpoint — sprint inteiramente de frontend,
+decidida em sessão de planejamento própria (2026-08-16) a partir de 3
+pontos que o CEO trouxe usando a tela "Natureza" na prática.
+
+- **Rótulo "Custo eventual" → "Eventual"** — `NATUREZA_LABELS.eventual`
+  (`utils/naturezaLabels.ts`), única fonte; `NaturezaPage.tsx` trocou o
+  `<select>` de classificação de 3 `<option>` hardcoded por um `.map()`
+  sobre `NATUREZA_ORDER`, eliminando a segunda fonte de verdade do rótulo.
+  Cosmético — `--nat-eventual`/enum `eventual` não mudam.
+- **Funil de Natureza ganha o nível Categoria**, virando `Natureza →
+  Categoria → Subcategoria → Transação` (era só `Natureza → Subcategoria →
+  Transação` desde a Sprint 12 — corte de escopo explícito, não bug).
+  `utils/categoriaGrouping.ts` novo: `groupCategoriaTotalsByGrupo` extrai a
+  aritmética pura de agrupamento por `group_id` (soma, percentual do total
+  recebido, ordenação desc) que `GrupoAccordion` (`DashboardsPage.tsx`) já
+  tinha — cor/dado/tendência continuam proprietários de cada tela (Natureza
+  usa cor de natureza constante em todo o funil, não a paleta categórica).
+  Sanfona multi-nível (mais de uma Categoria expandida ao mesmo tempo),
+  substituindo o single-select de subcategoria da Sprint 12.
+- **`TransactionsTable.tsx` novo** (`components/`) — unifica as 3
+  implementações divergentes de "tabela de transação" que existiam antes:
+  `TransacoesPanel` (privada em `DashboardsPage.tsx`, reaproveitada por
+  Dashboard e Natureza), o `<table>` hand-rolled de `AssetDrilldown`
+  (`AssetsPage.tsx`, só Data/Descrição/Valor em texto puro) e o de
+  `LiabilityDrilldown` (`LiabilitiesPage.tsx`). Contrato de
+  `TransacoesPanel` preservado, com flags `showCategoria`/`showAtivo`
+  (default `true`). `AssetDrilldown` ganha as colunas Categoria (editável)
+  e Ativo/sort que não tinha — mudança de comportamento explícita, não só
+  visual (decisão do CEO ao aprovar a unificação). `SortableHeader`
+  também extraído (`components/SortableHeader.tsx`), agora genérico sobre
+  a união de chaves de sort de cada tabela, reaproveitado por
+  `CategorizationReviewPage` (sort novo em Data/Descrição/Valor — a
+  tabela "flagship" da Sprint 11 nunca tinha tido) e pela tabela de
+  classificação de `NaturezaPage` (sort de Categoria/Subcategoria,
+  implementado à mão — não via `useTableSort` — porque reordena um dado
+  hierárquico com `rowSpan`, não uma lista plana).
+- **Redesign de tabela decidido via rodada `impeccable`** (Artifact,
+  2 candidatas de densidade/hover + 2 de hierarquia de botão, mesmo
+  processo das Sprints 5/6/9/12): o CEO pediu um híbrido depois de ver as
+  candidatas renderizadas — densidade compacta (`6px` padding vertical, a
+  fila de Categorização real tem centenas de itens) + hover de
+  preenchimento simples de fundo (`--accent-bg`), rejeitando um indicador
+  de borda lateral (`border-left` por célula) que criava uma linha vertical
+  falsa entre colunas e fazia o texto "pular" no hover. `table-layout:
+  fixed` + `<colgroup>` explícito agora em toda `<table>` do app (incluindo
+  `TransactionsTable`/`PatrimonioBreakdownPanel`, que não tinham antes) —
+  reabre a regra do `DESIGN.md` de que a tabela era "o nível mais plano do
+  funil por design" (ver seção Table, com nota de histórico).
+  **Achado real via browser-check pós-implementação:** `<select>`/combobox
+  de Categoria/Ativo vazavam visualmente por cima da coluna Valor seguinte
+  — `table-layout: fixed` não recorta conteúdo mais largo que a coluna por
+  conta própria; corrigido cancelando o `max-width: 200px` genérico
+  (`width: 100%`/`max-width: none`) dentro de `.txn-table`, mesmo padrão já
+  usado em `.cat-review-table` desde a Sprint 7.
+- **Hierarquia de botão nos cards de Ativos/Passivos** — decisão do CEO
+  após ver as 2 candidatas: só "Ver gasto no período" fica Default (já é a
+  continuação natural do sparkline que o card mostra); Editar/Vender/
+  Quitar/Excluir viram Ghost. `.btn-ghost` novo em `index.css` — através da
+  Sprint 12 esse vocabulário só existia embutido em `.app-nav
+  button`/`.dash-row`, sem classe reutilizável.
+- **`--danger` novo** (`#a3374a` claro / `#d9748c` escuro) — primeira cor
+  de aviso/destrutiva do app, decidida em rodada própria dentro do mesmo
+  ciclo `impeccable` (o CEO pediu pra ver uma opção antes de decidir).
+  Deliberadamente um vermelho frio/vinho, distinto em matiz do terracota
+  de despesa (laranja quente) — token independente, não reabre a One
+  Meaning Rule. Aplicado só em `Excluir` (`.btn-danger`, empilhada com
+  `.btn-ghost`/`.btn-quiet`) — nunca em Vender/Quitar, que não apagam dado.
+- **`.simple-list` novo** — Gestão de Contas e o diálogo de sincronização
+  (listas `<li>` cruas até então) ganham o mesmo espaçamento/hover das
+  outras listas do app, sem virar accordion (sem chevron, sem estado de
+  expansão — presentation only).
+- **`DESIGN.md` reescrito:** seção Table documenta a tabela unificada com
+  nota de histórico (a regra antiga "nível mais plano do funil" fica
+  registrada, não apagada); Buttons ganha o Ghost generalizado + Danger;
+  nova subseção Simple lists; Tertiary — Natureza registra o rename.
+- **Validado ao vivo contra a VM de dev**
+  (`scripts/browser-check/check-sprint13.mjs`, novo, desktop+mobile, sem
+  erros de console): rótulo "Eventual", funil de 4 níveis com percentual
+  em Categoria+Subcategoria e múltiplas categorias expandidas
+  simultaneamente, hover+sort nas tabelas de Categorização/Natureza-
+  classificação/drill-down de Dashboard, colgroup no breakdown de
+  Patrimônio, hierarquia de botão (cores computadas via `getComputedStyle`,
+  não só screenshot) nos cards de Ativos/Passivos, `.simple-list` em
+  Gestão de Contas. `check-sprint12.mjs` removido — testava a estrutura de
+  funil de 1 nível que esta sprint substituiu e usava o rótulo antigo
+  (mesmo padrão da remoção de `check-sanfona.mjs` na Sprint 9).
+
+## Qualidade (Sprint 1 → Sprint 13)
 
 - **Testes backend:** 313 testes, 98% cobertura total. Sprint 12 (100% em
   `app/dashboards/`): `get_por_natureza`/`get_tendencia_por_natureza` —
@@ -683,7 +772,7 @@ na prática pós-Sprint 9 (não coberta por PRD anterior) — ver
   sem subcategoria→eventual, exclusão de `excluir_de_totais`, isolamento
   por usuário, sempre 3 buckets mesmo sem dado, percentual somando 100%;
   endpoints novos 401 sem cookie, isolamento entre usuários. Sprint 10 (100% em `app/dashboards/` e `app/categorization/`): `suggest_asset` mirror completo dos testes de categoria (regra > histórico exato > similaridade `>=0.86`, isolamento); `has_asset`/`group_id` isolados e combinados entre si e com filtros existentes; `get_patrimonio_breakdown` batendo exatamente com `summary.patrimonio`; `cartao_credito`+`credito` excluído da receita (o achado do NuTag) enquanto `corrente`+`credito` continua contando normalmente; `GET /dashboards/patrimonio/breakdown` isolado por usuário, 401 sem cookie. Auth (Sprint 1), dados mestres (Sprint 2, 97%), Pluggy (Sprint 3, 98%), categorização (Sprint 4, paginação/filtro ano-mes pós-Sprint 6) — ver histórico nos relatórios de sprint. Dashboards (Sprint 5+6, 100% em `app/dashboards/`): período vazio, período só com "Transferência interna" (totais zerados), misto débito/crédito, sinal do saldo de `cartao_credito` na fórmula de patrimônio, ativos/passivos inativos excluídos, borda de mês (`data_competencia` no limite entre meses), soma de `/por-categoria` batendo com `/summary`, isolamento entre usuários; tendência terminando no mês filtrado (não no calendário), mês sem transação aparecendo zerado, tendência por categoria com bucket "Não categorizado", percentual somando 100% (menos arredondamento) e retornando `0` com denominador zero. Categorização/Pluggy (Sprint 7, 99%): filtro status/tipo em todas as combinações, bulk-confirm parcial (linha inválida não bloqueia as demais), `set_category` em transação já confirmada, propagação de descrição (match normalizado + mesma categoria, isolamento por usuário, "primeira grava, segunda não sobrescreve"), `sync_item`/`sync_items` pulando conta com `sync_enabled=False`, `apelido` preservado em resync. Gestão de Ativos (Sprint 8, 100% em `app/assets/` e `app/dashboards/`): `get_por_ativo` filtrando por `tipo` (período vazio, ativo sem transação vinculada, isolamento), `get_tendencia_por_ativo` zero-preenchendo meses sem transação e isolado por `tipo`/usuário, filtro `asset_id`/`tipo` em `/pluggy/transactions` combinados com outros filtros, `delete_asset` desassociando transações vinculadas em vez de falhar. Ativos/Passivos no Dashboard (Sprint 9, 100% em `app/dashboards/`): `suggest_liability` (substring, isolamento, sem match), `set_transaction_liability` (sets/clears, 404 cross-user), `delete_liability` desassociando (crítico, mirror de `delete_asset`), `get_por_passivo`/`get_tendencia_por_passivo` (nunca soma crédito, zero-preenchida, isolamento), `get_saldo_por_conta` (apelido→nome, isolamento), `summary.ativos`/`summary.passivos` batendo com a mesma base de `patrimonio`, filtro `liability_id` combinado com outros filtros, `account_tipo` na resposta de `/pluggy/transactions`. Revisão pós-entrega: `_upsert_account` persistindo/deixando `None` os campos de `creditData`, `get_saldo_por_conta` de cartão somando a janela da fatura (limite, exclui fora da janela, nunca soma crédito, cai pro saldo bruto sem `fatura_vencimento`), `_subtract_month` (rollover de ano, clamp de dia).
-- **Testes frontend:** 122 testes (Vitest + Testing Library) — renderização condicional, tratamento de 401, mock fetch, widget Pluggy Connect mockado. Sprint 12: `NaturezaPage.test.tsx` novo (3 cards com totais/percentuais mockados, drill-down natureza→subcategoria incluindo subcategoria não classificada caindo em "eventual", clique em subcategoria mostrando transações, tabela de classificação agrupada por categoria com `null`→"eventual" no `<select>`, edição salvando via `PUT /subcategories/{id}` com payload completo e refazendo as chamadas de `por-natureza`, toggle despesa/receita), `ProtectedPage.test.tsx` (nav com "Natureza", troca de aba), `api/categories.test.ts` novo (primeira cobertura direta do módulo — `fetchCategoryGroups`/`fetchSubcategories`/`updateSubcategory`, incluindo `natureza: null`), `api/dashboards.test.ts` atualizado (`fetchDashboardPorNatureza`/`fetchDashboardPorNaturezaTendencia`). Sprint 11: `CategoryCombobox.test.tsx` novo (abrir via clique/foco, filtro por digitação case/acento-insensível, filtro por nome de grupo, seleção por clique e por teclado, `Escape` cancela sem aplicar, padrão ARIA completo, `disabled`), `TransactionEditCells.test.tsx` novo (primeira cobertura direta de `CategorySelectCell`/`AssetSelectCell`/`DescriptionCell`), `CategorizationReviewPage.test.tsx` atualizado (interação via combobox no lugar de `selectOptions`, badge de status, seleção bufferizada em linha pendente) e `DashboardsPage.test.tsx` (interação de categoria no drill-down via combobox) — suíte 100% verde, sem regressão. Sprint 10: `LiabilitiesPage.test.tsx` (mirror de `AssetsPage.test.tsx` — listar ativos/quitados, criar/editar/quitar+idempotência 400/excluir, drill-down com edição inline), `CardSparkline.test.tsx` atualizado pra `pontos`, `ProtectedPage.test.tsx` (nav sem Início, ordem final, troca de aba), filtros novos e ícone débito/crédito em `CategorizationReviewPage.test.tsx`, edição inline no drill-down do Dashboard invalidando `dashboardSummary` em `DashboardsPage.test.tsx`. Dashboards (Sprint 5+6): cards a partir de dado mockado, refetch ao trocar filtro ano/mês, sparkline a partir de tendência mockada, refetch ao trocar seletor de período histórico, sanfona expandindo múltiplos níveis sem esconder os anteriores (e mantendo duas categorias expandidas ao mesmo tempo), percentual exibido em cada nível, estado vazio. Categorização (Sprint 7): filtro tipo/status disparando refetch, seleção em lote + "Aprovar marcadas" chamando bulk-confirm, edição de descrição + propagação chamando o endpoint certo, aceitar sugestão de descrição. Gestão de Contas (Sprint 7): apelido/sync_enabled salvos via PUT, diálogo de sincronização unificada pré-selecionado a partir de `sync_enabled` e confirmando com os `item_ids` corretos, fluxo de conexão via widget Pluggy Connect. Gestão de Ativos (Sprint 8): listar ativos/baixados, criar/editar/vender (idempotência refletindo o 400 do backend)/excluir, drill-down abrindo fora do card mostrando total+transações, toggle despesa/receita refazendo as chamadas com o `tipo` selecionado, sparkline no card quando há dado de tendência; `PeriodFilter` isolado disparando `onChange` ao trocar mês/ano. Ativos/Passivos no Dashboard (Sprint 9): cards Ativos (com toggle)/Passivos (sem toggle) abrindo o drill-down correto, card Saldo ignorando o filtro ano/mês, ícone de meio de pagamento por linha, ordenação por coluna (clique no cabeçalho, alterna asc/desc), `CardSparkline`/`TrendChart`/`useTableSort` isolados; `AssetsPage.test.tsx` sem mudança de assertion pós-refactor. Revisão pós-entrega: funil Categoria>Tipo>Transação (sanfona nos dois níveis, percentual em cada nível contra o total do nível acima), ícone dentro da célula Valor, coluna % ordenável, limite de crédito entre parênteses no card do cartão, `categoryColors.test.ts` isolado (atribuição estável por id, wrap após 8 grupos, fallback neutro, tint por grupo).
+- **Testes frontend:** 131 testes (Vitest + Testing Library) — renderização condicional, tratamento de 401, mock fetch, widget Pluggy Connect mockado. Sprint 13: `categoriaGrouping.test.ts` novo (soma por `group_id`, percentual somando 100%, ordenação desc, entrada vazia); `NaturezaPage.test.tsx` reescrito para o funil de 4 níveis (clique em Categoria antes de Subcategoria, percentuais somando 100% em cada nível novo, múltiplas categorias expandidas ao mesmo tempo, sort de Categoria/Subcategoria na tabela de classificação preservando o agrupamento por `rowSpan`); `AssetsPage.test.tsx`/`LiabilitiesPage.test.tsx` ganham teste de sort na tabela unificada (Data/Valor); `CategorizationReviewPage.test.tsx` ganha teste de sort novo — suíte 100% verde, sem regressão. Sprint 12: `NaturezaPage.test.tsx` novo (3 cards com totais/percentuais mockados, drill-down natureza→subcategoria incluindo subcategoria não classificada caindo em "eventual", clique em subcategoria mostrando transações, tabela de classificação agrupada por categoria com `null`→"eventual" no `<select>`, edição salvando via `PUT /subcategories/{id}` com payload completo e refazendo as chamadas de `por-natureza`, toggle despesa/receita), `ProtectedPage.test.tsx` (nav com "Natureza", troca de aba), `api/categories.test.ts` novo (primeira cobertura direta do módulo — `fetchCategoryGroups`/`fetchSubcategories`/`updateSubcategory`, incluindo `natureza: null`), `api/dashboards.test.ts` atualizado (`fetchDashboardPorNatureza`/`fetchDashboardPorNaturezaTendencia`). Sprint 11: `CategoryCombobox.test.tsx` novo (abrir via clique/foco, filtro por digitação case/acento-insensível, filtro por nome de grupo, seleção por clique e por teclado, `Escape` cancela sem aplicar, padrão ARIA completo, `disabled`), `TransactionEditCells.test.tsx` novo (primeira cobertura direta de `CategorySelectCell`/`AssetSelectCell`/`DescriptionCell`), `CategorizationReviewPage.test.tsx` atualizado (interação via combobox no lugar de `selectOptions`, badge de status, seleção bufferizada em linha pendente) e `DashboardsPage.test.tsx` (interação de categoria no drill-down via combobox) — suíte 100% verde, sem regressão. Sprint 10: `LiabilitiesPage.test.tsx` (mirror de `AssetsPage.test.tsx` — listar ativos/quitados, criar/editar/quitar+idempotência 400/excluir, drill-down com edição inline), `CardSparkline.test.tsx` atualizado pra `pontos`, `ProtectedPage.test.tsx` (nav sem Início, ordem final, troca de aba), filtros novos e ícone débito/crédito em `CategorizationReviewPage.test.tsx`, edição inline no drill-down do Dashboard invalidando `dashboardSummary` em `DashboardsPage.test.tsx`. Dashboards (Sprint 5+6): cards a partir de dado mockado, refetch ao trocar filtro ano/mês, sparkline a partir de tendência mockada, refetch ao trocar seletor de período histórico, sanfona expandindo múltiplos níveis sem esconder os anteriores (e mantendo duas categorias expandidas ao mesmo tempo), percentual exibido em cada nível, estado vazio. Categorização (Sprint 7): filtro tipo/status disparando refetch, seleção em lote + "Aprovar marcadas" chamando bulk-confirm, edição de descrição + propagação chamando o endpoint certo, aceitar sugestão de descrição. Gestão de Contas (Sprint 7): apelido/sync_enabled salvos via PUT, diálogo de sincronização unificada pré-selecionado a partir de `sync_enabled` e confirmando com os `item_ids` corretos, fluxo de conexão via widget Pluggy Connect. Gestão de Ativos (Sprint 8): listar ativos/baixados, criar/editar/vender (idempotência refletindo o 400 do backend)/excluir, drill-down abrindo fora do card mostrando total+transações, toggle despesa/receita refazendo as chamadas com o `tipo` selecionado, sparkline no card quando há dado de tendência; `PeriodFilter` isolado disparando `onChange` ao trocar mês/ano. Ativos/Passivos no Dashboard (Sprint 9): cards Ativos (com toggle)/Passivos (sem toggle) abrindo o drill-down correto, card Saldo ignorando o filtro ano/mês, ícone de meio de pagamento por linha, ordenação por coluna (clique no cabeçalho, alterna asc/desc), `CardSparkline`/`TrendChart`/`useTableSort` isolados; `AssetsPage.test.tsx` sem mudança de assertion pós-refactor. Revisão pós-entrega: funil Categoria>Tipo>Transação (sanfona nos dois níveis, percentual em cada nível contra o total do nível acima), ícone dentro da célula Valor, coluna % ordenável, limite de crédito entre parênteses no card do cartão, `categoryColors.test.ts` isolado (atribuição estável por id, wrap após 8 grupos, fallback neutro, tint por grupo).
 - **Lint:** ruff (Python), eslint (TypeScript) — suíte 100% verde
 - **Pre-commit:** ruff, eslint, detect-secrets (baseline) — executado local antes de push
 - **CI:** GitHub Actions — jobs `backend` (ruff check/format, pytest) e `frontend` (eslint, prettier, tsc, vitest) — roda em push/PR para `main`
