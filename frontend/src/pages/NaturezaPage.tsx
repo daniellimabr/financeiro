@@ -120,7 +120,10 @@ export function NaturezaPage() {
       a.localeCompare(b) * (classificacaoDirection === "asc" ? 1 : -1);
     const entries = gruposComSubcategorias.map((entry) =>
       classificacaoSortKey === "subcategoria"
-        ? { group: entry.group, subcategorias: [...entry.subcategorias].sort((a, b) => cmp(a.nome, b.nome)) }
+        ? {
+            group: entry.group,
+            subcategorias: [...entry.subcategorias].sort((a, b) => cmp(a.nome, b.nome)),
+          }
         : entry
     );
     if (classificacaoSortKey === "grupo") {

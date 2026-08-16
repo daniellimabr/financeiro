@@ -297,7 +297,12 @@ describe("AssetsPage", () => {
 
   it("the drilldown table shows an editable Categoria and can be sorted by Data/Valor", async () => {
     const GROUPS = [
-      { id: 1, nome: "Transporte", created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" },
+      {
+        id: 1,
+        nome: "Transporte",
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      },
     ];
     const SUBCATEGORIES = [
       {
@@ -310,7 +315,13 @@ describe("AssetsPage", () => {
       },
     ];
     const TX_A = { ...TRANSACAO_FIXTURE, id: 1, data: "2026-01-10", valor: "-150.00" };
-    const TX_B = { ...TRANSACAO_FIXTURE, id: 2, data: "2026-01-20", descricao: "Zona Azul", valor: "-30.00" };
+    const TX_B = {
+      ...TRANSACAO_FIXTURE,
+      id: 2,
+      data: "2026-01-20",
+      descricao: "Zona Azul",
+      valor: "-30.00",
+    };
 
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);

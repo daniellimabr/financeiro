@@ -1,6 +1,10 @@
 import { useMemo, useState } from "react";
 
-import type { CategorizationStatus, CategorizedTransaction, TransactionTipo } from "../api/categorization";
+import type {
+  CategorizationStatus,
+  CategorizedTransaction,
+  TransactionTipo,
+} from "../api/categorization";
 import { CategoryCombobox } from "../components/CategoryCombobox";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { SortableHeader } from "../components/SortableHeader";
@@ -57,10 +61,12 @@ export function CategorizationReviewPage() {
   const [checked, setChecked] = useState<Record<number, boolean>>({});
 
   const totalPaginas = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
-  const { sorted: sortedItems, sortKey, direction, toggleSort } = useTableSort<
-    CategorizedTransaction,
-    CategorizationSortKey
-  >(
+  const {
+    sorted: sortedItems,
+    sortKey,
+    direction,
+    toggleSort,
+  } = useTableSort<CategorizedTransaction, CategorizationSortKey>(
     items ?? [],
     (item, key) => {
       switch (key) {

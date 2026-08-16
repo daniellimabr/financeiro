@@ -293,7 +293,8 @@ describe("LiabilitiesPage", () => {
           ])
         );
       }
-      if (url.startsWith("/pluggy/transactions")) return Promise.resolve(jsonResponse([TX_A, TX_B]));
+      if (url.startsWith("/pluggy/transactions"))
+        return Promise.resolve(jsonResponse([TX_A, TX_B]));
       if (url.startsWith("/subcategories")) return Promise.resolve(jsonResponse([]));
       if (url.startsWith("/category-groups")) return Promise.resolve(jsonResponse([]));
       if (url.startsWith("/assets")) return Promise.resolve(jsonResponse([]));
@@ -308,7 +309,9 @@ describe("LiabilitiesPage", () => {
     await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
 
     await screen.findByRole("button", { name: "Parcela financiamento" });
-    const table = screen.getByRole("button", { name: "Parcela financiamento" }).closest("table") as HTMLElement;
+    const table = screen
+      .getByRole("button", { name: "Parcela financiamento" })
+      .closest("table") as HTMLElement;
     const rowsInOrder = () =>
       within(table)
         .getAllByRole("row")

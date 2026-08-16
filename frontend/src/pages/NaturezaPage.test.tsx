@@ -287,9 +287,7 @@ describe("NaturezaPage", () => {
 
     await userEvent.click(summary.getByRole("button", { name: /Fixo recorrente/ }));
     const funnel = within(container.querySelector(".dash-funnel") as HTMLElement);
-    const grupoRow = (await funnel.findByText("Moradia")).closest(
-      "button.dash-row"
-    ) as HTMLElement;
+    const grupoRow = (await funnel.findByText("Moradia")).closest("button.dash-row") as HTMLElement;
     await userEvent.click(grupoRow);
     const subcategoriaRow = (await funnel.findByText("Aluguel")).closest(
       "button.dash-row"
