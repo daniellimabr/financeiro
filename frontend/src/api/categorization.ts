@@ -155,21 +155,3 @@ export function updateDescription(
     }
   );
 }
-
-export function confirmDescriptionSuggestion(
-  transactionId: number
-): Promise<CategorizedTransaction> {
-  return apiFetch<CategorizedTransaction>(
-    `/categorization/transactions/${transactionId}/description/confirm`,
-    { method: "POST" }
-  );
-}
-
-export function dismissDescriptionSuggestion(
-  transactionId: number
-): Promise<CategorizedTransaction> {
-  return apiFetch<CategorizedTransaction>(
-    `/categorization/transactions/${transactionId}/description/dismiss`,
-    { method: "POST" }
-  );
-}

@@ -419,39 +419,6 @@ describe("CategorizationReviewPage", () => {
     expect(valorCell?.querySelector(".transaction-tipo-icon.despesa")).not.toBeNull();
   });
 
-  it("accepting a pending description suggestion calls the confirm endpoint", async () => {
-    const withSuggestion = { ...BASE_TRANSACTION, descricao_sugerida: "Mercado do bairro" };
-    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      const method = init?.method ?? "GET";
-      const base = baseHandlers(url);
-      if (base) return base;
-
-      if (url.startsWith("/categorization/transactions") && method === "GET")
-        return Promise.resolve(jsonResponse(transactionsPage([withSuggestion])));
-      if (url === "/categorization/transactions/1/description/confirm" && method === "POST") {
-        return Promise.resolve(jsonResponse({ ...withSuggestion, descricao_sugerida: null }));
-      }
-      throw new Error(`Unexpected fetch: ${method} ${url}`);
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    renderWithQueryClient(<CategorizationReviewPage />);
-    await screen.findByText("Mercado Sao Joao");
-    expect(await screen.findByText(/Sugestão: Mercado do bairro/)).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: "Aceitar" }));
-
-    await waitFor(() => {
-      const call = fetchMock.mock.calls.find(
-        (c) =>
-          String(c[0]) === "/categorization/transactions/1/description/confirm" &&
-          (c[1] as RequestInit)?.method === "POST"
-      );
-      expect(call).toBeDefined();
-    });
-  });
-
   it("sorts the current page by Data/Valor when a sortable header is clicked", async () => {
     const txA: CategorizedTransaction = {
       ...BASE_TRANSACTION,

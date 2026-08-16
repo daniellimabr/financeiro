@@ -92,7 +92,6 @@ export function CategorizationReviewPage() {
     () => (items ?? []).filter((tx) => tx.categorizacao_status === "pendente"),
     [items]
   );
-  const suggestionCount = (items ?? []).filter((tx) => tx.descricao_sugerida !== null).length;
 
   function mudarFiltro(overrides: {
     ano?: number;
@@ -214,12 +213,6 @@ export function CategorizationReviewPage() {
       {isLoading && <p>Carregando...</p>}
       {data && data.total === 0 && <p>Nenhuma transação encontrada.</p>}
       {setCategory.isError && <p role="alert">Não foi possível confirmar a categoria.</p>}
-      {suggestionCount > 0 && (
-        <p>
-          {suggestionCount} {suggestionCount === 1 ? "item" : "itens"} com sugestão de descrição
-          pendente.
-        </p>
-      )}
 
       {pendentesDaPagina.length > 0 && (
         <div className="dash-filter">

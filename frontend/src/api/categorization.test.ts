@@ -2,8 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   bulkConfirm,
-  confirmDescriptionSuggestion,
-  dismissDescriptionSuggestion,
   fetchTransactions,
   setCategory,
   setTransactionAsset,
@@ -118,27 +116,5 @@ describe("categorization api", () => {
     expect(init.method).toBe("PUT");
     expect(JSON.parse(init.body as string)).toEqual({ descricao: "Padaria do Zé" });
     expect(result.propagated).toBe(2);
-  });
-
-  it("confirmDescriptionSuggestion posts to the description/confirm endpoint", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ id: 1 }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    await confirmDescriptionSuggestion(1);
-
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("/categorization/transactions/1/description/confirm");
-    expect(init.method).toBe("POST");
-  });
-
-  it("dismissDescriptionSuggestion posts to the description/dismiss endpoint", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ id: 1 }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    await dismissDescriptionSuggestion(1);
-
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("/categorization/transactions/1/description/dismiss");
-    expect(init.method).toBe("POST");
   });
 });
