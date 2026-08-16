@@ -21,6 +21,13 @@ const EMPTY_FORM = {
   mesAlvo: "",
 };
 
+// crypto.randomUUID() só existe em secure context (https/localhost) — a VM
+// de dev serve por HTTP puro (porta 8080, sem TLS), onde ele não existe e
+// derruba o handler de submit (achado real via browser-check, Sprint 14).
+function generateId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 function mediaCampo(
   pontos: { receita: string; despesa: string; saldo: string }[],
   campo: "receita" | "despesa" | "saldo"
@@ -70,7 +77,7 @@ export function ProjecaoPage() {
     setHipoteticas((prev) => [
       ...prev,
       {
-        id: crypto.randomUUID(),
+        id: generateId(),
         nome: formState.nome.trim(),
         valor,
         tipo: formState.tipo,

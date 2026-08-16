@@ -32,20 +32,40 @@ async function cardValue(page, label) {
   return (await tile.locator(".v").innerText()).trim();
 }
 
-async function run(browser, viewport, label) {
-  const context = await browser.newContext({ viewport });
-  const u = new URL(url);
-  await context.addCookies([
-    {
-      name: "financeiro_session",
-      value: token,
-      domain: u.hostname,
-      path: "/",
-      httpOnly: true,
-      sameSite: "Lax",
-    },
-  ]);
-  const page = await context.newPage();
+// waitForTimeout fixo se mostrou frágil (mesmo achado do check-sprint13.mjs)
+// — espera ativamente o texto do card mudar em vez de confiar num delay fixo,
+// com timeout generoso; se nunca mudar, cardValue() logo depois faz a
+// asserção real e reporta o valor congelado com contexto no erro.
+async function waitForCardValueChange(page, label, before, timeoutMs = 5000) {
+  const tile = page.locator(".dash-summary .dash-tile", { hasText: label }).locator(".v");
+  try {
+    await tile.evaluate(
+      (el, prev) => {
+        return new Promise((resolve, reject) => {
+          if (el.textContent?.trim() !== prev) return resolve(undefined);
+          const observer = new MutationObserver(() => {
+            if (el.textContent?.trim() !== prev) {
+              observer.disconnect();
+              resolve(undefined);
+            }
+          });
+          observer.observe(el, { childList: true, characterData: true, subtree: true });
+          setTimeout(() => {
+            observer.disconnect();
+            reject(new Error("timeout waiting for card value change"));
+          }, timeoutMs);
+        });
+      },
+      before,
+      { timeout: timeoutMs + 1000 }
+    );
+  } catch {
+    // segue mesmo se o observer não disparou.
+  }
+  return cardValue(page, label);
+}
+
+async function runSteps(page, label) {
   let apiCallCount = 0;
   page.on("request", (req) => {
     if (req.url().includes("/dashboards/projecao") || req.url().includes("/dashboards/tendencia")) {
@@ -53,7 +73,7 @@ async function run(browser, viewport, label) {
     }
   });
   page.on("console", (msg) => {
-    if (msg.type() === "error") consoleErrors.push(`[${label}] ${msg.text()}`);
+    if (msg.type() === "error") consoleErrors.push(`[${label}] console: ${msg.text()}`);
   });
   page.on("pageerror", (err) => consoleErrors.push(`[${label}] pageerror: ${err.message}`));
 
@@ -83,9 +103,8 @@ async function run(browser, viewport, label) {
   await page.getByLabel("Tipo da hipotética").selectOption("receita");
   await page.getByLabel("Frequência da hipotética").selectOption("mensal");
   await page.getByRole("button", { name: "Adicionar" }).click();
-  await page.waitForTimeout(400);
 
-  const receitaDepoisMensal = await cardValue(page, "Receita projetada");
+  const receitaDepoisMensal = await waitForCardValueChange(page, "Receita projetada", receitaAntes);
   if (receitaDepoisMensal === receitaAntes) {
     consoleErrors.push(
       `[${label}] hipotética mensal não alterou o card Receita projetada (antes=${receitaAntes}, depois=${receitaDepoisMensal})`
@@ -108,9 +127,8 @@ async function run(browser, viewport, label) {
   await page.getByLabel("Tipo da hipotética").selectOption("despesa");
   await page.getByLabel("Frequência da hipotética").selectOption("unica");
   await page.getByRole("button", { name: "Adicionar" }).click();
-  await page.waitForTimeout(400);
 
-  const despesaDepoisUnica = await cardValue(page, "Despesa projetada");
+  const despesaDepoisUnica = await waitForCardValueChange(page, "Despesa projetada", despesaAntes);
   if (despesaDepoisUnica === despesaAntes) {
     consoleErrors.push(
       `[${label}] hipotética única não alterou o card Despesa projetada (antes=${despesaAntes}, depois=${despesaDepoisUnica})`
@@ -127,30 +145,65 @@ async function run(browser, viewport, label) {
   });
 
   // ---- 4. Remover as duas hipotéticas, cards voltam ao valor original ----
+  const receitaComHipoteticas = await cardValue(page, "Receita projetada");
   const removerButtons = page.getByRole("button", { name: "Remover" });
   while ((await removerButtons.count()) > 0) {
     await removerButtons.first().click();
     await page.waitForTimeout(200);
   }
-  const receitaFinal = await cardValue(page, "Receita projetada");
+  const receitaFinal = await waitForCardValueChange(page, "Receita projetada", receitaComHipoteticas);
   const saldoFinal = await cardValue(page, "Saldo projetado");
   if (receitaFinal !== receitaAntes || saldoFinal !== saldoAntes) {
     consoleErrors.push(
       `[${label}] remover as hipotéticas não restaurou os valores originais (receita ${receitaAntes}->${receitaFinal}, saldo ${saldoAntes}->${saldoFinal})`
     );
   }
+  await page.screenshot({
+    path: path.join(shotsDir, `${label}-sprint14-04-removido.png`),
+    fullPage: true,
+  });
 
   // ---- 5. Trocar horizonte, checar nova chamada de rede ----
   const callsAntesHorizonte = apiCallCount;
   await page.getByLabel("Horizonte de projeção").selectOption("3");
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(800);
   if (apiCallCount === callsAntesHorizonte) {
     consoleErrors.push(`[${label}] trocar horizonte não disparou nova chamada de rede`);
   }
   await page.screenshot({
-    path: path.join(shotsDir, `${label}-sprint14-04-horizonte-3.png`),
+    path: path.join(shotsDir, `${label}-sprint14-05-horizonte-3.png`),
     fullPage: true,
   });
+}
+
+async function run(browser, viewport, label) {
+  const context = await browser.newContext({ viewport });
+  const u = new URL(url);
+  await context.addCookies([
+    {
+      name: "financeiro_session",
+      value: token,
+      domain: u.hostname,
+      path: "/",
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ]);
+  const page = await context.newPage();
+
+  try {
+    await runSteps(page, label);
+  } catch (err) {
+    consoleErrors.push(`[${label}] script falhou: ${err.message}`);
+    try {
+      await page.screenshot({
+        path: path.join(shotsDir, `${label}-sprint14-ERRO.png`),
+        fullPage: true,
+      });
+    } catch {
+      // se nem o screenshot de erro funcionar, segue só com a mensagem já registrada.
+    }
+  }
 
   await context.close();
   console.log(`[${label}] done`);
