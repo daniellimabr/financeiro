@@ -861,6 +861,7 @@ input {
   border-bottom: 1px solid var(--border);
   font-size: var(--text-xs);
   white-space: nowrap;
+  vertical-align: middle;
 }
 
 .dash-table th {
@@ -1079,10 +1080,6 @@ input {
    sua fatia (%) do espaço disponível sempre, Ativo/Valor ficam justos ao
    conteúdo real. Ordem: checkbox, Status, Data, Descrição, Categoria, Ativo,
    Valor, Ações. */
-.cat-review-table td {
-  vertical-align: middle;
-}
-
 .cat-review-table .col-check {
   width: 40px;
 }
@@ -1138,10 +1135,6 @@ input {
 
 .nat-table .col-natureza {
   width: 30%;
-}
-
-.nat-table td {
-  vertical-align: middle;
 }
 
 .nat-table td:first-child {
