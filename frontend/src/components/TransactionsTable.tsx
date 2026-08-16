@@ -7,6 +7,7 @@ import { useSubcategories } from "../hooks/useSubcategories";
 import { useTableSort } from "../hooks/useTableSort";
 import { formatCurrency } from "../utils/format";
 import { AccountTipoIcon } from "./AccountTipoIcon";
+import { SortableHeader } from "./SortableHeader";
 import { AssetSelectCell, CategorySelectCell, DescriptionCell } from "./TransactionEditCells";
 
 function formatPercent(value: number): string {
@@ -86,7 +87,15 @@ export function TransactionsTable({
 
   return (
     <div className="dash-table-wrap">
-      <table className="dash-table">
+      <table className="dash-table txn-table">
+        <colgroup>
+          <col className="col-data" />
+          <col className="col-descricao" />
+          {showCategoria && <col className="col-categoria" />}
+          {showAtivo && <col className="col-ativo" />}
+          <col className="col-valor" />
+          {total !== undefined && <col className="col-percentual" />}
+        </colgroup>
         <thead>
           <tr>
             <SortableHeader
@@ -162,36 +171,5 @@ export function TransactionsTable({
         </tbody>
       </table>
     </div>
-  );
-}
-
-function SortableHeader({
-  label,
-  sortKeyName,
-  currentKey,
-  direction,
-  onClick,
-}: {
-  label: string;
-  sortKeyName: TransacaoSortKey;
-  currentKey: TransacaoSortKey;
-  direction: "asc" | "desc";
-  onClick: () => void;
-}) {
-  const active = currentKey === sortKeyName;
-  return (
-    <th
-      className="sortable"
-      aria-sort={active ? (direction === "asc" ? "ascending" : "descending") : "none"}
-    >
-      <button type="button" onClick={onClick}>
-        {label}
-        {active && (
-          <span className="sort-arrow" aria-hidden="true">
-            {direction === "asc" ? "▲" : "▼"}
-          </span>
-        )}
-      </button>
-    </th>
   );
 }

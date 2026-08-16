@@ -695,7 +695,12 @@ function PatrimonioBreakdownPanel({
 
   return (
     <div className="dash-table-wrap">
-      <table className="dash-table">
+      <table className="dash-table patrimonio-table">
+        <colgroup>
+          <col className="col-componente" />
+          <col className="col-valor" />
+          <col className="col-acoes" />
+        </colgroup>
         <thead>
           <tr>
             <th>Componente</th>

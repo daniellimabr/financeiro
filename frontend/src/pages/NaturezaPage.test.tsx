@@ -345,6 +345,45 @@ describe("NaturezaPage", () => {
     });
   });
 
+  it("classification table sorts by Categoria/Subcategoria, keeping rowSpan grouping intact", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<NaturezaPage />);
+    await screen.findByText("Moradia");
+
+    // default: Categoria já ativa asc (mesmo padrão das outras tabelas, que
+    // sempre têm uma coluna ordenada por padrão) — ordem alfabética. Só a
+    // primeira linha de cada grupo tem a célula de Categoria (rowSpan).
+    const gruposEmOrdem = () =>
+      Array.from(document.querySelectorAll(".nat-table tbody td[rowspan]")).map(
+        (td) => td.textContent
+      );
+    expect(gruposEmOrdem()).toEqual(["Alimentação", "Moradia"]);
+
+    await userEvent.click(screen.getByRole("button", { name: "Categoria" }));
+    expect(gruposEmOrdem()).toEqual(["Moradia", "Alimentação"]);
+
+    await userEvent.click(screen.getByRole("button", { name: "Categoria" }));
+    expect(gruposEmOrdem()).toEqual(["Alimentação", "Moradia"]);
+
+    // Subcategoria: reordena as linhas dentro de cada grupo, sem sort de
+    // grupo ativo a ordem dos grupos volta à ordem original (Moradia antes
+    // de Alimentação — mesma ordem de /category-groups no fixture).
+    await userEvent.click(screen.getByRole("button", { name: "Subcategoria" }));
+    expect(gruposEmOrdem()).toEqual(["Moradia", "Alimentação"]);
+
+    const primeirasDuasLinhas = () =>
+      Array.from(document.querySelectorAll(".nat-table tbody tr"))
+        .slice(0, 2)
+        .map((row) => row.textContent);
+    expect(primeirasDuasLinhas()[0]).toContain("Aluguel");
+    expect(primeirasDuasLinhas()[1]).toContain("Condomínio");
+
+    await userEvent.click(screen.getByRole("button", { name: "Subcategoria" }));
+    expect(primeirasDuasLinhas()[0]).toContain("Condomínio");
+    expect(primeirasDuasLinhas()[1]).toContain("Aluguel");
+  });
+
   it("toggling despesa/receita refetches por-natureza with the selected tipo", async () => {
     vi.stubGlobal("fetch", routedFetchMock());
 

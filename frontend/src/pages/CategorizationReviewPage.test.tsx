@@ -450,4 +450,46 @@ describe("CategorizationReviewPage", () => {
       expect(call).toBeDefined();
     });
   });
+
+  it("sorts the current page by Data/Valor when a sortable header is clicked", async () => {
+    const txA: CategorizedTransaction = {
+      ...BASE_TRANSACTION,
+      id: 1,
+      descricao: "Compra A",
+      data: "2026-01-10",
+      valor: "-200.00",
+    };
+    const txB: CategorizedTransaction = {
+      ...BASE_TRANSACTION,
+      id: 2,
+      descricao: "Compra B",
+      data: "2026-01-20",
+      valor: "-50.00",
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url.startsWith("/categorization/transactions"))
+        return Promise.resolve(jsonResponse(transactionsPage([txA, txB])));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<CategorizationReviewPage />);
+    await screen.findByText("Compra A");
+
+    const table = screen.getByText("Compra A").closest("table") as HTMLElement;
+    const rowsInOrder = () =>
+      Array.from(table.querySelectorAll("tbody tr")).map((row) => row.textContent);
+
+    // default: sorted por data desc — Compra B (dia 20) antes de Compra A (dia 10)
+    expect(rowsInOrder()[0]).toContain("Compra B");
+
+    await userEvent.click(screen.getByRole("button", { name: /Valor/ }));
+    expect(rowsInOrder()[0]).toContain("Compra A"); // -200 é o menor valor (asc)
+
+    await userEvent.click(screen.getByRole("button", { name: /Valor/ }));
+    expect(rowsInOrder()[0]).toContain("Compra B"); // -50 é o maior valor (desc)
+  });
 });

@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 
-import type { CategorizationStatus, TransactionTipo } from "../api/categorization";
+import type { CategorizationStatus, CategorizedTransaction, TransactionTipo } from "../api/categorization";
 import { CategoryCombobox } from "../components/CategoryCombobox";
 import { PeriodFilter } from "../components/PeriodFilter";
+import { SortableHeader } from "../components/SortableHeader";
 import { StatusIcon } from "../components/StatusIcon";
 import { AssetSelectCell, DescriptionCell } from "../components/TransactionEditCells";
 import { TransactionTipoIcon } from "../components/TransactionTipoIcon";
@@ -12,12 +13,16 @@ import { useCategorizationTransactions } from "../hooks/useCategorizationTransac
 import { useCategoryGroups } from "../hooks/useCategoryGroups";
 import { useSetCategory } from "../hooks/useSetCategory";
 import { useSubcategories } from "../hooks/useSubcategories";
+import { useTableSort } from "../hooks/useTableSort";
 import { formatCurrency } from "../utils/format";
 import { descricaoExibida } from "../utils/transactionEdit";
 
 const PAGE_SIZE = 20;
 
 type HasAssetFilter = "todos" | "sim" | "nao";
+// Sort client-side, só na página atual (paginação é server-side, 20 itens) —
+// limitação conhecida, não é bug (ver PRD-013, "Regras de negócio").
+type CategorizationSortKey = "data" | "descricao" | "valor";
 
 export function CategorizationReviewPage() {
   const now = new Date();
@@ -52,6 +57,24 @@ export function CategorizationReviewPage() {
   const [checked, setChecked] = useState<Record<number, boolean>>({});
 
   const totalPaginas = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
+  const { sorted: sortedItems, sortKey, direction, toggleSort } = useTableSort<
+    CategorizedTransaction,
+    CategorizationSortKey
+  >(
+    items ?? [],
+    (item, key) => {
+      switch (key) {
+        case "valor":
+          return Number(item.valor);
+        case "data":
+          return item.data;
+        case "descricao":
+          return item.descricao;
+      }
+    },
+    "data",
+    "desc"
+  );
   const pendentesDaPagina = useMemo(
     () => (items ?? []).filter((tx) => tx.categorizacao_status === "pendente"),
     [items]
@@ -218,16 +241,34 @@ export function CategorizationReviewPage() {
                 )}
               </th>
               <th>Status</th>
-              <th>Data</th>
-              <th>Descrição</th>
+              <SortableHeader
+                label="Data"
+                sortKeyName="data"
+                currentKey={sortKey}
+                direction={direction}
+                onClick={() => toggleSort("data")}
+              />
+              <SortableHeader
+                label="Descrição"
+                sortKeyName="descricao"
+                currentKey={sortKey}
+                direction={direction}
+                onClick={() => toggleSort("descricao")}
+              />
               <th>Categoria</th>
               <th>Ativo</th>
-              <th>Valor</th>
+              <SortableHeader
+                label="Valor"
+                sortKeyName="valor"
+                currentKey={sortKey}
+                direction={direction}
+                onClick={() => toggleSort("valor")}
+              />
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {items?.map((tx) => {
+            {sortedItems.map((tx) => {
               const isPendente = tx.categorizacao_status === "pendente";
               const subcategoryValue =
                 selectedSubcategory[tx.id] ??

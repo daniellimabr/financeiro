@@ -301,13 +301,17 @@ export function AssetsPage() {
               >
                 {selectedAssetId === asset.id ? "Fechar gasto" : "Ver gasto no período"}
               </button>
-              <button type="button" onClick={() => openEditForm(asset)}>
+              <button className="btn-ghost" type="button" onClick={() => openEditForm(asset)}>
                 Editar
               </button>
-              <button type="button" onClick={() => openSellDialog(asset.id)}>
+              <button className="btn-ghost" type="button" onClick={() => openSellDialog(asset.id)}>
                 Vender
               </button>
-              <button type="button" onClick={() => handleDelete(asset.id, asset.nome)}>
+              <button
+                className="btn-ghost btn-quiet btn-danger"
+                type="button"
+                onClick={() => handleDelete(asset.id, asset.nome)}
+              >
                 Excluir
               </button>
             </div>
@@ -344,7 +348,11 @@ export function AssetsPage() {
               <strong>{asset.nome}</strong>
               <span className="tag">Vendido em {asset.data_venda}</span>
               <div className="dash-filter">
-                <button type="button" onClick={() => handleDelete(asset.id, asset.nome)}>
+                <button
+                  className="btn-ghost btn-quiet btn-danger"
+                  type="button"
+                  onClick={() => handleDelete(asset.id, asset.nome)}
+                >
                   Excluir
                 </button>
               </div>

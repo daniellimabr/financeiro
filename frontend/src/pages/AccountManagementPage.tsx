@@ -123,7 +123,7 @@ export function AccountManagementPage() {
         <div role="dialog" aria-label="Sincronizar MeuPluggy" className="dash-filter">
           <div>
             <p>Selecione as contas a sincronizar:</p>
-            <ul>
+            <ul className="simple-list">
               {accounts?.map((account) => (
                 <li key={account.id}>
                   <label>
@@ -155,7 +155,7 @@ export function AccountManagementPage() {
       <h3>Contas conectadas</h3>
       {isLoading && <p>Carregando...</p>}
       {accounts && accounts.length === 0 && <p>Nenhuma conta conectada.</p>}
-      <ul>
+      <ul className="simple-list">
         {accounts?.map((account) => (
           <li key={account.id}>
             {editingAccountId === account.id ? (

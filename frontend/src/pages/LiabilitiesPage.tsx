@@ -227,13 +227,21 @@ export function LiabilitiesPage() {
               >
                 {selectedLiabilityId === liability.id ? "Fechar gasto" : "Ver gasto no período"}
               </button>
-              <button type="button" onClick={() => openEditForm(liability)}>
+              <button className="btn-ghost" type="button" onClick={() => openEditForm(liability)}>
                 Editar
               </button>
-              <button type="button" onClick={() => handleSettle(liability.id, liability.nome)}>
+              <button
+                className="btn-ghost"
+                type="button"
+                onClick={() => handleSettle(liability.id, liability.nome)}
+              >
                 Quitar
               </button>
-              <button type="button" onClick={() => handleDelete(liability.id, liability.nome)}>
+              <button
+                className="btn-ghost btn-quiet btn-danger"
+                type="button"
+                onClick={() => handleDelete(liability.id, liability.nome)}
+              >
                 Excluir
               </button>
             </div>
@@ -273,7 +281,11 @@ export function LiabilitiesPage() {
               <strong>{liability.nome}</strong>
               <span className="tag">Quitado em {liability.data_quitacao}</span>
               <div className="dash-filter">
-                <button type="button" onClick={() => handleDelete(liability.id, liability.nome)}>
+                <button
+                  className="btn-ghost btn-quiet btn-danger"
+                  type="button"
+                  onClick={() => handleDelete(liability.id, liability.nome)}
+                >
                   Excluir
                 </button>
               </div>

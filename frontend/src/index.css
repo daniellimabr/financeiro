@@ -48,6 +48,16 @@
   --despesa: #b8562f;
   --despesa-bg: rgba(184, 86, 47, 0.1);
 
+  /* Destrutivo (Sprint 13) — primeira cor de aviso do sistema, decidida via
+     rodada impeccable (candidatas em Artifact, CEO escolheu). Deliberadamente
+     um vermelho frio/vinho, distinto em matiz do terracota de despesa (que é
+     laranja quente) pra não ensinar o olho a ler "despesa" como "apaga dado"
+     — a One Meaning Rule do terracota não é reaberta, --danger é um token
+     novo e independente. Usada só em Excluir (ação que remove dado); Vender/
+     Quitar não são destrutivas e não usam este token. */
+  --danger: #a3374a;
+  --danger-bg: rgba(163, 55, 74, 0.1);
+
   /* Paleta categórica (Sprint 9, feedback pós-entrega) — identidade de
      Categoria/Tipo no funil de drill-down, nunca a cor despesa/receita
      (que segue reservada aos cards de resumo). 8 matizes validados via
@@ -135,6 +145,9 @@
     --despesa: #e0855c;
     --despesa-bg: rgba(224, 133, 92, 0.14);
 
+    --danger: #d9748c;
+    --danger-bg: rgba(217, 116, 140, 0.14);
+
     --cat-1: #3987e5;
     --cat-2: #d95926;
     --cat-3: #199e70;
@@ -167,6 +180,9 @@
   --receita: #5fc17e;
   --despesa: #e0855c;
   --despesa-bg: rgba(224, 133, 92, 0.14);
+
+  --danger: #d9748c;
+  --danger-bg: rgba(217, 116, 140, 0.14);
 
   --cat-1: #3987e5;
   --cat-2: #d95926;
@@ -246,6 +262,43 @@ button:disabled {
   opacity: 0.5;
 }
 
+/* Ghost (Sprint 13) — segunda variante formal de botão do DESIGN.md, pra
+   ações secundárias em grupos de botão (cards de Ativos/Passivos: Editar/
+   Vender/Quitar/Excluir). Sem borda, sem fundo em repouso, preenche
+   --accent-bg no hover — mesmo vocabulário que .app-nav button já usava,
+   generalizado pra fora da navegação. */
+.btn-ghost {
+  background: none;
+  border-color: transparent;
+  color: var(--text);
+}
+
+.btn-ghost:hover {
+  background: var(--accent-bg);
+  color: var(--text-h);
+  border-color: transparent;
+}
+
+/* Quiet — reforça que a ação é a menos frequente/mais consequente do grupo
+   (hoje só Excluir), sem introduzir uma 3ª forma de botão — só reduz
+   presença via opacidade e tamanho de fonte. */
+.btn-quiet {
+  opacity: 0.72;
+  font-size: var(--text-xs);
+}
+
+/* Danger (Sprint 13) — só em Excluir, nunca em Vender/Quitar (não são
+   destrutivas). Ver --danger no bloco de cores acima para a justificativa
+   de matiz distinto do terracota de despesa. */
+.btn-danger {
+  color: var(--danger);
+}
+
+.btn-danger:hover {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
 a {
   color: var(--accent-text);
 }
@@ -311,6 +364,24 @@ input {
 .dash-list li {
   padding: 0;
   border-bottom: none;
+}
+
+/* Listas simples (Sprint 13) — Gestão de Contas e o diálogo de
+   sincronização: mesmo vocabulário de espaçamento/hover das outras listas
+   do app (sem borda entre itens, preenchimento --accent-bg no hover), mas
+   sem virar accordion — são <li> normais, não botões de expandir/recolher. */
+.simple-list li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: 8px;
+  border-bottom: none;
+}
+
+.simple-list li:hover {
+  background: var(--accent-bg);
 }
 
 .login-hero {
@@ -764,14 +835,28 @@ input {
   overflow-x: auto;
 }
 
+/* Tabela unificada (Sprint 13) — substitui as 3 linguagens divergentes que
+   existiam antes (.dash-table plano sem hover, .cat-review-table com
+   hover/densidade próprios, .nat-table sem hover nem sort). Decidida via
+   rodada impeccable (2 candidatas renderizadas em Artifact, CEO escolheu):
+   densidade compacta (padding vertical 6px, mais linhas visíveis por tela —
+   a fila de Categorização real tem centenas de itens) + hover só de
+   preenchimento de fundo (sem indicador de borda lateral — uma primeira
+   versão testada usava `border-left` por célula pra sinalizar a linha ativa,
+   e o CEO rejeitou porque criava uma linha vertical falsa entre colunas e
+   fazia o texto "pular" ao mudar padding no hover). table-layout: fixed +
+   colgroup em toda tabela do app (não só Categorização/Natureza como antes)
+   — ver DESIGN.md, seção Table, pra histórico da regra anterior. */
 .dash-table {
   min-width: 480px;
+  table-layout: fixed;
+  width: 100%;
 }
 
 .dash-table th,
 .dash-table td {
   text-align: left;
-  padding: var(--space-2) var(--space-3);
+  padding: 6px var(--space-3);
   border-bottom: 1px solid var(--border);
   font-size: var(--text-sm);
   white-space: nowrap;
@@ -779,10 +864,14 @@ input {
 
 .dash-table th {
   color: var(--text);
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   font-size: var(--text-xs);
   letter-spacing: 0.04em;
+}
+
+.dash-table tbody tr:hover {
+  background: var(--accent-bg);
 }
 
 .dash-table .pct-col {
@@ -798,6 +887,17 @@ input {
 
 .dash-table th.sortable:hover {
   color: var(--text-h);
+}
+
+.dash-table th.sortable[aria-sort="ascending"],
+.dash-table th.sortable[aria-sort="descending"] {
+  color: var(--accent-text);
+}
+
+.dash-table th.sortable[aria-sort="ascending"] button,
+.dash-table th.sortable[aria-sort="descending"] button {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .dash-table th.sortable .sort-arrow {
@@ -947,32 +1047,12 @@ input {
   color: var(--accent-text);
 }
 
-/* Polish de linha e densidade só na tabela de Categorização (superfície de
-   trabalho primária, diferente do nível "terminal" das tabelas de
-   drill-down) — classe aditiva sobre .dash-table, não um fork.
-   table-layout: fixed + <colgroup> em vez de auto: com auto, o navegador
-   dimensiona cada coluna só pelo conteúdo atual da página (uma Descrição
-   curta na tela não "puxa" espaço livre do restante da tabela, mesmo com
-   .dash-page sem teto de largura) — o teto de 520px testado antes nunca
-   era alcançado de verdade, e Ativo/Valor sobravam com espaço desproporcional.
-   Com largura fixa por coluna, Descrição/Categoria reivindicam sua fatia
-   (%) do espaço disponível sempre, e Ativo/Valor ficam justos ao conteúdo
-   real deles. Ordem: checkbox, Status, Data, Descrição, Categoria, Ativo,
+/* Colunas da tabela de Categorização — densidade/hover/table-layout:fixed já
+   vêm de .dash-table (unificado na Sprint 13); aqui só ficam as larguras de
+   coluna, que são específicas desta tabela. Descrição/Categoria reivindicam
+   sua fatia (%) do espaço disponível sempre, Ativo/Valor ficam justos ao
+   conteúdo real. Ordem: checkbox, Status, Data, Descrição, Categoria, Ativo,
    Valor, Ações. */
-.cat-review-table {
-  table-layout: fixed;
-  width: 100%;
-}
-
-.cat-review-table tbody tr:hover {
-  background: var(--accent-bg);
-}
-
-.cat-review-table th,
-.cat-review-table td {
-  padding: var(--space-2) var(--space-2);
-}
-
 .cat-review-table td {
   vertical-align: middle;
 }
@@ -1040,13 +1120,8 @@ input {
 }
 
 /* Tabela de classificação de Natureza (Sprint 12) — agrupada por
-   CategoryGroup via rowSpan na 1a coluna, mesma técnica table-layout:fixed
-   + colgroup da tabela de Categorização, com só 3 colunas. */
-.nat-table {
-  table-layout: fixed;
-  width: 100%;
-}
-
+   CategoryGroup via rowSpan na 1a coluna. Densidade/hover/table-layout:fixed
+   vêm de .dash-table; aqui só as larguras de coluna. */
 .nat-table .col-grupo {
   width: 28%;
 }
@@ -1077,6 +1152,46 @@ input {
 .cat-review-table th:nth-child(7),
 .cat-review-table td:nth-child(7) {
   text-align: right;
+}
+
+/* Tabela de transação unificada (Sprint 13) — drill-downs de Dashboard/
+   Natureza/Ativos/Passivos, via components/TransactionsTable.tsx. Colunas
+   Categoria/Ativo/% são condicionais (showCategoria/showAtivo/total) — o
+   colgroup no componente já reflete isso, então as classes de largura não
+   precisam de :nth-child. Descrição fica sem largura fixa (table-layout:fixed
+   dá o espaço restante pra ela, mesma técnica de .col-descricao em
+   .cat-review-table). */
+.txn-table .col-data {
+  width: 90px;
+}
+
+.txn-table .col-categoria {
+  width: 220px;
+}
+
+.txn-table .col-ativo {
+  width: 140px;
+}
+
+.txn-table .col-valor {
+  width: 110px;
+}
+
+.txn-table .col-percentual {
+  width: 70px;
+}
+
+/* Breakdown de Patrimônio (DashboardsPage) — 3 colunas fixas, 5 linhas. */
+.patrimonio-table .col-componente {
+  width: 55%;
+}
+
+.patrimonio-table .col-valor {
+  width: 30%;
+}
+
+.patrimonio-table .col-acoes {
+  width: 15%;
 }
 
 @media (max-width: 640px) {

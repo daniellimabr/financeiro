@@ -12,6 +12,8 @@ colors:
   receita: "#3f7d3f"
   despesa: "#b8562f"
   despesa-bg: "rgba(184, 86, 47, 0.1)"
+  danger: "#a3374a"
+  danger-bg: "rgba(163, 55, 74, 0.1)"
   bg-dark: "#18181b"
   surface-dark: "#212024"
   border-dark: "#2c2c31"
@@ -20,6 +22,8 @@ colors:
   accent-dark: "#5fc17e"
   receita-dark: "#5fc17e"
   despesa-dark: "#e0855c"
+  danger-dark: "#d9748c"
+  danger-bg-dark: "rgba(217, 116, 140, 0.14)"
 typography:
   display:
     fontFamily: "Archivo, system-ui, 'Segoe UI', Roboto, sans-serif"
@@ -68,6 +72,14 @@ components:
     padding: "8px 16px"
   button-secondary-hover:
     textColor: "{colors.accent}"
+  button-ghost:
+    backgroundColor: "transparent"
+    textColor: "{colors.text}"
+    rounded: "{rounded.sm}"
+    padding: "8px 16px"
+  button-ghost-hover:
+    backgroundColor: "{colors.accent-bg}"
+    textColor: "{colors.text-h}"
 ---
 
 # Design System: Financeiro v2
@@ -141,9 +153,26 @@ safe for direct use as text/numeral color.
   recorrente — the most "planted" of the three, cool and steady.
 - **Ochre** (`--nat-variavel`, `#7a6420` light / `#c9ac5c` dark): Variável
   recorrente — recurring but not fixed in amount.
-- **Plum** (`--nat-eventual`, `#7a5580` light / `#b98cc4` dark): Custo
-  eventual — the default for anything unclassified, least "anchored" of
-  the three.
+- **Plum** (`--nat-eventual`, `#7a5580` light / `#b98cc4` dark): Eventual —
+  the default for anything unclassified, least "anchored" of the three.
+  Labeled "Custo eventual" through Sprint 12; the CEO found the label
+  implied expense when natureza applies equally to receita, so Sprint 13
+  shortened it to "Eventual" everywhere (card, funil, tabela de
+  classificação) — cosmetic rename only, `--nat-eventual` and the enum
+  value `eventual` are unchanged.
+
+### Quaternary — Danger (Sprint 13)
+The system's first warning/destructive color, added when the redesign gave
+Excluir a first-class visual treatment. Decided via a rendered-comparison
+Impeccable round (Artifact, CEO chose to introduce it rather than ship
+Excluir with no color at all).
+- **Wine** (`--danger`, `#a3374a` light / `#d9748c` dark): scoped to the
+  `Excluir` action only — never Vender/Quitar, which end an asset/
+  liability's active life but do not delete data. Deliberately a cool,
+  pinkish red, distinct in hue from the warm-orange `--despesa` terracotta
+  so the eye never reads "this destroys data" as "this is an expense," or
+  vice versa — see the One Meaning Rule below, which this token does not
+  reopen (it is independent, not a reuse of `--despesa`).
 
 ### Neutral
 - **Sage Mist** (`#f5f6f1` light / `#18181b` dark): page background.
@@ -156,10 +185,10 @@ safe for direct use as text/numeral color.
 - **Ink** (`#22231d` light / `#ececee` dark): headings and tile values.
 
 ### Named Rules
-**The One Meaning Rule.** Terracotta means despesa and nothing else. If a
-future screen needs a warning or destructive color, it must not reuse
-`despesa` — that would teach the user's eye to misread money as danger, or
-danger as an expense total.
+**The One Meaning Rule.** Terracotta means despesa and nothing else. It
+must never be reused for a warning or destructive color — see `--danger`
+above (Sprint 13), added specifically so a future screen never has to
+reach for `despesa` to signal risk.
 
 ## Typography
 
@@ -256,15 +285,33 @@ read as "a form field" rather than "a bubble."
   filter chrome): `var(--surface)` background, `var(--text-h)` label,
   border shifts to `var(--accent)` on hover — no background fill change.
   `disabled` drops to `0.5` opacity with a not-allowed cursor.
-- **Ghost** (sidebar nav items, drill-down/accordion rows): no border,
-  background transparent at rest, fills `var(--accent-bg)` on hover/active
-  — see Navigation below for the "you are here" vocabulary this carries for
-  nav specifically.
+- **Ghost** (sidebar nav items, drill-down/accordion rows, and — since
+  Sprint 13 — the `.btn-ghost` class for secondary actions in plain button
+  groups): no border, background transparent at rest, fills
+  `var(--accent-bg)` on hover/active. Through Sprint 12 this vocabulary only
+  existed baked into `.app-nav button`/`.dash-row`, each reimplementing the
+  same look; Sprint 13 generalized it into a reusable `.btn-ghost` class for
+  the Ativos/Passivos card button groups (Editar/Vender/Quitar), leaving nav
+  and accordion rows on their own selectors since those also carry the
+  active-state vocabulary described under Navigation below. `.btn-quiet`
+  (opacity `0.72`, smaller label) stacks on top of `.btn-ghost` to de-
+  emphasize the least frequent/most consequential action in a group — today
+  only `Excluir`, which also stacks `.btn-danger` (`var(--danger)` text,
+  `var(--danger-bg)` on hover — see Colors → Quaternary).
 - **The One Button Rule.** There is exactly one visual button system in the
-  app. A page that needs a button reaches for the base element, never a
+  app. A page that needs a button reaches for the base element (or the
+  Ghost/Quiet/Danger modifier classes above — additive, not a fork) never a
   bespoke class — `TransactionsPage`'s sync button and `DashboardsPage`'s
   clickable tile share the same `border-radius`/`border`/`hover` contract
   even though one is plain and one is a `.dash-tile`.
+- **Card button hierarchy (Ativos/Passivos, Sprint 13).** Only "Ver gasto no
+  período" stays Default — the card already surfaces the cost history via
+  its sparkline, so that button is the natural continuation of what the
+  card already shows. Editar/Vender/Quitar/Excluir are all Ghost: no
+  management action competes visually with reading the history, and none of
+  them needs the weight Default implies. Decided via a rendered-comparison
+  Impeccable round (two candidates, Editar-primary vs. Vender/Quitar-
+  primary, both rejected in favor of "only the read action is primary").
 
 ### Cards / Containers ("tiles")
 - **Corner Style:** `12px` radius.
@@ -345,10 +392,48 @@ replaced its own contents per drill level. Sprint 6 replaced both with the
 accordion described above — multiple categorias can be open at once, so a
 single linear trail could no longer describe "where you are."
 
-### Table (linha de extrato)
-Bottom-bordered rows, uppercase 12px labels for headers, no zebra striping,
-no row hover background beyond the default row border — the table is the
-terminal, plainest level of the funnel by design.
+### Table (`.dash-table`, unified — Sprint 13)
+One table language for every `<table>` in the app: `table-layout: fixed`
+with an explicit `<colgroup>` (every table now declares one — no more
+browser-auto column sizing), bottom-bordered rows, uppercase 12px labels
+for headers (`font-weight: 700`), no zebra striping, `6px` vertical padding
+(denser than the Sprint 5 default so a busy page like Categorização shows
+more rows at once), and a full-row `var(--accent-bg)` hover fill — the same
+fill the rest of the app already uses for "you're pointing at this," not a
+new idiom. Ordering columns (`.sortable` + `useTableSort`/`SortableHeader`)
+get an underline + `var(--accent-text)` on the active column, on top of the
+existing ▲/▼ direction glyph.
+
+**History:** through Sprint 12, `.dash-table` was deliberately flat — "the
+terminal, plainest level of the funnel by design," no hover, no sort on
+most tables — and three divergent dialects had grown on top of it:
+`.cat-review-table` (Sprint 11, the only one with hover/density/sort),
+`.nat-table` (Sprint 12, structured but static), and three separately
+hand-rolled "transaction table" implementations in
+`DashboardsPage`/`AssetsPage`/`LiabilitiesPage`. The CEO used the app
+enough to notice the inconsistency and asked to reopen the rule; Sprint 13
+picked a direction via a rendered-comparison Impeccable round (Artifact,
+two candidates: "Comfortable" — `.cat-review-table`'s existing look
+extended everywhere — vs. "Structured" — denser, with a border-left hover
+indicator). The shipped result is a hybrid the CEO asked for directly after
+seeing both: Structured's density, Comfortable's hover (a per-cell
+`border-left` indicator in the Structured candidate created a false
+vertical line between columns and made cell text visibly shift on hover —
+rejected on sight). `TransactionsTable.tsx` (a new shared component) now
+backs all three former "transaction table" implementations, and
+`AssetDrilldown` gained Categoria (editable) and sort columns it never had
+before — a deliberate behavior change, not just a visual one (see
+PRD-013).
+
+### Simple lists (`.simple-list`, Sprint 13)
+Gestão de Contas' connected-accounts list and the sync dialog's account
+checklist are plain `<li>` rows, not accordion buttons — they never
+expand — but Sprint 13 gave them the same spacing/hover vocabulary as every
+other list in the app (`padding` + `border-radius: 8px` per row,
+`var(--accent-bg)` fill on hover, no border between rows) so they stop
+reading as unstyled HTML next to `.dash-row`/`.dash-table`. This is
+presentation only: `.simple-list` adds no button semantics, no chevron, no
+expand state — a row that isn't interactive stays exactly that.
 
 ## Do's and Don'ts
 

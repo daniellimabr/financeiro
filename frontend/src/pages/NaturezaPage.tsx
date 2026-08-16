@@ -10,6 +10,7 @@ import {
 } from "../api/dashboards";
 import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
+import { SortableHeader } from "../components/SortableHeader";
 import { TransactionsTable } from "../components/TransactionsTable";
 import { useCategoryGroups } from "../hooks/useCategoryGroups";
 import { useDashboardByCategoria } from "../hooks/useDashboardByCategoria";
@@ -57,6 +58,10 @@ export function NaturezaPage() {
   const [selectedNatureza, setSelectedNatureza] = useState<NaturezaValue | null>(null);
   const [expandedGrupos, setExpandedGrupos] = useState<number[]>([]);
   const [expandedSubcategorias, setExpandedSubcategorias] = useState<number[]>([]);
+  const [classificacaoSortKey, setClassificacaoSortKey] = useState<"grupo" | "subcategoria">(
+    "grupo"
+  );
+  const [classificacaoDirection, setClassificacaoDirection] = useState<"asc" | "desc">("asc");
 
   const filter: { ano: number; mes: number } = { ano, mes };
 
@@ -103,6 +108,35 @@ export function NaturezaPage() {
       }))
       .filter((entry) => entry.subcategorias.length > 0);
   }, [groups, subcategories]);
+
+  // Sort da tabela de classificação: "Categoria" reordena os blocos de
+  // grupo (mantém o agrupamento por rowSpan); "Subcategoria" reordena as
+  // linhas dentro de cada grupo, sem mexer na ordem dos grupos. Só uma
+  // coluna ativa por vez, mesmo padrão de useTableSort nas outras tabelas —
+  // não reaproveita o hook porque o dado aqui é hierárquico (grupo →
+  // subcategorias), não uma lista plana.
+  const gruposComSubcategoriasOrdenados = useMemo(() => {
+    const cmp = (a: string, b: string) =>
+      a.localeCompare(b) * (classificacaoDirection === "asc" ? 1 : -1);
+    const entries = gruposComSubcategorias.map((entry) =>
+      classificacaoSortKey === "subcategoria"
+        ? { group: entry.group, subcategorias: [...entry.subcategorias].sort((a, b) => cmp(a.nome, b.nome)) }
+        : entry
+    );
+    if (classificacaoSortKey === "grupo") {
+      entries.sort((a, b) => cmp(a.group.nome, b.group.nome));
+    }
+    return entries;
+  }, [gruposComSubcategorias, classificacaoSortKey, classificacaoDirection]);
+
+  function toggleClassificacaoSort(key: "grupo" | "subcategoria") {
+    if (key === classificacaoSortKey) {
+      setClassificacaoDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setClassificacaoSortKey(key);
+      setClassificacaoDirection("asc");
+    }
+  }
 
   function toggleNatureza(natureza: NaturezaValue) {
     setSelectedNatureza((prev) => (prev === natureza ? null : natureza));
@@ -217,13 +251,25 @@ export function NaturezaPage() {
           </colgroup>
           <thead>
             <tr>
-              <th>Categoria</th>
-              <th>Subcategoria</th>
+              <SortableHeader
+                label="Categoria"
+                sortKeyName="grupo"
+                currentKey={classificacaoSortKey}
+                direction={classificacaoDirection}
+                onClick={() => toggleClassificacaoSort("grupo")}
+              />
+              <SortableHeader
+                label="Subcategoria"
+                sortKeyName="subcategoria"
+                currentKey={classificacaoSortKey}
+                direction={classificacaoDirection}
+                onClick={() => toggleClassificacaoSort("subcategoria")}
+              />
               <th>Natureza</th>
             </tr>
           </thead>
           <tbody>
-            {gruposComSubcategorias.map(({ group, subcategorias }) =>
+            {gruposComSubcategoriasOrdenados.map(({ group, subcategorias }) =>
               subcategorias.map((sub, index) => (
                 <tr key={sub.id}>
                   {index === 0 && <td rowSpan={subcategorias.length}>{group.nome}</td>}
