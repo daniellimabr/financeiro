@@ -14,7 +14,7 @@ Fases em épicos, derivados do escopo funcional do bootstrap. PRDs individuais s
 | E6 | Dashboards analíticos ✅ | Tendência histórica, percentual de representatividade, despesas por ativo (itens 4, 5, 6) — parte 1 (tendência/percentual/design system) ✅ Sprint 6; parte 2 (Gestão de Ativos) ✅ Sprint 8; parte 3 (cards Ativos/Passivos, drilldowns, refinamentos de Dashboard) ✅ Sprint 9 — épico fechado. Patrimônio/evolução de investimentos segue adiado por falta de série histórica no schema |
 | E7 | Conta e perfil | Perfil de usuário, logout, multiusuário (item 11); tela de Configurações (absorve Gestão de Contas) + regra de competência de salário — planejada como Sprint 15 |
 | E8 | Migração de dados legados ✅ | Import de categorias (Sprint 2) + memória de classificação do v1 (Sprint 4) — concluído em 2026-08-14 |
-| E9 | Natureza e projeção de custos | Classificação de subcategoria por natureza (fixo recorrente/variável recorrente/eventual) + dashboard de visibilidade — ✅ Sprint 12 (2026-08-16); rótulo "Eventual", funil Natureza>Categoria>Subcategoria>Transação e redesign de tabelas/botões do app — ✅ Sprint 13 (2026-08-16); projeção de custos futuros (receita/despesa/saldo) com simulação efêmera de hipotéticas — Sprint 14 (planejada, `/plan` própria em 2026-08-16) — épico fecha ao término da Sprint 14 |
+| E9 | Natureza e projeção de custos ✅ | Classificação de subcategoria por natureza (fixo recorrente/variável recorrente/eventual) + dashboard de visibilidade — ✅ Sprint 12 (2026-08-16); rótulo "Eventual", funil Natureza>Categoria>Subcategoria>Transação e redesign de tabelas/botões do app — ✅ Sprint 13 (2026-08-16); projeção de custos futuros (receita/despesa/saldo) com simulação efêmera de hipotéticas — ✅ Sprint 14 (2026-08-16) — épico fechado |
 
 Backlog futuro (não desenhar agora): sync Pluggy agendada, otimização para comercialização/escala >10 usuários, reavaliação do plugin Understand Anything quando o codebase passar de ~100 arquivos.
 
@@ -459,7 +459,7 @@ PRD: [PRD-013-natureza-funil-e-redesign-tabelas.md](prd/PRD-013-natureza-funil-e
 Plano: [SPRINT-013-natureza-funil-e-redesign-tabelas-plan.md](sprints/SPRINT-013-natureza-funil-e-redesign-tabelas-plan.md).
 Relatório: [SPRINT-013-natureza-funil-e-redesign-tabelas-report.md](sprints/SPRINT-013-natureza-funil-e-redesign-tabelas-report.md).
 
-### Sprint 14 — Projeção de custos futuros com despesas hipotéticas (E9, fecha o épico)
+### Sprint 14 — Projeção de custos futuros com despesas hipotéticas (E9, fecha o épico) ✅ concluída em 2026-08-16
 
 Planejada em sessão própria (2026-08-16), a partir de um título de roadmap
 sem PRD (herdado da divisão Sprint 12/13/14 feita na sessão de planejamento
@@ -486,8 +486,31 @@ combinando histórico real (linha sólida) e projeção (linha tracejada),
 "hipotéticas" (linhas ad-hoc única ou mensal, recalcula cards/gráfico no
 cliente sem chamada de API). Sem migration.
 
+Implementada em sessão própria (2026-08-16): `_future_month_range()` +
+`get_projecao()` em `app/dashboards/service.py` (dataclass `PontoProjecao`),
+endpoint `GET /dashboards/projecao?ano=&mes=&meses_futuros=&janela_media=`;
+tela nova `ProjecaoPage.tsx` (entre "Natureza" e "Gestão de contas"),
+`components/ProjectionChart.tsx` novo (primeiro gráfico do projeto a
+combinar histórico real e projeção na mesma série visual — mês-base
+compartilhado entre os dois campos do dado do gráfico conecta a linha
+sólida à tracejada sem gap), `utils/projecao.ts` (`applyHipoteticas`, lógica
+pura, 100% local). 114 testes backend novos (324 no total, 100% em
+`app/dashboards/`) + 12 testes frontend novos (144 no total), suíte
+completa verde. Deploy na VM de dev e validação ao vivo via
+`scripts/browser-check/check-sprint14.mjs` (novo) — a primeira rodada
+encontrou um bug real: `crypto.randomUUID()` não existe fora de secure
+context, e a VM de dev serve por HTTP puro (porta 8080, sem TLS), então o
+botão "Adicionar" hipotética quebrava em produção apesar de passar limpo
+localmente (Vite dev server e Vitest/jsdom contam como secure context) —
+corrigido com um gerador de id local sem dependência de Web Crypto,
+revalidado com sucesso (desktop+mobile, sem erros de console, hipotética
+única/mensal recalculando os cards sem chamada de rede nova, remover
+restaurando os valores originais, troca de horizonte disparando query
+nova).
+
 PRD: [PRD-014-projecao-custos-hipoteticas.md](prd/PRD-014-projecao-custos-hipoteticas.md).
 Plano: [SPRINT-014-projecao-custos-hipoteticas-plan.md](sprints/SPRINT-014-projecao-custos-hipoteticas-plan.md).
+Relatório: [SPRINT-014-projecao-custos-hipoteticas-report.md](sprints/SPRINT-014-projecao-custos-hipoteticas-report.md).
 
 ## Registro de reavaliações futuras
 
