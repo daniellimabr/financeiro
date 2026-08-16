@@ -588,6 +588,28 @@ na prática pós-Sprint 9 (não coberta por PRD anterior) — ver
   para `1800px`, aumentando a ocupação de tela de forma padronizada em
   Dashboards/Categorização/Ativos/Passivos/Gestão de Contas sem precisar
   tocar cada página individualmente.
+- **Segunda rodada de feedback (mesmo dia):** `.dash-page` perdeu o teto
+  de largura de vez (`max-width` removido — 1800px ainda deixava espaço
+  vazio em telas largas). Dentro da tabela de Categorização, as caixas de
+  Descrição/Categoria continuavam cortando texto mesmo com mais espaço
+  na página, e sobrava espaço excessivo entre Ativo/Valor — causa raiz:
+  `.dash-table` usa `table-layout: auto`, que dimensiona cada coluna só
+  pelo conteúdo da página atual, não pelo `max-width` do elemento
+  interno. `cat-review-table` passou a usar `table-layout: fixed` +
+  `<colgroup>` explícito (Descrição 32%, Categoria 26%, Ativo/Valor fixos
+  e justos ao conteúdo real), com `max-width: 200px` genérico de
+  `.dash-table` cancelado (`max-width: none` + `width: 100%`) só nessas
+  colunas — agora a caixa de texto sempre ocupa a coluna inteira, e a
+  coluna sempre reivindica sua fatia do espaço disponível.
+- **Lição de deploy (mesma sessão):** redeploy na VM de dev rodado
+  segundos depois do `git push`, antes do CI publicar a imagem nova no
+  GHCR (`:latest` só muda depois do job `build-and-push`, que roda
+  depois de `backend`/`frontend` passarem — leva minutos) — `docker
+  compose pull` trouxe silenciosamente a imagem *anterior*, sem erro
+  algum, então o CEO seguiu vendo a versão antiga mesmo após o "deploy".
+  Corrigido consultando o status do run do GitHub Actions pro commit
+  exato via API antes de fazer pull; documentado como regra permanente em
+  [ssh-workflow.md](../infra/ssh-workflow.md).
 
 ## Qualidade (Sprint 1 → Sprint 11)
 

@@ -84,6 +84,17 @@ A VM de dev roda um clone do repositório. O fluxo de edição é:
    roda **`git pull`** para pegar o estado mais recente.
 4. Nunca editar código diretamente na VM de dev — o notebook é sempre a fonte da verdade;
    a VM só executa.
+5. `docker compose pull` na VM só baixa a imagem que já está publicada no GHCR — o job
+   `build-and-push` do CI publica em `:latest` só depois que `backend`/`frontend` passam,
+   o que leva alguns minutos. Fazer o pull logo após o `push` (antes do CI terminar) traz
+   silenciosamente a imagem **anterior**, sem nenhum erro — parece um deploy bem-sucedido,
+   mas não é o código novo (achado real na Sprint 11: CEO viu a versão antiga mesmo depois
+   do "deploy"). **Sempre confirmar `conclusion: success` do workflow do GitHub Actions pro
+   commit exato** (via API, `GET /repos/daniellimabr/financeiro/actions/runs?branch=main` e
+   comparar `head_sha`) antes de rodar `docker compose pull` — não confiar em comparar o
+   timestamp de criação da imagem (`docker inspect --format='{{.Created}}'`) contra o
+   horário do commit local; há discrepância de relógio entre esta máquina e o servidor do
+   GitHub grande o suficiente pra invalidar essa checagem.
 
 ## Regras
 

@@ -215,7 +215,60 @@ badge trocada por asserção de `aria-label` do ícone); suíte completa
 rodada de novo — 109/109 verdes, `tsc`/`eslint`/`prettier` limpos.
 `check-categorizacao.mjs` atualizado para procurar `.status-icon` no
 lugar de `.status-badge`. `DESIGN.md` (seção Layout) e docs vivos
-atualizados para refletir o novo `max-width`. Mesma pendência de antes
-continua: validação ao vivo na VM de dev não rodou (sem token) — o
-ajuste de layout também não foi visto rendendo de verdade, só validado
-por teste automatizado e leitura de CSS.
+atualizados para refletir o novo `max-width`.
+
+### Deploy: VM ficou 4 commits atrás, depois redeploy prematuro
+
+Antes de qualquer um dos ajustes acima, o CEO reportou que a VM de dev
+"não parecia estar com a versão mais atual" — investigação confirmou:
+a VM estava parada no commit de aprovação da Sprint 10 (`f58285d`),
+sem nenhum dos 4 commits desta sprint. Causa: o fluxo de deploy na VM
+de dev (`git pull` + `docker compose pull` + `docker compose up -d`)
+não tinha sido executado depois dos commits desta sessão — só acontece
+quando alguém (CEO ou eu) roda explicitamente, não é automático.
+Corrigido rodando o fluxo manualmente.
+
+No processo, cometi um erro sequencial: fiz `docker compose pull`
+segundos depois do `git push`, sem esperar o CI (que builda e publica as
+imagens Docker no GHCR — job `build-and-push`, depois de `backend`+
+`frontend` passarem) terminar. `:latest` no GHCR só muda quando o CI
+publica; pull antes disso silenciosamente traz a imagem *anterior*, sem
+erro nenhum — por isso o CEO ainda via o badge de texto mesmo depois do
+"deploy". Comparar o timestamp de criação da imagen (`docker inspect
+--format='{{.Created}}'`) com o horário do commit confirmou o diagnóstico
+(imagem mais velha que o push). Fix: consultar o status do run do GitHub
+Actions pra esse commit exato via API
+(`/repos/.../actions/runs?branch=main`, `head_sha` == commit atual) antes
+de fazer pull — só re-deployar quando `status: completed`+
+`conclusion: success` pra aquele SHA específico. Comparar timestamp de
+imagem contra horário de commit local não é confiável (há discrepância
+de relógio entre a máquina local e o servidor do GitHub — não
+investigada a fundo, mas consistente o suficiente pra invalidar esse
+método de verificação).
+
+**Lição para deploys futuros na VM de dev:** depois de um `git push`,
+sempre confirmar `conclusion: success` do workflow CI pro commit exato
+antes de `docker compose pull` — nunca assumir que o pull pegou a versão
+esperada só porque o comando não deu erro.
+
+### Rodada 2: colunas não aproveitavam o espaço mesmo maiores
+
+Depois do ajuste acima, o CEO reportou que a coluna Descrição estava
+maior mas as caixas de texto continuavam cortando o conteúdo, e que
+sobrava espaço excessivo entre Ativo e Valor. Causa raiz: `.dash-table`
+usa `table-layout: auto` (padrão) — o navegador dimensiona cada coluna
+pelo conteúdo *daquela página específica*, não pelo `max-width` do
+elemento interno; uma Descrição curta na tela não "puxa" o espaço livre
+da tabela mesmo com `.dash-page` sem teto de largura, e o espaço sobra
+onde o algoritmo automático decidir (nesse caso, entre Ativo e Valor).
+Corrigido com `table-layout: fixed` + `<colgroup>` explícito por coluna
+(Descrição 32%, Categoria 26%, Ativo/Valor fixos e justos ao conteúdo
+real — 140px/110px), removendo o `max-width: 200px` genérico de
+`.dash-table td button/input/select` só para essas colunas (`max-width:
+none` + `width: 100%`) — agora a caixa de texto sempre ocupa a coluna
+inteira, que por sua vez sempre reivindica sua fatia (%) do espaço
+disponível, não só quando o conteúdo específico da página é longo.
+
+Mesma pendência de antes: nenhuma das três rodadas foi vista renderizada
+de verdade — validação ao vivo na VM de dev segue bloqueada por falta de
+`FINANCEIRO_SESSION_TOKEN`.
