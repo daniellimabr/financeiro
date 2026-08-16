@@ -37,17 +37,11 @@ import {
   type PontoTendencia,
   type TransacaoTipo,
 } from "../api/dashboards";
-import type { PluggyTransaction } from "../api/pluggy";
 import { AccountTipoIcon } from "../components/AccountTipoIcon";
 import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
-import {
-  AssetSelectCell,
-  CategorySelectCell,
-  DescriptionCell,
-} from "../components/TransactionEditCells";
+import { TransactionsTable } from "../components/TransactionsTable";
 import { useAssetGastos } from "../hooks/useAssetGastos";
-import { useAssets } from "../hooks/useAssets";
 import { useCategoryGroups } from "../hooks/useCategoryGroups";
 import { useDashboardByCategoria } from "../hooks/useDashboardByCategoria";
 import { useDashboardCategoriaTendencia } from "../hooks/useDashboardCategoriaTendencia";
@@ -55,10 +49,8 @@ import { useDashboardSummary } from "../hooks/useDashboardSummary";
 import { useDashboardTendencia } from "../hooks/useDashboardTendencia";
 import { useLiabilityGastos } from "../hooks/useLiabilityGastos";
 import { usePatrimonioBreakdown } from "../hooks/usePatrimonioBreakdown";
-import { usePluggyTransactions } from "../hooks/usePluggyTransactions";
 import { useSaldoPorConta } from "../hooks/useSaldoPorConta";
 import { useSubcategories } from "../hooks/useSubcategories";
-import { useTableSort } from "../hooks/useTableSort";
 import {
   buildGroupColorIndex,
   buildSubcategoryTintIndex,
@@ -528,7 +520,7 @@ function SubcategoriaAccordion({
               />
               {expandedSubcategorias.includes(item.subcategory_id) && (
                 <div className="dash-accordion-panel">
-                  <TransacoesPanel
+                  <TransactionsTable
                     filter={filter}
                     categoriaId={item.subcategory_id}
                     tipo={tipo}
@@ -586,7 +578,7 @@ function AtivosAccordion({
             />
             {expandedRows.includes(item.asset_id) && (
               <div className="dash-accordion-panel">
-                <TransacoesPanel
+                <TransactionsTable
                   filter={filter}
                   assetId={item.asset_id}
                   tipo={tipo}
@@ -640,7 +632,7 @@ function PassivosAccordion({
             />
             {expandedRows.includes(item.liability_id) && (
               <div className="dash-accordion-panel">
-                <TransacoesPanel
+                <TransactionsTable
                   filter={filter}
                   liabilityId={item.liability_id}
                   tipo="debito"
@@ -760,173 +752,6 @@ function PatrimonioBreakdownPanel({
         </tbody>
       </table>
     </div>
-  );
-}
-
-type TransacaoSortKey = "data" | "descricao" | "valor" | "percentual";
-
-export function TransacoesPanel({
-  filter,
-  categoriaId,
-  assetId,
-  liabilityId,
-  tipo,
-  totalParaPercentual,
-  emptyMessage,
-}: {
-  filter: PeriodoFiltro;
-  categoriaId?: number;
-  assetId?: number;
-  liabilityId?: number;
-  tipo?: TransacaoTipo;
-  totalParaPercentual?: string;
-  emptyMessage: string;
-}) {
-  const query = usePluggyTransactions({
-    ano: filter.ano,
-    mes: filter.mes,
-    subcategoryId: categoriaId,
-    assetId,
-    liabilityId,
-    tipo,
-    competencia: true,
-  });
-  const { data: subcategories } = useSubcategories();
-  const { data: groups } = useCategoryGroups();
-  const { data: assets } = useAssets();
-  const data = query.data ?? [];
-  const total = totalParaPercentual !== undefined ? Number(totalParaPercentual) : undefined;
-
-  const { sorted, sortKey, direction, toggleSort } = useTableSort<
-    PluggyTransaction,
-    TransacaoSortKey
-  >(
-    data,
-    (item, key) => {
-      switch (key) {
-        case "valor":
-          return Number(item.valor);
-        case "percentual":
-          return total !== undefined && total > 0 ? Math.abs(Number(item.valor)) / total : 0;
-        case "data":
-          return item.data;
-        case "descricao":
-          return item.descricao;
-      }
-    },
-    "data",
-    "desc"
-  );
-
-  if (query.isLoading) return <p>Carregando...</p>;
-  if (query.isError) return <p role="alert">Não foi possível carregar as transações.</p>;
-  if (data.length === 0) return <p className="dash-empty">{emptyMessage}</p>;
-
-  return (
-    <div className="dash-table-wrap">
-      <table className="dash-table">
-        <thead>
-          <tr>
-            <SortableHeader
-              label="Data"
-              sortKeyName="data"
-              currentKey={sortKey}
-              direction={direction}
-              onClick={() => toggleSort("data")}
-            />
-            <SortableHeader
-              label="Descrição"
-              sortKeyName="descricao"
-              currentKey={sortKey}
-              direction={direction}
-              onClick={() => toggleSort("descricao")}
-            />
-            <th>Categoria</th>
-            <th>Ativo</th>
-            <SortableHeader
-              label="Valor"
-              sortKeyName="valor"
-              currentKey={sortKey}
-              direction={direction}
-              onClick={() => toggleSort("valor")}
-            />
-            {total !== undefined && (
-              <SortableHeader
-                label="%"
-                sortKeyName="percentual"
-                currentKey={sortKey}
-                direction={direction}
-                onClick={() => toggleSort("percentual")}
-              />
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((transaction) => {
-            const percentual =
-              total !== undefined && total > 0
-                ? (Math.abs(Number(transaction.valor)) / total) * 100
-                : 0;
-            return (
-              <tr key={transaction.id}>
-                <td>{transaction.data}</td>
-                <td>
-                  <DescriptionCell transaction={transaction} />
-                </td>
-                <td>
-                  <CategorySelectCell
-                    transaction={transaction}
-                    subcategories={subcategories}
-                    groups={groups}
-                  />
-                </td>
-                <td>
-                  <AssetSelectCell transaction={transaction} assets={assets} />
-                </td>
-                <td>
-                  <span className="valor-cell">
-                    <AccountTipoIcon tipo={transaction.account_tipo} />
-                    {formatCurrency(transaction.valor)}
-                  </span>
-                </td>
-                {total !== undefined && <td className="pct-col">{formatPercent(percentual)}</td>}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function SortableHeader({
-  label,
-  sortKeyName,
-  currentKey,
-  direction,
-  onClick,
-}: {
-  label: string;
-  sortKeyName: TransacaoSortKey;
-  currentKey: TransacaoSortKey;
-  direction: "asc" | "desc";
-  onClick: () => void;
-}) {
-  const active = currentKey === sortKeyName;
-  return (
-    <th
-      className="sortable"
-      aria-sort={active ? (direction === "asc" ? "ascending" : "descending") : "none"}
-    >
-      <button type="button" onClick={onClick}>
-        {label}
-        {active && (
-          <span className="sort-arrow" aria-hidden="true">
-            {direction === "asc" ? "▲" : "▼"}
-          </span>
-        )}
-      </button>
-    </th>
   );
 }
 

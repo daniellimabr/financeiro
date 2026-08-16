@@ -9,13 +9,13 @@ import type {
 } from "../api/dashboards";
 import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
+import { TransactionsTable } from "../components/TransactionsTable";
 import { TrendChart } from "../components/TrendChart";
 import { useAssetGastos } from "../hooks/useAssetGastos";
 import { useAssetGastosTendencia } from "../hooks/useAssetGastosTendencia";
 import { useAssets } from "../hooks/useAssets";
 import { useCreateAsset } from "../hooks/useCreateAsset";
 import { useDeleteAsset } from "../hooks/useDeleteAsset";
-import { usePluggyTransactions } from "../hooks/usePluggyTransactions";
 import { useSellAsset } from "../hooks/useSellAsset";
 import { useUpdateAsset } from "../hooks/useUpdateAsset";
 import { formatCurrency } from "../utils/format";
@@ -368,21 +368,13 @@ function AssetDrilldown({
   pontos: PontoTendencia[] | undefined;
 }) {
   const gastosQuery = useAssetGastos(tipo, filter);
-  const transactionsQuery = usePluggyTransactions({
-    ano: filter.ano,
-    mes: filter.mes,
-    assetId,
-    tipo,
-    competencia: true,
-  });
 
   const total = gastosQuery.data?.find((item) => item.asset_id === assetId)?.total ?? "0";
-  const transacoes = transactionsQuery.data ?? [];
   const color = tipo === "credito" ? "var(--receita)" : "var(--despesa)";
   const rotulo = tipo === "credito" ? "Receita" : "Gasto";
 
-  if (gastosQuery.isLoading || transactionsQuery.isLoading) return <p>Carregando...</p>;
-  if (gastosQuery.isError || transactionsQuery.isError) {
+  if (gastosQuery.isLoading) return <p>Carregando...</p>;
+  if (gastosQuery.isError) {
     return <p role="alert">Não foi possível carregar o gasto do ativo.</p>;
   }
 
@@ -392,30 +384,13 @@ function AssetDrilldown({
       <p>
         {rotulo} no período: <strong style={{ color }}>{formatCurrency(total)}</strong>
       </p>
-      {transacoes.length === 0 ? (
-        <p className="dash-empty">Nenhuma transação vinculada neste período.</p>
-      ) : (
-        <div className="dash-table-wrap">
-          <table className="dash-table">
-            <thead>
-              <tr>
-                <th>Data</th>
-                <th>Descrição</th>
-                <th>Valor</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transacoes.map((transaction) => (
-                <tr key={transaction.id}>
-                  <td>{transaction.data}</td>
-                  <td>{transaction.descricao}</td>
-                  <td>{formatCurrency(transaction.valor)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <TransactionsTable
+        filter={filter}
+        assetId={assetId}
+        tipo={tipo}
+        showAtivo={false}
+        emptyMessage="Nenhuma transação vinculada neste período."
+      />
     </>
   );
 }

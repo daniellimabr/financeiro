@@ -271,6 +271,60 @@ describe("LiabilitiesPage", () => {
     expect(grid.contains(funnel)).toBe(false);
   });
 
+  it("the drilldown table can be sorted by Data/Valor", async () => {
+    const TX_A = { ...TRANSACAO_FIXTURE, id: 1, data: "2026-01-10", valor: "-1200.00" };
+    const TX_B = {
+      ...TRANSACAO_FIXTURE,
+      id: 2,
+      data: "2026-01-20",
+      descricao: "Parcela 2",
+      valor: "-50.00",
+    };
+
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url === "/liabilities") return Promise.resolve(jsonResponse([LIABILITY_ATIVO]));
+      if (url.startsWith("/dashboards/por-passivo")) {
+        return Promise.resolve(
+          jsonResponse([
+            { liability_id: 1, liability_nome: "Financiamento carro", total: "1250.00" },
+          ])
+        );
+      }
+      if (url.startsWith("/pluggy/transactions")) return Promise.resolve(jsonResponse([TX_A, TX_B]));
+      if (url.startsWith("/subcategories")) return Promise.resolve(jsonResponse([]));
+      if (url.startsWith("/category-groups")) return Promise.resolve(jsonResponse([]));
+      if (url.startsWith("/assets")) return Promise.resolve(jsonResponse([]));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<LiabilitiesPage />);
+    await screen.findByText("Financiamento carro");
+
+    const grid = screen.getByText("Financiamento carro").closest(".dash-tile") as HTMLElement;
+    await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
+
+    await screen.findByRole("button", { name: "Parcela financiamento" });
+    const table = screen.getByRole("button", { name: "Parcela financiamento" }).closest("table") as HTMLElement;
+    const rowsInOrder = () =>
+      within(table)
+        .getAllByRole("row")
+        .slice(1)
+        .map((row) => row.textContent);
+
+    // ordem inicial: data desc (default) — "Parcela 2" (dia 20) antes de "Parcela financiamento" (dia 10)
+    expect(rowsInOrder()[0]).toContain("Parcela 2");
+
+    await userEvent.click(within(table).getByRole("button", { name: /Valor/ }));
+    expect(rowsInOrder()[0]).toContain("Parcela financiamento"); // -1200 é o menor valor (asc)
+
+    await userEvent.click(within(table).getByRole("button", { name: /Valor/ }));
+    expect(rowsInOrder()[0]).toContain("Parcela 2"); // -50 é o maior valor (desc)
+  });
+
   it("renders a sparkline on the card when trend data is available", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);

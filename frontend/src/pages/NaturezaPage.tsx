@@ -10,6 +10,7 @@ import {
 } from "../api/dashboards";
 import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
+import { TransactionsTable } from "../components/TransactionsTable";
 import { useCategoryGroups } from "../hooks/useCategoryGroups";
 import { useDashboardByCategoria } from "../hooks/useDashboardByCategoria";
 import { useDashboardByNatureza } from "../hooks/useDashboardByNatureza";
@@ -24,7 +25,7 @@ import {
   naturezaLabel,
   type NaturezaValue,
 } from "../utils/naturezaLabels";
-import { Row, TransacoesPanel } from "./DashboardsPage";
+import { Row } from "./DashboardsPage";
 
 function toggleId(list: number[], id: number): number[] {
   return list.includes(id) ? list.filter((existing) => existing !== id) : [...list, id];
@@ -358,7 +359,7 @@ function NaturezaSubcategoriaAccordion({
               />
               {expanded && (
                 <div className="dash-accordion-panel">
-                  <TransacoesPanel
+                  <TransactionsTable
                     filter={filter}
                     categoriaId={item.subcategory_id}
                     tipo={tipo}

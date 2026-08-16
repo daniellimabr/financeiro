@@ -4,22 +4,14 @@ import type { Liability, LiabilityInput, LiabilityTipo } from "../api/liabilitie
 import type { PeriodoFilter, PontoTendencia } from "../api/dashboards";
 import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
-import {
-  AssetSelectCell,
-  CategorySelectCell,
-  DescriptionCell,
-} from "../components/TransactionEditCells";
+import { TransactionsTable } from "../components/TransactionsTable";
 import { TrendChart } from "../components/TrendChart";
-import { useAssets } from "../hooks/useAssets";
-import { useCategoryGroups } from "../hooks/useCategoryGroups";
 import { useCreateLiability } from "../hooks/useCreateLiability";
 import { useDeleteLiability } from "../hooks/useDeleteLiability";
 import { useLiabilities } from "../hooks/useLiabilities";
 import { useLiabilityGastos } from "../hooks/useLiabilityGastos";
 import { useLiabilityGastosTendencia } from "../hooks/useLiabilityGastosTendencia";
-import { usePluggyTransactions } from "../hooks/usePluggyTransactions";
 import { useSettleLiability } from "../hooks/useSettleLiability";
-import { useSubcategories } from "../hooks/useSubcategories";
 import { useUpdateLiability } from "../hooks/useUpdateLiability";
 import { formatCurrency } from "../utils/format";
 
@@ -303,23 +295,12 @@ function LiabilityDrilldown({
   pontos: PontoTendencia[] | undefined;
 }) {
   const gastosQuery = useLiabilityGastos(filter);
-  const transactionsQuery = usePluggyTransactions({
-    ano: filter.ano,
-    mes: filter.mes,
-    liabilityId,
-    tipo: "debito",
-    competencia: true,
-  });
-  const { data: subcategories } = useSubcategories();
-  const { data: groups } = useCategoryGroups();
-  const { data: assets } = useAssets();
 
   const total = gastosQuery.data?.find((item) => item.liability_id === liabilityId)?.total ?? "0";
-  const transacoes = transactionsQuery.data ?? [];
   const color = "var(--despesa)";
 
-  if (gastosQuery.isLoading || transactionsQuery.isLoading) return <p>Carregando...</p>;
-  if (gastosQuery.isError || transactionsQuery.isError) {
+  if (gastosQuery.isLoading) return <p>Carregando...</p>;
+  if (gastosQuery.isError) {
     return <p role="alert">Não foi possível carregar o gasto do passivo.</p>;
   }
 
@@ -329,44 +310,12 @@ function LiabilityDrilldown({
       <p>
         Gasto no período: <strong style={{ color }}>{formatCurrency(total)}</strong>
       </p>
-      {transacoes.length === 0 ? (
-        <p className="dash-empty">Nenhuma transação vinculada neste período.</p>
-      ) : (
-        <div className="dash-table-wrap">
-          <table className="dash-table">
-            <thead>
-              <tr>
-                <th>Data</th>
-                <th>Descrição</th>
-                <th>Categoria</th>
-                <th>Ativo</th>
-                <th>Valor</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transacoes.map((transaction) => (
-                <tr key={transaction.id}>
-                  <td>{transaction.data}</td>
-                  <td>
-                    <DescriptionCell transaction={transaction} />
-                  </td>
-                  <td>
-                    <CategorySelectCell
-                      transaction={transaction}
-                      subcategories={subcategories}
-                      groups={groups}
-                    />
-                  </td>
-                  <td>
-                    <AssetSelectCell transaction={transaction} assets={assets} />
-                  </td>
-                  <td>{formatCurrency(transaction.valor)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <TransactionsTable
+        filter={filter}
+        liabilityId={liabilityId}
+        tipo="debito"
+        emptyMessage="Nenhuma transação vinculada neste período."
+      />
     </>
   );
 }

@@ -295,6 +295,68 @@ describe("AssetsPage", () => {
     });
   });
 
+  it("the drilldown table shows an editable Categoria and can be sorted by Data/Valor", async () => {
+    const GROUPS = [
+      { id: 1, nome: "Transporte", created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" },
+    ];
+    const SUBCATEGORIES = [
+      {
+        id: 20,
+        group_id: 1,
+        nome: "Combustível",
+        natureza: null,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      },
+    ];
+    const TX_A = { ...TRANSACAO_FIXTURE, id: 1, data: "2026-01-10", valor: "-150.00" };
+    const TX_B = { ...TRANSACAO_FIXTURE, id: 2, data: "2026-01-20", descricao: "Zona Azul", valor: "-30.00" };
+
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url === "/assets") return Promise.resolve(jsonResponse([ASSET_ATIVO]));
+      if (url.startsWith("/dashboards/por-ativo")) {
+        return Promise.resolve(
+          jsonResponse([{ asset_id: 1, asset_nome: "Carro", total: "180.00" }])
+        );
+      }
+      if (url.startsWith("/pluggy/transactions"))
+        return Promise.resolve(jsonResponse([TX_A, TX_B]));
+      if (url === "/subcategories") return Promise.resolve(jsonResponse(SUBCATEGORIES));
+      if (url === "/category-groups") return Promise.resolve(jsonResponse(GROUPS));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<AssetsPage />);
+    await screen.findByText("Carro");
+
+    const grid = screen.getByText("Carro").closest(".dash-tile") as HTMLElement;
+    await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
+
+    expect(await screen.findByText("Posto Ipiranga")).toBeInTheDocument();
+    expect(screen.getByLabelText("Categoria de Posto Ipiranga")).toBeInTheDocument();
+    expect(screen.getByLabelText("Categoria de Zona Azul")).toBeInTheDocument();
+
+    const table = screen.getByText("Posto Ipiranga").closest("table") as HTMLElement;
+    const rowsInOrder = () =>
+      within(table)
+        .getAllByRole("row")
+        .slice(1)
+        .map((row) => row.textContent);
+
+    // ordem inicial: data desc (default do TransactionsTable) — Zona Azul (20) antes de Posto Ipiranga (10)
+    expect(rowsInOrder()[0]).toContain("Zona Azul");
+
+    await userEvent.click(within(table).getByRole("button", { name: /Valor/ }));
+    expect(rowsInOrder()[0]).toContain("Posto Ipiranga"); // -150 é o menor valor (asc)
+
+    await userEvent.click(within(table).getByRole("button", { name: /Valor/ }));
+    expect(rowsInOrder()[0]).toContain("Zona Azul"); // -30 é o maior valor (desc)
+  });
+
   it("renders a sparkline on the card when trend data is available", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
