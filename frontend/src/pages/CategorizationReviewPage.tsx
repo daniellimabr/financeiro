@@ -32,7 +32,7 @@ export function CategorizationReviewPage() {
   const now = new Date();
   const [ano, setAno] = useState(now.getFullYear());
   const [mes, setMes] = useState(now.getMonth() + 1);
-  const [status, setStatus] = useState<CategorizationStatus>("pendente");
+  const [status, setStatus] = useState<CategorizationStatus>("todas");
   const [tipo, setTipo] = useState<TransactionTipo | "todos">("todos");
   const [hasAssetFilter, setHasAssetFilter] = useState<HasAssetFilter>("todos");
   const [groupId, setGroupId] = useState<number | "todos">("todos");

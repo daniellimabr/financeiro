@@ -168,7 +168,7 @@ describe("CategorizationReviewPage", () => {
     expect(input.value).toBe("Alimentação / Restaurante");
   });
 
-  it("defaults to status=pendente in the request", async () => {
+  it("defaults to status=todas in the request, showing every item, not just pending ones", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       const base = baseHandlers(url);
@@ -183,7 +183,8 @@ describe("CategorizationReviewPage", () => {
     await screen.findByText("Mercado Sao Joao");
 
     const calls = fetchMock.mock.calls.map((call) => String(call[0]));
-    expect(calls.some((url) => url.includes("status=pendente"))).toBe(true);
+    expect(calls.some((url) => url.includes("status=todas"))).toBe(true);
+    expect((screen.getByLabelText("Status") as HTMLSelectElement).value).toBe("todas");
   });
 
   it("confirming a row calls the API and removes it from the list after refetch", async () => {

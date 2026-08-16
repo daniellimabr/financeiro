@@ -111,6 +111,7 @@
   --space-7: 48px;
 
   /* Escala tipográfica */
+  --text-2xs: 11px;
   --text-xs: 12px;
   --text-sm: 13.5px;
   --text-base: 16px;
@@ -858,7 +859,7 @@ input {
   text-align: left;
   padding: 6px var(--space-3);
   border-bottom: 1px solid var(--border);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
 
@@ -866,7 +867,7 @@ input {
   color: var(--text);
   font-weight: 700;
   text-transform: uppercase;
-  font-size: var(--text-xs);
+  font-size: var(--text-2xs);
   letter-spacing: 0.04em;
 }
 
@@ -954,6 +955,11 @@ input {
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* <button> centraliza texto por padrão do user-agent — invisível
+     enquanto o botão só é tão largo quanto o próprio texto, mas evidente
+     assim que uma tabela estica o botão pra 100% da coluna (Descrição em
+     .cat-review-table/.txn-table). Achado real do CEO ao vivo. */
+  text-align: left;
 }
 
 /* Categorização (Sprint 11): combobox buscável de categoria, compartilhado
@@ -1158,11 +1164,16 @@ input {
    Natureza/Ativos/Passivos, via components/TransactionsTable.tsx. Colunas
    Categoria/Ativo/% são condicionais (showCategoria/showAtivo/total) — o
    colgroup no componente já reflete isso, então as classes de largura não
-   precisam de :nth-child. Descrição fica sem largura fixa (table-layout:fixed
-   dá o espaço restante pra ela, mesma técnica de .col-descricao em
-   .cat-review-table). */
+   precisam de :nth-child. Descrição ficava sem largura fixa (table-layout:
+   fixed dava todo o espaço restante pra ela) — no painel largo do funil de
+   Dashboards isso deixava a coluna enorme; teto de 30% (mesma técnica de
+   .col-descricao em .cat-review-table) achado real do CEO ao vivo. */
 .txn-table .col-data {
   width: 90px;
+}
+
+.txn-table .col-descricao {
+  width: 30%;
 }
 
 .txn-table .col-categoria {
