@@ -647,7 +647,7 @@ PRD: [PRD-016-regime-competencia-caixa-patrimonio.md](prd/PRD-016-regime-compete
 Plano: [SPRINT-016-regime-competencia-caixa-plan.md](sprints/SPRINT-016-regime-competencia-caixa-plan.md).
 Relatório: [SPRINT-016-regime-competencia-caixa-report.md](sprints/SPRINT-016-regime-competencia-caixa-report.md).
 
-### Sprint 17 — Filtro de conta em Categorizar e validação de dados/cálculos contra extrato real (cross-epic, sem épico prévio)
+### Sprint 17 — Filtro de conta em Categorizar e validação de dados/cálculos contra extrato real (cross-epic, sem épico prévio) ✅ concluída em 2026-08-17
 
 Planejada em sessão própria (2026-08-17). CEO trouxe o extrato do Itaú do 1º
 semestre de 2026 (PDF) para validar sistematicamente, gasto a gasto e saldo a
@@ -670,8 +670,32 @@ formal). Escopo de correções não é pré-especificável — depende do que a
 comparação contra o extrato revelar; heurística de lag de dia útil Pluggy vs.
 Itaú segue fora de escopo (decisão já fechada na Sprint 16).
 
+Implementada em sessão própria (2026-08-17): Bloco 1 sem desvio — `account_id`
+em `GET /categorization/transactions`/`list_transactions` (filtro condicional,
+mesmo padrão de `group_id`), `<select>` "Conta" novo em
+`CategorizationReviewPage.tsx`. Bloco 2 concluído **sem nenhum bug real de
+data/cálculo encontrado**: saldo mensal da conta "Itaú - Conta Corrente"
+bateu exato ao centavo em março–junho/2026; as diferenças de janeiro
+(R$395,42) e fevereiro (R$159,68) foram confirmadas transação a transação
+como o mesmo lag de liquidação de fim de semana já decidido como fora de
+escopo na Sprint 16 (transações de sábado/domingo lançadas pelo Itaú só no
+próximo dia útil) — 78 transações de janeiro conferidas uma a uma contra o
+extrato, 100% de correspondência. **Achado real, mas de produto:** o CEO,
+lendo o resultado, identificou que transferências para investimento (ex. PIX
+de R$5.000 em 03/01/2026, Itaú→NuBank→Investimento) não têm categoria própria
+de Aporte/Resgate — uma delas está miscategorizada como "Impostos e taxas",
+inflando a despesa de janeiro; não corrigida nesta sprint por decisão do CEO,
+vira pauta de sprint nova (ver "Registro de reavaliações futuras"). 425 testes
+backend (+7) + 163 testes frontend (+8), suíte completa verde. Deploy na VM de
+dev (CI verde → `git pull` + `docker compose pull` + `up -d`) e validação ao
+vivo do filtro de conta contra dado real via `check-categorizacao.mjs`
+estendido. `.gitignore` ganhou `itau_extrato_*.pdf` antes de o PDF do CEO
+(deixado na raiz do repo, untracked) ser lido — risco real de commit
+acidental de dado financeiro sensível, corrigido antes de prosseguir.
+
 PRD: [PRD-017-filtro-conta-validacao-extrato.md](prd/PRD-017-filtro-conta-validacao-extrato.md).
 Plano: [SPRINT-017-filtro-conta-validacao-extrato-plan.md](sprints/SPRINT-017-filtro-conta-validacao-extrato-plan.md).
+Relatório: [SPRINT-017-filtro-conta-validacao-extrato-report.md](sprints/SPRINT-017-filtro-conta-validacao-extrato-report.md).
 
 ## Registro de reavaliações futuras
 
@@ -682,3 +706,4 @@ Plano: [SPRINT-017-filtro-conta-validacao-extrato-plan.md](sprints/SPRINT-017-fi
 - **Persistir despesas/receitas hipotéticas como cenários salvos:** decisão explícita do CEO na sessão de planejamento da Sprint 14 (2026-08-16) — a simulação da tela "Projeção" fica efêmera (sem CRUD, sem tabela) por ora. Se o CEO quiser voltar a um cenário entre sessões (ex.: comparar "com reforma" vs. "sem reforma" ao longo de semanas), viraria candidata a sprint futura com tabela nova + CRUD — sem PRD/plano ainda.
 - **Heurística de dia útil para o lag Pluggy vs. extrato bancário real:** decisão explícita do CEO na sessão de planejamento da Sprint 16 (2026-08-17) — transações de fim de semana às vezes aparecem no extrato do Itaú só no próximo dia útil (até 2 dias depois da data bruta que a Pluggy reporta), sem outro campo no payload (`postDate`/`settlementDate`) para corrigir automaticamente. Não implementado por ora (risco de heurística errada, sem tratar feriados); candidata a revisão futura se a Pluggy passar a expor um campo de liquidação, ou se o CEO priorizar uma heurística mesmo com o risco.
 - **Toggle competência/caixa nas telas "Natureza"/"Projeção":** fora de escopo da Sprint 16 (toggle só no Dashboard) — candidata a extensão futura se o CEO quiser o mesmo regime nessas telas.
+- **Categorização de Aporte/Resgate de investimento + tela de Gestão de Investimentos + conexão da conta de investimento NuBank via Pluggy:** achado do CEO na reconciliação da Sprint 17 (2026-08-17) — transferências para investimento (ex. Itaú→NuBank→Investimento) hoje caem em "Transferência interna" genérica ou, em pelo menos um caso real, ficam miscategorizadas como despesa comum, inflando totais. Escopo levantado pelo CEO: novas subcategorias "Investimento/Aporte" (despesa) e "Investimento/Resgate" (receita); tela nova com um card por investimento, drill-down pro extrato daquele investimento ao clicar; conectar a conta de investimento NuBank via Pluggy (ainda não conectada) e usar o dado real dela pra validar o destino dos aportes. Sem PRD/plano ainda — candidata a próxima sessão de `/plan`.
