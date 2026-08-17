@@ -705,19 +705,24 @@ real). Bloco 1 — edição manual de `data` de transação na tela Categorizar,
 com trava (`data_editada_manualmente`) contra sobrescrita em resyncs futuros
 da Pluggy, sobrevivendo tanto em conta corrente quanto em cartão de crédito.
 Bloco 2 — investigação com dado real do card "Saldo Acumulado", que o CEO
-reportou não bater com Itaú+NuBank em 31/01/2026: reconciliado por completo
-(sem bug de fórmula) — gap de R$7.830,82 explicado por 2 efeitos que somam
-exatamente, um salário de R$9.882,83 recebido em 30/01 mas deferido pra
-competência de fevereiro (regra já existente, funcionando como desenhada), e
-uma transação de R$2.052,01 (fatura de dezembro/2025 do cartão NuBank, fora
-do corte de dados) categorizada como "Transferência interna" — o CEO
-recategorizou essa linha ao vivo durante a investigação, e o card passou a
-bater exatamente com a fórmula esperada. UI ganhou nota explicando que o
-card é uma projeção por competência, não um snapshot bancário. Bloco 3 —
-guia não técnico dos cards do Dashboard (`docs/dashboards-guia-cards.md`),
-escrito só depois dos Blocos 1/2 fecharem. 438 testes backend (+13) + 166
-testes frontend (+3), suíte completa verde. Deploy do Bloco 1 na VM de dev
-(CI verde → `git pull` + `docker compose pull` + `up -d`).
+reportou não bater com Itaú+NuBank em 31/01/2026, virou uma reconciliação de
+3 meses (jan/fev/mar) feita ao vivo: janeiro fechou sem bug de fórmula (gap
+de R$7.830,82 explicado por competência de salário + uma miscategorização
+pontual da fronteira dez/2025↔jan/2026, corrigida via categorização);
+fevereiro revelou um **bug real** no regime caixa (deslocamento fixo de
+cartão de crédito e pagamento real de fatura contando a mesma compra 2
+vezes) — corrigido com mudança de código em `_base_query`
+(`app/dashboards/service.py`), confirmada com o CEO antes de implementar por
+tocar o PRD-016; março revalidou o fix (bate exato) e expôs, de novo, o
+padrão de transferência de investimento sem categoria própria (R$10.000,
+mesmo achado da Sprint 17), tratado como pauta futura, não corrigido aqui.
+UI ganhou nota explicando que o card é uma projeção por competência, não um
+snapshot bancário. Bloco 3 — guia não técnico dos cards do Dashboard
+(`docs/dashboards-guia-cards.md`), escrito só depois dos Blocos 1/2
+fecharem. 443 testes backend (+18) + 166 testes frontend (+3), suíte
+completa verde. Deploy em 2 rodadas na VM de dev (Bloco 1, depois o fix de
+regime caixa) — CI verde → `git pull` + `docker compose pull` + `up -d` em
+cada uma.
 
 PRD: [PRD-018-edicao-data-saldo-acumulado-guia-cards.md](prd/PRD-018-edicao-data-saldo-acumulado-guia-cards.md).
 Plano: [SPRINT-018-edicao-data-saldo-acumulado-guia-cards-plan.md](sprints/SPRINT-018-edicao-data-saldo-acumulado-guia-cards-plan.md).
@@ -732,4 +737,4 @@ Relatório: [SPRINT-018-edicao-data-saldo-acumulado-guia-cards-report.md](sprint
 - **Persistir despesas/receitas hipotéticas como cenários salvos:** decisão explícita do CEO na sessão de planejamento da Sprint 14 (2026-08-16) — a simulação da tela "Projeção" fica efêmera (sem CRUD, sem tabela) por ora. Se o CEO quiser voltar a um cenário entre sessões (ex.: comparar "com reforma" vs. "sem reforma" ao longo de semanas), viraria candidata a sprint futura com tabela nova + CRUD — sem PRD/plano ainda.
 - **Heurística de dia útil para o lag Pluggy vs. extrato bancário real:** decisão explícita do CEO na sessão de planejamento da Sprint 16 (2026-08-17) — transações de fim de semana às vezes aparecem no extrato do Itaú só no próximo dia útil (até 2 dias depois da data bruta que a Pluggy reporta), sem outro campo no payload (`postDate`/`settlementDate`) para corrigir automaticamente. Não implementado por ora (risco de heurística errada, sem tratar feriados); candidata a revisão futura se a Pluggy passar a expor um campo de liquidação, ou se o CEO priorizar uma heurística mesmo com o risco.
 - **Toggle competência/caixa nas telas "Natureza"/"Projeção":** fora de escopo da Sprint 16 (toggle só no Dashboard) — candidata a extensão futura se o CEO quiser o mesmo regime nessas telas.
-- **Categorização de Aporte/Resgate de investimento + tela de Gestão de Investimentos + conexão da conta de investimento NuBank via Pluggy:** achado do CEO na reconciliação da Sprint 17 (2026-08-17) — transferências para investimento (ex. Itaú→NuBank→Investimento) hoje caem em "Transferência interna" genérica ou, em pelo menos um caso real, ficam miscategorizadas como despesa comum, inflando totais. Escopo levantado pelo CEO: novas subcategorias "Investimento/Aporte" (despesa) e "Investimento/Resgate" (receita); tela nova com um card por investimento, drill-down pro extrato daquele investimento ao clicar; conectar a conta de investimento NuBank via Pluggy (ainda não conectada) e usar o dado real dela pra validar o destino dos aportes. Sem PRD/plano ainda — candidata a próxima sessão de `/plan`.
+- **Categorização de Aporte/Resgate de investimento + tela de Gestão de Investimentos + conexão da conta de investimento NuBank via Pluggy:** achado do CEO na reconciliação da Sprint 17 (2026-08-17) — transferências para investimento (ex. Itaú→NuBank→Investimento) hoje caem em "Transferência interna" genérica ou, em pelo menos um caso real, ficam miscategorizadas como despesa comum, inflando totais. Escopo levantado pelo CEO: novas subcategorias "Investimento/Aporte" (despesa) e "Investimento/Resgate" (receita); tela nova com um card por investimento, drill-down pro extrato daquele investimento ao clicar; conectar a conta de investimento NuBank via Pluggy (ainda não conectada) e usar o dado real dela pra validar o destino dos aportes. **Reconfirmado 2x na Sprint 18** (2026-08-17) durante a investigação de Saldo Acumulado — R$2.052,01 em janeiro (fatura de cartão fora do corte de dados, tratado caso a caso) e R$10.000 em março (resgate de investimento, hoje categorizado temporariamente como "Receitas/Outras", sem taxonomia própria ainda). Sem PRD/plano ainda — candidata a próxima sessão de `/plan`.

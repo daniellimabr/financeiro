@@ -1,6 +1,6 @@
 # Arquitetura — Visão Geral
 
-> Stack abaixo reflete [ADR-001](adr/ADR-001-stack.md), **aprovado pelo CEO em 2026-08-03**. Este doc é atualizado a cada mudança estrutural relevante (regra de doc viva). **Atualizado em 2026-08-17 após Sprint 18** — edição manual de data de transação na tela Categorizar (trava contra sobrescrita em resync); investigação do card "Saldo Acumulado" com dado real (nenhum bug — diferença conceitual entre projeção por competência e snapshot bancário, explicada e corrigida via recategorização de uma transação de transição dez/2025→jan/2026); guia não técnico dos cards do Dashboard novo (`docs/dashboards-guia-cards.md`). Sprint sem épico prévio no roadmap. Ver seção própria abaixo.
+> Stack abaixo reflete [ADR-001](adr/ADR-001-stack.md), **aprovado pelo CEO em 2026-08-03**. Este doc é atualizado a cada mudança estrutural relevante (regra de doc viva). **Atualizado em 2026-08-17 após Sprint 18** — edição manual de data de transação na tela Categorizar (trava contra sobrescrita em resync); investigação de 3 meses (jan/fev/mar) do card "Saldo Acumulado" com dado real — janeiro sem bug (diferença conceitual entre projeção por competência e snapshot bancário), fevereiro com bug real corrigido no regime caixa (cartão de crédito dobrava a mesma compra entre o modelo de deslocamento e o pagamento real da fatura); guia não técnico dos cards do Dashboard novo (`docs/dashboards-guia-cards.md`). Sprint sem épico prévio no roadmap. Ver seção própria abaixo.
 
 ## Visão de alto nível
 
@@ -1122,17 +1122,33 @@ completo e explicado por 2 efeitos que se somam exatamente:
    correspondente já contabilizada (já que a compra original não existe no
    sistema).
 
-Nenhum bug de fórmula ou de agregação foi encontrado — as duas regras
-(cutoff de competência de salário, exclusão de "Transferência interna")
-funcionam exatamente como desenhadas nas Sprints 15/16. O CEO recategorizou a
-transação de R$2.052,01 para "Outras Compras" (ação pontual, sem migration,
-via a própria tela Categorizar) para tratar a fronteira dez/2025↔jan/2026;
-após a correção, `get_saldo_acumulado` passou a bater exatamente com a
-fórmula esperada pelo CEO (R$1.031,22 = Itaú+NuBank − salário deferido).
-**Ação de UI (Bloco 2b):** card "Saldo Acumulado" ganha uma tag "projeção por
-competência — pode diferir do saldo bancário"; o drill-down ganha um
-parágrafo explicando a diferença (salário/cartão por competência vs. saldo
-bancário do dia), com link implícito pro card "Saldo" (snapshot real).
+Nenhum bug de fórmula ou de agregação foi encontrado em janeiro — as duas
+regras (cutoff de competência de salário, exclusão de "Transferência
+interna") funcionam exatamente como desenhadas nas Sprints 15/16. O CEO
+recategorizou a transação de R$2.052,01 para "Outras Compras" (ação pontual,
+sem migration, via a própria tela Categorizar) para tratar a fronteira
+dez/2025↔jan/2026. **Ação de UI (Bloco 2b):** card "Saldo Acumulado" ganha
+uma tag "projeção por competência — pode diferir do saldo bancário"; o
+drill-down ganha um parágrafo explicando a diferença (salário/cartão por
+competência vs. saldo bancário do dia), com link implícito pro card "Saldo"
+(snapshot real).
+
+O CEO continuou validando fevereiro e março ao vivo, e **fevereiro revelou um
+bug real** (não conceitual) no regime caixa: o deslocamento fixo de cartão
+de crédito (`competencia_padrao`/`caixa`, compra+1/+2 meses) e o pagamento
+real da fatura podiam contar a mesma compra 2 vezes — mascarado em fevereiro
+porque as compras de janeiro têm caixa modelado em março, mas exposto ao
+testar recategorizar a fatura pra validar o efeito (competência quebrou:
+`-120,92` em vez de `146,13`). **Fix confirmado com o CEO antes de
+implementar** (tocava PRD-016): sob regime caixa, `_base_query`
+(`app/dashboards/service.py`) passa a excluir toda transação de conta de
+cartão de crédito e a incluir a subcategoria "Pagamento de Fatura" (dentro
+de "Transferência interna") como despesa normal na data real — competência
+não muda. Revalidado nos 3 meses após o fix (jan `1.030,92`, fev `1.543,37`,
+mar `7.653,54`, todos batendo com Itaú+NuBank real menos salário deferido).
+Março também expôs, de novo, o padrão já registrado desde a Sprint 17
+(transferência de investimento sem categoria própria — dessa vez R$10.000),
+tratado como pauta de sprint futura, não corrigido aqui.
 
 **Bloco 3 — guia dos cards:** [docs/dashboards-guia-cards.md](../dashboards-guia-cards.md)
 novo, não técnico, cobrindo todos os cards do Dashboard (Saldo, Saldo
@@ -1147,16 +1163,19 @@ Relatório: [SPRINT-018-edicao-data-saldo-acumulado-guia-cards-report.md](../spr
 
 ## Qualidade (Sprint 1 → Sprint 18)
 
-- **Testes backend:** 438 testes (+13), 98% cobertura total. Sprint 18 (99%
+- **Testes backend:** 443 testes (+18), 98% cobertura total. Sprint 18 (99%
   em `app/categorization/service.py`, 98% em
-  `app/pluggy_integration/service.py`): `update_data` recomputando
-  competência por tipo de conta (corrente sem deslocamento, cartão via
-  `competencia_padrao`/`caixa`, Salário confirmada via `competencia_salario`),
-  rejeição de data futura, 404 cross-user; resync preservando
-  `data`/`data_competencia`/`data_caixa` de transação editada manualmente
-  (conta corrente e cartão) e continuando a sobrescrever transação não
-  editada (regressão) — sem bug real encontrado, cobertura puramente
-  aditiva. Sprint 17 (99% em
+  `app/pluggy_integration/service.py`, 99% em `app/dashboards/service.py`):
+  `update_data` recomputando competência por tipo de conta (corrente sem
+  deslocamento, cartão via `competencia_padrao`/`caixa`, Salário confirmada
+  via `competencia_salario`), rejeição de data futura, 404 cross-user; resync
+  preservando `data`/`data_competencia`/`data_caixa` de transação editada
+  manualmente (conta corrente e cartão) e continuando a sobrescrever
+  transação não editada (regressão); regime caixa excluindo cartão de
+  crédito inteiramente e contando "Pagamento de Fatura" como despesa normal
+  na data real, sem dobrar com o modelo de compra+1/2 meses — achado real
+  durante a investigação do Bloco 2 (ver seção própria), corrigido com
+  mudança de código em `_base_query`. Sprint 17 (99% em
   `app/categorization/service.py`): `account_id` isolado e combinado com
   `status` em `list_transactions`, isolamento cross-user (conta de outro
   usuário não vaza nenhuma linha) — sem migration, sem endpoint novo, filtro
