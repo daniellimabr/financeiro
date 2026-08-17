@@ -52,3 +52,6 @@ scripts/vm-config.local.ps1
 
 # Screenshots de QA visual — podem conter dado real do dashboard, nunca versionar
 scripts/browser-check/shots/
+
+# Extrato bancário real (Sprint 17) — dado financeiro sensível do CEO, nunca versionar
+itau_extrato_*.pdf
