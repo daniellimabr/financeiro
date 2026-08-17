@@ -583,6 +583,31 @@ PRD: [PRD-015-configuracoes-competencia-salario-saldo-acumulado.md](prd/PRD-015-
 Plano: [SPRINT-015-configuracoes-competencia-salario-plan.md](sprints/SPRINT-015-configuracoes-competencia-salario-plan.md).
 Relatório: [SPRINT-015-configuracoes-competencia-salario-report.md](sprints/SPRINT-015-configuracoes-competencia-salario-report.md).
 
+### Sprint 16 — Regime de competência/caixa e Patrimônio por Saldo Acumulado (cross-epic, sem épico prévio)
+
+Planejada em sessão própria (2026-08-17). CEO trouxe uma planilha de
+referência (fórmulas inspecionadas célula a célula) para validar sua
+leitura de somas/saldos e formalizar a lógica de competência — revelou duas
+lacunas reais: competência de cartão de crédito nunca foi implementada
+(hoje `data_competencia = data`, sem shift, para qualquer tipo de conta
+exceto Salário), e não existe uma "visão caixa" separada de competência.
+Decisões confirmadas com o CEO via perguntas diretas nesta sessão: a
+visão caixa vira um toggle visível em todo o Dashboard (não só correção
+interna); Patrimônio deixa de ser snapshot ao vivo da Pluggy e passa a ser
+Saldo Acumulado (líquido, no regime selecionado) + saldo ao vivo de
+investimentos + Ativos − Passivos; investimento fica fora do Saldo
+Acumulado (variação de mercado não é uma transação). Durante a
+investigação, um bug real de fuso horário foi encontrado e confirmado
+contra o payload bruto da Pluggy (`_parse_date` extrai a data do timestamp
+UTC sem converter para horário de Brasília) — entra nesta sprint. Um lag
+observado entre a data do evento (Pluggy) e a data de liquidação do Itaú
+para transações de fim de semana foi investigado mas **não** vira
+correção — decisão explícita do CEO, sem outro campo no payload para
+corrigir automaticamente, risco de heurística errada sem tratar feriados.
+
+PRD: [PRD-016-regime-competencia-caixa-patrimonio.md](prd/PRD-016-regime-competencia-caixa-patrimonio.md).
+Plano: [SPRINT-016-regime-competencia-caixa-plan.md](sprints/SPRINT-016-regime-competencia-caixa-plan.md).
+
 ## Registro de reavaliações futuras
 
 - **Understand Anything:** reavaliar instalação quando o codebase ultrapassar ~100 arquivos (ver ADR-002-plugins).
@@ -590,3 +615,5 @@ Relatório: [SPRINT-015-configuracoes-competencia-salario-report.md](sprints/SPR
 - **Ativo como nova camada do funil Categoria>Tipo>Transação (Dashboard):** ideia levantada pelo CEO na revisão pós-Sprint 10 (2026-08-15) — quando uma subcategoria (Tipo) tem transações vinculadas a um ativo, o drill-down ganharia um nível "Ativo" entre Tipo e Transação, agrupando por ativo antes de chegar na lista de transações. Registrada como candidata; requer sessão de `/plan` própria (decisões em aberto: só aparece quando há ≥1 transação com asset_id na subcategoria? bucket "sem ativo" pras demais? mesmo padrão pro funil de Passivos?) — sem PRD/plano ainda.
 - **Multiusuário — UI de gestão de usuários (item 11 do escopo original de E7):** decisão explícita do CEO na sessão de planejamento da Sprint 15 (2026-08-16) — já coberto arquiteturalmente (isolamento por `user_id` em toda tabela, login individual Google, suporta ~10 usuários sem retrabalho), mas não há UI pra ver/convidar/remover outros usuários. Sem PRD/plano ainda; entra no roadmap quando o CEO priorizar.
 - **Persistir despesas/receitas hipotéticas como cenários salvos:** decisão explícita do CEO na sessão de planejamento da Sprint 14 (2026-08-16) — a simulação da tela "Projeção" fica efêmera (sem CRUD, sem tabela) por ora. Se o CEO quiser voltar a um cenário entre sessões (ex.: comparar "com reforma" vs. "sem reforma" ao longo de semanas), viraria candidata a sprint futura com tabela nova + CRUD — sem PRD/plano ainda.
+- **Heurística de dia útil para o lag Pluggy vs. extrato bancário real:** decisão explícita do CEO na sessão de planejamento da Sprint 16 (2026-08-17) — transações de fim de semana às vezes aparecem no extrato do Itaú só no próximo dia útil (até 2 dias depois da data bruta que a Pluggy reporta), sem outro campo no payload (`postDate`/`settlementDate`) para corrigir automaticamente. Não implementado por ora (risco de heurística errada, sem tratar feriados); candidata a revisão futura se a Pluggy passar a expor um campo de liquidação, ou se o CEO priorizar uma heurística mesmo com o risco.
+- **Toggle competência/caixa nas telas "Natureza"/"Projeção":** fora de escopo da Sprint 16 (toggle só no Dashboard) — candidata a extensão futura se o CEO quiser o mesmo regime nessas telas.
