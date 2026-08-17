@@ -583,7 +583,7 @@ PRD: [PRD-015-configuracoes-competencia-salario-saldo-acumulado.md](prd/PRD-015-
 Plano: [SPRINT-015-configuracoes-competencia-salario-plan.md](sprints/SPRINT-015-configuracoes-competencia-salario-plan.md).
 Relatório: [SPRINT-015-configuracoes-competencia-salario-report.md](sprints/SPRINT-015-configuracoes-competencia-salario-report.md).
 
-### Sprint 16 — Regime de competência/caixa e Patrimônio por Saldo Acumulado (cross-epic, sem épico prévio)
+### Sprint 16 — Regime de competência/caixa e Patrimônio por Saldo Acumulado (cross-epic, sem épico prévio) ✅ concluída em 2026-08-17
 
 Planejada em sessão própria (2026-08-17). CEO trouxe uma planilha de
 referência (fórmulas inspecionadas célula a célula) para validar sua
@@ -605,8 +605,47 @@ para transações de fim de semana foi investigado mas **não** vira
 correção — decisão explícita do CEO, sem outro campo no payload para
 corrigir automaticamente, risco de heurística errada sem tratar feriados.
 
+Implementada em sessão própria (2026-08-17): `competencia_padrao`/`caixa`
+novos em `app/categorization/competencia.py` (cartão sempre desloca, sem
+dia de corte; demais tipos sem defasagem), aplicados nos 3 pontos de
+escrita (sync, `set_category`/`bulk_confirm` — cartão tem prioridade sobre
+Salário, ajuste de salário de dez/2025); `pluggy_transactions.data_caixa`
+novo (migration `0013`, backfill de `data_competencia` de cartão +
+`data_caixa` de toda transação); parâmetro `regime` threaded em 10 funções
+de `app/dashboards/service.py` via `_competencia_column`; `_base_query`
+ganha `excluir_investimento`; `PatrimonioBreakdown` redesenhado — de
+snapshot bancário (`saldo_contas`/`saldo_cartoes`) para
+`saldo_liquido_acumulado` (via `get_saldo_acumulado`) + `saldo_investimentos`
+(snapshot ao vivo), com fallback de conta sem `saldo_inicial` mantendo a
+convenção de sinal de `_base_query`. Bug de fuso corrigido com
+`.astimezone(ZoneInfo("America/Sao_Paulo"))` em `_parse_date`. Frontend:
+`RegimeToggle.tsx` novo, `regime` levantado em `DashboardsPage`/
+`AssetsPage`/`LiabilitiesPage`, threaded por 9 hooks (`regime` na
+`queryKey`), `PatrimonioBreakdownPanel` atualizado. 418 testes backend (98%
+cobertura, +39) + 162 testes frontend (+7), suíte completa verde — migration
+`0013` testada via `_backfill` extraída como função plana, carregada por
+`importlib` contra o schema de teste (precedente novo). Deploy na VM de dev
+(CI verde → `git pull` + `docker compose pull` + `docker compose up -d`,
+`alembic upgrade head` automático no entrypoint) + `POST /pluggy/sync`
+re-sincronizando as 2 contas reais — confirmado contra dado real: a
+transação "BRASA E DRINKS" (caso de verificação do PRD) foi de
+`data=2026-01-23` para `2026-01-22`, e uma segunda transação do mesmo
+comerciante teve o mesmo tipo de correção (achado não previsto no PRD,
+evidência de que o bug era mais amplo que o único caso documentado);
+transações de cartão confirmadas com `data_competencia` sempre 1 mês após
+`data`; toggle confirmado mudando o valor exibido (Despesa competência
+R$ 8.309,59 vs. caixa R$ 8.066,41 no mesmo período, dado real). QA visual
+via `scripts/browser-check/check-sprint16.mjs` (novo, só leitura),
+desktop+mobile, sem erros de console reais (só o 401 de logout já
+documentado na Sprint 15, confirmado benigno via script de diagnóstico
+dedicado). **Achado pendente de ação do CEO:** a conta "NuBank - Cartão de
+Crédito" não tem `saldo_inicial` preenchido — cai no fallback (não quebra o
+cálculo, mas o Patrimônio só reflete o saldo acumulado real dessa conta
+depois de preenchido em Configurações).
+
 PRD: [PRD-016-regime-competencia-caixa-patrimonio.md](prd/PRD-016-regime-competencia-caixa-patrimonio.md).
 Plano: [SPRINT-016-regime-competencia-caixa-plan.md](sprints/SPRINT-016-regime-competencia-caixa-plan.md).
+Relatório: [SPRINT-016-regime-competencia-caixa-report.md](sprints/SPRINT-016-regime-competencia-caixa-report.md).
 
 ## Registro de reavaliações futuras
 

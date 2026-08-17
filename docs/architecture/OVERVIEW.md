@@ -1,6 +1,6 @@
 # Arquitetura — Visão Geral
 
-> Stack abaixo reflete [ADR-001](adr/ADR-001-stack.md), **aprovado pelo CEO em 2026-08-03**. Este doc é atualizado a cada mudança estrutural relevante (regra de doc viva). **Atualizado em 2026-08-16/17 após Sprint 15** — tela "Configurações" (Perfil+logout, Gestão de Contas, Competência de Salário) substitui a aba "Gestão de contas"; regra de competência de salário por dia de corte; salário de dez/2025 como transação sentinela real; saldo inicial por conta + auditoria mensal; cards "Saldo Acumulado"/"Saldo Anterior" no Dashboard. Fecha o épico E7. Ver seção própria abaixo.
+> Stack abaixo reflete [ADR-001](adr/ADR-001-stack.md), **aprovado pelo CEO em 2026-08-03**. Este doc é atualizado a cada mudança estrutural relevante (regra de doc viva). **Atualizado em 2026-08-17 após Sprint 16** — competência de cartão de crédito (sempre evento+1 mês, sem dia de corte) e novo conceito `data_caixa`; toggle Competência/Caixa em todo o Dashboard, Ativos e Passivos; Patrimônio deixa de ser snapshot bancário e passa a ser Saldo Acumulado líquido + saldo de investimentos ao vivo + Ativos − Passivos; bug de fuso horário em `_parse_date` corrigido. Sprint sem épico prévio no roadmap. Ver seção própria abaixo.
 
 ## Visão de alto nível
 
@@ -932,9 +932,133 @@ salário real de dez/2025 nem o saldo real das contas até aquela data — ver
   `<h3>Gestão de Contas</h3>` desta sprint e `<h2>Gestão de contas</h2>` já
   existente dentro de `AccountManagementPage`), não na aplicação.
 
-## Qualidade (Sprint 1 → Sprint 15)
+## Regime de Competência/Caixa e Patrimônio por Saldo Acumulado (Sprint 16) — sem épico prévio
 
-- **Testes backend:** 379 testes, 98% cobertura total. Sprint 15 (100% em
+Planejada em sessão própria (2026-08-17), a partir de uma planilha de
+referência que o CEO trouxe (fórmulas inspecionadas célula a célula) para
+validar sua leitura de somas/saldos e formalizar a lógica de competência —
+revelou que competência de cartão de crédito nunca tinha sido implementada
+(`data_competencia = data`, sem shift, exceto para Salário) e que não
+existia uma "visão caixa" separada de competência. Ver
+[PRD-016](../prd/PRD-016-regime-competencia-caixa-patrimonio.md).
+
+- **Competência de cartão incondicional + `data_caixa` novo:**
+  `app/categorization/competencia.py` ganha `competencia_padrao(data,
+  account_tipo)` (cartão sempre `shift_to_next_month`, sem dia de corte —
+  diferente de Salário; demais tipos sem defasagem) e `caixa(data_competencia,
+  account_tipo)` (cartão desloca mais 1 mês sobre a competência — evento + 2
+  meses no total; demais tipos iguais à competência, mesmo quando já
+  deslocada por Salário). Aplicadas nos 3 pontos de escrita: `_upsert_transaction`
+  (sync), `_recompute_data_competencia` (`set_category`/`bulk_confirm` —
+  cartão tem prioridade sobre a regra de Salário, checada primeiro), e
+  `upsert_salario_ajuste_dez_2025`. `pluggy_transactions.data_caixa` (Date,
+  nullable) via migration `0013`, com backfill em Python (mesmo precedente
+  das migrations `0007`/`0012`): recalcula `data_competencia` de toda
+  transação de cartão existente e popula `data_caixa` para toda transação.
+- **Bug real de fuso horário corrigido:** `_parse_date`
+  (`app/pluggy_integration/service.py`) convertia o timestamp UTC bruto da
+  Pluggy direto para `date()`, sem passar por `America/Sao_Paulo` — transações
+  com horário local (BRT) entre 21h e 23h59 gravavam `data` um dia à frente
+  do evento real (equivalente a 00h–03h UTC do dia seguinte). Corrigido com
+  `.astimezone(ZoneInfo("America/Sao_Paulo"))` antes de `.date()`. Dado
+  histórico se autocorrige via re-sync (upsert idempotente); **confirmado
+  contra dado real da VM de dev** após `POST /pluggy/sync` pós-deploy — a
+  transação "BRASA E DRINKS" (`date` bruto `...T01:34:27Z`) foi de
+  `data=2026-01-23` para `2026-01-22`, e uma segunda transação do mesmo
+  comerciante teve o mesmo tipo de correção (`2026-01-16` → `2026-01-15`),
+  achado não previsto no PRD original — evidência de que o bug afetava mais
+  transações do que só o caso de verificação citado no PRD.
+- **`app/dashboards/service.py` — parâmetro `regime` (`Literal["competencia",
+  "caixa"]`, default `"competencia"`) threaded via `_competencia_column(regime)`
+  (`data_caixa` vs. `data_competencia`) em `get_summary`, `get_por_categoria`,
+  `_receita_despesa_por_periodo`, `get_tendencia`, `get_tendencia_por_categoria`,
+  `get_por_ativo`, `get_tendencia_por_ativo`, `get_por_passivo`,
+  `get_tendencia_por_passivo`, `get_saldo_acumulado`, `get_patrimonio_breakdown`
+  — sem mudança de contrato pra quem não passa o parâmetro. Fora de escopo por
+  decisão do CEO: telas "Natureza"/"Projeção" continuam só por competência.**
+- **`_base_query` ganha `excluir_investimento: bool = False`** — usado só por
+  `get_saldo_acumulado` (âncora `soma(saldo_inicial)` e acumulação de
+  receita/despesa excluem contas `tipo=investimento`; variação de valor de
+  mercado não é uma transação).
+- **Patrimônio redesenhado — de snapshot bancário pra ledger acumulado:**
+  `PatrimonioBreakdown` troca `saldo_contas`/`saldo_cartoes` (ambos snapshot
+  ao vivo) por `saldo_liquido_acumulado` (via `get_saldo_acumulado(regime=...,
+  ano/mes=hoje, meses=1)`, que já exclui investimento) + `saldo_investimentos`
+  (snapshot ao vivo, só contas `tipo=investimento`). **Fallback de conta sem
+  `saldo_inicial`:** contas líquidas (não-investimento) sem `saldo_inicial`
+  não entram na acumulação de `get_saldo_acumulado` — `_saldo_liquido_fallback`
+  soma o saldo ao vivo dessas contas específicas por fora, mantendo a
+  convenção de sinal de `_base_query` (cartão de crédito subtrai, demais
+  somam), sem quebrar o cálculo das contas ancoradas. `total = saldo_liquido_acumulado
+  + saldo_investimentos + ativos − passivos`.
+- **`app/dashboards/router.py`:** query param `regime` em `/summary`,
+  `/tendencia`, `/por-categoria`, `/por-categoria/tendencia`, `/por-ativo`,
+  `/por-ativo/tendencia`, `/por-passivo`, `/por-passivo/tendencia`,
+  `/saldo-acumulado`, `/patrimonio/breakdown`.
+- **Frontend:** `components/RegimeToggle.tsx` novo (mesmo padrão `aria-pressed`
+  do toggle despesa/receita de `AssetsPage`), state `regime` levantado em
+  `DashboardsPage`/`AssetsPage`/`LiabilitiesPage`, propagado pros hooks
+  (`useDashboardSummary`, `useDashboardTendencia`, `useDashboardByCategoria`,
+  `useDashboardCategoriaTendencia`, `useDashboardSaldoAcumulado`,
+  `useAssetGastos`/`Tendencia`, `useLiabilityGastos`/`Tendencia`,
+  `usePatrimonioBreakdown` — `regime` incluído na `queryKey` de cada um) e
+  incluído nas queries via `buildQuery`. `PatrimonioBreakdownPanel` atualizado
+  pros campos novos — linha "Saldo líquido acumulado" agora abre o drill-down
+  existente de "Saldo Acumulado" (`TrendChart`) em vez do antigo "Saldo em
+  conta"/"Saldo de cartão de crédito".
+- **418 testes backend (98% cobertura, +39 sobre a Sprint 15) + 162 testes
+  frontend (+7)**, suíte completa verde. Migration `0013` testada via um
+  precedente novo no projeto: `_backfill` extraída como função plana
+  (não depende do contexto `op` do alembic) e testada com `importlib` carregando
+  o arquivo de migration diretamente contra o schema do `db_session` de teste.
+- **Deploy na VM de dev + validação real:** CI verde publicou as imagens,
+  `git pull` + `docker compose pull` + `docker compose up -d`, `alembic
+  upgrade head` rodou automaticamente no entrypoint do container `api`
+  (`0012 → 0013`), `POST /pluggy/sync` re-sincronizou as 2 contas reais
+  (corrige o bug de fuso em dado histórico). `scripts/browser-check/check-sprint16.mjs`
+  (novo, só leitura — nenhuma mutação de dado persistido, diferente da Sprint
+  15): toggle Competência/Caixa presente e funcional no Dashboard/Ativos/
+  Passivos, drill-down de Patrimônio com os rótulos novos, "Ver detalhe" de
+  "Saldo líquido acumulado" abrindo o drill-down de Saldo Acumulado,
+  desktop+mobile, sem erros de console reais (só o 401 já documentado na
+  Sprint 15 de uma chamada em voo no instante do logout, confirmado via
+  script de diagnóstico que o mesmo fluxo sem logout não produz o erro).
+  Único achado foi no próprio script (assertion invertida sobre o toggle
+  despesa/receita pré-existente de `AssetsPage`), não na aplicação.
+  Confirmado contra dado real da conta do CEO: `Despesa` competência
+  R$ 8.309,59 vs. caixa R$ 8.066,41 no mesmo período — o toggle realmente
+  muda o número exibido, não só a UI; transações de cartão sincronizadas
+  mostrando `data_competencia` sempre 1 mês após `data` (ex.: `data=2028-05-29`
+  → `data_competencia=2028-06-29`).
+- **Achado real pendente de ação do CEO (não bloqueia a sprint, documentado
+  para a validação final):** a conta "NuBank - Cartão de Crédito" não tem
+  `saldo_inicial` preenchido — cai no fallback de `_saldo_liquido_fallback`
+  (soma o saldo ao vivo por fora da acumulação, comportamento correto e não
+  quebra as demais contas), mas o card "Patrimônio" só reflete o Saldo
+  Acumulado real dessa conta assim que o CEO preencher o campo em
+  Configurações (mesmo aviso já registrado no plano da sprint).
+
+PRD: [PRD-016-regime-competencia-caixa-patrimonio.md](../prd/PRD-016-regime-competencia-caixa-patrimonio.md).
+Plano: [SPRINT-016-regime-competencia-caixa-plan.md](../sprints/SPRINT-016-regime-competencia-caixa-plan.md).
+Relatório: [SPRINT-016-regime-competencia-caixa-report.md](../sprints/SPRINT-016-regime-competencia-caixa-report.md).
+
+## Qualidade (Sprint 1 → Sprint 16)
+
+- **Testes backend:** 418 testes, 98% cobertura total. Sprint 16 (100% em
+  `app/categorization/competencia.py`, 99% em `app/dashboards/service.py`):
+  `competencia_padrao`/`caixa` (cartão incondicional, demais tipos sem
+  defasagem, inclusive quando a competência já foi deslocada por Salário);
+  `_parse_date` (timestamp UTC próximo da virada de dia em BRT, com e sem
+  cruzar meia-noite); os 3 pontos de escrita respeitando cartão vs. salário
+  vs. default (cartão tem prioridade); cada função de `dashboards/service.py`
+  com `regime="caixa"` via um helper `_cartao_com_competencia_deslocada`
+  (evento/competência/caixa em meses diferentes, isola qual data cada
+  regime usa); `get_saldo_acumulado` excluindo investimento (âncora e
+  acumulação, com/sem conta de investimento); Patrimônio — `saldo_investimentos`
+  separado de `saldo_liquido_acumulado`, fallback de conta sem `saldo_inicial`
+  (sinal correto pra corrente vs. cartão), investimento nunca entra no
+  fallback; migration `0013` — backfill contra fixture com cartão histórico,
+  clamp de dia, isolamento por transação. Sprint 15 (100% em
   `app/categorization/competencia.py`, 99% em `app/categorization/service.py`
   e `app/dashboards/service.py`, 98% em `app/pluggy_integration/service.py`):
   `shift_to_next_month`/`competencia_salario` (fronteira do dia de corte,
