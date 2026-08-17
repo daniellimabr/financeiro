@@ -50,7 +50,12 @@ async function runSteps(page, label) {
   await page
     .getByRole("heading", { name: "Competência de Salário" })
     .waitFor({ state: "visible" });
-  await page.getByRole("heading", { name: "Gestão de Contas" }).waitFor({ state: "visible" });
+  // getByRole por nome é case-insensitive por padrão — "Gestão de Contas" (h3,
+  // seção desta tela) e "Gestão de contas" (h2, título interno do
+  // AccountManagementPage reaproveitado) colidem sem `level`.
+  await page
+    .getByRole("heading", { name: "Gestão de Contas", level: 3 })
+    .waitFor({ state: "visible" });
   await page.waitForTimeout(300);
   await page.screenshot({
     path: path.join(shotsDir, `${label}-sprint15-01-configuracoes.png`),

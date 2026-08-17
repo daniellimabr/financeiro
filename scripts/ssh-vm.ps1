@@ -15,7 +15,14 @@ param(
     [string[]]$RemoteCommand
 )
 
-$ErrorActionPreference = "Stop"
+# "Continue" (não "Stop"): comandos nativos abaixo (pip, python/ssh_vm.py) podem
+# escrever em stderr sem terem falhado de verdade — o remoto roda `git pull`,
+# cujo progresso vai sempre para stderr por convenção do git. Sob "Stop",
+# PowerShell 5.1 trata qualquer escrita em stderr de um comando nativo como
+# erro terminante mesmo com exit code 0, derrubando o script antes do comando
+# remoto real rodar. Falha de verdade continua detectada via `exit $LASTEXITCODE`
+# no fim do script, que já propaga o código real do processo remoto.
+$ErrorActionPreference = "Continue"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $VenvPath = Join-Path $RepoRoot ".venv-ssh"
 
@@ -36,7 +43,11 @@ $ActivateScript = Join-Path $VenvPath "Scripts\Activate.ps1"
 & $ActivateScript
 
 $RequirementsFile = Join-Path $PSScriptRoot "requirements-ssh.txt"
-pip install --quiet -r $RequirementsFile
+# --disable-pip-version-check evita que o aviso "new release available" do pip
+# (escrito em stderr) vire um NativeCommandError fatal sob $ErrorActionPreference
+# = "Stop" (PowerShell 5.1 trata qualquer escrita em stderr de um comando nativo
+# como erro terminante nesse modo, mesmo com exit code 0).
+pip install --quiet --disable-pip-version-check -r $RequirementsFile
 
 $SshVmScript = Join-Path $PSScriptRoot "ssh_vm.py"
 

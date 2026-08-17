@@ -12,7 +12,7 @@ Fases em épicos, derivados do escopo funcional do bootstrap. PRDs individuais s
 | E4 | Gestão de dados mestres ✅ | Categorias/subcategorias/natureza (item 10); ativos/passivos (item 9) — concluído na Sprint 2 (2026-08-06) |
 | E5 | Dashboards core ✅ | Receita/despesa/saldo/patrimônio com drill-down; filtros ano/mês (itens 3, 7) — concluído na Sprint 5 (2026-08-14) |
 | E6 | Dashboards analíticos ✅ | Tendência histórica, percentual de representatividade, despesas por ativo (itens 4, 5, 6) — parte 1 (tendência/percentual/design system) ✅ Sprint 6; parte 2 (Gestão de Ativos) ✅ Sprint 8; parte 3 (cards Ativos/Passivos, drilldowns, refinamentos de Dashboard) ✅ Sprint 9 — épico fechado. Patrimônio/evolução de investimentos segue adiado por falta de série histórica no schema |
-| E7 | Conta e perfil | Perfil de usuário, logout, multiusuário (item 11); tela de Configurações (absorve Gestão de Contas) + regra de competência de salário — planejada como Sprint 15 |
+| E7 | Conta e perfil ✅ | Perfil de usuário, logout; tela de Configurações (absorve Gestão de Contas) + regra de competência de salário + saldo inicial por conta/Saldo Acumulado — ✅ Sprint 15 (2026-08-17). Multiusuário/item 11 (UI de convidar/remover) adiado pra sprint futura, decisão do CEO — arquitetura já suporta |
 | E8 | Migração de dados legados ✅ | Import de categorias (Sprint 2) + memória de classificação do v1 (Sprint 4) — concluído em 2026-08-14 |
 | E9 | Natureza e projeção de custos ✅ | Classificação de subcategoria por natureza (fixo recorrente/variável recorrente/eventual) + dashboard de visibilidade — ✅ Sprint 12 (2026-08-16); rótulo "Eventual", funil Natureza>Categoria>Subcategoria>Transação e redesign de tabelas/botões do app — ✅ Sprint 13 (2026-08-16); projeção de custos futuros (receita/despesa/saldo) com simulação efêmera de hipotéticas — ✅ Sprint 14 (2026-08-16) — épico fechado |
 
@@ -512,9 +512,81 @@ PRD: [PRD-014-projecao-custos-hipoteticas.md](prd/PRD-014-projecao-custos-hipote
 Plano: [SPRINT-014-projecao-custos-hipoteticas-plan.md](sprints/SPRINT-014-projecao-custos-hipoteticas-plan.md).
 Relatório: [SPRINT-014-projecao-custos-hipoteticas-report.md](sprints/SPRINT-014-projecao-custos-hipoteticas-report.md) — aprovado pelo CEO em 2026-08-16.
 
+### Sprint 15 — Configurações, competência de salário e Saldo Acumulado (E7, fecha o épico) ✅ concluída em 2026-08-17
+
+Planejada em sessão própria (2026-08-16), a partir do título de roadmap
+herdado da divisão Sprint 12/13/14/15 (ver notas das Sprints 12/13/14
+acima). **Escopo cresceu além da linha original do roadmap durante esta
+sessão de planejamento**, por pedido explícito do CEO: a regra de
+competência de salário sozinha não bastava, porque o corte de sincronização
+Pluggy (`2026-01-01`) nunca trouxe o salário real de dez/2025 (cuja
+competência passa a ser jan/2026) nem o saldo real das contas até aquela
+data — sem os dois informados manualmente, jan/2026 ficaria com receita
+subestimada e não haveria como auditar saldo de conta contra extrato
+bancário real. Decisões resolvidas com o CEO via perguntas diretas (não
+presumidas pelo CTO), mesmo padrão das Sprints 12/13: dia de corte de
+competência de salário configurável por usuário (default 25, identificação
+por subcategoria "Salário", não por texto); salário de dez/2025 informado
+como uma **transação real** (não um número solto) pra aparecer no
+drill-down normal de jan/2026 — correção do CEO a meio da sessão, depois de
+um primeiro desenho que somava o valor "escondido" em 3 funções de
+agregação; saldo inicial por conta (31/12/2025), não um valor agregado
+único, alimentando uma ferramenta de auditoria mensal por conta (data real
+da transação, pra bater com extrato bancário) que fica só em
+Configurações, sem virar card de Dashboard; e uma métrica agregada nova,
+"Saldo Acumulado" (por competência, ancorada em saldo inicial somado menos
+o salário de dez/2025), com dois cards novos no Dashboard — "Saldo
+Acumulado" (mês filtrado) e "Saldo Anterior" (primeiro card da grid, mês
+anterior, navega o filtro da tela ao ser clicado, com alerta em vez de
+navegação no caso especial de jan/2026, cujo "mês anterior" não é
+navegável). "Multiusuário" (item 11 do escopo original de E7) fica fora
+desta sprint por decisão do CEO — já coberto arquiteturalmente, sem
+trabalho novo necessário.
+
+Implementada em sessão própria (2026-08-16/17): `app/categorization/competencia.py`
+novo (`shift_to_next_month`/`competencia_salario`), hook em `set_category`/
+`bulk_confirm` recalculando `data_competencia` a cada confirmação (shift pra
+Salário, reset ao sair); migration `0012` (`users.salario_competencia_cutoff_dia`,
+`pluggy_accounts.saldo_inicial`, backfill de `data_competencia`);
+`upsert_salario_ajuste_dez_2025` (transação sentinela idempotente, flui por
+`get_summary`/`get_tendencia`/`get_por_categoria` sem nenhum código especial —
+testado como regressão explícita); `get_evolucao_saldo_por_conta` (auditoria por
+conta, `data` real) e `get_saldo_acumulado` (agregado por competência, âncora
+saldo_inicial−sentinela) novos em `app/dashboards/service.py`, com
+`_receita_despesa_por_periodo` extraído de `get_tendencia` pra reuso. Frontend:
+`ConfiguracoesPage.tsx` novo (3 seções — Perfil+logout, Competência de Salário,
+Gestão de Contas reaproveitada), `ProtectedPage.tsx` troca "Gestão de contas" por
+"Configurações"; `AccountManagementPage.tsx` ganha saldo inicial editável +
+tabela de auditoria mensal; `DashboardsPage.tsx` ganha cards "Saldo Acumulado"
+(drill-down com `TrendChart`) e "Saldo Anterior" (primeiro card, navega o filtro
+ao clicar exceto em jan/2026, que alerta). 379 testes backend (98% cobertura) +
+155 testes frontend, suíte completa verde. CI pegou um bug real de teste (não da
+aplicação): `id(object())` usado como gerador de id "único" em
+`test_dashboards_endpoints.py` colidia sob CPython/Linux (endereço de memória
+reciclado), violando unique constraint — não reproduzia em Windows/Python 3.14;
+corrigido com contador `itertools`. Deploy na VM de dev e validação ao vivo via
+`scripts/browser-check/check-sprint15.mjs` (novo): logout, 3 seções, edição de
+dia de corte/ajuste de salário/saldo inicial (todas revertidas ao valor real
+original, confirmado por leitura direta da API pós-script — nenhum dado do CEO
+alterado permanentemente), tabela de auditoria, os dois cards novos incluindo o
+caso especial de "Saldo Anterior" em jan/2026 (alerta) vs. outro mês (navega),
+desktop+mobile, sem erros de console reais. Único achado foi no próprio script
+(ambiguidade de `getByRole` entre o `<h3>` novo "Gestão de Contas" e o `<h2>`
+"Gestão de contas" já existente dentro do componente reaproveitado), não na
+aplicação. Achado de infra à parte: `scripts/ssh-vm.ps1` tinha
+`$ErrorActionPreference = "Stop"` global, que derrubava o script sempre que o
+comando remoto (`git pull`) escrevia em stderr (progresso do git, convenção
+normal) — corrigido para `"Continue"`, já que a propagação de erro real sempre
+foi via `exit $LASTEXITCODE`.
+
+PRD: [PRD-015-configuracoes-competencia-salario-saldo-acumulado.md](prd/PRD-015-configuracoes-competencia-salario-saldo-acumulado.md).
+Plano: [SPRINT-015-configuracoes-competencia-salario-plan.md](sprints/SPRINT-015-configuracoes-competencia-salario-plan.md).
+Relatório: [SPRINT-015-configuracoes-competencia-salario-report.md](sprints/SPRINT-015-configuracoes-competencia-salario-report.md).
+
 ## Registro de reavaliações futuras
 
 - **Understand Anything:** reavaliar instalação quando o codebase ultrapassar ~100 arquivos (ver ADR-002-plugins).
 - **Sync Pluggy agendada:** só entra no roadmap se o CEO priorizar explicitamente.
 - **Ativo como nova camada do funil Categoria>Tipo>Transação (Dashboard):** ideia levantada pelo CEO na revisão pós-Sprint 10 (2026-08-15) — quando uma subcategoria (Tipo) tem transações vinculadas a um ativo, o drill-down ganharia um nível "Ativo" entre Tipo e Transação, agrupando por ativo antes de chegar na lista de transações. Registrada como candidata; requer sessão de `/plan` própria (decisões em aberto: só aparece quando há ≥1 transação com asset_id na subcategoria? bucket "sem ativo" pras demais? mesmo padrão pro funil de Passivos?) — sem PRD/plano ainda.
+- **Multiusuário — UI de gestão de usuários (item 11 do escopo original de E7):** decisão explícita do CEO na sessão de planejamento da Sprint 15 (2026-08-16) — já coberto arquiteturalmente (isolamento por `user_id` em toda tabela, login individual Google, suporta ~10 usuários sem retrabalho), mas não há UI pra ver/convidar/remover outros usuários. Sem PRD/plano ainda; entra no roadmap quando o CEO priorizar.
 - **Persistir despesas/receitas hipotéticas como cenários salvos:** decisão explícita do CEO na sessão de planejamento da Sprint 14 (2026-08-16) — a simulação da tela "Projeção" fica efêmera (sem CRUD, sem tabela) por ora. Se o CEO quiser voltar a um cenário entre sessões (ex.: comparar "com reforma" vs. "sem reforma" ao longo de semanas), viraria candidata a sprint futura com tabela nova + CRUD — sem PRD/plano ainda.
