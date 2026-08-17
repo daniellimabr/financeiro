@@ -2,7 +2,7 @@
 
 - **Plano:** [SPRINT-015-configuracoes-competencia-salario-plan.md](./SPRINT-015-configuracoes-competencia-salario-plan.md)
 - **Data do relatório:** 2026-08-17
-- **Status:** aguardando aprovação do CEO
+- **Status:** aprovado pelo CEO em 2026-08-17
 
 ## Resumo
 
@@ -167,7 +167,7 @@ sprint em escopo desde a Sprint 13, mas concluída numa sessão só.
 
 ## Pendências e próximos passos sugeridos
 
-- Nenhum bloqueio técnico conhecido. Aguardando revisão/aprovação do CEO.
+- Nenhum bloqueio técnico conhecido. Sprint aprovada pelo CEO em 2026-08-17.
 - UI de gestão de usuários (multiusuário, item 11 do escopo original de E7)
   segue registrada como candidata futura sem sprint numerada
   (`docs/roadmap.md`, "Registro de reavaliações futuras") — arquitetura já
