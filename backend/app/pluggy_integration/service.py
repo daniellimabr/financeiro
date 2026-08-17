@@ -346,8 +346,16 @@ def _upsert_transaction(
     tx.valor = Decimal(str(raw["amount"]))
     tx.tipo = _map_transaction_tipo(raw["type"])
     tx.data = tx_date
-    tx.data_competencia = competencia_padrao(tx_date, account.tipo)
-    tx.data_caixa = caixa(tx.data_competencia, account.tipo)
+    # Cartão sempre desloca incondicionalmente (mesmo valor de novo, sem
+    # risco de perder ajuste manual). Transação já confirmada em outra conta
+    # pode ter data_competencia deslocada por categoria (ex.: Salário, via
+    # set_category/bulk_confirm) — resync não deve descartar esse ajuste.
+    if (
+        account.tipo == PluggyAccountTipo.cartao_credito
+        or tx.categorizacao_status != PluggyTransactionCategorizacaoStatus.confirmada
+    ):
+        tx.data_competencia = competencia_padrao(tx_date, account.tipo)
+        tx.data_caixa = caixa(tx.data_competencia, account.tipo)
     tx.categoria_pluggy = raw.get("category")
     tx.status = _map_transaction_status(raw.get("status", "POSTED"))
     db.flush()

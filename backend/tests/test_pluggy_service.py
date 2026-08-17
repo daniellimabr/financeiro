@@ -183,6 +183,58 @@ def test_sync_item_writes_data_competencia_equal_to_data_on_resync(db_session, u
     assert transactions[0].data_competencia == transactions[0].data
 
 
+def test_resync_does_not_discard_salario_competencia_shift_of_confirmed_transaction(
+    db_session, user
+):
+    # Bug real encontrado em produção (Sprint 16, sessão de correção
+    # 2026-08-17): resync sempre reescrevia data_competencia pro valor
+    # padrão, mesmo em transação já confirmada com deslocamento de
+    # competência (Salário) — apagava silenciosamente o ajuste do usuário a
+    # cada re-sincronização.
+    from app.categorization import service as categorization_service
+
+    salario = _salario_subcategory(db_session)
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[_account_raw()],
+        transactions_by_account={"acc-ext-1": [_transaction_raw(date="2026-07-30T12:00:00.000Z")]},
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+
+    tx = service.list_transactions(db_session, user.id)[0]
+    confirmed = categorization_service.set_category(db_session, user.id, tx.id, salario.id)
+    assert confirmed.data_competencia == date(2026, 8, 30)  # dia 30 >= cutoff padrão (25)
+
+    service.sync_item(db_session, client, user.id, item.id)
+
+    resynced = service.list_transactions(db_session, user.id)[0]
+    assert resynced.data_competencia == date(2026, 8, 30)
+    assert resynced.data_caixa == date(2026, 8, 30)
+
+
+def test_resync_still_resets_data_competencia_of_pending_transaction(db_session, user):
+    # Contraste com o teste acima: sem confirmação, o resync continua livre
+    # pra corrigir data_competencia pro valor padrão (nenhum ajuste de
+    # categoria a preservar).
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[_account_raw()],
+        transactions_by_account={"acc-ext-1": [_transaction_raw()]},
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+
+    tx = service.list_transactions(db_session, user.id)[0]
+    tx.data_competencia = date(2099, 1, 1)  # simula um valor "estragado" a corrigir
+    db_session.commit()
+
+    service.sync_item(db_session, client, user.id, item.id)
+
+    resynced = service.list_transactions(db_session, user.id)[0]
+    assert resynced.data_competencia == resynced.data
+
+
 def test_sync_item_twice_does_not_duplicate_accounts_or_transactions(db_session, user):
     client = FakePluggyClient(
         item=_item_raw(),
