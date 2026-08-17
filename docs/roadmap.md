@@ -647,6 +647,32 @@ PRD: [PRD-016-regime-competencia-caixa-patrimonio.md](prd/PRD-016-regime-compete
 Plano: [SPRINT-016-regime-competencia-caixa-plan.md](sprints/SPRINT-016-regime-competencia-caixa-plan.md).
 Relatório: [SPRINT-016-regime-competencia-caixa-report.md](sprints/SPRINT-016-regime-competencia-caixa-report.md).
 
+### Sprint 17 — Filtro de conta em Categorizar e validação de dados/cálculos contra extrato real (cross-epic, sem épico prévio)
+
+Planejada em sessão própria (2026-08-17). CEO trouxe o extrato do Itaú do 1º
+semestre de 2026 (PDF) para validar sistematicamente, gasto a gasto e saldo a
+saldo, se o sistema faz as contas certas — nunca houve, até aqui, uma
+reconciliação linha a linha contra dado bancário real cobrindo todo o período
+sincronizado. **Decisão explícita do CEO:** sem que as contas estejam
+corretas, não há razão para desenvolver ou refinar qualquer outra
+funcionalidade — esta sprint pausa evolução de feature nova até a
+reconciliação fechar.
+
+Dois blocos: (1) filtro de conta específica (`account_id`, não tipo de conta)
+na tela Categorizar — pré-requisito pedido explicitamente para isolar uma
+conta (ex. "Itaú - Conta Corrente") na revisão gasto a gasto; (2) processo de
+validação mês a mês (janeiro a junho/2026, janela coberta pelo PDF),
+reaproveitando a tabela de auditoria por conta (`get_evolucao_saldo_por_conta`,
+Sprint 15) e o toggle Competência/Caixa (Sprint 16) — nenhuma ferramenta nova
+além do filtro. Julho/agosto ficam fora do escopo desta reconciliação
+orientada a arquivo (revisão "no olho" numa sessão futura, sem extrato
+formal). Escopo de correções não é pré-especificável — depende do que a
+comparação contra o extrato revelar; heurística de lag de dia útil Pluggy vs.
+Itaú segue fora de escopo (decisão já fechada na Sprint 16).
+
+PRD: [PRD-017-filtro-conta-validacao-extrato.md](prd/PRD-017-filtro-conta-validacao-extrato.md).
+Plano: [SPRINT-017-filtro-conta-validacao-extrato-plan.md](sprints/SPRINT-017-filtro-conta-validacao-extrato-plan.md).
+
 ## Registro de reavaliações futuras
 
 - **Understand Anything:** reavaliar instalação quando o codebase ultrapassar ~100 arquivos (ver ADR-002-plugins).
