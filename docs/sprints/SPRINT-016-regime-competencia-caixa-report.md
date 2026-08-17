@@ -2,6 +2,7 @@
 
 - **Plano:** [SPRINT-016-regime-competencia-caixa-plan.md](./SPRINT-016-regime-competencia-caixa-plan.md)
 - **Data do relatório:** 2026-08-17
+- **Status:** aprovado pelo CEO em 2026-08-17
 
 ## Resumo
 
@@ -124,6 +125,44 @@ frontend: prettier --check . — All matched files use Prettier code style!
   CEO além do `POST /pluggy/sync` explicitamente previsto no plano** (que é
   idempotente e só corrige `data`/`data_competencia`/`data_caixa` de
   transações já existentes).
+
+## Correção pós-relatório: resync apagava competência de Salário confirmado
+
+O CEO reportou, depois de ler este relatório, que o salário recebido em
+30/07 aparecia em julho em vez de agosto — bug real, não da leitura do CEO.
+**Causa raiz:** `_upsert_transaction` (rodado a cada sync) sempre
+reescrevia `data_competencia`/`data_caixa` pro valor padrão
+(`competencia_padrao`) em toda sincronização, mesmo em transações **já
+confirmadas** com deslocamento de competência (Salário) — cada re-sync
+desfazia silenciosamente o ajuste aplicado na confirmação. Bug
+pré-existente desde a Sprint 15 (a lógica de sync sempre foi
+`data_competencia = data`, incondicional), só nunca tinha se manifestado
+porque ninguém tinha rodado um re-sync depois de confirmar um salário —
+até o `POST /pluggy/sync` desta própria sessão de validação (tarefa 15/16
+do plano), que expôs o bug ao vivo.
+
+**Extensão real do dano:** 9 das 10 transações reais categorizadas como
+"Salário" estavam com `data_competencia` incorreta (a 10ª, a transação
+sentinela de dez/2025, não passa pelo sync normal e ficou correta). Todas
+as 9 foram corrigidas na hora, re-confirmando a mesma categoria via `PUT
+/categorization/transactions/{id}/category` (que já tinha a lógica
+correta — o bug estava só no caminho de sync, não na confirmação),
+verificado um a um contra a regra de negócio (dia ≥ 25 desloca pro mês
+seguinte, com clamp de dia via `calendar.monthrange`).
+
+**Correção de código:** `_upsert_transaction` só recalcula
+`data_competencia`/`data_caixa` incondicionalmente para conta
+`cartao_credito` (sempre desloca, mesmo valor sempre — sem risco) ou
+transação ainda não confirmada (`categorizacao_status != confirmada` —
+nada a preservar). Transação confirmada em conta não-cartão mantém o valor
+já calculado por `set_category`/`bulk_confirm`, que passa a ser a fonte de
+verdade até uma nova recategorização. 2 testes de regressão novos (420
+testes no total): um confirma que o resync preserva o deslocamento de uma
+transação confirmada, outro confirma que uma transação **pendente**
+continua sendo corrigida livremente pelo resync (nenhum ajuste de usuário
+a perder nesse caso). Deploy na VM de dev e verificação de que o fix está
+ao vivo pendente de conclusão do CI no momento em que este relatório foi
+atualizado — ver commit `c819c10`.
 
 ## Critérios de aceite do PRD — verificação item a item
 
