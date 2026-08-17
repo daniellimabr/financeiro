@@ -728,6 +728,67 @@ PRD: [PRD-018-edicao-data-saldo-acumulado-guia-cards.md](prd/PRD-018-edicao-data
 Plano: [SPRINT-018-edicao-data-saldo-acumulado-guia-cards-plan.md](sprints/SPRINT-018-edicao-data-saldo-acumulado-guia-cards-plan.md).
 Relatório: [SPRINT-018-edicao-data-saldo-acumulado-guia-cards-report.md](sprints/SPRINT-018-edicao-data-saldo-acumulado-guia-cards-report.md).
 
+### Sprint 19 — Gestão de Investimentos, Blocos 1+2 (cross-epic, sem épico prévio) ✅ concluída em 2026-08-17
+
+Planejada em sessão própria (2026-08-17), formalizando o item já registrado em
+"Registro de reavaliações futuras" desde a Sprint 17 (reconfirmado na Sprint
+18). Três blocos: (1) modelo `Investimento` — agrupamento lógico definido
+pelo usuário, `nome` só, com vínculo 1:N a carteiras (`PluggyAccount`
+`tipo=investimento`, `investimento_id` novo); (2) Aporte/Resgate como
+subcategorias normais do grupo novo "Investimentos" (`excluir_de_totais=
+false`, decisão do CEO — contam nos totais de Despesa/Receita como qualquer
+transação), com sugestão automática (mesma cascata regra→histórico→fuzzy já
+usada pra Ativo, clonada 1:1) e tela nova `InvestimentosPage.tsx`
+(cards+drilldown, mesmo padrão de `AssetsPage`); (3) bloco de investigação
+com dado real — CEO conectou/sincronizou Nubank Investimentos e XP na VM de
+dev pra usar como evidência.
+
+Implementada em sessão própria (2026-08-17): migration `0015` (tabelas
+`investimentos`/`investimento_categorization_rules`, colunas
+`investimento_id`/`investimento_sugerido_id`/`investimento_sugestao_confianca`
+em `pluggy_accounts`/`pluggy_transactions`, seed do grupo "Investimentos" +
+subcategorias "Aporte"/"Resgate"); `app/investimentos/` novo (CRUD +
+`get_evolucao` — `saldo_base`/`saldo_atual`/`total_aportes`/`total_resgates`/
+`rendimento_estimado`, este último rotulado como estimativa em toda
+superfície); `suggest_investimento`/índices espelhando `suggest_asset` em
+`categorization/engine.py`; `GET /dashboards/por-investimento`(`/tendencia`),
+clones de `por-ativo`, **sem nenhuma mudança** em `_base_query`/
+`_patrimonio_breakdown`/`get_saldo_acumulado` (aporte/resgate acontecem na
+conta corrente de origem/destino, já fluem pelos totais existentes) — testado
+como regressão explícita. Frontend: `InvestimentosPage.tsx`,
+`InvestimentoSelectCell` em `TransactionEditCells.tsx`, coluna Investimento
+em `TransactionsTable`/`CategorizationReviewPage`, `<select>` de vínculo
+carteira→investimento em `AccountManagementPage` (só pra contas
+`tipo=investimento`). 497 testes backend (+54, 100% em `app/investimentos/`)
++ 176 testes frontend (+10), suíte completa verde. Deploy na VM de dev (CI
+verde → `git pull` + `docker compose pull` + `up -d`, `alembic upgrade head`
+automático).
+
+**Bloco 3 (investigação com dado real) — achado real, mas escopo maior que o
+previsto:** com as contas Nubank Investimentos e XP sincronizadas na VM de
+dev, a inspeção read-only revelou duas coisas. Primeiro, o item Nubank
+Investimentos sincronizou sem erro (`status=updated`) mas retornou **zero
+contas** do endpoint genérico `GET /accounts` da Pluggy — nada capturável por
+aí. Segundo, o item XP trouxe 3 contas, nenhuma classificada
+`tipo=investimento` pelo `_map_account_tipo` existente (2 `corrente` + 1
+`cartao_credito`) — mas uma dessas contas "corrente" carrega dezenas de
+transações reais de dividendos/JCP desde jan/2026, com `categoria_pluggy`
+`"Proceeds interests and dividends"`/`"Taxes on investments"` e tickers reais
+(TAEE11, BBSE3, VALE3, HAPV3). Ou seja: rendimento *incidental* já flui pelo
+endpoint genérico já integrado, mas a visão completa de posições/holdings que
+o CEO tinha no v1 (CDBs via "Caixinha Nubank", posições em ações) exige as
+rotas dedicadas de Investments da Pluggy (`/investments`,
+`/investments/transactions`), nunca chamadas neste projeto — escopo maior que
+uma subcategoria nova. **Decisão do CEO ao ver o achado:** não implementar a
+subcategoria "Rendimento" nem soltar o filtro de tipo de conta agora — fecha
+Sprint 19 só com Blocos 1+2; a integração completa de Investments (holdings)
+vira a **próxima sprint**, já confirmada pelo CEO (ver "Registro de
+reavaliações futuras").
+
+PRD: [PRD-019-gestao-de-investimentos.md](prd/PRD-019-gestao-de-investimentos.md).
+Plano: [SPRINT-019-gestao-de-investimentos-plan.md](sprints/SPRINT-019-gestao-de-investimentos-plan.md).
+Relatório: [SPRINT-019-gestao-de-investimentos-report.md](sprints/SPRINT-019-gestao-de-investimentos-report.md).
+
 ## Registro de reavaliações futuras
 
 - **Understand Anything:** reavaliar instalação quando o codebase ultrapassar ~100 arquivos (ver ADR-002-plugins).
@@ -737,4 +798,4 @@ Relatório: [SPRINT-018-edicao-data-saldo-acumulado-guia-cards-report.md](sprint
 - **Persistir despesas/receitas hipotéticas como cenários salvos:** decisão explícita do CEO na sessão de planejamento da Sprint 14 (2026-08-16) — a simulação da tela "Projeção" fica efêmera (sem CRUD, sem tabela) por ora. Se o CEO quiser voltar a um cenário entre sessões (ex.: comparar "com reforma" vs. "sem reforma" ao longo de semanas), viraria candidata a sprint futura com tabela nova + CRUD — sem PRD/plano ainda.
 - **Heurística de dia útil para o lag Pluggy vs. extrato bancário real:** decisão explícita do CEO na sessão de planejamento da Sprint 16 (2026-08-17) — transações de fim de semana às vezes aparecem no extrato do Itaú só no próximo dia útil (até 2 dias depois da data bruta que a Pluggy reporta), sem outro campo no payload (`postDate`/`settlementDate`) para corrigir automaticamente. Não implementado por ora (risco de heurística errada, sem tratar feriados); candidata a revisão futura se a Pluggy passar a expor um campo de liquidação, ou se o CEO priorizar uma heurística mesmo com o risco.
 - **Toggle competência/caixa nas telas "Natureza"/"Projeção":** fora de escopo da Sprint 16 (toggle só no Dashboard) — candidata a extensão futura se o CEO quiser o mesmo regime nessas telas.
-- **Categorização de Aporte/Resgate de investimento + tela de Gestão de Investimentos + conexão da conta de investimento NuBank via Pluggy:** achado do CEO na reconciliação da Sprint 17 (2026-08-17) — transferências para investimento (ex. Itaú→NuBank→Investimento) hoje caem em "Transferência interna" genérica ou, em pelo menos um caso real, ficam miscategorizadas como despesa comum, inflando totais. Escopo levantado pelo CEO: novas subcategorias "Investimento/Aporte" (despesa) e "Investimento/Resgate" (receita); tela nova com um card por investimento, drill-down pro extrato daquele investimento ao clicar; conectar a conta de investimento NuBank via Pluggy (ainda não conectada) e usar o dado real dela pra validar o destino dos aportes. **Reconfirmado 2x na Sprint 18** (2026-08-17) durante a investigação de Saldo Acumulado — R$2.052,01 em janeiro (fatura de cartão fora do corte de dados, tratado caso a caso) e R$10.000 em março (resgate de investimento, hoje categorizado temporariamente como "Receitas/Outras", sem taxonomia própria ainda). Sem PRD/plano ainda — candidata a próxima sessão de `/plan`.
+- **Integração completa de Investments da Pluggy (holdings/posições — CDBs, ações, "Caixinha"):** achado real da Sprint 19 (2026-08-17, bloco de investigação com dado real) — as rotas dedicadas de Investments da Pluggy (`/investments`, `/investments/transactions`) nunca foram chamadas neste projeto; o endpoint genérico já integrado (`/accounts`/`/transactions`) só captura rendimento *incidental* quando cai numa conta classificada `tipo≠investimento` (achado real: dividendos/JCP da XP, ver relatório da Sprint 19), não a visão de posições que o CEO tinha no v1. **Confirmada pelo CEO como a próxima sprint** — sem PRD/plano ainda, mas já não é "candidata a reavaliar", é a próxima entrada da fila.
