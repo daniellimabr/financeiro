@@ -4,7 +4,7 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Query, Session
 
 from app.models.asset import Asset, AssetStatus
@@ -183,14 +183,57 @@ def _competencia_column(regime: Regime):
     return PluggyTransaction.data_caixa if regime == "caixa" else PluggyTransaction.data_competencia
 
 
-def _base_query(db: Session, user_id: int, *, excluir_investimento: bool = False) -> Query:
+_PAGAMENTO_FATURA_SUBCATEGORY_NOME = "Pagamento de Fatura"
+_TRANSFERENCIA_INTERNA_GROUP_NOME = "Transferência interna"
+
+
+def _pagamento_fatura_subcategory_id(db: Session) -> int | None:
+    row = (
+        db.query(Subcategory.id)
+        .join(CategoryGroup, Subcategory.group_id == CategoryGroup.id)
+        .filter(
+            Subcategory.nome == _PAGAMENTO_FATURA_SUBCATEGORY_NOME,
+            CategoryGroup.nome == _TRANSFERENCIA_INTERNA_GROUP_NOME,
+        )
+        .one_or_none()
+    )
+    return row[0] if row else None
+
+
+def _base_query(
+    db: Session, user_id: int, *, excluir_investimento: bool = False, regime: Regime = "competencia"
+) -> Query:
     query = (
         db.query(PluggyTransaction)
         .join(PluggyAccount, PluggyTransaction.account_id == PluggyAccount.id)
         .outerjoin(Subcategory, PluggyTransaction.subcategory_id == Subcategory.id)
         .outerjoin(CategoryGroup, Subcategory.group_id == CategoryGroup.id)
         .filter(PluggyTransaction.user_id == user_id)
-        .filter(func.coalesce(CategoryGroup.excluir_de_totais, False).is_(False))
+    )
+
+    if regime == "caixa":
+        # Sob caixa, o cartão de crédito deixa de usar o deslocamento
+        # modelado (compra+2 meses, uma estimativa) — a própria transação
+        # real de "Pagamento de Fatura" (subcategoria dentro de
+        # "Transferência interna") passa a representar a saída de caixa, na
+        # data real em que o dinheiro saiu da conta corrente/poupança. Por
+        # isso ela escapa da exclusão de "Transferência interna" só sob esse
+        # regime, e toda transação de conta de cartão de crédito é excluída
+        # (evita contar a mesma compra 2 vezes: uma pela fatura real, outra
+        # pelo modelo de competência+1/caixa+2).
+        pagamento_fatura_id = _pagamento_fatura_subcategory_id(db)
+        if pagamento_fatura_id is not None:
+            query = query.filter(
+                or_(
+                    func.coalesce(CategoryGroup.excluir_de_totais, False).is_(False),
+                    PluggyTransaction.subcategory_id == pagamento_fatura_id,
+                )
+            )
+        else:
+            query = query.filter(func.coalesce(CategoryGroup.excluir_de_totais, False).is_(False))
+        query = query.filter(PluggyAccount.tipo != PluggyAccountTipo.cartao_credito)
+    else:
+        query = query.filter(func.coalesce(CategoryGroup.excluir_de_totais, False).is_(False))
         # Em conta de cartão de crédito, `tipo=credito` nunca é receita real —
         # é pagamento de fatura ou estorno/reversão de compra (sinal negativo
         # de `valor`, convenção já validada na Sprint 5 para saldo/fatura).
@@ -198,13 +241,13 @@ def _base_query(db: Session, user_id: int, *, excluir_investimento: bool = False
         # cartão têm valor negativo, contra 100% dos `debito` com valor
         # positivo — sem exceção que sugira receita real (ex.: cashback)
         # nesse tipo de conta.
-        .filter(
+        query = query.filter(
             ~(
                 (PluggyAccount.tipo == PluggyAccountTipo.cartao_credito)
                 & (PluggyTransaction.tipo == PluggyTransactionTipo.credito)
             )
         )
-    )
+
     if excluir_investimento:
         # Variação de valor de mercado de investimento não é uma transação —
         # usado só pelo Saldo Acumulado (get_saldo_acumulado), não pelas
@@ -233,7 +276,7 @@ def _sum_tipo(
     mes: int | None,
     regime: Regime = "competencia",
 ) -> Decimal:
-    query = _base_query(db, user_id).filter(PluggyTransaction.tipo == tipo)
+    query = _base_query(db, user_id, regime=regime).filter(PluggyTransaction.tipo == tipo)
     query = _apply_periodo(query, ano=ano, mes=mes, regime=regime)
     total = query.with_entities(
         func.coalesce(func.sum(func.abs(PluggyTransaction.valor)), 0)
@@ -351,7 +394,7 @@ def get_por_categoria(
     mes: int | None = None,
     regime: Regime = "competencia",
 ) -> list[CategoriaTotal]:
-    query = _base_query(db, user_id).filter(PluggyTransaction.tipo == tipo)
+    query = _base_query(db, user_id, regime=regime).filter(PluggyTransaction.tipo == tipo)
     query = _apply_periodo(query, ano=ano, mes=mes, regime=regime)
     rows = (
         query.with_entities(
@@ -430,7 +473,9 @@ def _receita_despesa_por_periodo(
     inicio, fim = _date_bounds(periodo)
     coluna = _competencia_column(regime)
 
-    query = _base_query(db, user_id, excluir_investimento=excluir_investimento).filter(
+    query = _base_query(
+        db, user_id, excluir_investimento=excluir_investimento, regime=regime
+    ).filter(
         coluna >= inicio,
         coluna < fim,
     )
@@ -489,7 +534,7 @@ def get_tendencia_por_categoria(
     coluna = _competencia_column(regime)
 
     query = (
-        _base_query(db, user_id)
+        _base_query(db, user_id, regime=regime)
         .filter(PluggyTransaction.tipo == tipo)
         .filter(
             coluna >= inicio,
@@ -635,7 +680,7 @@ def get_por_ativo(
     # agregação de transações. Sem bucket "sem ativo": a maioria das
     # transações não tem asset_id, e isso é esperado (ver PRD-008).
     query = (
-        _base_query(db, user_id)
+        _base_query(db, user_id, regime=regime)
         .join(Asset, PluggyTransaction.asset_id == Asset.id)
         .filter(PluggyTransaction.tipo == tipo)
     )
@@ -666,7 +711,7 @@ def get_tendencia_por_ativo(
     coluna = _competencia_column(regime)
 
     query = (
-        _base_query(db, user_id)
+        _base_query(db, user_id, regime=regime)
         .join(Asset, PluggyTransaction.asset_id == Asset.id)
         .filter(PluggyTransaction.tipo == tipo)
         .filter(
@@ -722,7 +767,7 @@ def get_por_passivo(
     # de tipo exposto ao chamador (diferente de /por-ativo) — regime de
     # competência/caixa continua disponível.
     query = (
-        _base_query(db, user_id)
+        _base_query(db, user_id, regime=regime)
         .join(Liability, PluggyTransaction.liability_id == Liability.id)
         .filter(PluggyTransaction.tipo == PluggyTransactionTipo.debito)
     )
@@ -756,7 +801,7 @@ def get_tendencia_por_passivo(
     coluna = _competencia_column(regime)
 
     query = (
-        _base_query(db, user_id)
+        _base_query(db, user_id, regime=regime)
         .join(Liability, PluggyTransaction.liability_id == Liability.id)
         .filter(PluggyTransaction.tipo == PluggyTransactionTipo.debito)
         .filter(

@@ -1888,13 +1888,11 @@ def test_get_saldo_acumulado_excludes_investimento_transactions_from_accumulatio
 
 
 def test_get_saldo_acumulado_regime_caixa_uses_data_caixa(db_session, user):
-    cartao = _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito)
-    cartao.saldo_inicial = Decimal("0")
-    db_session.flush()
+    conta = _account(db_session, user)
     _transaction(
         db_session,
         user,
-        cartao,
+        conta,
         valor="-100.00",
         tipo=PluggyTransactionTipo.debito,
         data=date(2026, 1, 10),
@@ -1920,14 +1918,18 @@ def test_get_saldo_acumulado_regime_caixa_uses_data_caixa(db_session, user):
 # --- get_summary / get_por_categoria / etc. respeitando regime (Sprint 16) --
 
 
-def _cartao_com_competencia_deslocada(db_session, user):
-    """Transação de cartão: evento em jan, competência fev, caixa mar —
-    permite diferenciar as 3 datas em cada teste de regime."""
-    cartao = _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito)
+def _transacao_com_caixa_deslocado(db_session, user):
+    """Transação de conta corrente com data/competência/caixa manualmente
+    divergentes (evento em jan, competência fev, caixa mar) — permite
+    diferenciar as 3 datas em cada teste de regime sem depender do
+    tratamento especial de cartão de crédito sob caixa (Sprint 18, que
+    exclui cartão inteiramente desse regime — ver
+    test_get_saldo_acumulado_regime_caixa_excludes_cartao_credito)."""
+    conta = _account(db_session, user)
     tx = _transaction(
         db_session,
         user,
-        cartao,
+        conta,
         valor="-100.00",
         tipo=PluggyTransactionTipo.debito,
         data=date(2026, 1, 20),
@@ -1939,7 +1941,7 @@ def _cartao_com_competencia_deslocada(db_session, user):
 
 
 def test_get_summary_regime_caixa_uses_data_caixa(db_session, user):
-    _cartao_com_competencia_deslocada(db_session, user)
+    _transacao_com_caixa_deslocado(db_session, user)
 
     competencia = service.get_summary(db_session, user.id, ano=2026, mes=2)
     caixa = service.get_summary(db_session, user.id, ano=2026, mes=3, regime="caixa")
@@ -1949,7 +1951,7 @@ def test_get_summary_regime_caixa_uses_data_caixa(db_session, user):
 
 
 def test_get_por_categoria_regime_caixa_uses_data_caixa(db_session, user):
-    tx = _cartao_com_competencia_deslocada(db_session, user)
+    tx = _transacao_com_caixa_deslocado(db_session, user)
     group = _group(db_session, nome="Cartão")
     sub = _subcategory(db_session, group=group, nome="Compras")
     tx.subcategory_id = sub.id
@@ -1967,7 +1969,7 @@ def test_get_por_categoria_regime_caixa_uses_data_caixa(db_session, user):
 
 
 def test_get_tendencia_regime_caixa_uses_data_caixa(db_session, user):
-    _cartao_com_competencia_deslocada(db_session, user)
+    _transacao_com_caixa_deslocado(db_session, user)
 
     tendencia = service.get_tendencia(db_session, user.id, ano=2026, mes=3, meses=3, regime="caixa")
 
@@ -1978,7 +1980,7 @@ def test_get_tendencia_regime_caixa_uses_data_caixa(db_session, user):
 
 
 def test_get_tendencia_por_categoria_regime_caixa_uses_data_caixa(db_session, user):
-    tx = _cartao_com_competencia_deslocada(db_session, user)
+    tx = _transacao_com_caixa_deslocado(db_session, user)
     sub = _subcategory(db_session, nome="Compras")
     tx.subcategory_id = sub.id
     db_session.commit()
@@ -1999,7 +2001,7 @@ def test_get_tendencia_por_categoria_regime_caixa_uses_data_caixa(db_session, us
 
 
 def test_get_por_ativo_regime_caixa_uses_data_caixa(db_session, user):
-    tx = _cartao_com_competencia_deslocada(db_session, user)
+    tx = _transacao_com_caixa_deslocado(db_session, user)
     asset = _asset(db_session, user)
     tx.asset_id = asset.id
     db_session.commit()
@@ -2013,7 +2015,7 @@ def test_get_por_ativo_regime_caixa_uses_data_caixa(db_session, user):
 
 
 def test_get_tendencia_por_ativo_regime_caixa_uses_data_caixa(db_session, user):
-    tx = _cartao_com_competencia_deslocada(db_session, user)
+    tx = _transacao_com_caixa_deslocado(db_session, user)
     asset = _asset(db_session, user)
     tx.asset_id = asset.id
     db_session.commit()
@@ -2033,7 +2035,7 @@ def test_get_tendencia_por_ativo_regime_caixa_uses_data_caixa(db_session, user):
 
 
 def test_get_por_passivo_regime_caixa_uses_data_caixa(db_session, user):
-    tx = _cartao_com_competencia_deslocada(db_session, user)
+    tx = _transacao_com_caixa_deslocado(db_session, user)
     liability = _liability(db_session, user)
     tx.liability_id = liability.id
     db_session.commit()
@@ -2045,7 +2047,7 @@ def test_get_por_passivo_regime_caixa_uses_data_caixa(db_session, user):
 
 
 def test_get_tendencia_por_passivo_regime_caixa_uses_data_caixa(db_session, user):
-    tx = _cartao_com_competencia_deslocada(db_session, user)
+    tx = _transacao_com_caixa_deslocado(db_session, user)
     liability = _liability(db_session, user)
     tx.liability_id = liability.id
     db_session.commit()
@@ -2056,6 +2058,158 @@ def test_get_tendencia_por_passivo_regime_caixa_uses_data_caixa(db_session, user
 
     pontos = {(p.ano, p.mes): p.total for p in tendencia[0].pontos}
     assert pontos[(2026, 3)] == Decimal("100.00")
+
+
+# --- regime caixa: pagamento de fatura substitui o deslocamento modelado do
+# --- cartão de crédito (Sprint 18) --------------------------------------
+
+
+def _pagamento_fatura_subcategory(db_session):
+    grupo = _group(db_session, nome="Transferência interna", excluir_de_totais=True)
+    return _subcategory(db_session, group=grupo, nome="Pagamento de Fatura")
+
+
+def test_get_summary_regime_caixa_excludes_cartao_credito_entirely(db_session, user):
+    # Sob caixa, o cartão não usa mais o deslocamento modelado (compra+2
+    # meses) — a compra em si nunca conta, nem no mês do evento nem no mês
+    # do caixa modelado, evitando dobrar com o pagamento real da fatura.
+    cartao = _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito)
+    tx = _transaction(
+        db_session,
+        user,
+        cartao,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 20),
+        data_competencia=date(2026, 2, 20),
+    )
+    tx.data_caixa = date(2026, 3, 20)
+    db_session.commit()
+
+    competencia = service.get_summary(db_session, user.id, ano=2026, mes=2)
+    caixa_no_mes_do_evento = service.get_summary(
+        db_session, user.id, ano=2026, mes=1, regime="caixa"
+    )
+    caixa_no_mes_modelado = service.get_summary(
+        db_session, user.id, ano=2026, mes=3, regime="caixa"
+    )
+
+    assert competencia.despesa == Decimal("100.00")
+    assert caixa_no_mes_do_evento.despesa == Decimal("0")
+    assert caixa_no_mes_modelado.despesa == Decimal("0")
+
+
+def test_get_summary_regime_caixa_counts_pagamento_de_fatura_on_real_date(db_session, user):
+    sub = _pagamento_fatura_subcategory(db_session)
+    conta = _account(db_session, user)
+    tx = _transaction(
+        db_session,
+        user,
+        conta,
+        valor="-1767.05",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 2, 2),
+        subcategory_id=sub.id,
+    )
+    tx.data_caixa = date(2026, 2, 2)
+    db_session.commit()
+
+    competencia = service.get_summary(db_session, user.id, ano=2026, mes=2)
+    caixa = service.get_summary(db_session, user.id, ano=2026, mes=2, regime="caixa")
+
+    # Competência continua excluindo (evita dobrar com o modelo de
+    # compra+1 mês já aplicado às compras do cartão) — caixa passa a
+    # contar, na data real em que o dinheiro saiu da conta.
+    assert competencia.despesa == Decimal("0")
+    assert caixa.despesa == Decimal("1767.05")
+
+
+def test_get_summary_regime_caixa_still_excludes_other_transferencia_interna(db_session, user):
+    grupo = _group(db_session, nome="Transferência interna", excluir_de_totais=True)
+    sub = _subcategory(db_session, group=grupo, nome="Transferência interna")
+    conta = _account(db_session, user)
+    tx = _transaction(
+        db_session,
+        user,
+        conta,
+        valor="-500.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 2, 2),
+        subcategory_id=sub.id,
+    )
+    tx.data_caixa = date(2026, 2, 2)
+    db_session.commit()
+
+    caixa = service.get_summary(db_session, user.id, ano=2026, mes=2, regime="caixa")
+
+    assert caixa.despesa == Decimal("0")
+
+
+def test_get_por_categoria_regime_caixa_counts_pagamento_de_fatura(db_session, user):
+    sub = _pagamento_fatura_subcategory(db_session)
+    conta = _account(db_session, user)
+    tx = _transaction(
+        db_session,
+        user,
+        conta,
+        valor="-1767.05",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 2, 2),
+        subcategory_id=sub.id,
+    )
+    tx.data_caixa = date(2026, 2, 2)
+    db_session.commit()
+
+    por_categoria = service.get_por_categoria(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=2, regime="caixa"
+    )
+
+    assert len(por_categoria) == 1
+    assert por_categoria[0].total == Decimal("1767.05")
+
+
+def test_get_saldo_acumulado_regime_caixa_pagamento_de_fatura_avoids_double_count(db_session, user):
+    # Cenário real da Sprint 18: compra de cartão em janeiro (competência
+    # fev, caixa modelado mar) paga via Pix da conta corrente em fevereiro,
+    # categorizado "Pagamento de Fatura". Sob caixa, só a fatura real conta —
+    # a compra modelada em março não deve aparecer.
+    sub = _pagamento_fatura_subcategory(db_session)
+    corrente = _account(db_session, user)
+    corrente.saldo_inicial = Decimal("0")
+    cartao = _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito)
+    db_session.flush()
+
+    compra = _transaction(
+        db_session,
+        user,
+        cartao,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 15),
+        data_competencia=date(2026, 2, 15),
+    )
+    compra.data_caixa = date(2026, 3, 15)
+    fatura = _transaction(
+        db_session,
+        user,
+        corrente,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 2, 2),
+        subcategory_id=sub.id,
+    )
+    fatura.data_caixa = date(2026, 2, 2)
+    db_session.commit()
+
+    caixa = service.get_saldo_acumulado(
+        db_session, user.id, ano=2026, mes=3, meses=3, regime="caixa"
+    )
+
+    pontos = {(p.ano, p.mes): p.total for p in caixa}
+    # A fatura já pesou em fevereiro (-100) e permanece assim em março — não
+    # cai de novo (o que daria -200).
+    assert pontos[(2026, 2)] == Decimal("-100.00")
+    assert pontos[(2026, 3)] == Decimal("-100.00")
 
 
 # --- Patrimônio: saldo_liquido_acumulado / saldo_investimentos / fallback ---
@@ -2115,7 +2269,7 @@ def test_patrimonio_breakdown_investimento_without_saldo_inicial_never_enters_fa
 
 
 def test_patrimonio_breakdown_regime_caixa_shifts_accumulation(db_session, user, monkeypatch):
-    _cartao_com_competencia_deslocada(db_session, user)
+    _transacao_com_caixa_deslocado(db_session, user)
 
     class _HojeFevereiro(date):
         @classmethod
