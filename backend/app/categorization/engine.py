@@ -4,7 +4,11 @@ from difflib import SequenceMatcher
 from sqlalchemy.orm import Session
 
 from app.categorization.normalize import normalize_description
-from app.models.categorization import AssetCategorizationRule, CategorizationRule
+from app.models.categorization import (
+    AssetCategorizationRule,
+    CategorizationRule,
+    InvestimentoCategorizationRule,
+)
 from app.models.liability import Liability
 from app.models.pluggy import PluggyTransaction, PluggyTransactionCategorizacaoStatus
 
@@ -43,6 +47,19 @@ class HistoricoTransacao:
 class HistoricoAtivo:
     id: int
     asset_id: int
+    normalizado: str
+
+
+@dataclass
+class InvestimentoSuggestion:
+    investimento_id: int
+    confianca: str
+
+
+@dataclass
+class HistoricoInvestimento:
+    id: int
+    investimento_id: int
     normalizado: str
 
 
@@ -204,6 +221,83 @@ def _confirmed_asset_history(db: Session, user_id: int) -> list[PluggyTransactio
     return (
         db.query(PluggyTransaction)
         .filter(PluggyTransaction.user_id == user_id, PluggyTransaction.asset_id.isnot(None))
+        .order_by(PluggyTransaction.id)
+        .all()
+    )
+
+
+def suggest_investimento(
+    db: Session, user_id: int, descricao: str
+) -> InvestimentoSuggestion | None:
+    normalizado = normalize_description(descricao)
+    if not normalizado:
+        return None
+    return suggest_investimento_from_index(
+        normalizado,
+        build_investimento_rules_index(db, user_id),
+        build_investimento_historico_index(db, user_id),
+    )
+
+
+def suggest_investimento_from_index(
+    normalizado: str,
+    rules_by_pattern: dict[str, InvestimentoCategorizationRule],
+    historico: list[HistoricoInvestimento],
+) -> InvestimentoSuggestion | None:
+    if not normalizado:
+        return None
+
+    rule = rules_by_pattern.get(normalizado)
+    if rule is not None:
+        return InvestimentoSuggestion(investimento_id=rule.investimento_id, confianca="alta")
+
+    for h in historico:
+        if h.normalizado == normalizado:
+            return InvestimentoSuggestion(investimento_id=h.investimento_id, confianca="alta")
+
+    best_match: tuple[HistoricoInvestimento, float] | None = None
+    for h in historico:
+        score = SequenceMatcher(None, normalizado, h.normalizado).ratio()
+        if score >= SIMILARITY_THRESHOLD and (best_match is None or score > best_match[1]):
+            best_match = (h, score)
+
+    if best_match is not None:
+        h, _score = best_match
+        return InvestimentoSuggestion(investimento_id=h.investimento_id, confianca="alta")
+
+    return None
+
+
+def build_investimento_rules_index(
+    db: Session, user_id: int
+) -> dict[str, InvestimentoCategorizationRule]:
+    rules = (
+        db.query(InvestimentoCategorizationRule)
+        .filter(InvestimentoCategorizationRule.user_id == user_id)
+        .order_by(InvestimentoCategorizationRule.id)
+        .all()
+    )
+    index: dict[str, InvestimentoCategorizationRule] = {}
+    for rule in rules:
+        index.setdefault(rule.padrao_normalizado, rule)
+    return index
+
+
+def build_investimento_historico_index(db: Session, user_id: int) -> list[HistoricoInvestimento]:
+    return [
+        HistoricoInvestimento(
+            id=tx.id,
+            investimento_id=tx.investimento_id,
+            normalizado=normalize_description(tx.descricao),
+        )
+        for tx in _confirmed_investimento_history(db, user_id)
+    ]
+
+
+def _confirmed_investimento_history(db: Session, user_id: int) -> list[PluggyTransaction]:
+    return (
+        db.query(PluggyTransaction)
+        .filter(PluggyTransaction.user_id == user_id, PluggyTransaction.investimento_id.isnot(None))
         .order_by(PluggyTransaction.id)
         .all()
     )

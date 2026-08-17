@@ -54,6 +54,7 @@ class PluggyAccountOut(BaseModel):
     moeda: str
     sync_enabled: bool
     saldo_inicial: Decimal | None
+    investimento_id: int | None
     created_at: datetime
     updated_at: datetime
 
@@ -61,6 +62,7 @@ class PluggyAccountOut(BaseModel):
 class PluggyAccountUpdateIn(BaseModel):
     apelido: str | None = None
     sync_enabled: bool = True
+    investimento_id: int | None = None
 
 
 class PluggyAccountSaldoInicialIn(BaseModel):
@@ -118,5 +120,7 @@ class PluggyTransactionOut(BaseModel):
     account_tipo: PluggyAccountTipo
     asset_id: int | None
     asset_sugerido_id: int | None
+    investimento_id: int | None
+    investimento_sugerido_id: int | None
     created_at: datetime
     updated_at: datetime

@@ -7,6 +7,7 @@ from app.categorization.service import salario_subcategory_id
 from app.dashboards import service as dashboards_service
 from app.exceptions import InvalidStateError, NotFoundError
 from app.models.category import CategoryGroup, Subcategory
+from app.models.investimento import Investimento
 from app.models.pluggy import PluggyAccount, PluggyTransaction
 from app.models.user import User
 from app.pluggy_integration import service
@@ -352,6 +353,29 @@ def test_list_accounts_and_transactions_isolated_by_user(db_session, user, other
     assert len(service.list_transactions(db_session, user.id)) == 1
 
 
+def test_list_transactions_filters_by_investimento_id(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[_account_raw()],
+        transactions_by_account={"acc-ext-1": [_transaction_raw()]},
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    investimento = Investimento(user_id=user.id, nome="Reserva de emergência")
+    db_session.add(investimento)
+    db_session.commit()
+    db_session.refresh(investimento)
+    tx = service.list_transactions(db_session, user.id)[0]
+    tx.investimento_id = investimento.id
+    db_session.commit()
+
+    linked = service.list_transactions(db_session, user.id, investimento_id=investimento.id)
+    unrelated = service.list_transactions(db_session, user.id, investimento_id=999)
+
+    assert [t.id for t in linked] == [tx.id]
+    assert unrelated == []
+
+
 # --- apelido / sync_enabled (Sprint 7) --------------------------------------
 
 
@@ -410,6 +434,53 @@ def test_update_account_sets_apelido_and_sync_enabled(db_session, user):
 
     assert updated.apelido == "Poupança conjunta"
     assert updated.sync_enabled is False
+
+
+def test_update_account_links_investimento(db_session, user):
+    client = FakePluggyClient(item=_item_raw(), accounts=[_account_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    account = service.list_accounts(db_session, user.id)[0]
+    investimento = Investimento(user_id=user.id, nome="Reserva de emergência")
+    db_session.add(investimento)
+    db_session.commit()
+    db_session.refresh(investimento)
+
+    linked = service.update_account(
+        db_session,
+        user.id,
+        account.id,
+        apelido=None,
+        sync_enabled=True,
+        investimento_id=investimento.id,
+    )
+    assert linked.investimento_id == investimento.id
+
+    unlinked = service.update_account(
+        db_session, user.id, account.id, apelido=None, sync_enabled=True, investimento_id=None
+    )
+    assert unlinked.investimento_id is None
+
+
+def test_update_account_other_users_investimento_raises_not_found(db_session, user, other_user):
+    client = FakePluggyClient(item=_item_raw(), accounts=[_account_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    account = service.list_accounts(db_session, user.id)[0]
+    other_investimento = Investimento(user_id=other_user.id, nome="Do outro")
+    db_session.add(other_investimento)
+    db_session.commit()
+    db_session.refresh(other_investimento)
+
+    with pytest.raises(NotFoundError):
+        service.update_account(
+            db_session,
+            user.id,
+            account.id,
+            apelido=None,
+            sync_enabled=True,
+            investimento_id=other_investimento.id,
+        )
 
 
 def test_update_account_other_users_account_raises_not_found(db_session, user, other_user):

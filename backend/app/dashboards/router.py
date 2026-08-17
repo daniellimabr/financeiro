@@ -11,6 +11,7 @@ from app.schemas.dashboards import (
     AtivoTotalOut,
     CategoriaTotalOut,
     EvolucaoSaldoContaOut,
+    InvestimentoTotalOut,
     MeioPagamentoTotalOut,
     NaturezaTotalOut,
     PassivoTotalOut,
@@ -21,6 +22,7 @@ from app.schemas.dashboards import (
     SummaryOut,
     TendenciaAtivoOut,
     TendenciaCategoriaOut,
+    TendenciaInvestimentoOut,
     TendenciaMesOut,
     TendenciaNaturezaOut,
     TendenciaPassivoOut,
@@ -152,6 +154,35 @@ def get_por_ativo_tendencia(
     current_user: User = Depends(get_current_user),
 ):
     return service.get_tendencia_por_ativo(
+        db, current_user.id, tipo=tipo, ano=ano, mes=mes, meses=meses, regime=regime
+    )
+
+
+@router.get("/por-investimento", response_model=list[InvestimentoTotalOut])
+def get_por_investimento(
+    tipo: PluggyTransactionTipo,
+    ano: int | None = None,
+    mes: int | None = None,
+    regime: Regime = "competencia",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.get_por_investimento(
+        db, current_user.id, tipo=tipo, ano=ano, mes=mes, regime=regime
+    )
+
+
+@router.get("/por-investimento/tendencia", response_model=list[TendenciaInvestimentoOut])
+def get_por_investimento_tendencia(
+    tipo: PluggyTransactionTipo,
+    ano: int,
+    mes: int,
+    meses: int = Query(6, ge=1, le=24),
+    regime: Regime = "competencia",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.get_tendencia_por_investimento(
         db, current_user.id, tipo=tipo, ano=ano, mes=mes, meses=meses, regime=regime
     )
 

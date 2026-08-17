@@ -6,6 +6,7 @@ import pytest
 from app.dashboards import service
 from app.models.asset import Asset, AssetStatus, AssetTipo
 from app.models.category import CategoryGroup, Natureza, Subcategory
+from app.models.investimento import Investimento
 from app.models.liability import Liability, LiabilityStatus, LiabilityTipo
 from app.models.pluggy import (
     PluggyAccount,
@@ -936,6 +937,227 @@ def test_get_tendencia_por_ativo_isolated_by_user(db_session, user):
     )
 
     assert tendencia == []
+
+
+def _investimento(db_session, user, nome="Reserva de emergência"):
+    investimento = Investimento(user_id=user.id, nome=nome)
+    db_session.add(investimento)
+    db_session.flush()
+    return investimento
+
+
+def test_get_por_investimento_no_transactions_returns_empty_list(db_session, user):
+    por_investimento = service.get_por_investimento(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
+
+    assert por_investimento == []
+
+
+def test_get_por_investimento_sums_aporte_and_excludes_investimento_without_transaction(
+    db_session, user
+):
+    account = _account(db_session, user)
+    investimento_com_aporte = _investimento(db_session, user, nome="Reserva")
+    _investimento(db_session, user, nome="Renda fixa")
+    tx = _transaction(
+        db_session,
+        user,
+        account,
+        valor="-300.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+    )
+    tx.investimento_id = investimento_com_aporte.id
+    db_session.commit()
+
+    por_investimento = service.get_por_investimento(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
+
+    assert len(por_investimento) == 1
+    assert por_investimento[0].investimento_id == investimento_com_aporte.id
+    assert por_investimento[0].investimento_nome == "Reserva"
+    assert por_investimento[0].total == Decimal("300.00")
+
+
+def test_get_por_investimento_filters_by_tipo(db_session, user):
+    account = _account(db_session, user)
+    investimento_aporte = _investimento(db_session, user, nome="Reserva")
+    investimento_resgate = _investimento(db_session, user, nome="Renda fixa")
+    tx_aporte = _transaction(
+        db_session,
+        user,
+        account,
+        valor="-300.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+    )
+    tx_aporte.investimento_id = investimento_aporte.id
+    tx_resgate = _transaction(
+        db_session,
+        user,
+        account,
+        valor="1500.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 1, 12),
+    )
+    tx_resgate.investimento_id = investimento_resgate.id
+    db_session.commit()
+
+    despesas = service.get_por_investimento(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
+    receitas = service.get_por_investimento(
+        db_session, user.id, tipo=PluggyTransactionTipo.credito, ano=2026, mes=1
+    )
+
+    assert [i.investimento_id for i in despesas] == [investimento_aporte.id]
+    assert [i.investimento_id for i in receitas] == [investimento_resgate.id]
+    assert receitas[0].total == Decimal("1500.00")
+
+
+def test_get_por_investimento_isolated_by_user(db_session, user):
+    other = User(
+        google_sub="google-por-investimento-other", email="other-pi@example.com", name="Bob"
+    )
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+
+    account = _account(db_session, other)
+    investimento = _investimento(db_session, other)
+    tx = _transaction(
+        db_session,
+        other,
+        account,
+        valor="-500.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+    )
+    tx.investimento_id = investimento.id
+    db_session.commit()
+
+    por_investimento = service.get_por_investimento(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
+
+    assert por_investimento == []
+
+
+def test_get_tendencia_por_investimento_zero_fills_months_without_transaction(db_session, user):
+    account = _account(db_session, user)
+    investimento = _investimento(db_session, user, nome="Reserva")
+    tx_jan = _transaction(
+        db_session,
+        user,
+        account,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+    )
+    tx_jan.investimento_id = investimento.id
+    tx_mar = _transaction(
+        db_session,
+        user,
+        account,
+        valor="-50.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 3, 5),
+    )
+    tx_mar.investimento_id = investimento.id
+    db_session.commit()
+
+    tendencia = service.get_tendencia_por_investimento(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=3, meses=3
+    )
+
+    assert len(tendencia) == 1
+    item = tendencia[0]
+    assert item.investimento_id == investimento.id
+    assert item.investimento_nome == "Reserva"
+    pontos = {(p.ano, p.mes): p.total for p in item.pontos}
+    assert pontos[(2026, 1)] == Decimal("100.00")
+    assert pontos[(2026, 2)] == Decimal("0")
+    assert pontos[(2026, 3)] == Decimal("50.00")
+
+
+def test_get_tendencia_por_investimento_isolated_by_user(db_session, user):
+    other = User(
+        google_sub="google-tendencia-investimento-other", email="other-ti@example.com", name="Bob"
+    )
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+
+    account = _account(db_session, other)
+    investimento = _investimento(db_session, other)
+    tx = _transaction(
+        db_session,
+        other,
+        account,
+        valor="-999.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+    )
+    tx.investimento_id = investimento.id
+    db_session.commit()
+
+    tendencia = service.get_tendencia_por_investimento(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1, meses=3
+    )
+
+    assert tendencia == []
+
+
+# --- regressão: introdução do grupo "Investimentos" não muda totais --------
+# --- pré-existentes de Despesa/Receita para transações não relacionadas ----
+
+
+def test_aporte_resgate_group_does_not_change_totals_of_unrelated_transactions(db_session, user):
+    account = _account(db_session, user)
+    outro_grupo = _subcategory(db_session, nome="Mercado")
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-150.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+        subcategory_id=outro_grupo.id,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="1000.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 1, 15),
+    )
+
+    summary_antes = service.get_summary(db_session, user.id, ano=2026, mes=1)
+    por_categoria_antes = service.get_por_categoria(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
+
+    # Introduz o grupo "Investimentos" (excluir_de_totais=False) com
+    # subcategorias Aporte/Resgate, sem nenhuma transação usá-lo — mesmo
+    # cenário do dia 1 pós-migration 0015, antes de qualquer aporte real.
+    investimentos_group = CategoryGroup(nome="Investimentos", excluir_de_totais=False)
+    db_session.add(investimentos_group)
+    db_session.flush()
+    db_session.add(Subcategory(group_id=investimentos_group.id, nome="Aporte"))
+    db_session.add(Subcategory(group_id=investimentos_group.id, nome="Resgate"))
+    db_session.commit()
+
+    summary_depois = service.get_summary(db_session, user.id, ano=2026, mes=1)
+    por_categoria_depois = service.get_por_categoria(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=1
+    )
+
+    assert summary_depois.receita == summary_antes.receita == Decimal("1000.00")
+    assert summary_depois.despesa == summary_antes.despesa == Decimal("150.00")
+    assert por_categoria_depois == por_categoria_antes
 
 
 def test_tendencia_isolated_by_user(db_session, user):

@@ -31,6 +31,7 @@ export interface PluggyAccount {
   moeda: string;
   sync_enabled: boolean;
   saldo_inicial: string | null;
+  investimento_id: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -55,6 +56,8 @@ export interface PluggyTransaction {
   account_tipo: string;
   asset_id: number | null;
   asset_sugerido_id: number | null;
+  investimento_id: number | null;
+  investimento_sugerido_id: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -89,12 +92,16 @@ export function fetchPluggyAccounts(): Promise<PluggyAccount[]> {
 
 export function updatePluggyAccount(
   accountId: number,
-  payload: { apelido: string | null; syncEnabled: boolean }
+  payload: { apelido: string | null; syncEnabled: boolean; investimentoId?: number | null }
 ): Promise<PluggyAccount> {
   return apiFetch<PluggyAccount>(`/pluggy/accounts/${accountId}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ apelido: payload.apelido, sync_enabled: payload.syncEnabled }),
+    body: JSON.stringify({
+      apelido: payload.apelido,
+      sync_enabled: payload.syncEnabled,
+      investimento_id: payload.investimentoId ?? null,
+    }),
   });
 }
 
@@ -157,6 +164,7 @@ export interface PluggyTransactionFilters {
   accountTipo?: string;
   assetId?: number;
   liabilityId?: number;
+  investimentoId?: number;
   tipo?: string;
   competencia?: boolean;
 }
@@ -173,6 +181,9 @@ export function fetchPluggyTransactions(
   if (filters.accountTipo !== undefined) params.set("account_tipo", filters.accountTipo);
   if (filters.assetId !== undefined) params.set("asset_id", String(filters.assetId));
   if (filters.liabilityId !== undefined) params.set("liability_id", String(filters.liabilityId));
+  if (filters.investimentoId !== undefined) {
+    params.set("investimento_id", String(filters.investimentoId));
+  }
   if (filters.tipo !== undefined) params.set("tipo", filters.tipo);
   if (filters.competencia) params.set("competencia", "true");
 

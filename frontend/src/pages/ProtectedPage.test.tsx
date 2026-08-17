@@ -76,7 +76,7 @@ describe("ProtectedPage navigation", () => {
     expect(screen.getByRole("button", { name: "Passivos" })).toBeInTheDocument();
   });
 
-  it("orders the nav as Dashboards, Categorizar, Ativos, Passivos, Natureza, Projeção, Configurações", () => {
+  it("orders the nav as Dashboards, Categorizar, Ativos, Investimentos, Passivos, Natureza, Projeção, Configurações", () => {
     vi.stubGlobal("fetch", catchAllFetchMock());
 
     renderProtectedPage();
@@ -90,6 +90,7 @@ describe("ProtectedPage navigation", () => {
       "Dashboards",
       "Categorizar",
       "Ativos",
+      "Investimentos",
       "Passivos",
       "Natureza",
       "Projeção",

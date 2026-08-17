@@ -16,6 +16,7 @@ from app.schemas.categorization import (
     DateUpdateIn,
     DescriptionUpdateIn,
     DescriptionUpdateOut,
+    InvestimentoAssociationIn,
     LiabilityAssociationIn,
     TransactionOut,
     TransactionsPageOut,
@@ -106,6 +107,21 @@ def set_transaction_liability(
     try:
         return service.set_transaction_liability(
             db, current_user.id, transaction_id, payload.liability_id
+        )
+    except NotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.put("/transactions/{transaction_id}/investimento", response_model=TransactionOut)
+def set_transaction_investimento(
+    transaction_id: int,
+    payload: InvestimentoAssociationIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return service.set_transaction_investimento(
+            db, current_user.id, transaction_id, payload.investimento_id
         )
     except NotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

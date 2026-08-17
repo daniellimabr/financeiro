@@ -5,6 +5,7 @@ from app.auth.jwt import COOKIE_NAME, create_access_token
 from app.main import app
 from app.models.asset import Asset, AssetTipo
 from app.models.category import CategoryGroup, Subcategory
+from app.models.investimento import Investimento
 from app.models.liability import Liability, LiabilityTipo
 from app.models.pluggy import (
     PluggyAccount,
@@ -253,6 +254,14 @@ def _liability(db_session, user, nome="Financiamento"):
     return liability
 
 
+def _investimento(db_session, user, nome="Reserva de emergência"):
+    investimento = Investimento(user_id=user.id, nome=nome)
+    db_session.add(investimento)
+    db_session.commit()
+    db_session.refresh(investimento)
+    return investimento
+
+
 def _transaction(
     db_session,
     user,
@@ -265,6 +274,7 @@ def _transaction(
     subcategory_id=None,
     asset_id=None,
     liability_id=None,
+    investimento_id=None,
 ):
     item = PluggyItem(
         user_id=user.id,
@@ -298,6 +308,7 @@ def _transaction(
         subcategory_id=subcategory_id,
         asset_id=asset_id,
         liability_id=liability_id,
+        investimento_id=investimento_id,
         status=PluggyTransactionStatus.efetivada,
     )
     db_session.add(tx)
@@ -571,6 +582,20 @@ def test_list_transactions_filters_by_liability_id_isolated_by_user(client, db_s
     assert Decimal(body[0]["valor"]) == Decimal("-10.00")
 
 
+def test_list_transactions_filters_by_investimento_id(client, db_session):
+    user = _authenticate(client, db_session)
+    investimento = _investimento(db_session, user)
+    _transaction(db_session, user, valor="-10.00", investimento_id=investimento.id)
+    _transaction(db_session, user, valor="-20.00", investimento_id=None)
+
+    response = client.get("/pluggy/transactions", params={"investimento_id": investimento.id})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert Decimal(body[0]["valor"]) == Decimal("-10.00")
+
+
 def test_list_transactions_response_includes_account_tipo(client, db_session):
     user = _authenticate(client, db_session)
     _transaction(db_session, user, valor="-10.00", account_tipo=PluggyAccountTipo.cartao_credito)
@@ -635,6 +660,48 @@ def test_update_account_sets_apelido_and_sync_enabled(client, db_session):
     body = response.json()
     assert body["apelido"] == "Conta principal"
     assert body["sync_enabled"] is False
+
+
+def test_update_account_links_and_unlinks_investimento(client, db_session):
+    user = _authenticate(client, db_session)
+    _, account, _fake_client = _connect_account(client, db_session)
+    investimento = _investimento(db_session, user)
+
+    linked = client.put(
+        f"/pluggy/accounts/{account['id']}",
+        json={"apelido": None, "sync_enabled": True, "investimento_id": investimento.id},
+    )
+    assert linked.status_code == 200
+    assert linked.json()["investimento_id"] == investimento.id
+
+    unlinked = client.put(
+        f"/pluggy/accounts/{account['id']}",
+        json={"apelido": None, "sync_enabled": True, "investimento_id": None},
+    )
+    assert unlinked.status_code == 200
+    assert unlinked.json()["investimento_id"] is None
+
+
+def test_update_account_with_other_users_investimento_returns_404(client, db_session):
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    _, account, _fake_client = _connect_account(client, db_session)
+
+    other = User(google_sub="google-2", email="b@example.com", name="Bob")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    other_investimento = _investimento(db_session, other, nome="Do outro")
+
+    response = client.put(
+        f"/pluggy/accounts/{account['id']}",
+        json={
+            "apelido": None,
+            "sync_enabled": True,
+            "investimento_id": other_investimento.id,
+        },
+    )
+
+    assert response.status_code == 404
 
 
 def test_update_other_users_account_returns_404(client, db_session):

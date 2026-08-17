@@ -10,13 +10,18 @@ export function useUpdatePluggyAccount() {
       accountId,
       apelido,
       syncEnabled,
+      investimentoId,
     }: {
       accountId: number;
       apelido: string | null;
       syncEnabled: boolean;
-    }) => updatePluggyAccount(accountId, { apelido, syncEnabled }),
+      investimentoId?: number | null;
+    }) => updatePluggyAccount(accountId, { apelido, syncEnabled, investimentoId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pluggyAccounts"] });
+      // Vincular/desvincular a carteira a um Investimento muda saldo_base
+      // (saldo_inicial) e saldo_atual usados em GET /investimentos/{id}/evolucao.
+      queryClient.invalidateQueries({ queryKey: ["investimentoEvolucao"] });
     },
   });
 }

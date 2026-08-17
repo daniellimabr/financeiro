@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   fetchDashboardPorCategoria,
+  fetchDashboardPorInvestimento,
+  fetchDashboardPorInvestimentoTendencia,
   fetchDashboardPorMeioPagamento,
   fetchDashboardPorNatureza,
   fetchDashboardPorNaturezaTendencia,
@@ -105,6 +107,28 @@ describe("dashboards api", () => {
 
     expect(fetchMock.mock.calls[0][0]).toBe(
       "/dashboards/projecao?ano=2026&mes=1&meses_futuros=3&janela_media=6"
+    );
+  });
+
+  it("fetchDashboardPorInvestimento includes tipo and filters", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchDashboardPorInvestimento("debito", { ano: 2026, mes: 1 });
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/dashboards/por-investimento?tipo=debito&ano=2026&mes=1"
+    );
+  });
+
+  it("fetchDashboardPorInvestimentoTendencia includes tipo, periodo and meses", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchDashboardPorInvestimentoTendencia("credito", { ano: 2026, mes: 1, meses: 3 });
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/dashboards/por-investimento/tendencia?tipo=credito&ano=2026&mes=1&meses=3"
     );
   });
 });

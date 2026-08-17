@@ -60,6 +60,8 @@ const TRANSACTION: EditableTransaction = {
   subcategoria_sugerida_id: 10,
   asset_id: null,
   asset_sugerido_id: null,
+  investimento_id: null,
+  investimento_sugerido_id: null,
   data: "2026-01-15",
   data_editada_manualmente: false,
 };

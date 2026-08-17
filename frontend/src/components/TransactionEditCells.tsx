@@ -2,8 +2,10 @@ import { useState } from "react";
 
 import type { Asset } from "../api/assets";
 import type { CategoryGroup, Subcategory } from "../api/categories";
+import type { Investimento } from "../api/investimentos";
 import { useSetCategory } from "../hooks/useSetCategory";
 import { useSetTransactionAsset } from "../hooks/useSetTransactionAsset";
+import { useSetTransactionInvestimento } from "../hooks/useSetTransactionInvestimento";
 import { useUpdateDate } from "../hooks/useUpdateDate";
 import { useUpdateDescription } from "../hooks/useUpdateDescription";
 import { descricaoExibida, type EditableTransaction } from "../utils/transactionEdit";
@@ -142,6 +144,35 @@ export function AssetSelectCell({
       {assets?.map((asset) => (
         <option key={asset.id} value={asset.id}>
           {asset.nome}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+export function InvestimentoSelectCell({
+  transaction,
+  investimentos,
+}: {
+  transaction: EditableTransaction;
+  investimentos: Investimento[] | undefined;
+}) {
+  const setTransactionInvestimento = useSetTransactionInvestimento();
+  const value = transaction.investimento_sugerido_id ?? transaction.investimento_id ?? undefined;
+
+  return (
+    <select
+      aria-label={`Investimento de ${descricaoExibida(transaction)}`}
+      value={value ?? ""}
+      onChange={(event) => {
+        const investimentoId = event.target.value ? Number(event.target.value) : null;
+        setTransactionInvestimento.mutate({ transactionId: transaction.id, investimentoId });
+      }}
+    >
+      <option value="">Nenhum</option>
+      {investimentos?.map((investimento) => (
+        <option key={investimento.id} value={investimento.id}>
+          {investimento.nome}
         </option>
       ))}
     </select>

@@ -7,6 +7,7 @@ from app.categories.router import router as categories_router
 from app.categorization.router import router as categorization_router
 from app.config import settings
 from app.dashboards.router import router as dashboards_router
+from app.investimentos.router import router as investimentos_router
 from app.liabilities.router import router as liabilities_router
 from app.pluggy_integration.router import router as pluggy_router
 
@@ -16,6 +17,7 @@ app.include_router(auth_router)
 app.include_router(categories_router)
 app.include_router(assets_router)
 app.include_router(liabilities_router)
+app.include_router(investimentos_router)
 app.include_router(pluggy_router)
 app.include_router(categorization_router)
 app.include_router(dashboards_router)

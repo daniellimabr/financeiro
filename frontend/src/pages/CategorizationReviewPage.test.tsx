@@ -65,6 +65,9 @@ const BASE_TRANSACTION: CategorizedTransaction = {
   liability_id: null,
   liability_sugerido_id: null,
   liability_sugestao_confianca: null,
+  investimento_id: null,
+  investimento_sugerido_id: null,
+  investimento_sugestao_confianca: null,
   created_at: "2026-08-14T00:00:00Z",
   updated_at: "2026-08-14T00:00:00Z",
 };
@@ -89,6 +92,7 @@ function baseHandlers(url: string): Promise<Response> | null {
   if (url === "/category-groups") return Promise.resolve(jsonResponse([GROUP_FIXTURE]));
   if (url === "/subcategories") return Promise.resolve(jsonResponse([SUBCATEGORY_FIXTURE]));
   if (url === "/assets") return Promise.resolve(jsonResponse([]));
+  if (url === "/investimentos") return Promise.resolve(jsonResponse([]));
   if (url === "/pluggy/accounts") return Promise.resolve(jsonResponse([ACCOUNT_FIXTURE]));
   return null;
 }
@@ -585,5 +589,55 @@ describe("CategorizationReviewPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Ativo" }));
     // Compra A não tem ativo ("" vazio), Compra B tem "Carro" — "" vem antes (asc)
     expect(rowsInOrder()[0]).toContain("Compra A");
+  });
+
+  it("sorts the current page by Investimento when the sortable header is clicked", async () => {
+    const investimentoA = {
+      id: 1,
+      user_id: 1,
+      nome: "Reserva de emergência",
+      created_at: "2026-08-14T00:00:00Z",
+      updated_at: "2026-08-14T00:00:00Z",
+    };
+    const txA: CategorizedTransaction = {
+      ...BASE_TRANSACTION,
+      id: 1,
+      descricao: "Compra A",
+      investimento_id: null,
+      investimento_sugerido_id: null,
+    };
+    const txB: CategorizedTransaction = {
+      ...BASE_TRANSACTION,
+      id: 2,
+      descricao: "Compra B",
+      investimento_id: investimentoA.id,
+      investimento_sugerido_id: null,
+    };
+
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/investimentos") return Promise.resolve(jsonResponse([investimentoA]));
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url.startsWith("/categorization/transactions"))
+        return Promise.resolve(jsonResponse(transactionsPage([txA, txB])));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<CategorizationReviewPage />);
+    await screen.findByText("Compra A");
+
+    const table = screen.getByText("Compra A").closest("table") as HTMLElement;
+    const rowsInOrder = () =>
+      Array.from(table.querySelectorAll("tbody tr")).map((row) => row.textContent);
+
+    await userEvent.click(screen.getByRole("button", { name: "Investimento" }));
+    // Compra A não tem investimento ("" vazio), Compra B tem "Reserva de
+    // emergência" — "" vem antes (asc).
+    expect(rowsInOrder()[0]).toContain("Compra A");
+
+    await userEvent.click(screen.getByRole("button", { name: "Investimento" }));
+    expect(rowsInOrder()[0]).toContain("Compra B"); // desc
   });
 });

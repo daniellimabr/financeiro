@@ -10,6 +10,7 @@ from app.categorization.service import salario_subcategory_id
 from app.config import settings
 from app.exceptions import InvalidStateError, NotFoundError
 from app.models.category import SEM_CATEGORIA_ID
+from app.models.investimento import Investimento
 from app.models.pluggy import (
     PluggyAccount,
     PluggyAccountTipo,
@@ -107,11 +108,26 @@ def get_account(db: Session, user_id: int, account_id: int) -> PluggyAccount:
 
 
 def update_account(
-    db: Session, user_id: int, account_id: int, *, apelido: str | None, sync_enabled: bool
+    db: Session,
+    user_id: int,
+    account_id: int,
+    *,
+    apelido: str | None,
+    sync_enabled: bool,
+    investimento_id: int | None = None,
 ) -> PluggyAccount:
     account = get_account(db, user_id, account_id)
+    if investimento_id is not None:
+        investimento = (
+            db.query(Investimento)
+            .filter(Investimento.id == investimento_id, Investimento.user_id == user_id)
+            .one_or_none()
+        )
+        if investimento is None:
+            raise NotFoundError(f"Investimento {investimento_id} não encontrado")
     account.apelido = apelido
     account.sync_enabled = sync_enabled
+    account.investimento_id = investimento_id
     db.commit()
     db.refresh(account)
     return account
@@ -198,6 +214,7 @@ def list_transactions(
     account_tipo: PluggyAccountTipo | None = None,
     asset_id: int | None = None,
     liability_id: int | None = None,
+    investimento_id: int | None = None,
     tipo: PluggyTransactionTipo | None = None,
     competencia: bool = False,
 ) -> list[PluggyTransaction]:
@@ -219,6 +236,8 @@ def list_transactions(
         query = query.filter(PluggyTransaction.asset_id == asset_id)
     if liability_id is not None:
         query = query.filter(PluggyTransaction.liability_id == liability_id)
+    if investimento_id is not None:
+        query = query.filter(PluggyTransaction.investimento_id == investimento_id)
     if tipo is not None:
         query = query.filter(PluggyTransaction.tipo == tipo)
 

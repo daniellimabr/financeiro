@@ -4,6 +4,7 @@ import type { PeriodoHistorico } from "../api/dashboards";
 import { fetchConnectToken } from "../api/pluggy";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { useEvolucaoSaldoPorConta } from "../hooks/useEvolucaoSaldoPorConta";
+import { useInvestimentos } from "../hooks/useInvestimentos";
 import { usePluggyAccounts } from "../hooks/usePluggyAccounts";
 import { usePluggyItems } from "../hooks/usePluggyItems";
 import { useRegisterPluggyItem } from "../hooks/useRegisterPluggyItem";
@@ -23,6 +24,7 @@ const ACCOUNT_TIPO_LABEL: Record<string, string> = {
 export function AccountManagementPage() {
   const { data: items } = usePluggyItems();
   const { data: accounts, isLoading } = usePluggyAccounts();
+  const { data: investimentos } = useInvestimentos();
   const registerItem = useRegisterPluggyItem();
   const updateAccount = useUpdatePluggyAccount();
   const syncItems = useSyncPluggyItems();
@@ -79,14 +81,28 @@ export function AccountManagementPage() {
     setApelidoDraft(currentApelido ?? currentNome);
   }
 
-  function saveApelido(accountId: number, syncEnabled: boolean) {
+  function saveApelido(accountId: number, syncEnabled: boolean, investimentoId: number | null) {
     const value = apelidoDraft.trim();
-    updateAccount.mutate({ accountId, apelido: value || null, syncEnabled });
+    updateAccount.mutate({ accountId, apelido: value || null, syncEnabled, investimentoId });
     setEditingAccountId(null);
   }
 
-  function toggleSyncEnabled(accountId: number, apelido: string | null, syncEnabled: boolean) {
-    updateAccount.mutate({ accountId, apelido, syncEnabled: !syncEnabled });
+  function toggleSyncEnabled(
+    accountId: number,
+    apelido: string | null,
+    syncEnabled: boolean,
+    investimentoId: number | null
+  ) {
+    updateAccount.mutate({ accountId, apelido, syncEnabled: !syncEnabled, investimentoId });
+  }
+
+  function setInvestimento(
+    accountId: number,
+    apelido: string | null,
+    syncEnabled: boolean,
+    investimentoId: number | null
+  ) {
+    updateAccount.mutate({ accountId, apelido, syncEnabled, investimentoId });
   }
 
   function startEditingSaldoInicial(accountId: number, currentSaldoInicial: string | null) {
@@ -191,11 +207,18 @@ export function AccountManagementPage() {
                   autoFocus
                   onChange={(event) => setApelidoDraft(event.target.value)}
                   onKeyDown={(event) => {
-                    if (event.key === "Enter") saveApelido(account.id, account.sync_enabled);
+                    if (event.key === "Enter") {
+                      saveApelido(account.id, account.sync_enabled, account.investimento_id);
+                    }
                     if (event.key === "Escape") setEditingAccountId(null);
                   }}
                 />
-                <button type="button" onClick={() => saveApelido(account.id, account.sync_enabled)}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    saveApelido(account.id, account.sync_enabled, account.investimento_id)
+                  }
+                >
                   Salvar
                 </button>
                 <button type="button" onClick={() => setEditingAccountId(null)}>
@@ -218,12 +241,41 @@ export function AccountManagementPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    toggleSyncEnabled(account.id, account.apelido, account.sync_enabled)
+                    toggleSyncEnabled(
+                      account.id,
+                      account.apelido,
+                      account.sync_enabled,
+                      account.investimento_id
+                    )
                   }
                 >
                   {account.sync_enabled ? "Remover da sincronização" : "Incluir na sincronização"}
                 </button>
               </>
+            )}
+            {account.tipo === "investimento" && (
+              <div className="tag">
+                Investimento:{" "}
+                <select
+                  aria-label={`Investimento de ${account.apelido ?? account.nome}`}
+                  value={account.investimento_id ?? ""}
+                  onChange={(event) =>
+                    setInvestimento(
+                      account.id,
+                      account.apelido,
+                      account.sync_enabled,
+                      event.target.value ? Number(event.target.value) : null
+                    )
+                  }
+                >
+                  <option value="">Nenhum</option>
+                  {investimentos?.map((investimento) => (
+                    <option key={investimento.id} value={investimento.id}>
+                      {investimento.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
             <div className="tag">
               Saldo inicial (31/12/2025):{" "}

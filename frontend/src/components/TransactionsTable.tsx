@@ -2,20 +2,27 @@ import type { PeriodoFilter, TransacaoTipo } from "../api/dashboards";
 import type { PluggyTransaction } from "../api/pluggy";
 import { useAssets } from "../hooks/useAssets";
 import { useCategoryGroups } from "../hooks/useCategoryGroups";
+import { useInvestimentos } from "../hooks/useInvestimentos";
 import { usePluggyTransactions } from "../hooks/usePluggyTransactions";
 import { useSubcategories } from "../hooks/useSubcategories";
 import { useTableSort } from "../hooks/useTableSort";
 import { formatCurrency } from "../utils/format";
-import { assetLabel, subcategoryLabel } from "../utils/transactionEdit";
+import { assetLabel, investimentoLabel, subcategoryLabel } from "../utils/transactionEdit";
 import { AccountTipoIcon } from "./AccountTipoIcon";
 import { SortableHeader } from "./SortableHeader";
-import { AssetSelectCell, CategorySelectCell, DescriptionCell } from "./TransactionEditCells";
+import {
+  AssetSelectCell,
+  CategorySelectCell,
+  DescriptionCell,
+  InvestimentoSelectCell,
+} from "./TransactionEditCells";
 
 function formatPercent(value: number): string {
   return `${value.toFixed(1)}%`;
 }
 
-type TransacaoSortKey = "data" | "descricao" | "categoria" | "ativo" | "valor" | "percentual";
+type TransacaoSortKey =
+  "data" | "descricao" | "categoria" | "ativo" | "investimento" | "valor" | "percentual";
 
 // Tabela de transação unificada (Sprint 13) — substitui as 3 implementações
 // divergentes que existiam antes (TransacoesPanel em Dashboard/Natureza,
@@ -30,21 +37,25 @@ export function TransactionsTable({
   categoriaId,
   assetId,
   liabilityId,
+  investimentoId,
   tipo,
   totalParaPercentual,
   emptyMessage,
   showCategoria = true,
   showAtivo = true,
+  showInvestimento = false,
 }: {
   filter: PeriodoFilter;
   categoriaId?: number;
   assetId?: number;
   liabilityId?: number;
+  investimentoId?: number;
   tipo?: TransacaoTipo;
   totalParaPercentual?: string;
   emptyMessage: string;
   showCategoria?: boolean;
   showAtivo?: boolean;
+  showInvestimento?: boolean;
 }) {
   const query = usePluggyTransactions({
     ano: filter.ano,
@@ -52,12 +63,14 @@ export function TransactionsTable({
     subcategoryId: categoriaId,
     assetId,
     liabilityId,
+    investimentoId,
     tipo,
     competencia: true,
   });
   const { data: subcategories } = useSubcategories();
   const { data: groups } = useCategoryGroups();
   const { data: assets } = useAssets();
+  const { data: investimentos } = useInvestimentos();
   const data = query.data ?? [];
   const total = totalParaPercentual !== undefined ? Number(totalParaPercentual) : undefined;
 
@@ -82,6 +95,11 @@ export function TransactionsTable({
         }
         case "ativo":
           return assetLabel(item.asset_sugerido_id ?? item.asset_id, assets);
+        case "investimento":
+          return investimentoLabel(
+            item.investimento_sugerido_id ?? item.investimento_id,
+            investimentos
+          );
       }
     },
     "data",
@@ -100,6 +118,7 @@ export function TransactionsTable({
           <col className="col-descricao" />
           {showCategoria && <col className="col-categoria" />}
           {showAtivo && <col className="col-ativo" />}
+          {showInvestimento && <col className="col-investimento" />}
           <col className="col-valor" />
           {total !== undefined && <col className="col-percentual" />}
         </colgroup>
@@ -135,6 +154,15 @@ export function TransactionsTable({
                 currentKey={sortKey}
                 direction={direction}
                 onClick={() => toggleSort("ativo")}
+              />
+            )}
+            {showInvestimento && (
+              <SortableHeader
+                label="Investimento"
+                sortKeyName="investimento"
+                currentKey={sortKey}
+                direction={direction}
+                onClick={() => toggleSort("investimento")}
               />
             )}
             <SortableHeader
@@ -179,6 +207,14 @@ export function TransactionsTable({
                 {showAtivo && (
                   <td>
                     <AssetSelectCell transaction={transaction} assets={assets} />
+                  </td>
+                )}
+                {showInvestimento && (
+                  <td>
+                    <InvestimentoSelectCell
+                      transaction={transaction}
+                      investimentos={investimentos}
+                    />
                   </td>
                 )}
                 <td>

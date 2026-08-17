@@ -3,8 +3,13 @@ from decimal import Decimal
 
 from app.categorization import engine
 from app.models.asset import Asset, AssetTipo
-from app.models.categorization import AssetCategorizationRule, CategorizationRule
+from app.models.categorization import (
+    AssetCategorizationRule,
+    CategorizationRule,
+    InvestimentoCategorizationRule,
+)
 from app.models.category import CategoryGroup, Subcategory
+from app.models.investimento import Investimento
 from app.models.liability import Liability, LiabilityTipo
 from app.models.pluggy import (
     PluggyAccount,
@@ -307,6 +312,135 @@ def test_suggest_asset_returns_none_when_no_match(db_session):
     _confirmed_asset_transaction(db_session, user, asset, "Apartamento Centro")
 
     assert engine.suggest_asset(db_session, user.id, "Supermercado Extra") is None
+
+
+def _investimento(db_session, user, nome="Reserva de emergência"):
+    investimento = Investimento(user_id=user.id, nome=nome)
+    db_session.add(investimento)
+    db_session.commit()
+    db_session.refresh(investimento)
+    return investimento
+
+
+def _confirmed_investimento_transaction(db_session, user, investimento, descricao):
+    n = next(_SEQ)
+    item = PluggyItem(
+        user_id=user.id,
+        pluggy_item_id=f"item-{n}",
+        connector_id=1,
+        connector_name="Banco Fake",
+        status=PluggyItemStatus.updated,
+        cutoff_date=date(2026, 1, 1),
+    )
+    db_session.add(item)
+    db_session.flush()
+    account = PluggyAccount(
+        item_id=item.id,
+        user_id=user.id,
+        pluggy_account_id=f"acc-{n}",
+        tipo=PluggyAccountTipo.corrente,
+        nome="Conta",
+        saldo=Decimal("0"),
+    )
+    db_session.add(account)
+    db_session.flush()
+    tx = PluggyTransaction(
+        account_id=account.id,
+        user_id=user.id,
+        pluggy_transaction_id=f"tx-{n}",
+        descricao=descricao,
+        valor=Decimal("-10.00"),
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 15),
+        status=PluggyTransactionStatus.efetivada,
+        categorizacao_status=PluggyTransactionCategorizacaoStatus.confirmada,
+        investimento_id=investimento.id,
+    )
+    db_session.add(tx)
+    db_session.commit()
+    db_session.refresh(tx)
+    return tx
+
+
+def test_suggest_investimento_returns_none_when_nothing_matches(db_session):
+    user = _user(db_session)
+
+    assert engine.suggest_investimento(db_session, user.id, "Loja desconhecida") is None
+
+
+def test_suggest_investimento_regra_wins_over_historico_exato(db_session):
+    user = _user(db_session)
+    investimento_regra = _investimento(db_session, user, nome="Reserva")
+    investimento_historico = _investimento(db_session, user, nome="Renda fixa XP")
+
+    db_session.add(
+        InvestimentoCategorizationRule(
+            user_id=user.id,
+            investimento_id=investimento_regra.id,
+            padrao_descricao="Aporte Nubank Investimentos",
+            padrao_normalizado="aporte nubank investimentos",
+            origem="usuario_confirmou",
+        )
+    )
+    db_session.commit()
+    _confirmed_investimento_transaction(
+        db_session, user, investimento_historico, "Aporte Nubank Investimentos"
+    )
+
+    suggestion = engine.suggest_investimento(db_session, user.id, "Aporte Nubank Investimentos")
+
+    assert suggestion is not None
+    assert suggestion.confianca == "alta"
+    assert suggestion.investimento_id == investimento_regra.id
+
+
+def test_suggest_investimento_historico_exato_wins_over_similar(db_session):
+    user = _user(db_session)
+    investimento_exato = _investimento(db_session, user, nome="Reserva")
+    investimento_similar = _investimento(db_session, user, nome="Renda fixa")
+
+    _confirmed_investimento_transaction(db_session, user, investimento_exato, "Resgate Nubank Inv")
+    _confirmed_investimento_transaction(
+        db_session, user, investimento_similar, "Resgate Nubank Inw"
+    )
+
+    suggestion = engine.suggest_investimento(db_session, user.id, "Resgate Nubank Inv")
+
+    assert suggestion.confianca == "alta"
+    assert suggestion.investimento_id == investimento_exato.id
+
+
+def test_suggest_investimento_similarity_at_or_above_threshold_matches(db_session):
+    user = _user(db_session)
+    investimento = _investimento(db_session, user)
+    base = "aporte nubank investimentos ltda"
+    _confirmed_investimento_transaction(db_session, user, investimento, base)
+
+    # ratio(base, base + "x"*6) >= 0.86
+    suggestion = engine.suggest_investimento(db_session, user.id, base + "xxxxxx")
+
+    assert suggestion is not None
+    assert suggestion.investimento_id == investimento.id
+
+
+def test_suggest_investimento_below_similarity_threshold_returns_none(db_session):
+    user = _user(db_session)
+    investimento = _investimento(db_session, user)
+    base = "aporte nubank investimentos ltda"
+    _confirmed_investimento_transaction(db_session, user, investimento, base)
+
+    suggestion = engine.suggest_investimento(db_session, user.id, base + "xxxxxxxxxxxx")
+
+    assert suggestion is None
+
+
+def test_suggest_investimento_isolated_by_user(db_session):
+    user = _user(db_session)
+    other_user = _user(db_session)
+    investimento = _investimento(db_session, other_user, nome="Reserva")
+    _confirmed_investimento_transaction(db_session, other_user, investimento, "Aporte Nubank")
+
+    assert engine.suggest_investimento(db_session, user.id, "Aporte Nubank") is None
 
 
 def test_suggest_liability_matches_by_normalized_contains(db_session):

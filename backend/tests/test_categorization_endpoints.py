@@ -4,6 +4,7 @@ from decimal import Decimal
 from app.auth.jwt import COOKIE_NAME, create_access_token
 from app.models.asset import Asset, AssetTipo
 from app.models.category import CategoryGroup, Subcategory
+from app.models.investimento import Investimento
 from app.models.liability import Liability, LiabilityTipo
 from app.models.pluggy import (
     PluggyAccount,
@@ -640,3 +641,69 @@ def test_confirm_description_suggestion_without_pending_returns_400(client, db_s
     response = client.post(f"/categorization/transactions/{tx.id}/description/confirm")
 
     assert response.status_code == 400
+
+
+# --- investimento --------------------------------------------------------
+
+
+def test_set_investimento_without_cookie_returns_401(client):
+    response = client.put(
+        "/categorization/transactions/1/investimento", json={"investimento_id": None}
+    )
+    assert response.status_code == 401
+
+
+def test_set_and_clear_investimento_association(client, db_session):
+    user = _authenticate(client, db_session)
+    tx = _pending_transaction(db_session, user)
+    investimento = Investimento(user_id=user.id, nome="Reserva de emergência")
+    db_session.add(investimento)
+    db_session.commit()
+    db_session.refresh(investimento)
+
+    set_response = client.put(
+        f"/categorization/transactions/{tx.id}/investimento",
+        json={"investimento_id": investimento.id},
+    )
+    assert set_response.status_code == 200
+    assert set_response.json()["investimento_id"] == investimento.id
+
+    clear_response = client.put(
+        f"/categorization/transactions/{tx.id}/investimento", json={"investimento_id": None}
+    )
+    assert clear_response.status_code == 200
+    assert clear_response.json()["investimento_id"] is None
+
+
+def test_set_investimento_with_invalid_investimento_id_returns_404(client, db_session):
+    user = _authenticate(client, db_session)
+    tx = _pending_transaction(db_session, user)
+
+    response = client.put(
+        f"/categorization/transactions/{tx.id}/investimento", json={"investimento_id": 999}
+    )
+
+    assert response.status_code == 404
+
+
+def test_set_investimento_other_users_investimento_returns_404(client, db_session):
+    other = User(
+        google_sub="google-investimento-other", email="investimento-other@example.com", name="Bob"
+    )
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    other_investimento = Investimento(user_id=other.id, nome="Reserva de outro")
+    db_session.add(other_investimento)
+    db_session.commit()
+    db_session.refresh(other_investimento)
+
+    user = _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    tx = _pending_transaction(db_session, user)
+
+    response = client.put(
+        f"/categorization/transactions/{tx.id}/investimento",
+        json={"investimento_id": other_investimento.id},
+    )
+
+    assert response.status_code == 404

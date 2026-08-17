@@ -9,6 +9,7 @@ from sqlalchemy.orm import Query, Session
 
 from app.models.asset import Asset, AssetStatus
 from app.models.category import SEM_CATEGORIA_ID, CategoryGroup, Natureza, Subcategory
+from app.models.investimento import Investimento
 from app.models.liability import Liability, LiabilityStatus
 from app.models.pluggy import (
     PluggyAccount,
@@ -94,6 +95,20 @@ class AtivoTotal:
 class TendenciaAtivo:
     asset_id: int
     asset_nome: str
+    pontos: list[PontoTendencia]
+
+
+@dataclass
+class InvestimentoTotal:
+    investimento_id: int
+    investimento_nome: str
+    total: Decimal
+
+
+@dataclass
+class TendenciaInvestimento:
+    investimento_id: int
+    investimento_nome: str
     pontos: list[PontoTendencia]
 
 
@@ -752,6 +767,100 @@ def get_tendencia_por_ativo(
             pontos=[PontoTendencia(ano=y, mes=m, total=dado["pontos"][(y, m)]) for y, m in periodo],
         )
         for asset_id, dado in por_ativo.items()
+    ]
+
+
+def get_por_investimento(
+    db: Session,
+    user_id: int,
+    *,
+    tipo: PluggyTransactionTipo,
+    ano: int | None = None,
+    mes: int | None = None,
+    regime: Regime = "competencia",
+) -> list[InvestimentoTotal]:
+    # Aporte/Resgate contam nos totais normais de Despesa/Receita (decisão do
+    # CEO, PRD-019) — acontecem na conta corrente de origem/destino, não numa
+    # conta tipo=investimento, então _base_query não precisa de exclusão.
+    query = (
+        _base_query(db, user_id, regime=regime)
+        .join(Investimento, PluggyTransaction.investimento_id == Investimento.id)
+        .filter(PluggyTransaction.tipo == tipo)
+    )
+    query = _apply_periodo(query, ano=ano, mes=mes, regime=regime)
+    rows = (
+        query.with_entities(
+            Investimento.id, Investimento.nome, func.sum(func.abs(PluggyTransaction.valor))
+        )
+        .group_by(Investimento.id, Investimento.nome)
+        .all()
+    )
+    return [
+        InvestimentoTotal(
+            investimento_id=investimento_id,
+            investimento_nome=investimento_nome,
+            total=_to_decimal(total),
+        )
+        for investimento_id, investimento_nome, total in rows
+    ]
+
+
+def get_tendencia_por_investimento(
+    db: Session,
+    user_id: int,
+    *,
+    tipo: PluggyTransactionTipo,
+    ano: int,
+    mes: int,
+    meses: int = 6,
+    regime: Regime = "competencia",
+) -> list[TendenciaInvestimento]:
+    periodo = _month_range(ano, mes, meses)
+    inicio, fim = _date_bounds(periodo)
+    coluna = _competencia_column(regime)
+
+    query = (
+        _base_query(db, user_id, regime=regime)
+        .join(Investimento, PluggyTransaction.investimento_id == Investimento.id)
+        .filter(PluggyTransaction.tipo == tipo)
+        .filter(
+            coluna >= inicio,
+            coluna < fim,
+        )
+    )
+    rows = (
+        query.with_entities(
+            Investimento.id,
+            Investimento.nome,
+            func.extract("year", coluna),
+            func.extract("month", coluna),
+            func.sum(func.abs(PluggyTransaction.valor)),
+        )
+        .group_by(
+            Investimento.id,
+            Investimento.nome,
+            func.extract("year", coluna),
+            func.extract("month", coluna),
+        )
+        .all()
+    )
+
+    por_investimento: dict[int, dict] = {}
+    for investimento_id, investimento_nome, y, m, total in rows:
+        if investimento_id not in por_investimento:
+            por_investimento[investimento_id] = {
+                "nome": investimento_nome,
+                "pontos": {chave: Decimal("0") for chave in periodo},
+            }
+        por_investimento[investimento_id]["pontos"][(int(y), int(m))] = _to_decimal(total)
+
+    return [
+        TendenciaInvestimento(
+            investimento_id=investimento_id,
+            investimento_nome=dado["nome"],
+            pontos=[PontoTendencia(ano=y, mes=m, total=dado["pontos"][(y, m)]) for y, m in periodo],
+        )
+        for investimento_id, dado in por_investimento.items()
     ]
 
 

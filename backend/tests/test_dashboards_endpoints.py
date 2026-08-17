@@ -4,6 +4,7 @@ from decimal import Decimal
 from app.auth.jwt import COOKIE_NAME, create_access_token
 from app.models.asset import Asset, AssetTipo
 from app.models.category import CategoryGroup, Natureza, Subcategory
+from app.models.investimento import Investimento
 from app.models.liability import Liability, LiabilityTipo
 from app.models.pluggy import (
     PluggyAccount,
@@ -52,6 +53,14 @@ def _asset(db_session, user, nome="Carro"):
     db_session.commit()
     db_session.refresh(asset)
     return asset
+
+
+def _investimento(db_session, user, nome="Reserva de emergência"):
+    investimento = Investimento(user_id=user.id, nome=nome)
+    db_session.add(investimento)
+    db_session.commit()
+    db_session.refresh(investimento)
+    return investimento
 
 
 def _liability(db_session, user, nome="Financiamento"):
@@ -105,6 +114,7 @@ def _transaction(
     data=date(2026, 1, 15),
     asset_id=None,
     liability_id=None,
+    investimento_id=None,
     account=None,
 ):
     if account is None:
@@ -140,6 +150,7 @@ def _transaction(
         subcategory_id=subcategory_id,
         asset_id=asset_id,
         liability_id=liability_id,
+        investimento_id=investimento_id,
         status=PluggyTransactionStatus.efetivada,
     )
     db_session.add(tx)
@@ -317,6 +328,93 @@ def test_por_ativo_tendencia_isolated_by_user(client, db_session):
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_por_investimento_without_cookie_returns_401(client):
+    assert client.get("/dashboards/por-investimento", params={"tipo": "debito"}).status_code == 401
+
+
+def test_por_investimento_tendencia_without_cookie_returns_401(client):
+    response = client.get(
+        "/dashboards/por-investimento/tendencia",
+        params={"tipo": "debito", "ano": 2026, "mes": 1},
+    )
+    assert response.status_code == 401
+
+
+def test_por_investimento_returns_totals_for_period(client, db_session):
+    user = _authenticate(client, db_session)
+    investimento = _investimento(db_session, user)
+    _transaction(
+        db_session,
+        user,
+        valor="-250.00",
+        tipo=PluggyTransactionTipo.debito,
+        investimento_id=investimento.id,
+    )
+
+    response = client.get(
+        "/dashboards/por-investimento", params={"tipo": "debito", "ano": 2026, "mes": 1}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["investimento_id"] == investimento.id
+    assert body[0]["investimento_nome"] == "Reserva de emergência"
+    assert Decimal(body[0]["total"]) == Decimal("250.00")
+
+
+def test_por_investimento_isolated_by_user(client, db_session):
+    other = User(
+        google_sub="google-por-investimento", email="por-investimento@example.com", name="Bob"
+    )
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    other_investimento = _investimento(db_session, other, nome="Do outro")
+    _transaction(
+        db_session,
+        other,
+        valor="-999.00",
+        tipo=PluggyTransactionTipo.debito,
+        investimento_id=other_investimento.id,
+    )
+
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+
+    response = client.get(
+        "/dashboards/por-investimento", params={"tipo": "debito", "ano": 2026, "mes": 1}
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_por_investimento_tendencia_returns_series_zero_filled(client, db_session):
+    user = _authenticate(client, db_session)
+    investimento = _investimento(db_session, user)
+    _transaction(
+        db_session,
+        user,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        investimento_id=investimento.id,
+        data=date(2026, 1, 15),
+    )
+
+    response = client.get(
+        "/dashboards/por-investimento/tendencia",
+        params={"tipo": "debito", "ano": 2026, "mes": 1, "meses": 3},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["investimento_id"] == investimento.id
+    assert len(body[0]["pontos"]) == 3
+    janeiro = next(p for p in body[0]["pontos"] if p["ano"] == 2026 and p["mes"] == 1)
+    assert Decimal(janeiro["total"]) == Decimal("100.00")
 
 
 def test_user_does_not_see_other_users_totals(client, db_session):

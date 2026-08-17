@@ -8,8 +8,13 @@ from app.categorization.competencia import caixa, competencia_padrao, competenci
 from app.categorization.normalize import normalize_description
 from app.exceptions import InvalidStateError, NotFoundError
 from app.models.asset import Asset
-from app.models.categorization import AssetCategorizationRule, CategorizationRule
+from app.models.categorization import (
+    AssetCategorizationRule,
+    CategorizationRule,
+    InvestimentoCategorizationRule,
+)
 from app.models.category import CategoryGroup, Subcategory
+from app.models.investimento import Investimento
 from app.models.liability import Liability
 from app.models.pluggy import (
     PluggyAccountTipo,
@@ -116,9 +121,19 @@ def list_transactions(
         asset_rules = engine.build_asset_rules_index(db, user_id)
         asset_historico = engine.build_asset_historico_index(db, user_id)
         liabilities = engine.build_liabilities_index(db, user_id)
+        investimento_rules = engine.build_investimento_rules_index(db, user_id)
+        investimento_historico = engine.build_investimento_historico_index(db, user_id)
         for tx in pendentes_da_pagina:
             _apply_suggestions(
-                db, tx, rules_by_pattern, historico, asset_rules, asset_historico, liabilities
+                db,
+                tx,
+                rules_by_pattern,
+                historico,
+                asset_rules,
+                asset_historico,
+                liabilities,
+                investimento_rules,
+                investimento_historico,
             )
         db.commit()
         for tx in pendentes_da_pagina:
@@ -135,6 +150,8 @@ def _apply_suggestions(
     asset_rules: dict[str, AssetCategorizationRule],
     asset_historico: list[engine.HistoricoAtivo],
     liabilities: list[tuple[int, str]],
+    investimento_rules: dict[str, InvestimentoCategorizationRule],
+    investimento_historico: list[engine.HistoricoInvestimento],
 ) -> None:
     normalizado = normalize_description(tx.descricao)
 
@@ -169,6 +186,16 @@ def _apply_suggestions(
     else:
         tx.liability_sugerido_id = None
         tx.liability_sugestao_confianca = None
+
+    investimento_suggestion = engine.suggest_investimento_from_index(
+        normalizado, investimento_rules, investimento_historico
+    )
+    if investimento_suggestion is not None:
+        tx.investimento_sugerido_id = investimento_suggestion.investimento_id
+        tx.investimento_sugestao_confianca = investimento_suggestion.confianca
+    else:
+        tx.investimento_sugerido_id = None
+        tx.investimento_sugestao_confianca = None
 
     db.flush()
 
@@ -283,6 +310,26 @@ def set_transaction_liability(
             raise NotFoundError(f"Passivo {liability_id} não encontrado")
 
     tx.liability_id = liability_id
+    db.commit()
+    db.refresh(tx)
+    return tx
+
+
+def set_transaction_investimento(
+    db: Session, user_id: int, transaction_id: int, investimento_id: int | None
+) -> PluggyTransaction:
+    tx = _get_transaction(db, user_id, transaction_id)
+
+    if investimento_id is not None:
+        investimento = (
+            db.query(Investimento)
+            .filter(Investimento.id == investimento_id, Investimento.user_id == user_id)
+            .one_or_none()
+        )
+        if investimento is None:
+            raise NotFoundError(f"Investimento {investimento_id} não encontrado")
+
+    tx.investimento_id = investimento_id
     db.commit()
     db.refresh(tx)
     return tx

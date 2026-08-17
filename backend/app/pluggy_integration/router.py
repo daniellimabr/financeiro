@@ -100,6 +100,7 @@ def update_account(
             account_id,
             apelido=payload.apelido,
             sync_enabled=payload.sync_enabled,
+            investimento_id=payload.investimento_id,
         )
     except NotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -176,6 +177,7 @@ def list_transactions(
     account_tipo: PluggyAccountTipo | None = None,
     asset_id: int | None = None,
     liability_id: int | None = None,
+    investimento_id: int | None = None,
     tipo: PluggyTransactionTipo | None = None,
     competencia: bool = False,
     db: Session = Depends(get_db),
@@ -190,6 +192,7 @@ def list_transactions(
         account_tipo=account_tipo,
         asset_id=asset_id,
         liability_id=liability_id,
+        investimento_id=investimento_id,
         tipo=tipo,
         competencia=competencia,
     )

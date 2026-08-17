@@ -9,25 +9,37 @@ import { CategoryCombobox } from "../components/CategoryCombobox";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { SortableHeader } from "../components/SortableHeader";
 import { StatusIcon } from "../components/StatusIcon";
-import { AssetSelectCell, DateCell, DescriptionCell } from "../components/TransactionEditCells";
+import {
+  AssetSelectCell,
+  DateCell,
+  DescriptionCell,
+  InvestimentoSelectCell,
+} from "../components/TransactionEditCells";
 import { TransactionTipoIcon } from "../components/TransactionTipoIcon";
 import { useAssets } from "../hooks/useAssets";
 import { useBulkConfirmCategorization } from "../hooks/useBulkConfirmCategorization";
 import { useCategorizationTransactions } from "../hooks/useCategorizationTransactions";
 import { useCategoryGroups } from "../hooks/useCategoryGroups";
+import { useInvestimentos } from "../hooks/useInvestimentos";
 import { usePluggyAccounts } from "../hooks/usePluggyAccounts";
 import { useSetCategory } from "../hooks/useSetCategory";
 import { useSubcategories } from "../hooks/useSubcategories";
 import { useTableSort } from "../hooks/useTableSort";
 import { formatCurrency } from "../utils/format";
-import { assetLabel, descricaoExibida, subcategoryLabel } from "../utils/transactionEdit";
+import {
+  assetLabel,
+  descricaoExibida,
+  investimentoLabel,
+  subcategoryLabel,
+} from "../utils/transactionEdit";
 
 const PAGE_SIZE = 20;
 
 type HasAssetFilter = "todos" | "sim" | "nao";
 // Sort client-side, só na página atual (paginação é server-side, 20 itens) —
 // limitação conhecida, não é bug (ver PRD-013, "Regras de negócio").
-type CategorizationSortKey = "data" | "descricao" | "categoria" | "ativo" | "valor";
+type CategorizationSortKey =
+  "data" | "descricao" | "categoria" | "ativo" | "investimento" | "valor";
 
 export function CategorizationReviewPage() {
   const now = new Date();
@@ -55,6 +67,7 @@ export function CategorizationReviewPage() {
   const { data: groups } = useCategoryGroups();
   const { data: subcategories } = useSubcategories();
   const { data: assets } = useAssets();
+  const { data: investimentos } = useInvestimentos();
   const { data: accounts } = usePluggyAccounts();
   const setCategory = useSetCategory();
   const bulkConfirm = useBulkConfirmCategorization();
@@ -87,6 +100,11 @@ export function CategorizationReviewPage() {
         }
         case "ativo":
           return assetLabel(item.asset_sugerido_id ?? item.asset_id, assets);
+        case "investimento":
+          return investimentoLabel(
+            item.investimento_sugerido_id ?? item.investimento_id,
+            investimentos
+          );
       }
     },
     "data",
@@ -256,6 +274,7 @@ export function CategorizationReviewPage() {
             <col className="col-descricao" />
             <col className="col-categoria" />
             <col className="col-ativo" />
+            <col className="col-investimento" />
             <col className="col-valor" />
             <col className="col-acoes" />
           </colgroup>
@@ -299,6 +318,13 @@ export function CategorizationReviewPage() {
                 currentKey={sortKey}
                 direction={direction}
                 onClick={() => toggleSort("ativo")}
+              />
+              <SortableHeader
+                label="Investimento"
+                sortKeyName="investimento"
+                currentKey={sortKey}
+                direction={direction}
+                onClick={() => toggleSort("investimento")}
               />
               <SortableHeader
                 label="Valor"
@@ -359,6 +385,9 @@ export function CategorizationReviewPage() {
                   </td>
                   <td>
                     <AssetSelectCell transaction={tx} assets={assets} />
+                  </td>
+                  <td>
+                    <InvestimentoSelectCell transaction={tx} investimentos={investimentos} />
                   </td>
                   <td>
                     <span className="valor-cell">

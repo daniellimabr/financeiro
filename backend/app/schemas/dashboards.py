@@ -93,6 +93,22 @@ class TendenciaAtivoOut(BaseModel):
     pontos: list[PontoTendenciaOut]
 
 
+class InvestimentoTotalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    investimento_id: int
+    investimento_nome: str
+    total: Decimal
+
+
+class TendenciaInvestimentoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    investimento_id: int
+    investimento_nome: str
+    pontos: list[PontoTendenciaOut]
+
+
 class PassivoTotalOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

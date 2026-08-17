@@ -87,6 +87,7 @@ describe("pluggy api", () => {
     expect(JSON.parse(init.body as string)).toEqual({
       apelido: "Conta principal",
       sync_enabled: false,
+      investimento_id: null,
     });
   });
 

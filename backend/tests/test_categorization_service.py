@@ -9,6 +9,7 @@ from app.exceptions import InvalidStateError, NotFoundError
 from app.models.asset import Asset, AssetTipo
 from app.models.categorization import CategorizationRule
 from app.models.category import CategoryGroup, Subcategory
+from app.models.investimento import Investimento
 from app.models.liability import Liability, LiabilityTipo
 from app.models.pluggy import (
     PluggyAccount,
@@ -627,6 +628,73 @@ def test_set_transaction_liability_other_users_liability_raises_not_found(
 def test_set_transaction_liability_missing_transaction_raises_not_found(db_session, user):
     with pytest.raises(NotFoundError):
         service.set_transaction_liability(db_session, user.id, 999, None)
+
+
+# --- set_transaction_investimento -------------------------------------------
+
+
+def test_set_transaction_investimento_sets_and_clears(db_session, user):
+    tx = _pending_transaction(db_session, user)
+    investimento = Investimento(user_id=user.id, nome="Reserva de emergência")
+    db_session.add(investimento)
+    db_session.commit()
+    db_session.refresh(investimento)
+
+    updated = service.set_transaction_investimento(db_session, user.id, tx.id, investimento.id)
+    assert updated.investimento_id == investimento.id
+
+    cleared = service.set_transaction_investimento(db_session, user.id, tx.id, None)
+    assert cleared.investimento_id is None
+
+
+def test_set_transaction_investimento_other_users_investimento_raises_not_found(
+    db_session, user, other_user
+):
+    tx = _pending_transaction(db_session, user)
+    investimento = Investimento(user_id=other_user.id, nome="Reserva de emergência")
+    db_session.add(investimento)
+    db_session.commit()
+    db_session.refresh(investimento)
+
+    with pytest.raises(NotFoundError):
+        service.set_transaction_investimento(db_session, user.id, tx.id, investimento.id)
+
+
+def test_set_transaction_investimento_missing_transaction_raises_not_found(db_session, user):
+    with pytest.raises(NotFoundError):
+        service.set_transaction_investimento(db_session, user.id, 999, None)
+
+
+# --- sugestão de investimento aplicada por list_transactions -----------------
+
+
+def test_list_transactions_applies_investimento_suggestion_but_never_confirms(db_session, user):
+    from app.models.categorization import InvestimentoCategorizationRule
+
+    investimento = Investimento(user_id=user.id, nome="Reserva de emergência")
+    db_session.add(investimento)
+    db_session.commit()
+    db_session.refresh(investimento)
+    db_session.add(
+        InvestimentoCategorizationRule(
+            user_id=user.id,
+            investimento_id=investimento.id,
+            padrao_descricao="Aporte Nubank Investimentos",
+            padrao_normalizado="aporte nubank investimentos",
+            origem="usuario_confirmou",
+        )
+    )
+    db_session.commit()
+    tx = _pending_transaction(db_session, user, "Aporte Nubank Investimentos")
+
+    items, total = service.list_transactions(db_session, user.id, status="pendente")
+
+    assert total == 1
+    result = items[0]
+    assert result.id == tx.id
+    assert result.investimento_sugerido_id == investimento.id
+    assert result.investimento_sugestao_confianca == "alta"
+    assert result.investimento_id is None
 
 
 # --- update_description / propagation --------------------------------------

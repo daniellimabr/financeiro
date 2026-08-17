@@ -15,6 +15,10 @@ function invalidateAllDashboardQueries(queryClient: QueryClient): void {
 export function invalidateAfterTransactionEdit(queryClient: QueryClient): void {
   queryClient.invalidateQueries({ queryKey: ["categorizationTransactions"] });
   queryClient.invalidateQueries({ queryKey: ["pluggyTransactions"] });
+  // Categoria/investimento de uma transação pode ser Aporte/Resgate, que
+  // entra direto no cálculo de rendimento_estimado — sem isso o card do
+  // investimento ficaria com dado velho até um reload manual.
+  queryClient.invalidateQueries({ queryKey: ["investimentoEvolucao"] });
   invalidateAllDashboardQueries(queryClient);
 }
 

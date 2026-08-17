@@ -34,6 +34,7 @@ const ACCOUNT_FIXTURE = {
   moeda: "BRL",
   sync_enabled: true,
   saldo_inicial: null,
+  investimento_id: null,
   created_at: "2026-08-07T00:00:00Z",
   updated_at: "2026-08-07T00:00:00Z",
 };
@@ -118,7 +119,11 @@ describe("AccountManagementPage", () => {
       );
       expect(call).toBeDefined();
       const body = JSON.parse((call?.[1] as RequestInit).body as string);
-      expect(body).toEqual({ apelido: "Conta principal", sync_enabled: true });
+      expect(body).toEqual({
+        apelido: "Conta principal",
+        sync_enabled: true,
+        investimento_id: null,
+      });
     });
   });
 
@@ -149,7 +154,7 @@ describe("AccountManagementPage", () => {
       );
       expect(call).toBeDefined();
       const body = JSON.parse((call?.[1] as RequestInit).body as string);
-      expect(body).toEqual({ apelido: null, sync_enabled: false });
+      expect(body).toEqual({ apelido: null, sync_enabled: false, investimento_id: null });
     });
   });
 
@@ -259,6 +264,52 @@ describe("AccountManagementPage", () => {
       expect(call).toBeDefined();
       const body = JSON.parse((call?.[1] as RequestInit).body as string);
       expect(body).toEqual({ saldo_inicial: "1500" });
+    });
+  });
+
+  it("linking a carteira to an investimento saves it via PUT /pluggy/accounts/{id}", async () => {
+    const investmentAccount = {
+      ...ACCOUNT_FIXTURE,
+      id: 2,
+      tipo: "investimento",
+      nome: "Nubank Investimentos",
+    };
+    const investimentoFixture = {
+      id: 1,
+      user_id: 1,
+      nome: "Reserva de emergência",
+      created_at: "2026-08-14T00:00:00Z",
+      updated_at: "2026-08-14T00:00:00Z",
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      if (url === "/pluggy/items") return Promise.resolve(jsonResponse([ITEM_FIXTURE]));
+      if (url === "/pluggy/accounts" && method === "GET")
+        return Promise.resolve(jsonResponse([investmentAccount]));
+      if (url === "/investimentos") return Promise.resolve(jsonResponse([investimentoFixture]));
+      if (url === "/pluggy/accounts/2" && method === "PUT") {
+        return Promise.resolve(jsonResponse({ ...investmentAccount, investimento_id: 1 }));
+      }
+      if (url.startsWith("/dashboards/evolucao-saldo-por-conta"))
+        return Promise.resolve(jsonResponse([]));
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<AccountManagementPage />);
+    await screen.findByText(/Nubank Investimentos/);
+
+    const select = await screen.findByLabelText("Investimento de Nubank Investimentos");
+    await userEvent.selectOptions(select, "1");
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (c) => String(c[0]) === "/pluggy/accounts/2" && (c[1] as RequestInit)?.method === "PUT"
+      );
+      expect(call).toBeDefined();
+      const body = JSON.parse((call?.[1] as RequestInit).body as string);
+      expect(body).toEqual({ apelido: null, sync_enabled: true, investimento_id: 1 });
     });
   });
 

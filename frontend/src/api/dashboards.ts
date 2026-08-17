@@ -83,6 +83,18 @@ export interface TendenciaAtivo {
   pontos: PontoTendencia[];
 }
 
+export interface InvestimentoTotal {
+  investimento_id: number;
+  investimento_nome: string;
+  total: string;
+}
+
+export interface TendenciaInvestimento {
+  investimento_id: number;
+  investimento_nome: string;
+  pontos: PontoTendencia[];
+}
+
 export interface PassivoTotal {
   liability_id: number;
   liability_nome: string;
@@ -211,6 +223,24 @@ export function fetchDashboardPorAtivoTendencia(
 ): Promise<TendenciaAtivo[]> {
   return apiFetch<TendenciaAtivo[]>(
     `/dashboards/por-ativo/tendencia${buildQuery({ tipo, ...filter })}`
+  );
+}
+
+export function fetchDashboardPorInvestimento(
+  tipo: TransacaoTipo,
+  filter: PeriodoFilter & RegimeFilter = {}
+): Promise<InvestimentoTotal[]> {
+  return apiFetch<InvestimentoTotal[]>(
+    `/dashboards/por-investimento${buildQuery({ tipo, ...filter })}`
+  );
+}
+
+export function fetchDashboardPorInvestimentoTendencia(
+  tipo: TransacaoTipo,
+  filter: Required<PeriodoFilter> & RegimeFilter & { meses: PeriodoHistorico }
+): Promise<TendenciaInvestimento[]> {
+  return apiFetch<TendenciaInvestimento[]>(
+    `/dashboards/por-investimento/tendencia${buildQuery({ tipo, ...filter })}`
   );
 }
 

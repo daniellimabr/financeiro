@@ -5,6 +5,7 @@ import { AssetsPage } from "./AssetsPage";
 import { CategorizationReviewPage } from "./CategorizationReviewPage";
 import { ConfiguracoesPage } from "./ConfiguracoesPage";
 import { DashboardsPage } from "./DashboardsPage";
+import { InvestimentosPage } from "./InvestimentosPage";
 import { LiabilitiesPage } from "./LiabilitiesPage";
 import { NaturezaPage } from "./NaturezaPage";
 import { ProjecaoPage } from "./ProjecaoPage";
@@ -14,12 +15,20 @@ interface ProtectedPageProps {
 }
 
 type Tab =
-  "dashboards" | "categorizar" | "ativos" | "passivos" | "natureza" | "projecao" | "configuracoes";
+  | "dashboards"
+  | "categorizar"
+  | "ativos"
+  | "investimentos"
+  | "passivos"
+  | "natureza"
+  | "projecao"
+  | "configuracoes";
 
 const NAV_ITEMS: { tab: Tab; label: string }[] = [
   { tab: "dashboards", label: "Dashboards" },
   { tab: "categorizar", label: "Categorizar" },
   { tab: "ativos", label: "Ativos" },
+  { tab: "investimentos", label: "Investimentos" },
   { tab: "passivos", label: "Passivos" },
   { tab: "natureza", label: "Natureza" },
   { tab: "projecao", label: "Projeção" },
@@ -58,6 +67,7 @@ export function ProtectedPage({ user }: ProtectedPageProps) {
         {tab === "dashboards" && <DashboardsPage />}
         {tab === "categorizar" && <CategorizationReviewPage />}
         {tab === "ativos" && <AssetsPage />}
+        {tab === "investimentos" && <InvestimentosPage />}
         {tab === "passivos" && <LiabilitiesPage />}
         {tab === "natureza" && <NaturezaPage />}
         {tab === "projecao" && <ProjecaoPage />}
