@@ -51,6 +51,7 @@ const BASE_TRANSACTION: CategorizedTransaction = {
   valor: "-50.25",
   tipo: "debito",
   data: "2026-01-15",
+  data_editada_manualmente: false,
   status: "efetivada",
   categorizacao_status: "pendente",
   subcategory_id: null,

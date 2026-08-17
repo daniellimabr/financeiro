@@ -7,7 +7,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Asset } from "../api/assets";
 import type { CategoryGroup, Subcategory } from "../api/categories";
 import type { EditableTransaction } from "../utils/transactionEdit";
-import { AssetSelectCell, CategorySelectCell, DescriptionCell } from "./TransactionEditCells";
+import {
+  AssetSelectCell,
+  CategorySelectCell,
+  DateCell,
+  DescriptionCell,
+} from "./TransactionEditCells";
 
 const GROUPS: CategoryGroup[] = [{ id: 1, nome: "Alimentação", created_at: "", updated_at: "" }];
 
@@ -55,6 +60,8 @@ const TRANSACTION: EditableTransaction = {
   subcategoria_sugerida_id: 10,
   asset_id: null,
   asset_sugerido_id: null,
+  data: "2026-01-15",
+  data_editada_manualmente: false,
 };
 
 function jsonResponse(body: unknown, status = 200) {
@@ -148,6 +155,56 @@ describe("TransactionEditCells", () => {
         );
         expect(call).toBeDefined();
       });
+    });
+  });
+
+  describe("DateCell", () => {
+    it("editing the date calls the data endpoint", async () => {
+      const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? "GET";
+        if (url === "/categorization/transactions/1/data" && method === "PUT") {
+          return Promise.resolve(
+            jsonResponse({ ...TRANSACTION, data: "2026-01-16", data_editada_manualmente: true })
+          );
+        }
+        throw new Error(`Unexpected fetch: ${method} ${url}`);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      renderWithQueryClient(<DateCell transaction={TRANSACTION} />);
+
+      await userEvent.click(screen.getByText("2026-01-15"));
+      const input = screen.getByLabelText("Editar data de Mercado Sao Joao");
+      await userEvent.clear(input);
+      await userEvent.type(input, "2026-01-16");
+      await userEvent.tab();
+
+      await waitFor(() => {
+        const call = fetchMock.mock.calls.find(
+          (c) =>
+            String(c[0]) === "/categorization/transactions/1/data" &&
+            (c[1] as RequestInit)?.method === "PUT"
+        );
+        expect(call).toBeDefined();
+        expect(JSON.parse((call?.[1] as RequestInit).body as string)).toEqual({
+          data: "2026-01-16",
+        });
+      });
+    });
+
+    it("shows a visual indicator when the date was edited manually", () => {
+      renderWithQueryClient(
+        <DateCell transaction={{ ...TRANSACTION, data_editada_manualmente: true }} />
+      );
+
+      expect(screen.getByLabelText("Data editada manualmente")).toBeInTheDocument();
+    });
+
+    it("does not show the indicator when the date was not edited manually", () => {
+      renderWithQueryClient(<DateCell transaction={TRANSACTION} />);
+
+      expect(screen.queryByLabelText("Data editada manualmente")).not.toBeInTheDocument();
     });
   });
 

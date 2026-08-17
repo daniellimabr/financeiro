@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
@@ -955,3 +955,68 @@ def test_bulk_confirm_credit_card_shifts_competencia_and_caixa(db_session, user,
     db_session.refresh(tx_cartao)
     assert tx_cartao.data_competencia == date(2026, 2, 28)
     assert tx_cartao.data_caixa == date(2026, 3, 28)
+
+
+# --- update_data (edição manual de data, Sprint 18) --------------------------
+
+
+def test_update_data_sets_data_and_flag_on_corrente_account(db_session, user):
+    tx = _pending_transaction(db_session, user)
+    tx.data = date(2026, 1, 15)
+    db_session.commit()
+
+    updated = service.update_data(db_session, user.id, tx.id, date(2026, 1, 13))
+
+    assert updated.data == date(2026, 1, 13)
+    assert updated.data_editada_manualmente is True
+    assert updated.data_competencia == date(2026, 1, 13)
+    assert updated.data_caixa == date(2026, 1, 13)
+
+
+def test_update_data_recomputes_competencia_for_credit_card(db_session, user):
+    tx = _transaction(db_session, user, account_tipo=PluggyAccountTipo.cartao_credito)
+    tx.data = date(2026, 1, 15)
+    db_session.commit()
+
+    updated = service.update_data(db_session, user.id, tx.id, date(2026, 1, 13))
+
+    assert updated.data == date(2026, 1, 13)
+    assert updated.data_competencia == date(2026, 2, 13)
+    assert updated.data_caixa == date(2026, 3, 13)
+
+
+def test_update_data_recomputes_competencia_salario_when_confirmed(db_session, user):
+    salario = _salario_subcategory(db_session)
+    tx = _confirmed_transaction(db_session, user, salario, "Salário mensal")
+    tx.data = date(2026, 1, 20)
+    db_session.commit()
+
+    # cutoff padrão é 25 — dia 10 (< cutoff) não desloca.
+    updated = service.update_data(db_session, user.id, tx.id, date(2026, 1, 10))
+
+    assert updated.data == date(2026, 1, 10)
+    assert updated.data_competencia == date(2026, 1, 10)
+
+    # dia 28 (>= cutoff) desloca pro mês seguinte.
+    updated = service.update_data(db_session, user.id, tx.id, date(2026, 1, 28))
+
+    assert updated.data_competencia == date(2026, 2, 28)
+
+
+def test_update_data_rejects_future_date(db_session, user):
+    tx = _pending_transaction(db_session, user)
+
+    with pytest.raises(InvalidStateError):
+        service.update_data(db_session, user.id, tx.id, date.today() + timedelta(days=1))
+
+
+def test_update_data_missing_transaction_raises_not_found(db_session, user):
+    with pytest.raises(NotFoundError):
+        service.update_data(db_session, user.id, 999, date(2026, 1, 13))
+
+
+def test_update_data_other_users_transaction_raises_not_found(db_session, user, other_user):
+    tx = _pending_transaction(db_session, other_user)
+
+    with pytest.raises(NotFoundError):
+        service.update_data(db_session, user.id, tx.id, date(2026, 1, 13))

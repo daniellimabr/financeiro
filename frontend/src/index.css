@@ -934,6 +934,12 @@ input {
   gap: var(--space-1);
 }
 
+.date-edited-indicator {
+  margin-left: var(--space-1);
+  color: var(--accent-text);
+  font-size: var(--text-xs);
+}
+
 .amt-detail {
   color: var(--text);
   font-size: var(--text-xs);

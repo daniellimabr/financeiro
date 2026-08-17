@@ -137,6 +137,7 @@ class PluggyTransaction(Base):
     data: Mapped[date] = mapped_column(Date, nullable=False)
     data_competencia: Mapped[date | None] = mapped_column(Date, nullable=True)
     data_caixa: Mapped[date | None] = mapped_column(Date, nullable=True)
+    data_editada_manualmente: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     subcategory_id: Mapped[int | None] = mapped_column(
         ForeignKey("subcategories.id"), nullable=True
     )

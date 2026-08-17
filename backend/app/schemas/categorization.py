@@ -23,6 +23,7 @@ class TransactionOut(BaseModel):
     valor: Decimal
     tipo: PluggyTransactionTipo
     data: date
+    data_editada_manualmente: bool
     status: PluggyTransactionStatus
     categorizacao_status: PluggyTransactionCategorizacaoStatus
     subcategory_id: int | None
@@ -85,3 +86,7 @@ class DescriptionUpdateIn(BaseModel):
 class DescriptionUpdateOut(BaseModel):
     transaction: TransactionOut
     propagated: int
+
+
+class DateUpdateIn(BaseModel):
+    data: date

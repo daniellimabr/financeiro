@@ -345,17 +345,21 @@ def _upsert_transaction(
     tx.descricao = raw.get("description", "")
     tx.valor = Decimal(str(raw["amount"]))
     tx.tipo = _map_transaction_tipo(raw["type"])
-    tx.data = tx_date
-    # Cartão sempre desloca incondicionalmente (mesmo valor de novo, sem
-    # risco de perder ajuste manual). Transação já confirmada em outra conta
-    # pode ter data_competencia deslocada por categoria (ex.: Salário, via
-    # set_category/bulk_confirm) — resync não deve descartar esse ajuste.
-    if (
-        account.tipo == PluggyAccountTipo.cartao_credito
-        or tx.categorizacao_status != PluggyTransactionCategorizacaoStatus.confirmada
-    ):
-        tx.data_competencia = competencia_padrao(tx_date, account.tipo)
-        tx.data_caixa = caixa(tx.data_competencia, account.tipo)
+    # Data editada manualmente pelo usuário (tela Categorizar) é uma trava
+    # explícita contra o valor bruto da Pluggy — sobrevive a todo resync
+    # futuro para a mesma transação (PRD-018).
+    if not tx.data_editada_manualmente:
+        tx.data = tx_date
+        # Cartão sempre desloca incondicionalmente (mesmo valor de novo, sem
+        # risco de perder ajuste manual). Transação já confirmada em outra conta
+        # pode ter data_competencia deslocada por categoria (ex.: Salário, via
+        # set_category/bulk_confirm) — resync não deve descartar esse ajuste.
+        if (
+            account.tipo == PluggyAccountTipo.cartao_credito
+            or tx.categorizacao_status != PluggyTransactionCategorizacaoStatus.confirmada
+        ):
+            tx.data_competencia = competencia_padrao(tx_date, account.tipo)
+            tx.data_caixa = caixa(tx.data_competencia, account.tipo)
     tx.categoria_pluggy = raw.get("category")
     tx.status = _map_transaction_status(raw.get("status", "POSTED"))
     db.flush()

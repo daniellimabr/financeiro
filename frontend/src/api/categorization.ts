@@ -14,6 +14,7 @@ export interface CategorizedTransaction {
   valor: string;
   tipo: TransactionTipo;
   data: string;
+  data_editada_manualmente: boolean;
   status: string;
   categorizacao_status: string;
   subcategory_id: number | null;
@@ -137,6 +138,14 @@ export function setTransactionLiability(
       body: JSON.stringify({ liability_id: liabilityId }),
     }
   );
+}
+
+export function updateData(transactionId: number, data: string): Promise<CategorizedTransaction> {
+  return apiFetch<CategorizedTransaction>(`/categorization/transactions/${transactionId}/data`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ data }),
+  });
 }
 
 export interface DescriptionUpdateResult {

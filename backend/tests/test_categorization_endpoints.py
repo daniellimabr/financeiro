@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from app.auth.jwt import COOKIE_NAME, create_access_token
@@ -137,6 +137,11 @@ def test_confirm_description_suggestion_without_cookie_returns_401(client):
 
 def test_dismiss_description_suggestion_without_cookie_returns_401(client):
     response = client.post("/categorization/transactions/1/description/dismiss")
+    assert response.status_code == 401
+
+
+def test_update_data_without_cookie_returns_401(client):
+    response = client.put("/categorization/transactions/1/data", json={"data": "2026-01-13"})
     assert response.status_code == 401
 
 
@@ -525,6 +530,44 @@ def test_set_liability_other_users_liability_returns_404(client, db_session):
         f"/categorization/transactions/{tx.id}/liability",
         json={"liability_id": other_liability.id},
     )
+
+    assert response.status_code == 404
+
+
+# --- edição manual de data (Sprint 18) ---------------------------------------
+
+
+def test_update_data_sets_data_and_flag(client, db_session):
+    user = _authenticate(client, db_session)
+    tx = _pending_transaction(db_session, user)
+
+    response = client.put(f"/categorization/transactions/{tx.id}/data", json={"data": "2026-01-13"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data"] == "2026-01-13"
+    assert body["data_editada_manualmente"] is True
+
+
+def test_update_data_rejects_future_date(client, db_session):
+    user = _authenticate(client, db_session)
+    tx = _pending_transaction(db_session, user)
+    futura = (date.today() + timedelta(days=1)).isoformat()
+
+    response = client.put(f"/categorization/transactions/{tx.id}/data", json={"data": futura})
+
+    assert response.status_code == 400
+
+
+def test_update_data_other_users_transaction_returns_404(client, db_session):
+    _authenticate(client, db_session)
+    other_user = User(google_sub="google-2", email="b@example.com", name="Bob")
+    db_session.add(other_user)
+    db_session.commit()
+    db_session.refresh(other_user)
+    tx = _pending_transaction(db_session, other_user)
+
+    response = client.put(f"/categorization/transactions/{tx.id}/data", json={"data": "2026-01-13"})
 
     assert response.status_code == 404
 

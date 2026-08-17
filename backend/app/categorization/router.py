@@ -13,6 +13,7 @@ from app.schemas.categorization import (
     BulkConfirmOut,
     BulkConfirmResultOut,
     CategoryIn,
+    DateUpdateIn,
     DescriptionUpdateIn,
     DescriptionUpdateOut,
     LiabilityAssociationIn,
@@ -124,6 +125,21 @@ def update_description(
     except NotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return DescriptionUpdateOut(transaction=tx, propagated=propagated)
+
+
+@router.put("/transactions/{transaction_id}/data", response_model=TransactionOut)
+def update_data(
+    transaction_id: int,
+    payload: DateUpdateIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return service.update_data(db, current_user.id, transaction_id, payload.data)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except InvalidStateError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.post("/transactions/{transaction_id}/description/confirm", response_model=TransactionOut)

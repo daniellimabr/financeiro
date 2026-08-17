@@ -110,6 +110,7 @@ class PluggyTransactionOut(BaseModel):
     tipo: PluggyTransactionTipo
     data: date
     data_competencia: date | None
+    data_editada_manualmente: bool
     subcategory_id: int | None
     subcategoria_sugerida_id: int | None
     categoria_pluggy: str | None

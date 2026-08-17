@@ -1,3 +1,5 @@
+from datetime import date
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -328,6 +330,27 @@ def update_description(
     db.commit()
     db.refresh(tx)
     return tx, propagated
+
+
+def update_data(
+    db: Session, user_id: int, transaction_id: int, nova_data: date
+) -> PluggyTransaction:
+    tx = _get_transaction(db, user_id, transaction_id)
+
+    if nova_data > date.today():
+        raise InvalidStateError("Data não pode ser no futuro")
+
+    user = db.get(User, user_id)
+    salario_id = salario_subcategory_id(db)
+
+    tx.data = nova_data
+    tx.data_editada_manualmente = True
+    _recompute_data_competencia(
+        tx, tx.subcategory_id, salario_id, user.salario_competencia_cutoff_dia
+    )
+    db.commit()
+    db.refresh(tx)
+    return tx
 
 
 def confirm_description_suggestion(

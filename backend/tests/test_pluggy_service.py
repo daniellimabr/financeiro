@@ -683,6 +683,87 @@ def test_sync_item_non_credit_card_keeps_data_caixa_equal_to_data_competencia(db
     assert tx.data_caixa == tx.data_competencia
 
 
+# --- data_editada_manualmente sobrevive a resync (Sprint 18) ----------------
+
+
+def test_resync_preserves_manually_edited_date_on_corrente_account(db_session, user):
+    from app.categorization import service as categorization_service
+
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[_account_raw()],
+        transactions_by_account={"acc-ext-1": [_transaction_raw(date="2026-01-15T12:00:00.000Z")]},
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+
+    tx = service.list_transactions(db_session, user.id)[0]
+    edited = categorization_service.update_data(db_session, user.id, tx.id, date(2026, 1, 13))
+    assert edited.data == date(2026, 1, 13)
+    assert edited.data_editada_manualmente is True
+
+    # resync traz um valor bruto diferente (ex.: banco reenvia o payload) —
+    # não deve sobrescrever a data editada manualmente.
+    client.transactions_by_account["acc-ext-1"] = [
+        _transaction_raw(date="2026-01-17T12:00:00.000Z")
+    ]
+    service.sync_item(db_session, client, user.id, item.id)
+
+    resynced = service.list_transactions(db_session, user.id)[0]
+    assert resynced.data == date(2026, 1, 13)
+    assert resynced.data_competencia == date(2026, 1, 13)
+    assert resynced.data_caixa == date(2026, 1, 13)
+
+
+def test_resync_preserves_manually_edited_date_on_credit_card_account(db_session, user):
+    from app.categorization import service as categorization_service
+
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[_account_raw(type="CREDIT", subtype="CREDIT_CARD")],
+        transactions_by_account={"acc-ext-1": [_transaction_raw(date="2026-01-15T12:00:00.000Z")]},
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+
+    tx = service.list_transactions(db_session, user.id)[0]
+    edited = categorization_service.update_data(db_session, user.id, tx.id, date(2026, 1, 13))
+    assert edited.data == date(2026, 1, 13)
+    assert edited.data_competencia == date(2026, 2, 13)
+    assert edited.data_caixa == date(2026, 3, 13)
+
+    # cartão desloca incondicionalmente no resync — a trava precisa segurar
+    # os 3 campos, não só `data`.
+    client.transactions_by_account["acc-ext-1"] = [
+        _transaction_raw(date="2026-01-17T12:00:00.000Z")
+    ]
+    service.sync_item(db_session, client, user.id, item.id)
+
+    resynced = service.list_transactions(db_session, user.id)[0]
+    assert resynced.data == date(2026, 1, 13)
+    assert resynced.data_competencia == date(2026, 2, 13)
+    assert resynced.data_caixa == date(2026, 3, 13)
+
+
+def test_resync_still_overwrites_date_of_non_manually_edited_transaction(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[_account_raw()],
+        transactions_by_account={"acc-ext-1": [_transaction_raw(date="2026-01-15T12:00:00.000Z")]},
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+
+    client.transactions_by_account["acc-ext-1"] = [
+        _transaction_raw(date="2026-01-17T12:00:00.000Z")
+    ]
+    service.sync_item(db_session, client, user.id, item.id)
+
+    resynced = service.list_transactions(db_session, user.id)[0]
+    assert resynced.data == date(2026, 1, 17)
+    assert resynced.data_editada_manualmente is False
+
+
 # --- regressão: sentinela de salário flui por get_summary/get_tendencia/    -
 # --- get_por_categoria sem nenhum código especial nessas três funções -------
 

@@ -47,6 +47,7 @@ export interface PluggyTransaction {
   tipo: string;
   data: string;
   data_competencia: string | null;
+  data_editada_manualmente: boolean;
   subcategory_id: number | null;
   subcategoria_sugerida_id: number | null;
   categoria_pluggy: string | null;

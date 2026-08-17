@@ -12,6 +12,8 @@ export interface EditableTransaction {
   subcategoria_sugerida_id: number | null;
   asset_id: number | null;
   asset_sugerido_id: number | null;
+  data: string;
+  data_editada_manualmente: boolean;
 }
 
 export function descricaoExibida(transaction: EditableTransaction): string {

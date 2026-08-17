@@ -152,6 +152,7 @@ const TRANSACAO_FIXTURE = {
   tipo: "debito",
   data: "2026-01-10",
   data_competencia: "2026-01-10",
+  data_editada_manualmente: false,
   subcategory_id: 10,
   subcategoria_sugerida_id: null,
   categoria_pluggy: null,

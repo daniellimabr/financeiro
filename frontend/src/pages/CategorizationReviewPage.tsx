@@ -9,7 +9,7 @@ import { CategoryCombobox } from "../components/CategoryCombobox";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { SortableHeader } from "../components/SortableHeader";
 import { StatusIcon } from "../components/StatusIcon";
-import { AssetSelectCell, DescriptionCell } from "../components/TransactionEditCells";
+import { AssetSelectCell, DateCell, DescriptionCell } from "../components/TransactionEditCells";
 import { TransactionTipoIcon } from "../components/TransactionTipoIcon";
 import { useAssets } from "../hooks/useAssets";
 import { useBulkConfirmCategorization } from "../hooks/useBulkConfirmCategorization";
@@ -337,7 +337,9 @@ export function CategorizationReviewPage() {
                   <td>
                     <StatusIcon pending={isPendente} />
                   </td>
-                  <td>{tx.data}</td>
+                  <td>
+                    <DateCell transaction={tx} />
+                  </td>
                   <td>
                     <DescriptionCell transaction={tx} />
                   </td>
