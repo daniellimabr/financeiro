@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { fetchPatrimonioBreakdown } from "../api/dashboards";
+import { fetchPatrimonioBreakdown, type Regime } from "../api/dashboards";
 
-export function usePatrimonioBreakdown() {
+export function usePatrimonioBreakdown(regime: Regime = "competencia") {
   return useQuery({
-    queryKey: ["dashboardPatrimonioBreakdown"],
-    queryFn: fetchPatrimonioBreakdown,
+    queryKey: ["dashboardPatrimonioBreakdown", regime],
+    queryFn: () => fetchPatrimonioBreakdown(regime),
   });
 }

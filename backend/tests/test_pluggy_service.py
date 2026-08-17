@@ -114,7 +114,9 @@ def test_sync_item_creates_accounts_and_transactions(db_session, user):
     client = FakePluggyClient(
         item=_item_raw(),
         accounts=[_account_raw()],
-        transactions_by_account={"acc-ext-1": [_transaction_raw()]},
+        # Horário fixado ao meio-dia UTC — não cruza a virada de dia em BRT
+        # (ver testes dedicados de fuso horário para o caso de fronteira).
+        transactions_by_account={"acc-ext-1": [_transaction_raw(date="2026-01-15T12:00:00.000Z")]},
     )
     item = service.register_item(db_session, client, user.id, "item-ext-1")
 
@@ -485,6 +487,7 @@ def test_upsert_salario_ajuste_creates_confirmed_transaction_with_competencia(db
     assert tx.categorizacao_status.value == "confirmada"
     assert tx.subcategory_id == salario_subcategory_id(db_session)
     assert tx.tipo.value == "credito"
+    assert tx.data_caixa == tx.data_competencia
 
 
 def test_upsert_salario_ajuste_called_twice_updates_instead_of_duplicating(db_session, user):
@@ -571,6 +574,61 @@ def test_upsert_salario_ajuste_isolated_by_user(db_session, user, other_user):
 
 def test_get_salario_ajuste_dez_2025_returns_none_when_absent(db_session, user):
     assert service.get_salario_ajuste_dez_2025(db_session, user.id) is None
+
+
+# --- bug de fuso horário em _parse_date (Sprint 16) -------------------------
+
+
+def test_parse_date_converts_utc_timestamp_near_midnight_brt_to_previous_day():
+    # Caso de verificação do PRD-016: "BRASA E DRINKS", date bruto
+    # 2026-01-23T01:34:27Z (22:34:27 em 22/01 no horário de Brasília, UTC-3).
+    assert service._parse_date("2026-01-23T01:34:27.000Z") == date(2026, 1, 22)
+
+
+def test_parse_date_utc_timestamp_well_after_midnight_brt_stays_same_day():
+    # 2026-01-23T15:00:00Z = 12:00 em 23/01 no horário de Brasília — não
+    # cruza a virada de dia.
+    assert service._parse_date("2026-01-23T15:00:00.000Z") == date(2026, 1, 23)
+
+
+def test_parse_date_utc_timestamp_at_brt_midnight_boundary_stays_same_day():
+    # 2026-01-23T03:00:00Z = 00:00 em 23/01 no horário de Brasília — fronteira
+    # exata, não deve retroceder.
+    assert service._parse_date("2026-01-23T03:00:00.000Z") == date(2026, 1, 23)
+
+
+# --- competência de cartão de crédito no sync (Sprint 16) -------------------
+
+
+def test_sync_item_credit_card_shifts_data_competencia_to_next_month(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[_account_raw(type="CREDIT", subtype="CREDIT_CARD")],
+        transactions_by_account={"acc-ext-1": [_transaction_raw(date="2026-01-15T12:00:00.000Z")]},
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+
+    service.sync_item(db_session, client, user.id, item.id)
+
+    tx = service.list_transactions(db_session, user.id)[0]
+    assert tx.data == date(2026, 1, 15)
+    assert tx.data_competencia == date(2026, 2, 15)
+    assert tx.data_caixa == date(2026, 3, 15)
+
+
+def test_sync_item_non_credit_card_keeps_data_caixa_equal_to_data_competencia(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[_account_raw()],
+        transactions_by_account={"acc-ext-1": [_transaction_raw()]},
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+
+    service.sync_item(db_session, client, user.id, item.id)
+
+    tx = service.list_transactions(db_session, user.id)[0]
+    assert tx.data_competencia == tx.data
+    assert tx.data_caixa == tx.data_competencia
 
 
 # --- regressão: sentinela de salário flui por get_summary/get_tendencia/    -

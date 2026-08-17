@@ -2,6 +2,15 @@ import { apiFetch } from "./client";
 
 export type TransacaoTipo = "debito" | "credito";
 
+// Regime de leitura (Sprint 16) — toggle Competência (default)/Caixa
+// exposto pelas agregações de Dashboards; não altera nada gravado, só qual
+// coluna de data (data_competencia/data_caixa) as agregações usam.
+export type Regime = "competencia" | "caixa";
+
+interface RegimeFilter {
+  regime?: Regime;
+}
+
 // Sentinel usado pelo backend (app.models.category.SEM_CATEGORIA_ID) para
 // representar "sem subcategoria atribuída" em group_id/subcategory_id e nos
 // filtros categoria_id/subcategory_id.
@@ -89,8 +98,8 @@ export interface TendenciaPassivo {
 export interface PatrimonioBreakdown {
   ativos: string;
   passivos: string;
-  saldo_contas: string;
-  saldo_cartoes: string;
+  saldo_liquido_acumulado: string;
+  saldo_investimentos: string;
   total: string;
 }
 
@@ -135,13 +144,15 @@ function buildQuery(params: Record<string, string | number | undefined>): string
   return query ? `?${query}` : "";
 }
 
-export function fetchDashboardSummary(filter: PeriodoFilter = {}): Promise<DashboardSummary> {
+export function fetchDashboardSummary(
+  filter: PeriodoFilter & RegimeFilter = {}
+): Promise<DashboardSummary> {
   return apiFetch<DashboardSummary>(`/dashboards/summary${buildQuery({ ...filter })}`);
 }
 
 export function fetchDashboardPorCategoria(
   tipo: TransacaoTipo,
-  filter: PeriodoFilter = {}
+  filter: PeriodoFilter & RegimeFilter = {}
 ): Promise<CategoriaTotal[]> {
   return apiFetch<CategoriaTotal[]>(`/dashboards/por-categoria${buildQuery({ tipo, ...filter })}`);
 }
@@ -157,14 +168,14 @@ export function fetchDashboardPorMeioPagamento(
 }
 
 export function fetchDashboardTendencia(
-  filter: Required<PeriodoFilter> & { meses: PeriodoHistorico }
+  filter: Required<PeriodoFilter> & RegimeFilter & { meses: PeriodoHistorico }
 ): Promise<TendenciaMes[]> {
   return apiFetch<TendenciaMes[]>(`/dashboards/tendencia${buildQuery({ ...filter })}`);
 }
 
 export function fetchDashboardPorCategoriaTendencia(
   tipo: TransacaoTipo,
-  filter: Required<PeriodoFilter> & { meses: PeriodoHistorico }
+  filter: Required<PeriodoFilter> & RegimeFilter & { meses: PeriodoHistorico }
 ): Promise<TendenciaCategoria[]> {
   return apiFetch<TendenciaCategoria[]>(
     `/dashboards/por-categoria/tendencia${buildQuery({ tipo, ...filter })}`
@@ -189,26 +200,28 @@ export function fetchDashboardPorNaturezaTendencia(
 
 export function fetchDashboardPorAtivo(
   tipo: TransacaoTipo,
-  filter: PeriodoFilter = {}
+  filter: PeriodoFilter & RegimeFilter = {}
 ): Promise<AtivoTotal[]> {
   return apiFetch<AtivoTotal[]>(`/dashboards/por-ativo${buildQuery({ tipo, ...filter })}`);
 }
 
 export function fetchDashboardPorAtivoTendencia(
   tipo: TransacaoTipo,
-  filter: Required<PeriodoFilter> & { meses: PeriodoHistorico }
+  filter: Required<PeriodoFilter> & RegimeFilter & { meses: PeriodoHistorico }
 ): Promise<TendenciaAtivo[]> {
   return apiFetch<TendenciaAtivo[]>(
     `/dashboards/por-ativo/tendencia${buildQuery({ tipo, ...filter })}`
   );
 }
 
-export function fetchDashboardPorPassivo(filter: PeriodoFilter = {}): Promise<PassivoTotal[]> {
+export function fetchDashboardPorPassivo(
+  filter: PeriodoFilter & RegimeFilter = {}
+): Promise<PassivoTotal[]> {
   return apiFetch<PassivoTotal[]>(`/dashboards/por-passivo${buildQuery({ ...filter })}`);
 }
 
 export function fetchDashboardPorPassivoTendencia(
-  filter: Required<PeriodoFilter> & { meses: PeriodoHistorico }
+  filter: Required<PeriodoFilter> & RegimeFilter & { meses: PeriodoHistorico }
 ): Promise<TendenciaPassivo[]> {
   return apiFetch<TendenciaPassivo[]>(
     `/dashboards/por-passivo/tendencia${buildQuery({ ...filter })}`
@@ -232,8 +245,10 @@ export function fetchSaldoPorConta(): Promise<SaldoConta[]> {
   return apiFetch<SaldoConta[]>("/dashboards/saldo-por-conta");
 }
 
-export function fetchPatrimonioBreakdown(): Promise<PatrimonioBreakdown> {
-  return apiFetch<PatrimonioBreakdown>("/dashboards/patrimonio/breakdown");
+export function fetchPatrimonioBreakdown(
+  regime: Regime = "competencia"
+): Promise<PatrimonioBreakdown> {
+  return apiFetch<PatrimonioBreakdown>(`/dashboards/patrimonio/breakdown${buildQuery({ regime })}`);
 }
 
 export function fetchEvolucaoSaldoPorConta(
@@ -245,7 +260,7 @@ export function fetchEvolucaoSaldoPorConta(
 }
 
 export function fetchSaldoAcumulado(
-  filter: Required<PeriodoFilter> & { meses?: number }
+  filter: Required<PeriodoFilter> & RegimeFilter & { meses?: number }
 ): Promise<PontoTendencia[]> {
   return apiFetch<PontoTendencia[]>(`/dashboards/saldo-acumulado${buildQuery({ ...filter })}`);
 }

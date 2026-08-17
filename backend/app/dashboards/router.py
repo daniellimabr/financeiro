@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
 from app.dashboards import service
+from app.dashboards.service import Regime
 from app.db import get_db
 from app.models.pluggy import PluggyTransactionTipo
 from app.models.user import User
@@ -32,18 +33,20 @@ router = APIRouter(prefix="/dashboards")
 def get_summary(
     ano: int | None = None,
     mes: int | None = None,
+    regime: Regime = "competencia",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.get_summary(db, current_user.id, ano=ano, mes=mes)
+    return service.get_summary(db, current_user.id, ano=ano, mes=mes, regime=regime)
 
 
 @router.get("/patrimonio/breakdown", response_model=PatrimonioBreakdownOut)
 def get_patrimonio_breakdown(
+    regime: Regime = "competencia",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.get_patrimonio_breakdown(db, current_user.id)
+    return service.get_patrimonio_breakdown(db, current_user.id, regime=regime)
 
 
 @router.get("/por-categoria", response_model=list[CategoriaTotalOut])
@@ -51,10 +54,13 @@ def get_por_categoria(
     tipo: PluggyTransactionTipo,
     ano: int | None = None,
     mes: int | None = None,
+    regime: Regime = "competencia",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.get_por_categoria(db, current_user.id, tipo=tipo, ano=ano, mes=mes)
+    return service.get_por_categoria(
+        db, current_user.id, tipo=tipo, ano=ano, mes=mes, regime=regime
+    )
 
 
 @router.get("/por-meio-pagamento", response_model=list[MeioPagamentoTotalOut])
@@ -76,10 +82,11 @@ def get_tendencia(
     ano: int,
     mes: int,
     meses: int = Query(6, ge=1, le=24),
+    regime: Regime = "competencia",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.get_tendencia(db, current_user.id, ano=ano, mes=mes, meses=meses)
+    return service.get_tendencia(db, current_user.id, ano=ano, mes=mes, meses=meses, regime=regime)
 
 
 @router.get("/por-categoria/tendencia", response_model=list[TendenciaCategoriaOut])
@@ -88,11 +95,12 @@ def get_por_categoria_tendencia(
     ano: int,
     mes: int,
     meses: int = Query(6, ge=1, le=24),
+    regime: Regime = "competencia",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     return service.get_tendencia_por_categoria(
-        db, current_user.id, tipo=tipo, ano=ano, mes=mes, meses=meses
+        db, current_user.id, tipo=tipo, ano=ano, mes=mes, meses=meses, regime=regime
     )
 
 
@@ -126,10 +134,11 @@ def get_por_ativo(
     tipo: PluggyTransactionTipo,
     ano: int | None = None,
     mes: int | None = None,
+    regime: Regime = "competencia",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.get_por_ativo(db, current_user.id, tipo=tipo, ano=ano, mes=mes)
+    return service.get_por_ativo(db, current_user.id, tipo=tipo, ano=ano, mes=mes, regime=regime)
 
 
 @router.get("/por-ativo/tendencia", response_model=list[TendenciaAtivoOut])
@@ -138,11 +147,12 @@ def get_por_ativo_tendencia(
     ano: int,
     mes: int,
     meses: int = Query(6, ge=1, le=24),
+    regime: Regime = "competencia",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     return service.get_tendencia_por_ativo(
-        db, current_user.id, tipo=tipo, ano=ano, mes=mes, meses=meses
+        db, current_user.id, tipo=tipo, ano=ano, mes=mes, meses=meses, regime=regime
     )
 
 
@@ -150,10 +160,11 @@ def get_por_ativo_tendencia(
 def get_por_passivo(
     ano: int | None = None,
     mes: int | None = None,
+    regime: Regime = "competencia",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.get_por_passivo(db, current_user.id, ano=ano, mes=mes)
+    return service.get_por_passivo(db, current_user.id, ano=ano, mes=mes, regime=regime)
 
 
 @router.get("/por-passivo/tendencia", response_model=list[TendenciaPassivoOut])
@@ -161,10 +172,13 @@ def get_por_passivo_tendencia(
     ano: int,
     mes: int,
     meses: int = Query(6, ge=1, le=24),
+    regime: Regime = "competencia",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.get_tendencia_por_passivo(db, current_user.id, ano=ano, mes=mes, meses=meses)
+    return service.get_tendencia_por_passivo(
+        db, current_user.id, ano=ano, mes=mes, meses=meses, regime=regime
+    )
 
 
 @router.get("/projecao", response_model=list[PontoProjecaoOut])
@@ -210,7 +224,10 @@ def get_saldo_acumulado(
     ano: int,
     mes: int,
     meses: int = Query(6, ge=1, le=24),
+    regime: Regime = "competencia",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.get_saldo_acumulado(db, current_user.id, ano=ano, mes=mes, meses=meses)
+    return service.get_saldo_acumulado(
+        db, current_user.id, ano=ano, mes=mes, meses=meses, regime=regime
+    )

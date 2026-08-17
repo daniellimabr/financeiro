@@ -1,9 +1,10 @@
 import { useMemo, useState, type FormEvent } from "react";
 
 import type { Liability, LiabilityInput, LiabilityTipo } from "../api/liabilities";
-import type { PeriodoFilter, PontoTendencia } from "../api/dashboards";
+import type { PeriodoFilter, PontoTendencia, Regime } from "../api/dashboards";
 import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
+import { RegimeToggle } from "../components/RegimeToggle";
 import { TransactionsTable } from "../components/TransactionsTable";
 import { TrendChart } from "../components/TrendChart";
 import { useCreateLiability } from "../hooks/useCreateLiability";
@@ -35,12 +36,14 @@ export function LiabilitiesPage() {
   const [mes, setMes] = useState(now.getMonth() + 1);
   const filter: PeriodoFilter = { ano, mes };
 
+  const [regime, setRegime] = useState<Regime>("competencia");
+
   const liabilitiesQuery = useLiabilities();
   const createLiability = useCreateLiability();
   const updateLiability = useUpdateLiability();
   const settleLiability = useSettleLiability();
   const deleteLiability = useDeleteLiability();
-  const tendenciaQuery = useLiabilityGastosTendencia(ano, mes, PERIODO_HISTORICO);
+  const tendenciaQuery = useLiabilityGastosTendencia(ano, mes, PERIODO_HISTORICO, regime);
 
   const [editingLiabilityId, setEditingLiabilityId] = useState<number | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -126,6 +129,7 @@ export function LiabilitiesPage() {
             if (next.mes !== undefined) setMes(next.mes);
           }}
         />
+        <RegimeToggle value={regime} onChange={setRegime} />
         <button type="button" onClick={openCreateForm}>
           Novo passivo
         </button>
@@ -264,6 +268,7 @@ export function LiabilitiesPage() {
           <LiabilityDrilldown
             liabilityId={selectedLiability.id}
             filter={filter}
+            regime={regime}
             pontos={trendByLiability.get(selectedLiability.id)}
           />
         </div>
@@ -300,13 +305,15 @@ export function LiabilitiesPage() {
 function LiabilityDrilldown({
   liabilityId,
   filter,
+  regime,
   pontos,
 }: {
   liabilityId: number;
   filter: PeriodoFilter;
+  regime: Regime;
   pontos: PontoTendencia[] | undefined;
 }) {
-  const gastosQuery = useLiabilityGastos(filter);
+  const gastosQuery = useLiabilityGastos({ ...filter, regime });
 
   const total = gastosQuery.data?.find((item) => item.liability_id === liabilityId)?.total ?? "0";
   const color = "var(--despesa)";

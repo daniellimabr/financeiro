@@ -561,8 +561,8 @@ describe("DashboardsPage", () => {
           jsonResponse({
             ativos: "150000.00",
             passivos: "7200.00",
-            saldo_contas: "1200.00",
-            saldo_cartoes: "300.00",
+            saldo_liquido_acumulado: "1200.00",
+            saldo_investimentos: "300.00",
             total: "143700.00",
           })
         );
@@ -583,6 +583,31 @@ describe("DashboardsPage", () => {
     await userEvent.click(detalheButtons[0]);
 
     expect(await screen.findByRole("button", { name: /Carro/ })).toBeInTheDocument();
+  });
+
+  it("adds regime=caixa to summary/tendencia/saldo-acumulado requests when the Caixa toggle is selected", async () => {
+    const fetchMock = routedFetchMock();
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: "Caixa" }));
+
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls.map((call) => String(call[0]));
+      expect(
+        calls.some((url) => url.startsWith("/dashboards/summary") && url.includes("regime=caixa"))
+      ).toBe(true);
+      expect(
+        calls.some((url) => url.startsWith("/dashboards/tendencia") && url.includes("regime=caixa"))
+      ).toBe(true);
+      expect(
+        calls.some(
+          (url) => url.startsWith("/dashboards/saldo-acumulado") && url.includes("regime=caixa")
+        )
+      ).toBe(true);
+    });
   });
 
   it("editing a transaction's category from the drilldown invalidates the dashboard summary", async () => {

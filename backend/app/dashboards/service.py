@@ -2,6 +2,7 @@ from calendar import monthrange
 from dataclasses import dataclass
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
+from typing import Literal
 
 from sqlalchemy import func
 from sqlalchemy.orm import Query, Session
@@ -15,6 +16,8 @@ from app.models.pluggy import (
     PluggyTransaction,
     PluggyTransactionTipo,
 )
+
+Regime = Literal["competencia", "caixa"]
 
 
 @dataclass
@@ -112,8 +115,8 @@ class TendenciaPassivo:
 class PatrimonioBreakdown:
     ativos: Decimal
     passivos: Decimal
-    saldo_contas: Decimal
-    saldo_cartoes: Decimal
+    saldo_liquido_acumulado: Decimal
+    saldo_investimentos: Decimal
     total: Decimal
 
 
@@ -176,8 +179,12 @@ def _date_bounds(periodo: list[tuple[int, int]]) -> tuple[date, date]:
     return inicio, fim
 
 
-def _base_query(db: Session, user_id: int) -> Query:
-    return (
+def _competencia_column(regime: Regime):
+    return PluggyTransaction.data_caixa if regime == "caixa" else PluggyTransaction.data_competencia
+
+
+def _base_query(db: Session, user_id: int, *, excluir_investimento: bool = False) -> Query:
+    query = (
         db.query(PluggyTransaction)
         .join(PluggyAccount, PluggyTransaction.account_id == PluggyAccount.id)
         .outerjoin(Subcategory, PluggyTransaction.subcategory_id == Subcategory.id)
@@ -198,21 +205,36 @@ def _base_query(db: Session, user_id: int) -> Query:
             )
         )
     )
+    if excluir_investimento:
+        # Variação de valor de mercado de investimento não é uma transação —
+        # usado só pelo Saldo Acumulado (get_saldo_acumulado), não pelas
+        # agregações normais de Receita/Despesa.
+        query = query.filter(PluggyAccount.tipo != PluggyAccountTipo.investimento)
+    return query
 
 
-def _apply_periodo(query: Query, *, ano: int | None, mes: int | None) -> Query:
+def _apply_periodo(
+    query: Query, *, ano: int | None, mes: int | None, regime: Regime = "competencia"
+) -> Query:
+    coluna = _competencia_column(regime)
     if ano is not None:
-        query = query.filter(func.extract("year", PluggyTransaction.data_competencia) == ano)
+        query = query.filter(func.extract("year", coluna) == ano)
     if mes is not None:
-        query = query.filter(func.extract("month", PluggyTransaction.data_competencia) == mes)
+        query = query.filter(func.extract("month", coluna) == mes)
     return query
 
 
 def _sum_tipo(
-    db: Session, user_id: int, tipo: PluggyTransactionTipo, *, ano: int | None, mes: int | None
+    db: Session,
+    user_id: int,
+    tipo: PluggyTransactionTipo,
+    *,
+    ano: int | None,
+    mes: int | None,
+    regime: Regime = "competencia",
 ) -> Decimal:
     query = _base_query(db, user_id).filter(PluggyTransaction.tipo == tipo)
-    query = _apply_periodo(query, ano=ano, mes=mes)
+    query = _apply_periodo(query, ano=ano, mes=mes, regime=regime)
     total = query.with_entities(
         func.coalesce(func.sum(func.abs(PluggyTransaction.valor)), 0)
     ).scalar()
@@ -233,52 +255,82 @@ def _ativos_e_passivos(db: Session, user_id: int) -> tuple[Decimal, Decimal]:
     return _to_decimal(ativos), _to_decimal(passivos)
 
 
-def _patrimonio_breakdown(db: Session, user_id: int) -> PatrimonioBreakdown:
+def _saldo_liquido_fallback(db: Session, user_id: int) -> Decimal:
+    """Contas líquidas (não-investimento) sem `saldo_inicial` não entram na
+    âncora/acumulação de get_saldo_acumulado — entram aqui pelo saldo ao vivo,
+    fora da acumulação, sem quebrar o cálculo das demais contas (PRD-016,
+    critério 6). Cartão de crédito sem saldo_inicial mantém a convenção de
+    sinal de _base_query: saldo representa dívida, entra subtraindo.
+    """
+    rows = (
+        db.query(PluggyAccount.tipo, func.coalesce(func.sum(PluggyAccount.saldo), 0))
+        .filter(
+            PluggyAccount.user_id == user_id,
+            PluggyAccount.tipo != PluggyAccountTipo.investimento,
+            PluggyAccount.saldo_inicial.is_(None),
+        )
+        .group_by(PluggyAccount.tipo)
+        .all()
+    )
+    total = Decimal("0")
+    for tipo, saldo in rows:
+        saldo = _to_decimal(saldo)
+        total += -saldo if tipo == PluggyAccountTipo.cartao_credito else saldo
+    return total
+
+
+def _patrimonio_breakdown(
+    db: Session, user_id: int, *, regime: Regime = "competencia"
+) -> PatrimonioBreakdown:
     ativos, passivos = _ativos_e_passivos(db, user_id)
-    saldo_contas = (
+
+    hoje = date.today()
+    pontos_acumulado = get_saldo_acumulado(
+        db, user_id, ano=hoje.year, mes=hoje.month, meses=1, regime=regime
+    )
+    saldo_liquido_acumulado = pontos_acumulado[0].total if pontos_acumulado else Decimal("0")
+    saldo_liquido_acumulado += _saldo_liquido_fallback(db, user_id)
+
+    saldo_investimentos = (
         db.query(func.coalesce(func.sum(PluggyAccount.saldo), 0))
         .filter(
             PluggyAccount.user_id == user_id,
-            PluggyAccount.tipo != PluggyAccountTipo.cartao_credito,
+            PluggyAccount.tipo == PluggyAccountTipo.investimento,
         )
         .scalar()
     )
-    # Saldo de cartão de crédito representa dívida (confirmado empiricamente
-    # contra dado real da VM de dev, ver plano da Sprint 5), não ativo — entra
-    # subtraindo do patrimônio.
-    saldo_cartoes = (
-        db.query(func.coalesce(func.sum(PluggyAccount.saldo), 0))
-        .filter(
-            PluggyAccount.user_id == user_id,
-            PluggyAccount.tipo == PluggyAccountTipo.cartao_credito,
-        )
-        .scalar()
-    )
-    saldo_contas = _to_decimal(saldo_contas)
-    saldo_cartoes = _to_decimal(saldo_cartoes)
+    saldo_investimentos = _to_decimal(saldo_investimentos)
+
     return PatrimonioBreakdown(
         ativos=ativos,
         passivos=passivos,
-        saldo_contas=saldo_contas,
-        saldo_cartoes=saldo_cartoes,
-        total=ativos - passivos + saldo_contas - saldo_cartoes,
+        saldo_liquido_acumulado=saldo_liquido_acumulado,
+        saldo_investimentos=saldo_investimentos,
+        total=saldo_liquido_acumulado + saldo_investimentos + ativos - passivos,
     )
 
 
-def _calcula_patrimonio(db: Session, user_id: int) -> Decimal:
-    return _patrimonio_breakdown(db, user_id).total
+def _calcula_patrimonio(db: Session, user_id: int, *, regime: Regime = "competencia") -> Decimal:
+    return _patrimonio_breakdown(db, user_id, regime=regime).total
 
 
-def get_patrimonio_breakdown(db: Session, user_id: int) -> PatrimonioBreakdown:
-    return _patrimonio_breakdown(db, user_id)
+def get_patrimonio_breakdown(
+    db: Session, user_id: int, *, regime: Regime = "competencia"
+) -> PatrimonioBreakdown:
+    return _patrimonio_breakdown(db, user_id, regime=regime)
 
 
 def get_summary(
-    db: Session, user_id: int, *, ano: int | None = None, mes: int | None = None
+    db: Session,
+    user_id: int,
+    *,
+    ano: int | None = None,
+    mes: int | None = None,
+    regime: Regime = "competencia",
 ) -> Summary:
-    receita = _sum_tipo(db, user_id, PluggyTransactionTipo.credito, ano=ano, mes=mes)
-    despesa = _sum_tipo(db, user_id, PluggyTransactionTipo.debito, ano=ano, mes=mes)
-    patrimonio = _calcula_patrimonio(db, user_id)
+    receita = _sum_tipo(db, user_id, PluggyTransactionTipo.credito, ano=ano, mes=mes, regime=regime)
+    despesa = _sum_tipo(db, user_id, PluggyTransactionTipo.debito, ano=ano, mes=mes, regime=regime)
+    patrimonio = _calcula_patrimonio(db, user_id, regime=regime)
     ativos, passivos = _ativos_e_passivos(db, user_id)
     return Summary(
         receita=receita,
@@ -297,9 +349,10 @@ def get_por_categoria(
     tipo: PluggyTransactionTipo,
     ano: int | None = None,
     mes: int | None = None,
+    regime: Regime = "competencia",
 ) -> list[CategoriaTotal]:
     query = _base_query(db, user_id).filter(PluggyTransaction.tipo == tipo)
-    query = _apply_periodo(query, ano=ano, mes=mes)
+    query = _apply_periodo(query, ano=ano, mes=mes, regime=regime)
     rows = (
         query.with_entities(
             CategoryGroup.id,
@@ -363,27 +416,34 @@ def get_por_meio_pagamento(
 
 
 def _receita_despesa_por_periodo(
-    db: Session, user_id: int, periodo: list[tuple[int, int]]
+    db: Session,
+    user_id: int,
+    periodo: list[tuple[int, int]],
+    *,
+    regime: Regime = "competencia",
+    excluir_investimento: bool = False,
 ) -> dict[tuple[int, int], dict[str, Decimal]]:
-    """Soma receita/despesa por mês (por competência) num range arbitrário de
-    meses — reaproveitado por get_tendencia (últimos N meses terminando no
-    filtro) e get_saldo_acumulado (range fixo desde jan/2026)."""
+    """Soma receita/despesa por mês (por competência ou caixa) num range
+    arbitrário de meses — reaproveitado por get_tendencia (últimos N meses
+    terminando no filtro) e get_saldo_acumulado (range fixo desde jan/2026,
+    excluindo investimento)."""
     inicio, fim = _date_bounds(periodo)
+    coluna = _competencia_column(regime)
 
-    query = _base_query(db, user_id).filter(
-        PluggyTransaction.data_competencia >= inicio,
-        PluggyTransaction.data_competencia < fim,
+    query = _base_query(db, user_id, excluir_investimento=excluir_investimento).filter(
+        coluna >= inicio,
+        coluna < fim,
     )
     rows = (
         query.with_entities(
-            func.extract("year", PluggyTransaction.data_competencia),
-            func.extract("month", PluggyTransaction.data_competencia),
+            func.extract("year", coluna),
+            func.extract("month", coluna),
             PluggyTransaction.tipo,
             func.sum(func.abs(PluggyTransaction.valor)),
         )
         .group_by(
-            func.extract("year", PluggyTransaction.data_competencia),
-            func.extract("month", PluggyTransaction.data_competencia),
+            func.extract("year", coluna),
+            func.extract("month", coluna),
             PluggyTransaction.tipo,
         )
         .all()
@@ -397,10 +457,10 @@ def _receita_despesa_por_periodo(
 
 
 def get_tendencia(
-    db: Session, user_id: int, *, ano: int, mes: int, meses: int = 6
+    db: Session, user_id: int, *, ano: int, mes: int, meses: int = 6, regime: Regime = "competencia"
 ) -> list[TendenciaMes]:
     periodo = _month_range(ano, mes, meses)
-    totais = _receita_despesa_por_periodo(db, user_id, periodo)
+    totais = _receita_despesa_por_periodo(db, user_id, periodo, regime=regime)
 
     return [
         TendenciaMes(
@@ -422,31 +482,33 @@ def get_tendencia_por_categoria(
     ano: int,
     mes: int,
     meses: int = 6,
+    regime: Regime = "competencia",
 ) -> list[TendenciaCategoria]:
     periodo = _month_range(ano, mes, meses)
     inicio, fim = _date_bounds(periodo)
+    coluna = _competencia_column(regime)
 
     query = (
         _base_query(db, user_id)
         .filter(PluggyTransaction.tipo == tipo)
         .filter(
-            PluggyTransaction.data_competencia >= inicio,
-            PluggyTransaction.data_competencia < fim,
+            coluna >= inicio,
+            coluna < fim,
         )
     )
     rows = (
         query.with_entities(
             Subcategory.id,
             Subcategory.nome,
-            func.extract("year", PluggyTransaction.data_competencia),
-            func.extract("month", PluggyTransaction.data_competencia),
+            func.extract("year", coluna),
+            func.extract("month", coluna),
             func.sum(func.abs(PluggyTransaction.valor)),
         )
         .group_by(
             Subcategory.id,
             Subcategory.nome,
-            func.extract("year", PluggyTransaction.data_competencia),
-            func.extract("month", PluggyTransaction.data_competencia),
+            func.extract("year", coluna),
+            func.extract("month", coluna),
         )
         .all()
     )
@@ -567,6 +629,7 @@ def get_por_ativo(
     tipo: PluggyTransactionTipo,
     ano: int | None = None,
     mes: int | None = None,
+    regime: Regime = "competencia",
 ) -> list[AtivoTotal]:
     # Venda de ativo é tratada à parte (valor_venda), nunca entra na
     # agregação de transações. Sem bucket "sem ativo": a maioria das
@@ -576,7 +639,7 @@ def get_por_ativo(
         .join(Asset, PluggyTransaction.asset_id == Asset.id)
         .filter(PluggyTransaction.tipo == tipo)
     )
-    query = _apply_periodo(query, ano=ano, mes=mes)
+    query = _apply_periodo(query, ano=ano, mes=mes, regime=regime)
     rows = (
         query.with_entities(Asset.id, Asset.nome, func.sum(func.abs(PluggyTransaction.valor)))
         .group_by(Asset.id, Asset.nome)
@@ -596,32 +659,34 @@ def get_tendencia_por_ativo(
     ano: int,
     mes: int,
     meses: int = 6,
+    regime: Regime = "competencia",
 ) -> list[TendenciaAtivo]:
     periodo = _month_range(ano, mes, meses)
     inicio, fim = _date_bounds(periodo)
+    coluna = _competencia_column(regime)
 
     query = (
         _base_query(db, user_id)
         .join(Asset, PluggyTransaction.asset_id == Asset.id)
         .filter(PluggyTransaction.tipo == tipo)
         .filter(
-            PluggyTransaction.data_competencia >= inicio,
-            PluggyTransaction.data_competencia < fim,
+            coluna >= inicio,
+            coluna < fim,
         )
     )
     rows = (
         query.with_entities(
             Asset.id,
             Asset.nome,
-            func.extract("year", PluggyTransaction.data_competencia),
-            func.extract("month", PluggyTransaction.data_competencia),
+            func.extract("year", coluna),
+            func.extract("month", coluna),
             func.sum(func.abs(PluggyTransaction.valor)),
         )
         .group_by(
             Asset.id,
             Asset.nome,
-            func.extract("year", PluggyTransaction.data_competencia),
-            func.extract("month", PluggyTransaction.data_competencia),
+            func.extract("year", coluna),
+            func.extract("month", coluna),
         )
         .all()
     )
@@ -651,15 +716,17 @@ def get_por_passivo(
     *,
     ano: int | None = None,
     mes: int | None = None,
+    regime: Regime = "competencia",
 ) -> list[PassivoTotal]:
     # Passivo nunca gera receita — sempre despesa (tipo=debito), sem toggle
-    # exposto ao chamador (diferente de /por-ativo).
+    # de tipo exposto ao chamador (diferente de /por-ativo) — regime de
+    # competência/caixa continua disponível.
     query = (
         _base_query(db, user_id)
         .join(Liability, PluggyTransaction.liability_id == Liability.id)
         .filter(PluggyTransaction.tipo == PluggyTransactionTipo.debito)
     )
-    query = _apply_periodo(query, ano=ano, mes=mes)
+    query = _apply_periodo(query, ano=ano, mes=mes, regime=regime)
     rows = (
         query.with_entities(
             Liability.id, Liability.nome, func.sum(func.abs(PluggyTransaction.valor))
@@ -682,32 +749,34 @@ def get_tendencia_por_passivo(
     ano: int,
     mes: int,
     meses: int = 6,
+    regime: Regime = "competencia",
 ) -> list[TendenciaPassivo]:
     periodo = _month_range(ano, mes, meses)
     inicio, fim = _date_bounds(periodo)
+    coluna = _competencia_column(regime)
 
     query = (
         _base_query(db, user_id)
         .join(Liability, PluggyTransaction.liability_id == Liability.id)
         .filter(PluggyTransaction.tipo == PluggyTransactionTipo.debito)
         .filter(
-            PluggyTransaction.data_competencia >= inicio,
-            PluggyTransaction.data_competencia < fim,
+            coluna >= inicio,
+            coluna < fim,
         )
     )
     rows = (
         query.with_entities(
             Liability.id,
             Liability.nome,
-            func.extract("year", PluggyTransaction.data_competencia),
-            func.extract("month", PluggyTransaction.data_competencia),
+            func.extract("year", coluna),
+            func.extract("month", coluna),
             func.sum(func.abs(PluggyTransaction.valor)),
         )
         .group_by(
             Liability.id,
             Liability.nome,
-            func.extract("year", PluggyTransaction.data_competencia),
-            func.extract("month", PluggyTransaction.data_competencia),
+            func.extract("year", coluna),
+            func.extract("month", coluna),
         )
         .all()
     )
@@ -940,16 +1009,21 @@ def get_evolucao_saldo_por_conta(
 
 
 def get_saldo_acumulado(
-    db: Session, user_id: int, *, ano: int, mes: int, meses: int = 6
+    db: Session, user_id: int, *, ano: int, mes: int, meses: int = 6, regime: Regime = "competencia"
 ) -> list[PontoTendencia]:
     # Âncora ("saldo acumulado de dez/2025") = soma de saldo_inicial das
-    # contas menos o valor da transação sentinela de salário de dez/2025 (se
-    # existir) — ver regra de negócio no PRD-015: saldo_inicial já inclui
-    # fisicamente esse dinheiro, mas por competência ele "pertence" a
-    # jan/2026 e já entra de volta sozinho na receita desse mês.
+    # contas (excluindo investimento — variação de valor de mercado não é uma
+    # transação, PRD-016) menos o valor da transação sentinela de salário de
+    # dez/2025 (se existir) — ver regra de negócio no PRD-015: saldo_inicial
+    # já inclui fisicamente esse dinheiro, mas por competência ele "pertence"
+    # a jan/2026 e já entra de volta sozinho na receita desse mês.
     soma_saldo_inicial = (
         db.query(func.coalesce(func.sum(PluggyAccount.saldo_inicial), 0))
-        .filter(PluggyAccount.user_id == user_id, PluggyAccount.saldo_inicial.isnot(None))
+        .filter(
+            PluggyAccount.user_id == user_id,
+            PluggyAccount.saldo_inicial.isnot(None),
+            PluggyAccount.tipo != PluggyAccountTipo.investimento,
+        )
         .scalar()
     )
     valor_sentinela = (
@@ -966,7 +1040,9 @@ def get_saldo_acumulado(
     )
 
     range_completo = _months_between((2026, 1), (ano, mes))
-    totais = _receita_despesa_por_periodo(db, user_id, range_completo)
+    totais = _receita_despesa_por_periodo(
+        db, user_id, range_completo, regime=regime, excluir_investimento=True
+    )
 
     saldo = ancora
     saldo_por_mes: dict[tuple[int, int], Decimal] = {}

@@ -90,6 +90,7 @@ def _transaction(
     subcategory_id=None,
     subcategoria_sugerida_id=None,
     data=date(2026, 1, 15),
+    account_tipo=PluggyAccountTipo.corrente,
 ):
     n = next(_SEQ)
     item = PluggyItem(
@@ -106,7 +107,7 @@ def _transaction(
         item_id=item.id,
         user_id=user.id,
         pluggy_account_id=f"acc-{n}",
-        tipo=PluggyAccountTipo.corrente,
+        tipo=account_tipo,
         nome="Conta",
         saldo=Decimal("0"),
     )
@@ -859,3 +860,57 @@ def test_confirm_description_suggestion_other_users_transaction_raises_not_found
 
     with pytest.raises(NotFoundError):
         service.confirm_description_suggestion(db_session, user.id, tx.id)
+
+
+# --- competência de cartão de crédito (set_category / bulk_confirm, Sprint 16) --
+
+
+def test_set_category_credit_card_shifts_competencia_unconditionally(db_session, user, subcategory):
+    tx = _transaction(db_session, user, account_tipo=PluggyAccountTipo.cartao_credito)
+    tx.data = date(2026, 1, 5)
+    db_session.commit()
+
+    confirmed = service.set_category(db_session, user.id, tx.id, subcategory.id)
+
+    assert confirmed.data_competencia == date(2026, 2, 5)
+    assert confirmed.data_caixa == date(2026, 3, 5)
+
+
+def test_set_category_credit_card_ignores_salario_cutoff(db_session, user):
+    salario = _salario_subcategory(db_session)
+    tx = _transaction(db_session, user, account_tipo=PluggyAccountTipo.cartao_credito)
+    tx.data = date(2026, 1, 5)
+    db_session.commit()
+
+    confirmed = service.set_category(db_session, user.id, tx.id, salario.id)
+
+    # Cartão sempre desloca por competencia_padrao, mesmo categorizado como
+    # Salário (regra de cutoff não se aplica a cartão).
+    assert confirmed.data_competencia == date(2026, 2, 5)
+
+
+def test_set_category_non_credit_card_sets_data_caixa_equal_to_competencia(
+    db_session, user, subcategory
+):
+    tx = _pending_transaction(db_session, user)
+    tx.data = date(2026, 1, 25)
+    db_session.commit()
+
+    confirmed = service.set_category(db_session, user.id, tx.id, subcategory.id)
+
+    assert confirmed.data_caixa == confirmed.data_competencia == date(2026, 1, 25)
+
+
+def test_bulk_confirm_credit_card_shifts_competencia_and_caixa(db_session, user, subcategory):
+    tx_cartao = _transaction(
+        db_session, user, "Compra cartao", account_tipo=PluggyAccountTipo.cartao_credito
+    )
+    tx_cartao.data = date(2026, 1, 28)
+    db_session.commit()
+
+    results = service.bulk_confirm(db_session, user.id, [(tx_cartao.id, subcategory.id)])
+
+    assert all(r.success for r in results)
+    db_session.refresh(tx_cartao)
+    assert tx_cartao.data_competencia == date(2026, 2, 28)
+    assert tx_cartao.data_caixa == date(2026, 3, 28)

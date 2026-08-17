@@ -5,10 +5,12 @@ import type {
   PeriodoFilter,
   PeriodoHistorico,
   PontoTendencia,
+  Regime,
   TransacaoTipo,
 } from "../api/dashboards";
 import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
+import { RegimeToggle } from "../components/RegimeToggle";
 import { TransactionsTable } from "../components/TransactionsTable";
 import { TrendChart } from "../components/TrendChart";
 import { useAssetGastos } from "../hooks/useAssetGastos";
@@ -46,13 +48,14 @@ export function AssetsPage() {
   const filter: PeriodoFilter = { ano, mes };
 
   const [drillTipo, setDrillTipo] = useState<TransacaoTipo>("debito");
+  const [regime, setRegime] = useState<Regime>("competencia");
 
   const assetsQuery = useAssets();
   const createAsset = useCreateAsset();
   const updateAsset = useUpdateAsset();
   const sellAsset = useSellAsset();
   const deleteAsset = useDeleteAsset();
-  const tendenciaQuery = useAssetGastosTendencia(drillTipo, ano, mes, PERIODO_HISTORICO);
+  const tendenciaQuery = useAssetGastosTendencia(drillTipo, ano, mes, PERIODO_HISTORICO, regime);
 
   const [editingAssetId, setEditingAssetId] = useState<number | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -165,6 +168,7 @@ export function AssetsPage() {
             Receita
           </button>
         </div>
+        <RegimeToggle value={regime} onChange={setRegime} />
         <button type="button" onClick={openCreateForm}>
           Novo ativo
         </button>
@@ -331,6 +335,7 @@ export function AssetsPage() {
             assetId={selectedAsset.id}
             tipo={drillTipo}
             filter={filter}
+            regime={regime}
             pontos={trendByAsset.get(selectedAsset.id)}
           />
         </div>
@@ -368,14 +373,16 @@ function AssetDrilldown({
   assetId,
   tipo,
   filter,
+  regime,
   pontos,
 }: {
   assetId: number;
   tipo: TransacaoTipo;
   filter: PeriodoFilter;
+  regime: Regime;
   pontos: PontoTendencia[] | undefined;
 }) {
-  const gastosQuery = useAssetGastos(tipo, filter);
+  const gastosQuery = useAssetGastos(tipo, { ...filter, regime });
 
   const total = gastosQuery.data?.find((item) => item.asset_id === assetId)?.total ?? "0";
   const color = tipo === "credito" ? "var(--receita)" : "var(--despesa)";

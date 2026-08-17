@@ -2,7 +2,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.categorization import engine
-from app.categorization.competencia import competencia_salario
+from app.categorization.competencia import caixa, competencia_padrao, competencia_salario
 from app.categorization.normalize import normalize_description
 from app.exceptions import InvalidStateError, NotFoundError
 from app.models.asset import Asset
@@ -10,6 +10,7 @@ from app.models.categorization import AssetCategorizationRule, CategorizationRul
 from app.models.category import CategoryGroup, Subcategory
 from app.models.liability import Liability
 from app.models.pluggy import (
+    PluggyAccountTipo,
     PluggyTransaction,
     PluggyTransactionCategorizacaoStatus,
     PluggyTransactionTipo,
@@ -36,10 +37,14 @@ def salario_subcategory_id(db: Session) -> int | None:
 def _recompute_data_competencia(
     tx: PluggyTransaction, subcategory_id: int, salario_id: int | None, cutoff_dia: int
 ) -> None:
-    if salario_id is not None and subcategory_id == salario_id:
+    account_tipo = tx.account_tipo
+    if account_tipo == PluggyAccountTipo.cartao_credito:
+        tx.data_competencia = competencia_padrao(tx.data, account_tipo)
+    elif salario_id is not None and subcategory_id == salario_id:
         tx.data_competencia = competencia_salario(tx.data, cutoff_dia)
     else:
         tx.data_competencia = tx.data
+    tx.data_caixa = caixa(tx.data_competencia, account_tipo)
 
 
 def list_transactions(

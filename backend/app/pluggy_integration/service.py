@@ -1,10 +1,11 @@
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from app.categorization.competencia import competencia_salario
+from app.categorization.competencia import caixa, competencia_padrao, competencia_salario
 from app.categorization.service import salario_subcategory_id
 from app.config import settings
 from app.exceptions import InvalidStateError, NotFoundError
@@ -174,7 +175,11 @@ def upsert_salario_ajuste_dez_2025(
     tx.valor = valor
     tx.tipo = PluggyTransactionTipo.credito
     tx.data = data
-    tx.data_competencia = competencia_salario(data, cutoff_dia)
+    if account.tipo == PluggyAccountTipo.cartao_credito:
+        tx.data_competencia = competencia_padrao(data, account.tipo)
+    else:
+        tx.data_competencia = competencia_salario(data, cutoff_dia)
+    tx.data_caixa = caixa(tx.data_competencia, account.tipo)
     tx.subcategory_id = subcategory_id
     tx.status = PluggyTransactionStatus.efetivada
     tx.categorizacao_status = PluggyTransactionCategorizacaoStatus.confirmada
@@ -341,7 +346,8 @@ def _upsert_transaction(
     tx.valor = Decimal(str(raw["amount"]))
     tx.tipo = _map_transaction_tipo(raw["type"])
     tx.data = tx_date
-    tx.data_competencia = tx_date
+    tx.data_competencia = competencia_padrao(tx_date, account.tipo)
+    tx.data_caixa = caixa(tx.data_competencia, account.tipo)
     tx.categoria_pluggy = raw.get("category")
     tx.status = _map_transaction_status(raw.get("status", "POSTED"))
     db.flush()
@@ -374,5 +380,8 @@ def _map_transaction_status(raw: str) -> PluggyTransactionStatus:
     return PluggyTransactionStatus.efetivada
 
 
+_BRT = ZoneInfo("America/Sao_Paulo")
+
+
 def _parse_date(raw: str) -> date:
-    return datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
+    return datetime.fromisoformat(raw.replace("Z", "+00:00")).astimezone(_BRT).date()

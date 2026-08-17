@@ -271,6 +271,47 @@ describe("LiabilitiesPage", () => {
     expect(grid.contains(funnel)).toBe(false);
   });
 
+  it("toggling Competência/Caixa refetches por-passivo with the selected regime", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url === "/liabilities") return Promise.resolve(jsonResponse([LIABILITY_ATIVO]));
+      if (url.startsWith("/dashboards/por-passivo")) {
+        const regime = url.includes("regime=caixa") ? "caixa" : "competencia";
+        const total = regime === "caixa" ? "999.00" : "1200.00";
+        return Promise.resolve(
+          jsonResponse([{ liability_id: 1, liability_nome: "Financiamento carro", total }])
+        );
+      }
+      if (url.startsWith("/pluggy/transactions")) return Promise.resolve(jsonResponse([]));
+      if (url.startsWith("/subcategories")) return Promise.resolve(jsonResponse([]));
+      if (url.startsWith("/category-groups")) return Promise.resolve(jsonResponse([]));
+      if (url.startsWith("/assets")) return Promise.resolve(jsonResponse([]));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<LiabilitiesPage />);
+    await screen.findByText("Financiamento carro");
+
+    const grid = screen.getByText("Financiamento carro").closest(".dash-tile") as HTMLElement;
+    await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
+    expect(await screen.findByText("R$ 1.200,00")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Caixa" }));
+
+    expect(await screen.findByText("R$ 999,00")).toBeInTheDocument();
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls.map((call) => String(call[0]));
+      expect(
+        calls.some(
+          (url) => url.startsWith("/dashboards/por-passivo") && url.includes("regime=caixa")
+        )
+      ).toBe(true);
+    });
+  });
+
   it("the drilldown table can be sorted by Data/Valor", async () => {
     const TX_A = { ...TRANSACAO_FIXTURE, id: 1, data: "2026-01-10", valor: "-1200.00" };
     const TX_B = {

@@ -246,8 +246,11 @@ def test_get_patrimonio_breakdown_parts_sum_to_summary_patrimonio(db_session, us
 
     assert breakdown.ativos == Decimal("50000.00")
     assert breakdown.passivos == Decimal("4000.00")
-    assert breakdown.saldo_contas == Decimal("1000.00")
-    assert breakdown.saldo_cartoes == Decimal("300.00")
+    # Nenhuma das contas tem saldo_inicial preenchido — ambas entram pelo
+    # fallback de saldo ao vivo (corrente soma, cartão de crédito subtrai,
+    # mesma convenção de sinal de _base_query).
+    assert breakdown.saldo_liquido_acumulado == Decimal("700.00")
+    assert breakdown.saldo_investimentos == Decimal("0")
     assert breakdown.total == summary.patrimonio
 
 
@@ -1842,3 +1845,289 @@ def test_get_saldo_acumulado_isolated_by_user(db_session, user):
     pontos = service.get_saldo_acumulado(db_session, user.id, ano=2026, mes=1, meses=1)
 
     assert pontos[0].total == Decimal("0")
+
+
+def test_get_saldo_acumulado_excludes_investimento_from_anchor(db_session, user):
+    _account(db_session, user, tipo=PluggyAccountTipo.corrente).saldo_inicial = Decimal("1000.00")
+    investimento = _account(db_session, user, tipo=PluggyAccountTipo.investimento)
+    investimento.saldo_inicial = Decimal("50000.00")
+    db_session.commit()
+
+    pontos = service.get_saldo_acumulado(db_session, user.id, ano=2026, mes=1, meses=1)
+
+    assert pontos[0].total == Decimal("1000.00")
+
+
+def test_get_saldo_acumulado_excludes_investimento_transactions_from_accumulation(db_session, user):
+    corrente = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    corrente.saldo_inicial = Decimal("0")
+    investimento = _account(db_session, user, tipo=PluggyAccountTipo.investimento)
+    investimento.saldo_inicial = Decimal("0")
+    db_session.flush()
+    _transaction(
+        db_session,
+        user,
+        corrente,
+        valor="100.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 1, 10),
+    )
+    _transaction(
+        db_session,
+        user,
+        investimento,
+        valor="9999.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 1, 10),
+    )
+    db_session.commit()
+
+    pontos = service.get_saldo_acumulado(db_session, user.id, ano=2026, mes=1, meses=1)
+
+    assert pontos[0].total == Decimal("100.00")
+
+
+def test_get_saldo_acumulado_regime_caixa_uses_data_caixa(db_session, user):
+    cartao = _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito)
+    cartao.saldo_inicial = Decimal("0")
+    db_session.flush()
+    _transaction(
+        db_session,
+        user,
+        cartao,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+        data_competencia=date(2026, 2, 10),
+    )
+    tx = db_session.query(PluggyTransaction).one()
+    tx.data_caixa = date(2026, 3, 10)
+    db_session.commit()
+
+    competencia = service.get_saldo_acumulado(db_session, user.id, ano=2026, mes=2, meses=1)
+    caixa = service.get_saldo_acumulado(
+        db_session, user.id, ano=2026, mes=2, meses=1, regime="caixa"
+    )
+    caixa_no_mes_certo = service.get_saldo_acumulado(
+        db_session, user.id, ano=2026, mes=3, meses=1, regime="caixa"
+    )
+
+    assert competencia[0].total == Decimal("-100.00")
+    assert caixa[0].total == Decimal("0")
+    assert caixa_no_mes_certo[0].total == Decimal("-100.00")
+
+
+# --- get_summary / get_por_categoria / etc. respeitando regime (Sprint 16) --
+
+
+def _cartao_com_competencia_deslocada(db_session, user):
+    """Transação de cartão: evento em jan, competência fev, caixa mar —
+    permite diferenciar as 3 datas em cada teste de regime."""
+    cartao = _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito)
+    tx = _transaction(
+        db_session,
+        user,
+        cartao,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 20),
+        data_competencia=date(2026, 2, 20),
+    )
+    tx.data_caixa = date(2026, 3, 20)
+    db_session.commit()
+    return tx
+
+
+def test_get_summary_regime_caixa_uses_data_caixa(db_session, user):
+    _cartao_com_competencia_deslocada(db_session, user)
+
+    competencia = service.get_summary(db_session, user.id, ano=2026, mes=2)
+    caixa = service.get_summary(db_session, user.id, ano=2026, mes=3, regime="caixa")
+
+    assert competencia.despesa == Decimal("100.00")
+    assert caixa.despesa == Decimal("100.00")
+
+
+def test_get_por_categoria_regime_caixa_uses_data_caixa(db_session, user):
+    tx = _cartao_com_competencia_deslocada(db_session, user)
+    group = _group(db_session, nome="Cartão")
+    sub = _subcategory(db_session, group=group, nome="Compras")
+    tx.subcategory_id = sub.id
+    db_session.commit()
+
+    por_categoria_caixa = service.get_por_categoria(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=3, regime="caixa"
+    )
+    por_categoria_competencia_no_mes_caixa = service.get_por_categoria(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=3
+    )
+
+    assert por_categoria_caixa[0].total == Decimal("100.00")
+    assert por_categoria_competencia_no_mes_caixa == []
+
+
+def test_get_tendencia_regime_caixa_uses_data_caixa(db_session, user):
+    _cartao_com_competencia_deslocada(db_session, user)
+
+    tendencia = service.get_tendencia(db_session, user.id, ano=2026, mes=3, meses=3, regime="caixa")
+
+    marco = next(p for p in tendencia if p.ano == 2026 and p.mes == 3)
+    fevereiro = next(p for p in tendencia if p.ano == 2026 and p.mes == 2)
+    assert marco.despesa == Decimal("100.00")
+    assert fevereiro.despesa == Decimal("0")
+
+
+def test_get_tendencia_por_categoria_regime_caixa_uses_data_caixa(db_session, user):
+    tx = _cartao_com_competencia_deslocada(db_session, user)
+    sub = _subcategory(db_session, nome="Compras")
+    tx.subcategory_id = sub.id
+    db_session.commit()
+
+    tendencia = service.get_tendencia_por_categoria(
+        db_session,
+        user.id,
+        tipo=PluggyTransactionTipo.debito,
+        ano=2026,
+        mes=3,
+        meses=3,
+        regime="caixa",
+    )
+
+    pontos = {(p.ano, p.mes): p.total for p in tendencia[0].pontos}
+    assert pontos[(2026, 3)] == Decimal("100.00")
+    assert pontos[(2026, 2)] == Decimal("0")
+
+
+def test_get_por_ativo_regime_caixa_uses_data_caixa(db_session, user):
+    tx = _cartao_com_competencia_deslocada(db_session, user)
+    asset = _asset(db_session, user)
+    tx.asset_id = asset.id
+    db_session.commit()
+
+    por_ativo = service.get_por_ativo(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=3, regime="caixa"
+    )
+
+    assert len(por_ativo) == 1
+    assert por_ativo[0].total == Decimal("100.00")
+
+
+def test_get_tendencia_por_ativo_regime_caixa_uses_data_caixa(db_session, user):
+    tx = _cartao_com_competencia_deslocada(db_session, user)
+    asset = _asset(db_session, user)
+    tx.asset_id = asset.id
+    db_session.commit()
+
+    tendencia = service.get_tendencia_por_ativo(
+        db_session,
+        user.id,
+        tipo=PluggyTransactionTipo.debito,
+        ano=2026,
+        mes=3,
+        meses=3,
+        regime="caixa",
+    )
+
+    pontos = {(p.ano, p.mes): p.total for p in tendencia[0].pontos}
+    assert pontos[(2026, 3)] == Decimal("100.00")
+
+
+def test_get_por_passivo_regime_caixa_uses_data_caixa(db_session, user):
+    tx = _cartao_com_competencia_deslocada(db_session, user)
+    liability = _liability(db_session, user)
+    tx.liability_id = liability.id
+    db_session.commit()
+
+    por_passivo = service.get_por_passivo(db_session, user.id, ano=2026, mes=3, regime="caixa")
+
+    assert len(por_passivo) == 1
+    assert por_passivo[0].total == Decimal("100.00")
+
+
+def test_get_tendencia_por_passivo_regime_caixa_uses_data_caixa(db_session, user):
+    tx = _cartao_com_competencia_deslocada(db_session, user)
+    liability = _liability(db_session, user)
+    tx.liability_id = liability.id
+    db_session.commit()
+
+    tendencia = service.get_tendencia_por_passivo(
+        db_session, user.id, ano=2026, mes=3, meses=3, regime="caixa"
+    )
+
+    pontos = {(p.ano, p.mes): p.total for p in tendencia[0].pontos}
+    assert pontos[(2026, 3)] == Decimal("100.00")
+
+
+# --- Patrimônio: saldo_liquido_acumulado / saldo_investimentos / fallback ---
+
+
+def test_patrimonio_breakdown_saldo_investimentos_separate_from_acumulado(db_session, user):
+    corrente = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    corrente.saldo_inicial = Decimal("1000.00")
+    investimento = _account(
+        db_session, user, tipo=PluggyAccountTipo.investimento, saldo=Decimal("5000.00")
+    )
+    investimento.saldo_inicial = Decimal("5000.00")
+    db_session.commit()
+
+    breakdown = service.get_patrimonio_breakdown(db_session, user.id)
+
+    assert breakdown.saldo_liquido_acumulado == Decimal("1000.00")
+    assert breakdown.saldo_investimentos == Decimal("5000.00")
+    assert breakdown.total == Decimal("6000.00")
+
+
+def test_patrimonio_breakdown_fallback_account_without_saldo_inicial_uses_live_balance(
+    db_session, user
+):
+    _account(db_session, user, tipo=PluggyAccountTipo.corrente, saldo=Decimal("200.00"))
+    ancorada = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    ancorada.saldo_inicial = Decimal("1000.00")
+    db_session.commit()
+
+    breakdown = service.get_patrimonio_breakdown(db_session, user.id)
+
+    # Conta ancorada entra via get_saldo_acumulado (1000, sem transações);
+    # conta sem saldo_inicial entra pelo saldo ao vivo (200) — soma 1200,
+    # sem quebrar o cálculo da conta ancorada.
+    assert breakdown.saldo_liquido_acumulado == Decimal("1200.00")
+
+
+def test_patrimonio_breakdown_fallback_credit_card_without_saldo_inicial_subtracts(
+    db_session, user
+):
+    _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito, saldo=Decimal("300.00"))
+
+    breakdown = service.get_patrimonio_breakdown(db_session, user.id)
+
+    assert breakdown.saldo_liquido_acumulado == Decimal("-300.00")
+
+
+def test_patrimonio_breakdown_investimento_without_saldo_inicial_never_enters_fallback(
+    db_session, user
+):
+    _account(db_session, user, tipo=PluggyAccountTipo.investimento, saldo=Decimal("777.00"))
+
+    breakdown = service.get_patrimonio_breakdown(db_session, user.id)
+
+    assert breakdown.saldo_liquido_acumulado == Decimal("0")
+    assert breakdown.saldo_investimentos == Decimal("777.00")
+
+
+def test_patrimonio_breakdown_regime_caixa_shifts_accumulation(db_session, user, monkeypatch):
+    _cartao_com_competencia_deslocada(db_session, user)
+
+    class _HojeFevereiro(date):
+        @classmethod
+        def today(cls):
+            return date(2026, 2, 25)
+
+    monkeypatch.setattr(service, "date", _HojeFevereiro)
+
+    # "Hoje" congelado em 25/fev: a despesa (competência fev, caixa mar) já
+    # entrou na acumulação por competência, mas ainda não por caixa (mar é
+    # futuro em relação a "hoje").
+    competencia = service.get_patrimonio_breakdown(db_session, user.id, regime="competencia")
+    caixa = service.get_patrimonio_breakdown(db_session, user.id, regime="caixa")
+
+    assert competencia.total == caixa.total - Decimal("100.00")

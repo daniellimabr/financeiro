@@ -35,11 +35,13 @@ import {
   type CategoriaTotal,
   type PeriodoHistorico,
   type PontoTendencia,
+  type Regime,
   type TransacaoTipo,
 } from "../api/dashboards";
 import { AccountTipoIcon } from "../components/AccountTipoIcon";
 import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
+import { RegimeToggle } from "../components/RegimeToggle";
 import { TransactionsTable } from "../components/TransactionsTable";
 import { TrendChart } from "../components/TrendChart";
 import { useAssetGastos } from "../hooks/useAssetGastos";
@@ -107,14 +109,15 @@ export function DashboardsPage() {
   const [ano, setAno] = useState(now.getFullYear());
   const [mes, setMes] = useState(now.getMonth() + 1);
   const [periodoHistorico, setPeriodoHistorico] = useState<PeriodoHistorico>(6);
+  const [regime, setRegime] = useState<Regime>("competencia");
   const [drill, setDrill] = useState<DrillState | null>(null);
   const [ativosTipo, setAtivosTipo] = useState<TransacaoTipo>("debito");
 
   const filter: PeriodoFiltro = { ano, mes };
 
-  const summaryQuery = useDashboardSummary(filter);
-  const tendenciaQuery = useDashboardTendencia(ano, mes, periodoHistorico);
-  const saldoAcumuladoQuery = useDashboardSaldoAcumulado(ano, mes, periodoHistorico);
+  const summaryQuery = useDashboardSummary({ ...filter, regime });
+  const tendenciaQuery = useDashboardTendencia(ano, mes, periodoHistorico, regime);
+  const saldoAcumuladoQuery = useDashboardSaldoAcumulado(ano, mes, periodoHistorico, regime);
 
   // A série vem com um ponto a mais no início (ver useDashboardSaldoAcumulado)
   // — esse ponto extra é só o valor do "mês anterior", usado pelo card
@@ -201,6 +204,7 @@ export function DashboardsPage() {
             <option value={12}>12 meses</option>
           </select>
         </label>
+        <RegimeToggle value={regime} onChange={setRegime} />
       </div>
 
       {summaryQuery.isLoading && <p>Carregando...</p>}
@@ -309,6 +313,7 @@ export function DashboardsPage() {
               tipo={drill.kind === "receita" ? "credito" : "debito"}
               filter={filter}
               periodoHistorico={periodoHistorico}
+              regime={regime}
               expandedGrupos={drill.expandedGrupos}
               expandedSubcategorias={drill.expandedSubcategorias}
               onToggleGrupo={toggleGrupo}
@@ -337,6 +342,7 @@ export function DashboardsPage() {
               <AtivosAccordion
                 tipo={ativosTipo}
                 filter={filter}
+                regime={regime}
                 expandedRows={drill.expandedRows}
                 onToggleRow={toggleRow}
               />
@@ -346,6 +352,7 @@ export function DashboardsPage() {
           {drill.kind === "passivos" && (
             <PassivosAccordion
               filter={filter}
+              regime={regime}
               expandedRows={drill.expandedRows}
               onToggleRow={toggleRow}
             />
@@ -354,7 +361,7 @@ export function DashboardsPage() {
           {drill.kind === "saldo" && <SaldoPorContaList />}
 
           {drill.kind === "patrimonio" && (
-            <PatrimonioBreakdownPanel onNavigate={(kind) => abrirFunil(kind)} />
+            <PatrimonioBreakdownPanel regime={regime} onNavigate={(kind) => abrirFunil(kind)} />
           )}
 
           {drill.kind === "saldoAcumulado" &&
@@ -417,6 +424,7 @@ function GrupoAccordion({
   tipo,
   filter,
   periodoHistorico,
+  regime,
   expandedGrupos,
   expandedSubcategorias,
   onToggleGrupo,
@@ -425,17 +433,19 @@ function GrupoAccordion({
   tipo: TransacaoTipo;
   filter: PeriodoFiltro;
   periodoHistorico: PeriodoHistorico;
+  regime: Regime;
   expandedGrupos: number[];
   expandedSubcategorias: number[];
   onToggleGrupo: (id: number) => void;
   onToggleSubcategoria: (id: number) => void;
 }) {
-  const query = useDashboardByCategoria(tipo, filter);
+  const query = useDashboardByCategoria(tipo, { ...filter, regime });
   const tendenciaQuery = useDashboardCategoriaTendencia(
     tipo,
     filter.ano,
     filter.mes,
-    periodoHistorico
+    periodoHistorico,
+    regime
   );
   const groupsQuery = useCategoryGroups();
   const subcategoriesQuery = useSubcategories();
@@ -600,15 +610,17 @@ function SubcategoriaAccordion({
 function AtivosAccordion({
   tipo,
   filter,
+  regime,
   expandedRows,
   onToggleRow,
 }: {
   tipo: TransacaoTipo;
   filter: PeriodoFiltro;
+  regime: Regime;
   expandedRows: number[];
   onToggleRow: (id: number) => void;
 }) {
-  const query = useAssetGastos(tipo, filter);
+  const query = useAssetGastos(tipo, { ...filter, regime });
   const color = tipo === "credito" ? "var(--receita)" : "var(--despesa)";
 
   const sorted = useMemo(
@@ -655,14 +667,16 @@ function AtivosAccordion({
 
 function PassivosAccordion({
   filter,
+  regime,
   expandedRows,
   onToggleRow,
 }: {
   filter: PeriodoFiltro;
+  regime: Regime;
   expandedRows: number[];
   onToggleRow: (id: number) => void;
 }) {
-  const query = useLiabilityGastos(filter);
+  const query = useLiabilityGastos({ ...filter, regime });
   const color = "var(--despesa)";
 
   const sorted = useMemo(
@@ -740,18 +754,20 @@ function SaldoPorContaList() {
 }
 
 function PatrimonioBreakdownPanel({
+  regime,
   onNavigate,
 }: {
-  onNavigate: (kind: "ativos" | "passivos" | "saldo") => void;
+  regime: Regime;
+  onNavigate: (kind: "ativos" | "passivos" | "saldo" | "saldoAcumulado") => void;
 }) {
-  const query = usePatrimonioBreakdown();
+  const query = usePatrimonioBreakdown(regime);
 
   if (query.isLoading) return <p>Carregando...</p>;
   if (query.isError || !query.data) {
     return <p role="alert">Não foi possível carregar a composição do patrimônio.</p>;
   }
 
-  const { ativos, passivos, saldo_contas, saldo_cartoes, total } = query.data;
+  const { ativos, passivos, saldo_liquido_acumulado, saldo_investimentos, total } = query.data;
 
   return (
     <div className="dash-table-wrap">
@@ -788,17 +804,17 @@ function PatrimonioBreakdownPanel({
             </td>
           </tr>
           <tr>
-            <td>Saldo em conta</td>
-            <td>{formatCurrency(saldo_contas)}</td>
+            <td>Saldo líquido acumulado</td>
+            <td>{formatCurrency(saldo_liquido_acumulado)}</td>
             <td>
-              <button type="button" onClick={() => onNavigate("saldo")}>
+              <button type="button" onClick={() => onNavigate("saldoAcumulado")}>
                 Ver detalhe
               </button>
             </td>
           </tr>
           <tr>
-            <td>Saldo de cartão de crédito</td>
-            <td>-{formatCurrency(saldo_cartoes)}</td>
+            <td>Saldo em investimentos</td>
+            <td>{formatCurrency(saldo_investimentos)}</td>
             <td>
               <button type="button" onClick={() => onNavigate("saldo")}>
                 Ver detalhe

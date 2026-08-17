@@ -295,6 +295,40 @@ describe("AssetsPage", () => {
     });
   });
 
+  it("toggling Competência/Caixa refetches por-ativo with the selected regime", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url === "/assets") return Promise.resolve(jsonResponse([ASSET_ATIVO]));
+      if (url.startsWith("/dashboards/por-ativo")) {
+        const regime = url.includes("regime=caixa") ? "caixa" : "competencia";
+        const total = regime === "caixa" ? "999.00" : "300.00";
+        return Promise.resolve(jsonResponse([{ asset_id: 1, asset_nome: "Carro", total }]));
+      }
+      if (url.startsWith("/pluggy/transactions")) return Promise.resolve(jsonResponse([]));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<AssetsPage />);
+    await screen.findByText("Carro");
+
+    const grid = screen.getByText("Carro").closest(".dash-tile") as HTMLElement;
+    await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
+    expect(await screen.findByText("R$ 300,00")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Caixa" }));
+
+    expect(await screen.findByText("R$ 999,00")).toBeInTheDocument();
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls.map((call) => String(call[0]));
+      expect(
+        calls.some((url) => url.startsWith("/dashboards/por-ativo") && url.includes("regime=caixa"))
+      ).toBe(true);
+    });
+  });
+
   it("the drilldown table shows an editable Categoria and can be sorted by Data/Valor", async () => {
     const GROUPS = [
       {

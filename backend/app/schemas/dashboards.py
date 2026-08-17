@@ -114,8 +114,8 @@ class PatrimonioBreakdownOut(BaseModel):
 
     ativos: Decimal
     passivos: Decimal
-    saldo_contas: Decimal
-    saldo_cartoes: Decimal
+    saldo_liquido_acumulado: Decimal
+    saldo_investimentos: Decimal
     total: Decimal
 
 
