@@ -16,6 +16,8 @@ from app.models.pluggy import (
 )
 from app.models.user import User
 
+_SEQ = iter(range(1, 100_000))
+
 
 def _authenticate(client, db_session, *, google_sub="google-1", email="a@example.com"):
     user = User(google_sub=google_sub, email=email, name="Alice")
@@ -67,7 +69,7 @@ def _liability(db_session, user, nome="Financiamento"):
 
 
 def _account(db_session, user, *, tipo=PluggyAccountTipo.corrente, saldo_inicial=None):
-    n = id(object())
+    n = next(_SEQ)
     item = PluggyItem(
         user_id=user.id,
         pluggy_item_id=f"item-acc-{user.id}-{n}",
@@ -129,7 +131,7 @@ def _transaction(
     tx = PluggyTransaction(
         account_id=account.id,
         user_id=user.id,
-        pluggy_transaction_id=f"tx-{user.id}-{valor}-{tipo}-{id(object())}",
+        pluggy_transaction_id=f"tx-{user.id}-{valor}-{tipo}-{next(_SEQ)}",
         descricao="Transacao",
         valor=Decimal(valor),
         tipo=tipo,
