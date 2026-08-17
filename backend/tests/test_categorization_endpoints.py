@@ -279,6 +279,38 @@ def test_list_transactions_filters_by_group_id(client, db_session):
     assert body["items"][0]["id"] == tx_grupo.id
 
 
+def test_list_transactions_filters_by_account_id(client, db_session):
+    user = _authenticate(client, db_session)
+    tx_conta_alvo = _pending_transaction(db_session, user, "Conta alvo")
+    _pending_transaction(db_session, user, "Outra conta")
+
+    response = client.get(
+        "/categorization/transactions",
+        params={"account_id": tx_conta_alvo.account_id},
+    )
+
+    body = response.json()
+    assert body["total"] == 1
+    assert body["items"][0]["id"] == tx_conta_alvo.id
+
+
+def test_list_transactions_account_id_does_not_leak_other_users_transactions(client, db_session):
+    user = _authenticate(client, db_session)
+    other_user = User(google_sub="google-2", email="b@example.com", name="Bob")
+    db_session.add(other_user)
+    db_session.commit()
+    db_session.refresh(other_user)
+    tx_other = _pending_transaction(db_session, other_user, "Conta do outro usuario")
+    del user
+
+    response = client.get(
+        "/categorization/transactions",
+        params={"account_id": tx_other.account_id},
+    )
+
+    assert response.json()["items"] == []
+
+
 def test_user_a_does_not_see_or_act_on_user_bs_transactions(client, db_session):
     user_a = _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
     tx_b_owner = User(google_sub="google-2", email="b@example.com", name="Bob")

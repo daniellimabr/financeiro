@@ -143,6 +143,28 @@ if ((await primeiraLinhaPendente.count()) === 0) {
   });
 }
 
+// --- filtro de conta (Sprint 17) -------------------------------------------
+// seleciona a primeira conta real (não "Todas"), confirma que a tabela
+// atualiza, e volta pra "Todas" antes de terminar (estado só de página, não
+// muta nada no backend, mas evita deixar a tela num filtro estreito pra
+// quem abrir a aba em seguida).
+const contaSelect = page.getByRole("combobox", { name: "Conta" });
+const opcoesConta = await contaSelect.locator("option").allTextContents();
+if (opcoesConta.length <= 1) {
+  consoleErrors.push("filtro de Conta sem contas reais pra selecionar");
+} else {
+  const contaAlvo = opcoesConta[1];
+  await contaSelect.selectOption({ label: contaAlvo });
+  await page.waitForTimeout(600);
+  await page.screenshot({
+    path: path.join(shotsDir, "categorizacao-06-filtro-conta.png"),
+    fullPage: true,
+  });
+  console.log(`filtro de conta aplicado: "${contaAlvo}"`);
+  await contaSelect.selectOption({ label: "Todas" });
+  await page.waitForTimeout(300);
+}
+
 console.log(consoleErrors.length ? consoleErrors.join("\n") : "no console errors");
 await browser.close();
 if (consoleErrors.length) process.exitCode = 1;

@@ -385,6 +385,47 @@ def test_list_transactions_combines_has_asset_and_group_id(
     assert [tx.id for tx in items] == [tx_match.id]
 
 
+def test_list_transactions_filters_by_account_id(db_session, user):
+    tx_conta_alvo = _pending_transaction(db_session, user, "Conta alvo")
+    _pending_transaction(db_session, user, "Outra conta")
+
+    items, total = service.list_transactions(
+        db_session, user.id, account_id=tx_conta_alvo.account_id
+    )
+
+    assert total == 1
+    assert [tx.id for tx in items] == [tx_conta_alvo.id]
+
+
+def test_list_transactions_combines_account_id_and_status(db_session, user, subcategory):
+    tx_pendente = _pending_transaction(db_session, user, "Pendente conta alvo")
+    tx_confirmada = _transaction(
+        db_session,
+        user,
+        "Confirmada conta alvo",
+        status_categorizacao=PluggyTransactionCategorizacaoStatus.confirmada,
+        subcategory_id=subcategory.id,
+    )
+    tx_confirmada.account_id = tx_pendente.account_id
+    db_session.commit()
+
+    items, total = service.list_transactions(
+        db_session, user.id, status="pendente", account_id=tx_pendente.account_id
+    )
+
+    assert total == 1
+    assert [tx.id for tx in items] == [tx_pendente.id]
+
+
+def test_list_transactions_account_id_cross_user_isolation(db_session, user, other_user):
+    tx_other = _pending_transaction(db_session, other_user, "Conta do outro usuario")
+
+    items, total = service.list_transactions(db_session, user.id, account_id=tx_other.account_id)
+
+    assert items == []
+    assert total == 0
+
+
 # --- set_category --------------------------------------------------------
 
 

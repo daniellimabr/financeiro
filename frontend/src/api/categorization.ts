@@ -45,6 +45,7 @@ export interface TransactionsFilter {
   mes?: number;
   hasAsset?: boolean;
   groupId?: number;
+  accountId?: number;
   page?: number;
   pageSize?: number;
 }
@@ -59,7 +60,7 @@ function buildQuery(params: Record<string, string | number | boolean | undefined
 }
 
 export function fetchTransactions(filter: TransactionsFilter = {}): Promise<TransactionsPage> {
-  const { status, tipo, ano, mes, hasAsset, groupId, page, pageSize } = filter;
+  const { status, tipo, ano, mes, hasAsset, groupId, accountId, page, pageSize } = filter;
   return apiFetch<TransactionsPage>(
     `/categorization/transactions${buildQuery({
       status,
@@ -68,6 +69,7 @@ export function fetchTransactions(filter: TransactionsFilter = {}): Promise<Tran
       mes,
       has_asset: hasAsset,
       group_id: groupId,
+      account_id: accountId,
       page,
       page_size: pageSize,
     })}`

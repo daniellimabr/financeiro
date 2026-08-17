@@ -15,6 +15,7 @@ import { useAssets } from "../hooks/useAssets";
 import { useBulkConfirmCategorization } from "../hooks/useBulkConfirmCategorization";
 import { useCategorizationTransactions } from "../hooks/useCategorizationTransactions";
 import { useCategoryGroups } from "../hooks/useCategoryGroups";
+import { usePluggyAccounts } from "../hooks/usePluggyAccounts";
 import { useSetCategory } from "../hooks/useSetCategory";
 import { useSubcategories } from "../hooks/useSubcategories";
 import { useTableSort } from "../hooks/useTableSort";
@@ -36,6 +37,7 @@ export function CategorizationReviewPage() {
   const [tipo, setTipo] = useState<TransactionTipo | "todos">("todos");
   const [hasAssetFilter, setHasAssetFilter] = useState<HasAssetFilter>("todos");
   const [groupId, setGroupId] = useState<number | "todos">("todos");
+  const [accountId, setAccountId] = useState<number | "todas">("todas");
   const [page, setPage] = useState(1);
 
   const { data, isLoading } = useCategorizationTransactions({
@@ -45,6 +47,7 @@ export function CategorizationReviewPage() {
     tipo: tipo === "todos" ? undefined : tipo,
     hasAsset: hasAssetFilter === "todos" ? undefined : hasAssetFilter === "sim",
     groupId: groupId === "todos" ? undefined : groupId,
+    accountId: accountId === "todas" ? undefined : accountId,
     page,
     pageSize: PAGE_SIZE,
   });
@@ -52,6 +55,7 @@ export function CategorizationReviewPage() {
   const { data: groups } = useCategoryGroups();
   const { data: subcategories } = useSubcategories();
   const { data: assets } = useAssets();
+  const { data: accounts } = usePluggyAccounts();
   const setCategory = useSetCategory();
   const bulkConfirm = useBulkConfirmCategorization();
 
@@ -100,6 +104,7 @@ export function CategorizationReviewPage() {
     tipo?: TransactionTipo | "todos";
     hasAssetFilter?: HasAssetFilter;
     groupId?: number | "todos";
+    accountId?: number | "todas";
   }) {
     if (overrides.ano !== undefined) setAno(overrides.ano);
     if (overrides.mes !== undefined) setMes(overrides.mes);
@@ -107,6 +112,7 @@ export function CategorizationReviewPage() {
     if (overrides.tipo !== undefined) setTipo(overrides.tipo);
     if (overrides.hasAssetFilter !== undefined) setHasAssetFilter(overrides.hasAssetFilter);
     if (overrides.groupId !== undefined) setGroupId(overrides.groupId);
+    if (overrides.accountId !== undefined) setAccountId(overrides.accountId);
     setPage(1);
     setChecked({});
   }
@@ -204,6 +210,25 @@ export function CategorizationReviewPage() {
             {groups?.map((group) => (
               <option key={group.id} value={group.id}>
                 {group.nome}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Conta
+          <select
+            aria-label="Conta"
+            value={accountId}
+            onChange={(event) =>
+              mudarFiltro({
+                accountId: event.target.value === "todas" ? "todas" : Number(event.target.value),
+              })
+            }
+          >
+            <option value="todas">Todas</option>
+            {accounts?.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.apelido ?? account.nome}
               </option>
             ))}
           </select>

@@ -12,6 +12,7 @@ export function useCategorizationTransactions(filter: TransactionsFilter = {}) {
       filter.mes,
       filter.hasAsset,
       filter.groupId,
+      filter.accountId,
       filter.page,
       filter.pageSize,
     ],

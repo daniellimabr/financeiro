@@ -23,6 +23,23 @@ const SUBCATEGORY_FIXTURE = {
   updated_at: "2026-08-14T00:00:00Z",
 };
 
+const ACCOUNT_FIXTURE = {
+  id: 1,
+  item_id: 1,
+  user_id: 1,
+  pluggy_account_id: "acc-1",
+  tipo: "corrente",
+  nome: "Itaú - Conta Corrente",
+  apelido: null,
+  numero_mascarado: null,
+  saldo: "1000.00",
+  moeda: "BRL",
+  sync_enabled: true,
+  saldo_inicial: null,
+  created_at: "2026-08-14T00:00:00Z",
+  updated_at: "2026-08-14T00:00:00Z",
+};
+
 const BASE_TRANSACTION: CategorizedTransaction = {
   id: 1,
   account_id: 1,
@@ -71,6 +88,7 @@ function baseHandlers(url: string): Promise<Response> | null {
   if (url === "/category-groups") return Promise.resolve(jsonResponse([GROUP_FIXTURE]));
   if (url === "/subcategories") return Promise.resolve(jsonResponse([SUBCATEGORY_FIXTURE]));
   if (url === "/assets") return Promise.resolve(jsonResponse([]));
+  if (url === "/pluggy/accounts") return Promise.resolve(jsonResponse([ACCOUNT_FIXTURE]));
   return null;
 }
 
@@ -395,6 +413,37 @@ describe("CategorizationReviewPage", () => {
       expect(
         calls.some(
           (url) => url.startsWith("/categorization/transactions") && url.includes("group_id=1")
+        )
+      ).toBe(true);
+    });
+  });
+
+  it("populates the conta filter from usePluggyAccounts and refetches with account_id when changed", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url.startsWith("/categorization/transactions"))
+        return Promise.resolve(jsonResponse(transactionsPage([BASE_TRANSACTION])));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<CategorizationReviewPage />);
+    await screen.findByText("Mercado Sao Joao");
+
+    const select = (await screen.findByLabelText("Conta")) as HTMLSelectElement;
+    expect(Array.from(select.options).map((option) => option.textContent)).toContain(
+      "Itaú - Conta Corrente"
+    );
+
+    await userEvent.selectOptions(select, "Itaú - Conta Corrente");
+
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls.map((call) => String(call[0]));
+      expect(
+        calls.some(
+          (url) => url.startsWith("/categorization/transactions") && url.includes("account_id=1")
         )
       ).toBe(true);
     });

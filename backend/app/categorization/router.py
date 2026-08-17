@@ -31,6 +31,7 @@ def list_transactions(
     mes: int | None = None,
     has_asset: bool | None = None,
     group_id: int | None = None,
+    account_id: int | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -45,6 +46,7 @@ def list_transactions(
         mes=mes,
         has_asset=has_asset,
         group_id=group_id,
+        account_id=account_id,
         page=page,
         page_size=page_size,
     )

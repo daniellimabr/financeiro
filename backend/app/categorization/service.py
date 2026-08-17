@@ -57,6 +57,7 @@ def list_transactions(
     mes: int | None = None,
     has_asset: bool | None = None,
     group_id: int | None = None,
+    account_id: int | None = None,
     page: int = 1,
     page_size: int = 20,
 ) -> tuple[list[PluggyTransaction], int]:
@@ -88,6 +89,8 @@ def list_transactions(
         query = query.join(Subcategory, PluggyTransaction.subcategory_id == Subcategory.id).filter(
             Subcategory.group_id == group_id
         )
+    if account_id is not None:
+        query = query.filter(PluggyTransaction.account_id == account_id)
 
     total = query.count()
     items = (
