@@ -15,6 +15,7 @@ CEO: idealiza, aprova planos, valida entregas. CTO (Claude Code): planeja, arqui
 | Épicos e sequência de sprints | [docs/roadmap.md](docs/roadmap.md) |
 | Plano/relatório de uma sprint | [docs/sprints/](docs/sprints/) |
 | Mapa de diretórios do repo | [docs/directory-structure.md](docs/directory-structure.md) |
+| O que cada card do Dashboard soma/exclui | [docs/dashboards-guia-cards.md](docs/dashboards-guia-cards.md) |
 | Procedimento de SSH para a VM | [docs/infra/ssh-workflow.md](docs/infra/ssh-workflow.md) |
 | Formato de import do v1 (categorias + memória) | [docs/migration/legacy-data.md](docs/migration/legacy-data.md) |
 

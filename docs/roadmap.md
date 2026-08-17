@@ -697,6 +697,32 @@ PRD: [PRD-017-filtro-conta-validacao-extrato.md](prd/PRD-017-filtro-conta-valida
 Plano: [SPRINT-017-filtro-conta-validacao-extrato-plan.md](sprints/SPRINT-017-filtro-conta-validacao-extrato-plan.md).
 Relatório: [SPRINT-017-filtro-conta-validacao-extrato-report.md](sprints/SPRINT-017-filtro-conta-validacao-extrato-report.md).
 
+### Sprint 18 — Edição manual de data em Categorizar, investigação de Saldo Acumulado, guia dos cards (cross-epic, sem épico prévio) ✅ concluída em 2026-08-17
+
+Planejada em sessão própria (2026-08-17). Três pedidos do CEO conectados pelo
+mesmo fio da Sprint 17 (confiança na conferência do saldo mensal contra dado
+real). Bloco 1 — edição manual de `data` de transação na tela Categorizar,
+com trava (`data_editada_manualmente`) contra sobrescrita em resyncs futuros
+da Pluggy, sobrevivendo tanto em conta corrente quanto em cartão de crédito.
+Bloco 2 — investigação com dado real do card "Saldo Acumulado", que o CEO
+reportou não bater com Itaú+NuBank em 31/01/2026: reconciliado por completo
+(sem bug de fórmula) — gap de R$7.830,82 explicado por 2 efeitos que somam
+exatamente, um salário de R$9.882,83 recebido em 30/01 mas deferido pra
+competência de fevereiro (regra já existente, funcionando como desenhada), e
+uma transação de R$2.052,01 (fatura de dezembro/2025 do cartão NuBank, fora
+do corte de dados) categorizada como "Transferência interna" — o CEO
+recategorizou essa linha ao vivo durante a investigação, e o card passou a
+bater exatamente com a fórmula esperada. UI ganhou nota explicando que o
+card é uma projeção por competência, não um snapshot bancário. Bloco 3 —
+guia não técnico dos cards do Dashboard (`docs/dashboards-guia-cards.md`),
+escrito só depois dos Blocos 1/2 fecharem. 438 testes backend (+13) + 166
+testes frontend (+3), suíte completa verde. Deploy do Bloco 1 na VM de dev
+(CI verde → `git pull` + `docker compose pull` + `up -d`).
+
+PRD: [PRD-018-edicao-data-saldo-acumulado-guia-cards.md](prd/PRD-018-edicao-data-saldo-acumulado-guia-cards.md).
+Plano: [SPRINT-018-edicao-data-saldo-acumulado-guia-cards-plan.md](sprints/SPRINT-018-edicao-data-saldo-acumulado-guia-cards-plan.md).
+Relatório: [SPRINT-018-edicao-data-saldo-acumulado-guia-cards-report.md](sprints/SPRINT-018-edicao-data-saldo-acumulado-guia-cards-report.md).
+
 ## Registro de reavaliações futuras
 
 - **Understand Anything:** reavaliar instalação quando o codebase ultrapassar ~100 arquivos (ver ADR-002-plugins).

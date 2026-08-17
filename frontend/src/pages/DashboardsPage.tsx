@@ -269,6 +269,7 @@ export function DashboardsPage() {
             <span className="v">
               {saldoAcumuladoAtual ? formatCurrency(saldoAcumuladoAtual.total) : "—"}
             </span>
+            <span className="tag">projeção por competência — pode diferir do saldo bancário</span>
             <CardSparkline pontos={saldoAcumuladoSparkline} color="var(--accent)" />
           </button>
           <button
@@ -364,12 +365,23 @@ export function DashboardsPage() {
             <PatrimonioBreakdownPanel regime={regime} onNavigate={(kind) => abrirFunil(kind)} />
           )}
 
-          {drill.kind === "saldoAcumulado" &&
-            (saldoAcumuladoSparkline && saldoAcumuladoSparkline.length > 0 ? (
-              <TrendChart pontos={saldoAcumuladoSparkline} color="var(--accent)" />
-            ) : (
-              <p className="dash-empty">Nenhuma conta com saldo inicial informado.</p>
-            ))}
+          {drill.kind === "saldoAcumulado" && (
+            <>
+              <p className="dash-empty">
+                Este valor soma o saldo inicial das contas com "Saldo inicial" configurado (ver
+                Configurações) mais receitas/despesas por competência (ou caixa, no toggle acima) —
+                não é o saldo bancário do dia. Salário recebido perto do fim do mês, por exemplo, só
+                entra na competência do mês seguinte, mesmo já estando na conta; e uma compra no
+                cartão de crédito entra na competência antes da fatura ser paga. Pra ver o saldo
+                bancário atual por conta, use o card "Saldo".
+              </p>
+              {saldoAcumuladoSparkline && saldoAcumuladoSparkline.length > 0 ? (
+                <TrendChart pontos={saldoAcumuladoSparkline} color="var(--accent)" />
+              ) : (
+                <p className="dash-empty">Nenhuma conta com saldo inicial informado.</p>
+              )}
+            </>
+          )}
         </div>
       )}
     </section>
