@@ -64,7 +64,6 @@ def upgrade() -> None:
             "pluggy_investment_transaction_id",
             sa.String(length=255),
             nullable=False,
-            unique=True,
         ),
         sa.Column("tipo", sa.String(length=50), nullable=False),
         sa.Column("descricao", sa.String(length=500), nullable=True),
@@ -83,8 +82,11 @@ def upgrade() -> None:
         "pluggy_investment_transactions",
         ["user_id"],
     )
+    # Nome encurtado — o nome "natural" (ix_..._pluggy_investment_transaction_id)
+    # excede o limite de 63 caracteres de identificador do Postgres (achado real
+    # no deploy da VM de dev: SQLite, usado nos testes, não tem esse limite).
     op.create_index(
-        "ix_pluggy_investment_transactions_pluggy_investment_transaction_id",
+        "ix_pluggy_investment_tx_ext_id",
         "pluggy_investment_transactions",
         ["pluggy_investment_transaction_id"],
         unique=True,
@@ -102,7 +104,7 @@ def downgrade() -> None:
         table_name="pluggy_investment_transactions",
     )
     op.drop_index(
-        "ix_pluggy_investment_transactions_pluggy_investment_transaction_id",
+        "ix_pluggy_investment_tx_ext_id",
         table_name="pluggy_investment_transactions",
     )
     op.drop_index(
