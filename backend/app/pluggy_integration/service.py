@@ -14,6 +14,8 @@ from app.models.investimento import Investimento
 from app.models.pluggy import (
     PluggyAccount,
     PluggyAccountTipo,
+    PluggyInvestment,
+    PluggyInvestmentTransaction,
     PluggyItem,
     PluggyItemStatus,
     PluggyTransaction,
@@ -141,6 +143,69 @@ def update_saldo_inicial(
     db.commit()
     db.refresh(account)
     return account
+
+
+def list_investments(
+    db: Session, user_id: int, *, investimento_id: int | None = None
+) -> list[PluggyInvestment]:
+    query = db.query(PluggyInvestment).filter(PluggyInvestment.user_id == user_id)
+    if investimento_id is not None:
+        query = query.filter(PluggyInvestment.investimento_id == investimento_id)
+    return query.order_by(PluggyInvestment.nome).all()
+
+
+def get_investment(db: Session, user_id: int, investment_id: int) -> PluggyInvestment:
+    investment = (
+        db.query(PluggyInvestment)
+        .filter(PluggyInvestment.id == investment_id, PluggyInvestment.user_id == user_id)
+        .one_or_none()
+    )
+    if investment is None:
+        raise NotFoundError(f"Posição de investimento {investment_id} não encontrada")
+    return investment
+
+
+def update_investment(
+    db: Session, user_id: int, investment_id: int, *, investimento_id: int | None = None
+) -> PluggyInvestment:
+    investment = get_investment(db, user_id, investment_id)
+    if investimento_id is not None:
+        investimento = (
+            db.query(Investimento)
+            .filter(Investimento.id == investimento_id, Investimento.user_id == user_id)
+            .one_or_none()
+        )
+        if investimento is None:
+            raise NotFoundError(f"Investimento {investimento_id} não encontrado")
+    investment.investimento_id = investimento_id
+    db.commit()
+    db.refresh(investment)
+    return investment
+
+
+def update_investment_saldo_inicial(
+    db: Session, user_id: int, investment_id: int, *, saldo_inicial: Decimal | None
+) -> PluggyInvestment:
+    investment = get_investment(db, user_id, investment_id)
+    investment.saldo_inicial = saldo_inicial
+    db.commit()
+    db.refresh(investment)
+    return investment
+
+
+def list_investment_transactions(
+    db: Session, user_id: int, investment_id: int
+) -> list[PluggyInvestmentTransaction]:
+    get_investment(db, user_id, investment_id)
+    return (
+        db.query(PluggyInvestmentTransaction)
+        .filter(
+            PluggyInvestmentTransaction.user_id == user_id,
+            PluggyInvestmentTransaction.investment_id == investment_id,
+        )
+        .order_by(PluggyInvestmentTransaction.data.desc())
+        .all()
+    )
 
 
 def get_salario_ajuste_dez_2025(db: Session, user_id: int) -> PluggyTransaction | None:
@@ -282,6 +347,19 @@ def sync_item(db: Session, client: PluggyClient, user_id: int, item_id: int) -> 
                 continue
             _upsert_transaction(db, account, tx_raw, tx_date)
 
+    # Investments é buscado para todo item, mesmo os que também retornam
+    # contas via /accounts (achado real do Bloco 1, Sprint 20: XP retorna
+    # ambos, sem sobreposição — holdings e contas bancárias são fontes
+    # distintas para o mesmo item).
+    investments_raw = client.get_investments(item.pluggy_item_id)
+    for investment_raw in investments_raw:
+        investment = _upsert_investment(db, item, investment_raw)
+        investment_transactions_raw = client.get_investment_transactions(
+            investment_raw["id"], from_date=item.cutoff_date
+        )
+        for investment_tx_raw in investment_transactions_raw:
+            _upsert_investment_transaction(db, investment, investment_tx_raw)
+
     item.last_synced_at = datetime.now(UTC)
     db.commit()
     db.refresh(item)
@@ -343,6 +421,64 @@ def _upsert_account(db: Session, item: PluggyItem, raw: dict) -> PluggyAccount:
 
     db.flush()
     return account
+
+
+def _upsert_investment(db: Session, item: PluggyItem, raw: dict) -> PluggyInvestment:
+    investment = (
+        db.query(PluggyInvestment)
+        .filter(PluggyInvestment.pluggy_investment_id == raw["id"])
+        .one_or_none()
+    )
+    if investment is None:
+        investment = PluggyInvestment(
+            item_id=item.id, user_id=item.user_id, pluggy_investment_id=raw["id"]
+        )
+        db.add(investment)
+
+    investment.tipo = raw.get("type") or ""
+    investment.subtipo = raw.get("subtype")
+    investment.nome = raw.get("name") or ""
+    # `code` (ticker) e `isin` são campos distintos no payload real (Bloco 1) —
+    # `code` cobre ações (ex.: HAPV3); CDBs não têm nenhum dos dois, títulos do
+    # Tesouro têm os dois idênticos. Um único campo `codigo` livre é suficiente
+    # para exibição (critério de aceite 4 do PRD-020).
+    investment.codigo = raw.get("code") or raw.get("isin")
+    investment.quantidade = (
+        Decimal(str(raw["quantity"])) if raw.get("quantity") is not None else None
+    )
+    investment.valor_investido = (
+        Decimal(str(raw["amountOriginal"])) if raw.get("amountOriginal") is not None else None
+    )
+    investment.valor_atual = Decimal(str(raw["balance"]))
+    investment.moeda = raw.get("currencyCode", "BRL")
+
+    db.flush()
+    return investment
+
+
+def _upsert_investment_transaction(
+    db: Session, investment: PluggyInvestment, raw: dict
+) -> PluggyInvestmentTransaction:
+    tx = (
+        db.query(PluggyInvestmentTransaction)
+        .filter(PluggyInvestmentTransaction.pluggy_investment_transaction_id == raw["id"])
+        .one_or_none()
+    )
+    if tx is None:
+        tx = PluggyInvestmentTransaction(
+            investment_id=investment.id,
+            user_id=investment.user_id,
+            pluggy_investment_transaction_id=raw["id"],
+        )
+        db.add(tx)
+
+    tx.tipo = raw.get("type") or ""
+    tx.descricao = raw.get("description")
+    tx.valor = Decimal(str(raw["amount"]))
+    tx.quantidade = Decimal(str(raw["quantity"])) if raw.get("quantity") is not None else None
+    tx.data = _parse_investment_date(raw["date"])
+    db.flush()
+    return tx
 
 
 def _upsert_transaction(
@@ -416,3 +552,12 @@ _BRT = ZoneInfo("America/Sao_Paulo")
 
 def _parse_date(raw: str) -> date:
     return datetime.fromisoformat(raw.replace("Z", "+00:00")).astimezone(_BRT).date()
+
+
+def _parse_investment_date(raw: str) -> date:
+    # `date`/`tradeDate` de /investments/{id}/transactions vêm como meia-noite
+    # UTC (convenção de "só a data", achado do Bloco 1, Sprint 20) — diferente
+    # do timestamp de evento de /v2/transactions, que exige conversão pra BRT
+    # (_parse_date). Aplicar a mesma conversão aqui deslocaria a data um dia
+    # pra trás incorretamente.
+    return datetime.fromisoformat(raw.replace("Z", "+00:00")).date()

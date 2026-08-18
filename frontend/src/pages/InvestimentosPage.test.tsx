@@ -40,6 +40,39 @@ const CARTEIRA_FIXTURE = {
   updated_at: "2026-01-01T00:00:00Z",
 };
 
+const HOLDING_FIXTURE = {
+  id: 1,
+  item_id: 2,
+  user_id: 1,
+  pluggy_investment_id: "inv-ext-1",
+  tipo: "FIXED_INCOME",
+  subtipo: "CDB",
+  nome: "CDB - NU FINANCEIRA",
+  codigo: null,
+  quantidade: "1967409.5229",
+  valor_investido: "19674.095229",
+  valor_atual: "22762.07",
+  saldo_inicial: null,
+  moeda: "BRL",
+  investimento_id: 1,
+  created_at: "2026-08-17T00:00:00Z",
+  updated_at: "2026-08-17T00:00:00Z",
+};
+
+const HOLDING_TRANSACTION_FIXTURE = {
+  id: 1,
+  investment_id: 1,
+  user_id: 1,
+  pluggy_investment_transaction_id: "invtx-ext-1",
+  tipo: "SELL",
+  descricao: null,
+  valor: "1398.87",
+  quantidade: "109999.8270035",
+  data: "2026-02-22",
+  created_at: "2026-02-22T00:00:00Z",
+  updated_at: "2026-02-22T00:00:00Z",
+};
+
 const TRANSACAO_FIXTURE = {
   id: 1,
   account_id: 2,
@@ -79,6 +112,7 @@ function baseHandlers(url: string): Promise<Response> | null {
     return Promise.resolve(jsonResponse([]));
   }
   if (url === "/pluggy/accounts") return Promise.resolve(jsonResponse([]));
+  if (url === "/pluggy/investments") return Promise.resolve(jsonResponse([]));
   if (url.endsWith("/evolucao")) return Promise.resolve(jsonResponse(EVOLUCAO_FIXTURE));
   return null;
 }
@@ -249,10 +283,62 @@ describe("InvestimentosPage", () => {
     });
   });
 
+  it("lists linked posições (holdings) on the card", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/pluggy/investments") return Promise.resolve(jsonResponse([HOLDING_FIXTURE]));
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url === "/investimentos") return Promise.resolve(jsonResponse([INVESTIMENTO_FIXTURE]));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<InvestimentosPage />);
+
+    expect(await screen.findByText("Reserva de emergência")).toBeInTheDocument();
+    expect(screen.getByText(/Posições: CDB - NU FINANCEIRA/)).toBeInTheDocument();
+  });
+
+  it("opens the drilldown Posições view showing the holding and its expandable transaction history", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/pluggy/investments") return Promise.resolve(jsonResponse([HOLDING_FIXTURE]));
+      if (url === "/pluggy/investments/1/transactions") {
+        return Promise.resolve(jsonResponse([HOLDING_TRANSACTION_FIXTURE]));
+      }
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url === "/investimentos") return Promise.resolve(jsonResponse([INVESTIMENTO_FIXTURE]));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<InvestimentosPage />);
+    await screen.findByText("Reserva de emergência");
+
+    const grid = screen.getByText("Reserva de emergência").closest(".dash-tile") as HTMLElement;
+    await userEvent.click(within(grid).getByRole("button", { name: "Ver extrato no período" }));
+    await userEvent.click(screen.getByRole("button", { name: "Posições" }));
+
+    expect(await screen.findByText("CDB - NU FINANCEIRA")).toBeInTheDocument();
+    expect(screen.getByText("FIXED_INCOME / CDB")).toBeInTheDocument();
+    expect(screen.getByText("R$ 22.762,07")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Ver histórico" }));
+
+    expect(await screen.findByText("SELL")).toBeInTheDocument();
+    expect(screen.getByText("R$ 1.398,87")).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some((c) => String(c[0]) === "/pluggy/investments/1/transactions")
+    ).toBe(true);
+  });
+
   it("renders a sparkline on the card when trend data is available", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url === "/pluggy/accounts") return Promise.resolve(jsonResponse([]));
+      if (url === "/pluggy/investments") return Promise.resolve(jsonResponse([]));
       if (url.endsWith("/evolucao")) return Promise.resolve(jsonResponse(EVOLUCAO_FIXTURE));
       if (url === "/investimentos") return Promise.resolve(jsonResponse([INVESTIMENTO_FIXTURE]));
       if (url.startsWith("/dashboards/por-investimento/tendencia")) {

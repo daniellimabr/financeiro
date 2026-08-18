@@ -65,6 +65,32 @@ class PluggyClient:
         response = self._request("GET", "/accounts", params={"itemId": pluggy_item_id})
         return response.json()["results"]
 
+    def get_investments(self, pluggy_item_id: str) -> list[dict]:
+        return self._get_paginated("/investments", {"itemId": pluggy_item_id})
+
+    def get_investment_transactions(
+        self, pluggy_investment_id: str, *, from_date: date | None = None
+    ) -> list[dict]:
+        params: dict = {}
+        if from_date is not None:
+            params["from"] = from_date.isoformat()
+        return self._get_paginated(f"/investments/{pluggy_investment_id}/transactions", params)
+
+    def _get_paginated(self, path: str, params: dict) -> list[dict]:
+        # /investments e /investments/{id}/transactions retornam um envelope
+        # {total, totalPages, page, results} — paginação por número de página,
+        # confirmado empiricamente contra o sandbox real (Bloco 1, Sprint 20),
+        # diferente do cursor usado em /v2/transactions.
+        results: list[dict] = []
+        page = 1
+        while True:
+            data = self._request("GET", path, params={**params, "page": page}).json()
+            results.extend(data["results"])
+            if page >= data["totalPages"]:
+                break
+            page += 1
+        return results
+
     def get_transactions(
         self, pluggy_account_id: str, *, from_date: date | None = None
     ) -> list[dict]:

@@ -11,6 +11,7 @@ from app.models.liability import Liability, LiabilityStatus, LiabilityTipo
 from app.models.pluggy import (
     PluggyAccount,
     PluggyAccountTipo,
+    PluggyInvestment,
     PluggyItem,
     PluggyItemStatus,
     PluggyTransaction,
@@ -2488,6 +2489,103 @@ def test_patrimonio_breakdown_investimento_without_saldo_inicial_never_enters_fa
 
     assert breakdown.saldo_liquido_acumulado == Decimal("0")
     assert breakdown.saldo_investimentos == Decimal("777.00")
+
+
+def _item(db_session, user):
+    n = next(_SEQ)
+    item = PluggyItem(
+        user_id=user.id,
+        pluggy_item_id=f"item-{n}",
+        connector_id=1,
+        connector_name="Banco Fake",
+        status=PluggyItemStatus.updated,
+        cutoff_date=date(2026, 1, 1),
+    )
+    db_session.add(item)
+    db_session.flush()
+    return item
+
+
+def _account_for_item(
+    db_session, user, item, *, tipo=PluggyAccountTipo.corrente, saldo=Decimal("0")
+):
+    n = next(_SEQ)
+    account = PluggyAccount(
+        item_id=item.id,
+        user_id=user.id,
+        pluggy_account_id=f"acc-{n}",
+        tipo=tipo,
+        nome="Conta",
+        saldo=saldo,
+    )
+    db_session.add(account)
+    db_session.flush()
+    return account
+
+
+def _investment(db_session, user, item, *, valor_atual=Decimal("0")):
+    n = next(_SEQ)
+    investment = PluggyInvestment(
+        item_id=item.id,
+        user_id=user.id,
+        pluggy_investment_id=f"inv-{n}",
+        tipo="FIXED_INCOME",
+        subtipo="CDB",
+        nome="CDB Fake",
+        valor_atual=valor_atual,
+    )
+    db_session.add(investment)
+    db_session.flush()
+    return investment
+
+
+def test_patrimonio_breakdown_sums_holdings_into_saldo_investimentos(db_session, user):
+    item = _item(db_session, user)
+    _investment(db_session, user, item, valor_atual=Decimal("22762.07"))
+    db_session.commit()
+
+    breakdown = service.get_patrimonio_breakdown(db_session, user.id)
+
+    assert breakdown.saldo_investimentos == Decimal("22762.07")
+
+
+def test_patrimonio_breakdown_prefers_holdings_over_account_for_same_item(db_session, user):
+    # Achado do Bloco 1 (Sprint 20): nenhum item conhecido retorna as duas
+    # fontes pro mesmo saldo hoje, mas a query já protege contra dobra de
+    # contagem caso isso mude no futuro.
+    item = _item(db_session, user)
+    _account_for_item(
+        db_session, user, item, tipo=PluggyAccountTipo.investimento, saldo=Decimal("999.00")
+    )
+    _investment(db_session, user, item, valor_atual=Decimal("22762.07"))
+    db_session.commit()
+
+    breakdown = service.get_patrimonio_breakdown(db_session, user.id)
+
+    assert breakdown.saldo_investimentos == Decimal("22762.07")
+
+
+def test_patrimonio_breakdown_item_without_holdings_keeps_using_account_saldo_regression(
+    db_session, user
+):
+    # Regressão explícita (critério de aceite 5 do PRD-020): item com
+    # holdings soma via holdings; item sem nenhuma holding continua somando
+    # pelo saldo da conta tipo=investimento, exatamente como antes da sprint.
+    item_com_holding = _item(db_session, user)
+    _investment(db_session, user, item_com_holding, valor_atual=Decimal("1000.00"))
+    item_sem_holding = _item(db_session, user)
+    _account_for_item(
+        db_session,
+        user,
+        item_sem_holding,
+        tipo=PluggyAccountTipo.investimento,
+        saldo=Decimal("500.00"),
+    )
+    db_session.commit()
+
+    breakdown = service.get_patrimonio_breakdown(db_session, user.id)
+
+    assert breakdown.saldo_investimentos == Decimal("1500.00")
 
 
 def test_patrimonio_breakdown_regime_caixa_shifts_accumulation(db_session, user, monkeypatch):

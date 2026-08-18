@@ -14,10 +14,20 @@ from app.pluggy_integration import service
 
 
 class FakePluggyClient:
-    def __init__(self, *, item, accounts=None, transactions_by_account=None):
+    def __init__(
+        self,
+        *,
+        item,
+        accounts=None,
+        transactions_by_account=None,
+        investments=None,
+        investment_transactions_by_investment=None,
+    ):
         self.item = item
         self.accounts = accounts or []
         self.transactions_by_account = transactions_by_account or {}
+        self.investments = investments or []
+        self.investment_transactions_by_investment = investment_transactions_by_investment or {}
         self.get_accounts_calls = 0
 
     def get_item(self, pluggy_item_id):
@@ -29,6 +39,12 @@ class FakePluggyClient:
 
     def get_transactions(self, pluggy_account_id, *, from_date=None):
         return self.transactions_by_account.get(pluggy_account_id, [])
+
+    def get_investments(self, pluggy_item_id):
+        return self.investments
+
+    def get_investment_transactions(self, pluggy_investment_id, *, from_date=None):
+        return self.investment_transactions_by_investment.get(pluggy_investment_id, [])
 
     def create_connect_token(self, *, item_id=None):
         return "connect-token"
@@ -67,6 +83,37 @@ def _transaction_raw(**overrides):
         "date": "2026-01-15T00:00:00.000Z",
         "status": "POSTED",
         "category": "Alimentação",
+    }
+    data.update(overrides)
+    return data
+
+
+def _investment_raw(**overrides):
+    # Formato real confirmado no Bloco 1 (Sprint 20) contra o sandbox Pluggy.
+    data = {
+        "id": "inv-ext-1",
+        "type": "FIXED_INCOME",
+        "subtype": "CDB",
+        "name": "CDB - NU FINANCEIRA",
+        "code": None,
+        "isin": None,
+        "quantity": 1967409.5229,
+        "amountOriginal": 19674.095229,
+        "balance": 22762.07,
+        "currencyCode": "BRL",
+    }
+    data.update(overrides)
+    return data
+
+
+def _investment_transaction_raw(**overrides):
+    data = {
+        "id": "invtx-ext-1",
+        "type": "SELL",
+        "description": None,
+        "amount": 1398.87,
+        "quantity": 109999.8270035,
+        "date": "2026-02-22T00:00:00.000Z",
     }
     data.update(overrides)
     return data
@@ -867,3 +914,215 @@ def test_salario_ajuste_flows_through_dashboards_aggregations_without_special_ca
     assert tendencia[0].receita == Decimal("5000.00")
     salario_bucket = next(c for c in por_categoria if c.subcategory_id == salario.id)
     assert salario_bucket.total == Decimal("5000.00")
+
+
+# --- Investments da Pluggy (Sprint 20) ---------------------------------------
+
+
+def test_sync_item_creates_investments_and_investment_transactions(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[],
+        investments=[_investment_raw()],
+        investment_transactions_by_investment={
+            "inv-ext-1": [_investment_transaction_raw()],
+        },
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+
+    service.sync_item(db_session, client, user.id, item.id)
+
+    investments = service.list_investments(db_session, user.id)
+    assert len(investments) == 1
+    investment = investments[0]
+    assert investment.user_id == user.id
+    assert investment.item_id == item.id
+    assert investment.tipo == "FIXED_INCOME"
+    assert investment.subtipo == "CDB"
+    assert investment.quantidade == Decimal("1967409.5229")
+    assert investment.valor_atual == Decimal("22762.07")
+
+    transactions = service.list_investment_transactions(db_session, user.id, investment.id)
+    assert len(transactions) == 1
+    assert transactions[0].tipo == "SELL"
+    assert transactions[0].valor == Decimal("1398.87")
+    assert transactions[0].data == date(2026, 2, 22)
+
+
+def test_sync_item_creates_investments_for_item_without_any_account(db_session, user):
+    # Achado real do Bloco 1 (Sprint 20): "Nubank Investimentos" sincroniza
+    # sem erro mas GET /accounts retorna zero contas — holdings não dependem
+    # de nenhuma PluggyAccount existir.
+    client = FakePluggyClient(item=_item_raw(), accounts=[], investments=[_investment_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+
+    service.sync_item(db_session, client, user.id, item.id)
+
+    assert service.list_accounts(db_session, user.id) == []
+    assert len(service.list_investments(db_session, user.id)) == 1
+
+
+def test_sync_item_twice_does_not_duplicate_investments_or_transactions(db_session, user):
+    from app.models.pluggy import PluggyInvestment, PluggyInvestmentTransaction
+
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[],
+        investments=[_investment_raw()],
+        investment_transactions_by_investment={
+            "inv-ext-1": [_investment_transaction_raw()],
+        },
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+
+    service.sync_item(db_session, client, user.id, item.id)
+    service.sync_item(db_session, client, user.id, item.id)
+
+    assert db_session.query(PluggyInvestment).count() == 1
+    assert db_session.query(PluggyInvestmentTransaction).count() == 1
+
+
+def test_resync_updates_investment_valor_atual_from_pluggy(db_session, user):
+    client = FakePluggyClient(item=_item_raw(), accounts=[], investments=[_investment_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+
+    client.investments = [_investment_raw(balance=30000.00)]
+    service.sync_item(db_session, client, user.id, item.id)
+
+    investment = service.list_investments(db_session, user.id)[0]
+    assert investment.valor_atual == Decimal("30000.00")
+
+
+def test_resync_preserves_investimento_link_and_saldo_inicial(db_session, user):
+    client = FakePluggyClient(item=_item_raw(), accounts=[], investments=[_investment_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    investment = service.list_investments(db_session, user.id)[0]
+
+    investimento = Investimento(user_id=user.id, nome="Reserva")
+    db_session.add(investimento)
+    db_session.commit()
+    db_session.refresh(investimento)
+    service.update_investment(db_session, user.id, investment.id, investimento_id=investimento.id)
+    service.update_investment_saldo_inicial(
+        db_session, user.id, investment.id, saldo_inicial=Decimal("20000.00")
+    )
+
+    client.investments = [_investment_raw(balance=30000.00)]
+    service.sync_item(db_session, client, user.id, item.id)
+
+    reloaded = service.list_investments(db_session, user.id)[0]
+    assert reloaded.investimento_id == investimento.id
+    assert reloaded.saldo_inicial == Decimal("20000.00")
+    assert reloaded.valor_atual == Decimal("30000.00")
+
+
+def test_list_investments_isolated_by_user(db_session, user, other_user):
+    client = FakePluggyClient(item=_item_raw(), accounts=[], investments=[_investment_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+
+    assert service.list_investments(db_session, other_user.id) == []
+    assert len(service.list_investments(db_session, user.id)) == 1
+
+
+def test_list_investments_filters_by_investimento_id(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[],
+        investments=[_investment_raw(id="inv-1"), _investment_raw(id="inv-2")],
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    investimento = Investimento(user_id=user.id, nome="Reserva")
+    db_session.add(investimento)
+    db_session.commit()
+    db_session.refresh(investimento)
+    investments = service.list_investments(db_session, user.id)
+    service.update_investment(
+        db_session, user.id, investments[0].id, investimento_id=investimento.id
+    )
+
+    linked = service.list_investments(db_session, user.id, investimento_id=investimento.id)
+
+    assert [i.id for i in linked] == [investments[0].id]
+
+
+def test_update_investment_links_and_unlinks(db_session, user):
+    client = FakePluggyClient(item=_item_raw(), accounts=[], investments=[_investment_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    investment = service.list_investments(db_session, user.id)[0]
+    investimento = Investimento(user_id=user.id, nome="Reserva")
+    db_session.add(investimento)
+    db_session.commit()
+    db_session.refresh(investimento)
+
+    linked = service.update_investment(
+        db_session, user.id, investment.id, investimento_id=investimento.id
+    )
+    assert linked.investimento_id == investimento.id
+
+    unlinked = service.update_investment(db_session, user.id, investment.id, investimento_id=None)
+    assert unlinked.investimento_id is None
+
+
+def test_update_investment_other_users_investimento_raises_not_found(db_session, user, other_user):
+    client = FakePluggyClient(item=_item_raw(), accounts=[], investments=[_investment_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    investment = service.list_investments(db_session, user.id)[0]
+    other_investimento = Investimento(user_id=other_user.id, nome="Do outro")
+    db_session.add(other_investimento)
+    db_session.commit()
+    db_session.refresh(other_investimento)
+
+    with pytest.raises(NotFoundError):
+        service.update_investment(
+            db_session, user.id, investment.id, investimento_id=other_investimento.id
+        )
+
+
+def test_update_investment_other_users_investment_raises_not_found(db_session, user, other_user):
+    client = FakePluggyClient(item=_item_raw(), accounts=[], investments=[_investment_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    investment = service.list_investments(db_session, user.id)[0]
+
+    with pytest.raises(NotFoundError):
+        service.update_investment(db_session, other_user.id, investment.id, investimento_id=None)
+
+
+def test_update_investment_saldo_inicial_sets_and_clears_value(db_session, user):
+    client = FakePluggyClient(item=_item_raw(), accounts=[], investments=[_investment_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    investment = service.list_investments(db_session, user.id)[0]
+
+    updated = service.update_investment_saldo_inicial(
+        db_session, user.id, investment.id, saldo_inicial=Decimal("1000.00")
+    )
+    assert updated.saldo_inicial == Decimal("1000.00")
+
+    cleared = service.update_investment_saldo_inicial(
+        db_session, user.id, investment.id, saldo_inicial=None
+    )
+    assert cleared.saldo_inicial is None
+
+
+def test_list_investment_transactions_isolated_by_user(db_session, user, other_user):
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[],
+        investments=[_investment_raw()],
+        investment_transactions_by_investment={
+            "inv-ext-1": [_investment_transaction_raw()],
+        },
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    investment = service.list_investments(db_session, user.id)[0]
+
+    with pytest.raises(NotFoundError):
+        service.list_investment_transactions(db_session, other_user.id, investment.id)

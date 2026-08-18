@@ -9,6 +9,7 @@ from app.models.category import CategoryGroup, Subcategory
 from app.models.pluggy import (
     PluggyAccount,
     PluggyAccountTipo,
+    PluggyInvestment,
     PluggyItem,
     PluggyItemStatus,
     PluggyTransaction,
@@ -116,6 +117,42 @@ def _account(
     db_session.commit()
     db_session.refresh(account)
     return account
+
+
+def _investment(
+    db_session,
+    user,
+    *,
+    valor_atual=Decimal("0"),
+    saldo_inicial=None,
+    investimento_id=None,
+):
+    n = next(_SEQ)
+    item = PluggyItem(
+        user_id=user.id,
+        pluggy_item_id=f"item-inv-{n}",
+        connector_id=1,
+        connector_name="Banco Fake",
+        status=PluggyItemStatus.updated,
+        cutoff_date=date(2026, 1, 1),
+    )
+    db_session.add(item)
+    db_session.flush()
+    investment = PluggyInvestment(
+        item_id=item.id,
+        user_id=user.id,
+        pluggy_investment_id=f"inv-{n}",
+        tipo="FIXED_INCOME",
+        subtipo="CDB",
+        nome="CDB Fake",
+        valor_atual=valor_atual,
+        saldo_inicial=saldo_inicial,
+        investimento_id=investimento_id,
+    )
+    db_session.add(investment)
+    db_session.commit()
+    db_session.refresh(investment)
+    return investment
 
 
 def _transaction(
@@ -314,6 +351,75 @@ def test_get_evolucao_only_counts_confirmed_aporte_resgate(db_session, user):
     assert evolucao.rendimento_estimado == Decimal("2000.00") - Decimal("1000.00") - Decimal(
         "800.00"
     ) + Decimal("200.00")
+
+
+def test_get_evolucao_sums_holdings_saldo_base_and_saldo_atual(db_session, user):
+    investimento = service.create_investimento(db_session, user.id, nome="Com holding")
+    _investment(
+        db_session,
+        user,
+        valor_atual=Decimal("22762.07"),
+        saldo_inicial=Decimal("20000.00"),
+        investimento_id=investimento.id,
+    )
+
+    evolucao = service.get_evolucao(db_session, user.id, investimento.id)
+
+    assert evolucao.saldo_base == Decimal("20000.00")
+    assert evolucao.saldo_atual == Decimal("22762.07")
+
+
+def test_get_evolucao_sums_carteiras_and_holdings_together(db_session, user):
+    investimento = service.create_investimento(db_session, user.id, nome="Misto")
+    _account(
+        db_session,
+        user,
+        saldo=Decimal("1200.00"),
+        saldo_inicial=Decimal("1000.00"),
+        investimento_id=investimento.id,
+    )
+    _investment(
+        db_session,
+        user,
+        valor_atual=Decimal("500.00"),
+        saldo_inicial=Decimal("400.00"),
+        investimento_id=investimento.id,
+    )
+
+    evolucao = service.get_evolucao(db_session, user.id, investimento.id)
+
+    assert evolucao.saldo_base == Decimal("1400.00")
+    assert evolucao.saldo_atual == Decimal("1700.00")
+
+
+def test_get_evolucao_treats_missing_holding_saldo_inicial_as_zero(db_session, user):
+    investimento = service.create_investimento(db_session, user.id, nome="Holding sem base")
+    _investment(
+        db_session,
+        user,
+        valor_atual=Decimal("500.00"),
+        saldo_inicial=None,
+        investimento_id=investimento.id,
+    )
+
+    evolucao = service.get_evolucao(db_session, user.id, investimento.id)
+
+    assert evolucao.saldo_base == Decimal("0")
+    assert evolucao.saldo_atual == Decimal("500.00")
+
+
+def test_get_evolucao_holdings_isolated_by_user(db_session, user, other_user):
+    investimento = service.create_investimento(db_session, other_user.id, nome="Do outro")
+    _investment(
+        db_session,
+        other_user,
+        valor_atual=Decimal("999.00"),
+        saldo_inicial=Decimal("500.00"),
+        investimento_id=investimento.id,
+    )
+
+    with pytest.raises(NotFoundError):
+        service.get_evolucao(db_session, user.id, investimento.id)
 
 
 def test_get_evolucao_missing_investimento_raises_not_found(db_session, user):

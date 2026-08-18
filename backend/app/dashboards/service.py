@@ -14,6 +14,7 @@ from app.models.liability import Liability, LiabilityStatus
 from app.models.pluggy import (
     PluggyAccount,
     PluggyAccountTipo,
+    PluggyInvestment,
     PluggyTransaction,
     PluggyTransactionTipo,
 )
@@ -349,15 +350,30 @@ def _patrimonio_breakdown(
     saldo_liquido_acumulado = pontos_acumulado[0].total if pontos_acumulado else Decimal("0")
     saldo_liquido_acumulado += _saldo_liquido_fallback(db, user_id)
 
-    saldo_investimentos = (
+    # Holdings (PluggyInvestment) são a fonte preferencial de saldo_investimentos
+    # por item Pluggy; contas tipo=investimento só entram para itens sem
+    # nenhuma holding — evita dobrar contagem caso um item retorne as duas
+    # fontes pro mesmo saldo (nenhum item conhecido faz isso hoje, achado do
+    # Bloco 1 da Sprint 20: XP retorna contas E holdings, sem sobreposição de
+    # saldo entre elas).
+    saldo_holdings = (
+        db.query(func.coalesce(func.sum(PluggyInvestment.valor_atual), 0))
+        .filter(PluggyInvestment.user_id == user_id)
+        .scalar()
+    )
+    itens_com_holdings = db.query(PluggyInvestment.item_id).filter(
+        PluggyInvestment.user_id == user_id
+    )
+    saldo_contas_sem_holdings = (
         db.query(func.coalesce(func.sum(PluggyAccount.saldo), 0))
         .filter(
             PluggyAccount.user_id == user_id,
             PluggyAccount.tipo == PluggyAccountTipo.investimento,
+            PluggyAccount.item_id.not_in(itens_com_holdings),
         )
         .scalar()
     )
-    saldo_investimentos = _to_decimal(saldo_investimentos)
+    saldo_investimentos = _to_decimal(saldo_holdings) + _to_decimal(saldo_contas_sem_holdings)
 
     return PatrimonioBreakdown(
         ativos=ativos,

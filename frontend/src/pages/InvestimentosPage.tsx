@@ -1,6 +1,7 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { Fragment, useMemo, useState, type FormEvent } from "react";
 
 import type { Investimento, InvestimentoInput } from "../api/investimentos";
+import type { PluggyInvestment } from "../api/pluggy";
 import type {
   PeriodoFilter,
   PeriodoHistorico,
@@ -18,8 +19,12 @@ import { useInvestimentoGastos } from "../hooks/useInvestimentoGastos";
 import { useInvestimentoGastosTendencia } from "../hooks/useInvestimentoGastosTendencia";
 import { useInvestimentos } from "../hooks/useInvestimentos";
 import { usePluggyAccounts } from "../hooks/usePluggyAccounts";
+import { usePluggyInvestments } from "../hooks/usePluggyInvestments";
+import { usePluggyInvestmentTransactions } from "../hooks/usePluggyInvestmentTransactions";
 import { useUpdateInvestimento } from "../hooks/useUpdateInvestimento";
 import { formatCurrency } from "../utils/format";
+
+type DrillView = "extrato" | "posicoes";
 
 const EMPTY_FORM: InvestimentoInput = { nome: "" };
 
@@ -35,6 +40,7 @@ export function InvestimentosPage() {
 
   const investimentosQuery = useInvestimentos();
   const { data: accounts } = usePluggyAccounts();
+  const { data: investments } = usePluggyInvestments();
   const createInvestimento = useCreateInvestimento();
   const updateInvestimento = useUpdateInvestimento();
   const deleteInvestimento = useDeleteInvestimento();
@@ -45,6 +51,7 @@ export function InvestimentosPage() {
   const [formState, setFormState] = useState<InvestimentoInput>(EMPTY_FORM);
 
   const [selectedInvestimentoId, setSelectedInvestimentoId] = useState<number | null>(null);
+  const [drillView, setDrillView] = useState<DrillView>("extrato");
 
   const investimentos = investimentosQuery.data ?? [];
   const selectedInvestimento =
@@ -60,6 +67,12 @@ export function InvestimentosPage() {
 
   function carteirasDe(investimentoId: number) {
     return (accounts ?? []).filter((account) => account.investimento_id === investimentoId);
+  }
+
+  function posicoesDe(investimentoId: number) {
+    return (investments ?? []).filter(
+      (investment) => investment.investimento_id === investimentoId
+    );
   }
 
   function openCreateForm() {
@@ -103,6 +116,7 @@ export function InvestimentosPage() {
 
   function toggleDrilldown(investimentoId: number) {
     setSelectedInvestimentoId((prev) => (prev === investimentoId ? null : investimentoId));
+    setDrillView("extrato");
   }
 
   return (
@@ -188,6 +202,7 @@ export function InvestimentosPage() {
             key={investimento.id}
             investimento={investimento}
             carteiras={carteirasDe(investimento.id)}
+            posicoes={posicoesDe(investimento.id)}
             pontos={trendByInvestimento.get(investimento.id)}
             trendColor={trendColor}
             expanded={selectedInvestimentoId === investimento.id}
@@ -210,12 +225,32 @@ export function InvestimentosPage() {
               Fechar
             </button>
           </div>
-          <InvestimentoDrilldown
-            investimentoId={selectedInvestimento.id}
-            tipo={drillTipo}
-            filter={filter}
-            pontos={trendByInvestimento.get(selectedInvestimento.id)}
-          />
+          <div className="dash-toggle" role="group" aria-label="Visão do investimento">
+            <button
+              type="button"
+              aria-pressed={drillView === "extrato"}
+              onClick={() => setDrillView("extrato")}
+            >
+              Extrato
+            </button>
+            <button
+              type="button"
+              aria-pressed={drillView === "posicoes"}
+              onClick={() => setDrillView("posicoes")}
+            >
+              Posições
+            </button>
+          </div>
+          {drillView === "extrato" ? (
+            <InvestimentoDrilldown
+              investimentoId={selectedInvestimento.id}
+              tipo={drillTipo}
+              filter={filter}
+              pontos={trendByInvestimento.get(selectedInvestimento.id)}
+            />
+          ) : (
+            <InvestimentoPosicoes posicoes={posicoesDe(selectedInvestimento.id)} />
+          )}
         </div>
       )}
     </section>
@@ -225,6 +260,7 @@ export function InvestimentosPage() {
 function InvestimentoCard({
   investimento,
   carteiras,
+  posicoes,
   pontos,
   trendColor,
   expanded,
@@ -234,6 +270,7 @@ function InvestimentoCard({
 }: {
   investimento: Investimento;
   carteiras: { id: number; apelido: string | null; nome: string }[];
+  posicoes: PluggyInvestment[];
   pontos: PontoTendencia[] | undefined;
   trendColor: string;
   expanded: boolean;
@@ -257,6 +294,11 @@ function InvestimentoCard({
         {carteiras.length === 0
           ? "Nenhuma carteira vinculada"
           : `Carteiras: ${carteiras.map((c) => c.apelido ?? c.nome).join(", ")}`}
+      </span>
+      <span className="tag">
+        {posicoes.length === 0
+          ? "Nenhuma posição vinculada"
+          : `Posições: ${posicoes.map((p) => p.codigo ?? p.nome).join(", ")}`}
       </span>
       <CardSparkline pontos={pontos} color={trendColor} />
       <div className="dash-filter">
@@ -312,5 +354,96 @@ function InvestimentoDrilldown({
         emptyMessage="Nenhuma transação vinculada neste período."
       />
     </>
+  );
+}
+
+function InvestimentoPosicoes({ posicoes }: { posicoes: PluggyInvestment[] }) {
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  if (posicoes.length === 0) {
+    return <p className="dash-empty">Nenhuma posição vinculada a este investimento.</p>;
+  }
+
+  return (
+    <div className="dash-table-wrap">
+      <table className="dash-table">
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>Nome/Código</th>
+            <th>Quantidade</th>
+            <th>Valor atual</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {posicoes.map((posicao) => {
+            const isExpanded = expandedId === posicao.id;
+            return (
+              <Fragment key={posicao.id}>
+                <tr>
+                  <td>
+                    {posicao.tipo}
+                    {posicao.subtipo ? ` / ${posicao.subtipo}` : ""}
+                  </td>
+                  <td>{posicao.codigo ?? posicao.nome}</td>
+                  <td>{posicao.quantidade ?? "—"}</td>
+                  <td>{formatCurrency(posicao.valor_atual)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      aria-expanded={isExpanded}
+                      onClick={() => setExpandedId(isExpanded ? null : posicao.id)}
+                    >
+                      {isExpanded ? "Fechar histórico" : "Ver histórico"}
+                    </button>
+                  </td>
+                </tr>
+                {isExpanded && (
+                  <tr>
+                    <td colSpan={5}>
+                      <PosicaoHistorico investmentId={posicao.id} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function PosicaoHistorico({ investmentId }: { investmentId: number }) {
+  const { data: transactions, isLoading, isError } = usePluggyInvestmentTransactions(investmentId);
+
+  if (isLoading) return <p>Carregando...</p>;
+  if (isError) return <p role="alert">Não foi possível carregar o histórico da posição.</p>;
+  if (!transactions || transactions.length === 0) {
+    return <p className="dash-empty">Nenhuma transação no histórico desta posição.</p>;
+  }
+
+  return (
+    <table className="dash-table">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Tipo</th>
+          <th>Descrição</th>
+          <th>Valor</th>
+        </tr>
+      </thead>
+      <tbody>
+        {transactions.map((transaction) => (
+          <tr key={transaction.id}>
+            <td>{transaction.data}</td>
+            <td>{transaction.tipo}</td>
+            <td>{transaction.descricao ?? "—"}</td>
+            <td>{formatCurrency(transaction.valor)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

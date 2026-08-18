@@ -98,6 +98,51 @@ class SyncItemsOut(BaseModel):
     results: list[SyncItemResultOut]
 
 
+class PluggyInvestmentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    item_id: int
+    user_id: int
+    pluggy_investment_id: str
+    tipo: str
+    subtipo: str | None
+    nome: str
+    codigo: str | None
+    quantidade: Decimal | None
+    valor_investido: Decimal | None
+    valor_atual: Decimal
+    saldo_inicial: Decimal | None
+    moeda: str
+    investimento_id: int | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class PluggyInvestmentUpdateIn(BaseModel):
+    investimento_id: int | None = None
+
+
+class PluggyInvestmentSaldoInicialIn(BaseModel):
+    saldo_inicial: Decimal | None = None
+
+
+class PluggyInvestmentTransactionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    investment_id: int
+    user_id: int
+    pluggy_investment_transaction_id: str
+    tipo: str
+    descricao: str | None
+    valor: Decimal
+    quantidade: Decimal | None
+    data: date
+    created_at: datetime
+    updated_at: datetime
+
+
 class PluggyTransactionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -6,10 +6,13 @@ import { PeriodFilter } from "../components/PeriodFilter";
 import { useEvolucaoSaldoPorConta } from "../hooks/useEvolucaoSaldoPorConta";
 import { useInvestimentos } from "../hooks/useInvestimentos";
 import { usePluggyAccounts } from "../hooks/usePluggyAccounts";
+import { usePluggyInvestments } from "../hooks/usePluggyInvestments";
 import { usePluggyItems } from "../hooks/usePluggyItems";
 import { useRegisterPluggyItem } from "../hooks/useRegisterPluggyItem";
 import { useSyncPluggyItems } from "../hooks/useSyncPluggyItems";
 import { useUpdatePluggyAccount } from "../hooks/useUpdatePluggyAccount";
+import { useUpdatePluggyInvestment } from "../hooks/useUpdatePluggyInvestment";
+import { useUpdatePluggyInvestmentSaldoInicial } from "../hooks/useUpdatePluggyInvestmentSaldoInicial";
 import { useUpdateSaldoInicial } from "../hooks/useUpdateSaldoInicial";
 import { loadPluggyConnect } from "../pluggy/loadPluggyConnect";
 import { formatCurrency } from "../utils/format";
@@ -24,10 +27,18 @@ const ACCOUNT_TIPO_LABEL: Record<string, string> = {
 export function AccountManagementPage() {
   const { data: items } = usePluggyItems();
   const { data: accounts, isLoading } = usePluggyAccounts();
+  const { data: investments, isLoading: isLoadingInvestments } = usePluggyInvestments();
   const { data: investimentos } = useInvestimentos();
   const registerItem = useRegisterPluggyItem();
   const updateAccount = useUpdatePluggyAccount();
+  const updateInvestment = useUpdatePluggyInvestment();
   const syncItems = useSyncPluggyItems();
+
+  const [editingInvestmentSaldoInicialId, setEditingInvestmentSaldoInicialId] = useState<
+    number | null
+  >(null);
+  const [investmentSaldoInicialDraft, setInvestmentSaldoInicialDraft] = useState("");
+  const updateInvestmentSaldoInicial = useUpdatePluggyInvestmentSaldoInicial();
 
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
@@ -114,6 +125,23 @@ export function AccountManagementPage() {
     const value = saldoInicialDraft.trim();
     updateSaldoInicial.mutate({ accountId, saldoInicial: value === "" ? null : value });
     setEditingSaldoInicialId(null);
+  }
+
+  function startEditingInvestmentSaldoInicial(
+    investmentId: number,
+    currentSaldoInicial: string | null
+  ) {
+    setEditingInvestmentSaldoInicialId(investmentId);
+    setInvestmentSaldoInicialDraft(currentSaldoInicial ?? "");
+  }
+
+  function saveInvestmentSaldoInicial(investmentId: number) {
+    const value = investmentSaldoInicialDraft.trim();
+    updateInvestmentSaldoInicial.mutate({
+      investmentId,
+      saldoInicial: value === "" ? null : value,
+    });
+    setEditingInvestmentSaldoInicialId(null);
   }
 
   function openSyncDialog() {
@@ -316,6 +344,83 @@ export function AccountManagementPage() {
             </div>
           </li>
         ))}
+      </ul>
+
+      <h3>Posições de investimento</h3>
+      {isLoadingInvestments && <p>Carregando...</p>}
+      {investments && investments.length === 0 && <p>Nenhuma posição sincronizada.</p>}
+      <ul className="simple-list">
+        {investments?.map((investment) => {
+          const label = investment.codigo ?? investment.nome;
+          return (
+            <li key={investment.id}>
+              <strong>{label}</strong>
+              {" — "}
+              {investment.tipo}
+              {investment.subtipo ? ` / ${investment.subtipo}` : ""} ·{" "}
+              {formatCurrency(investment.valor_atual)}
+              <div className="tag">
+                Investimento:{" "}
+                <select
+                  aria-label={`Investimento de ${label}`}
+                  value={investment.investimento_id ?? ""}
+                  onChange={(event) =>
+                    updateInvestment.mutate({
+                      investmentId: investment.id,
+                      investimentoId: event.target.value ? Number(event.target.value) : null,
+                    })
+                  }
+                >
+                  <option value="">Nenhum</option>
+                  {investimentos?.map((investimento) => (
+                    <option key={investimento.id} value={investimento.id}>
+                      {investimento.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="tag">
+                Saldo inicial (31/12/2025):{" "}
+                {editingInvestmentSaldoInicialId === investment.id ? (
+                  <>
+                    <input
+                      aria-label={`Saldo inicial de ${label}`}
+                      type="number"
+                      step="0.01"
+                      value={investmentSaldoInicialDraft}
+                      autoFocus
+                      onChange={(event) => setInvestmentSaldoInicialDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") saveInvestmentSaldoInicial(investment.id);
+                        if (event.key === "Escape") setEditingInvestmentSaldoInicialId(null);
+                      }}
+                    />
+                    <button type="button" onClick={() => saveInvestmentSaldoInicial(investment.id)}>
+                      Salvar
+                    </button>
+                    <button type="button" onClick={() => setEditingInvestmentSaldoInicialId(null)}>
+                      Cancelar
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {investment.saldo_inicial !== null
+                      ? formatCurrency(investment.saldo_inicial)
+                      : "não informado"}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        startEditingInvestmentSaldoInicial(investment.id, investment.saldo_inicial)
+                      }
+                    >
+                      Editar
+                    </button>
+                  </>
+                )}
+              </div>
+            </li>
+          );
+        })}
       </ul>
 
       <h3>Auditoria de saldo por conta</h3>

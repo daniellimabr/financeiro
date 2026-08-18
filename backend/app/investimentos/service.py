@@ -7,7 +7,12 @@ from sqlalchemy.orm import Session
 from app.exceptions import NotFoundError
 from app.models.category import CategoryGroup, Subcategory
 from app.models.investimento import Investimento
-from app.models.pluggy import PluggyAccount, PluggyTransaction, PluggyTransactionCategorizacaoStatus
+from app.models.pluggy import (
+    PluggyAccount,
+    PluggyInvestment,
+    PluggyTransaction,
+    PluggyTransactionCategorizacaoStatus,
+)
 
 _INVESTIMENTOS_GROUP_NOME = "Investimentos"
 _APORTE_SUBCATEGORY_NOME = "Aporte"
@@ -120,7 +125,7 @@ def _confirmed_total(
 def get_evolucao(db: Session, user_id: int, investimento_id: int) -> Evolucao:
     get_investimento(db, user_id, investimento_id)
 
-    saldo_base = (
+    saldo_base_carteiras = (
         db.query(func.coalesce(func.sum(PluggyAccount.saldo_inicial), 0))
         .filter(
             PluggyAccount.user_id == user_id,
@@ -128,9 +133,17 @@ def get_evolucao(db: Session, user_id: int, investimento_id: int) -> Evolucao:
         )
         .scalar()
     )
-    saldo_base = Decimal(str(saldo_base))
+    saldo_base_holdings = (
+        db.query(func.coalesce(func.sum(PluggyInvestment.saldo_inicial), 0))
+        .filter(
+            PluggyInvestment.user_id == user_id,
+            PluggyInvestment.investimento_id == investimento_id,
+        )
+        .scalar()
+    )
+    saldo_base = Decimal(str(saldo_base_carteiras)) + Decimal(str(saldo_base_holdings))
 
-    saldo_atual = (
+    saldo_atual_carteiras = (
         db.query(func.coalesce(func.sum(PluggyAccount.saldo), 0))
         .filter(
             PluggyAccount.user_id == user_id,
@@ -138,7 +151,15 @@ def get_evolucao(db: Session, user_id: int, investimento_id: int) -> Evolucao:
         )
         .scalar()
     )
-    saldo_atual = Decimal(str(saldo_atual))
+    saldo_atual_holdings = (
+        db.query(func.coalesce(func.sum(PluggyInvestment.valor_atual), 0))
+        .filter(
+            PluggyInvestment.user_id == user_id,
+            PluggyInvestment.investimento_id == investimento_id,
+        )
+        .scalar()
+    )
+    saldo_atual = Decimal(str(saldo_atual_carteiras)) + Decimal(str(saldo_atual_holdings))
 
     total_aportes = _confirmed_total(db, user_id, investimento_id, aporte_subcategory_id(db))
     total_resgates = _confirmed_total(db, user_id, investimento_id, resgate_subcategory_id(db))

@@ -185,3 +185,63 @@ class PluggyTransaction(Base):
     @property
     def account_tipo(self) -> "PluggyAccountTipo":
         return self.account.tipo
+
+
+class PluggyInvestment(Base):
+    __tablename__ = "pluggy_investments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("pluggy_items.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    pluggy_investment_id: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    # `tipo`/`subtipo` livres (String, não Enum) — taxonomia de investimento da
+    # Pluggy (ex.: FIXED_INCOME/CDB, EQUITY/STOCK, achado real do Bloco 1) é
+    # maior e mais volátil que PluggyAccountTipo; um enum forçaria migration a
+    # cada tipo novo retornado pela Pluggy.
+    tipo: Mapped[str] = mapped_column(String(50), nullable=False)
+    subtipo: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    nome: Mapped[str] = mapped_column(String(255), nullable=False)
+    codigo: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Numeric(20, 8): payload real do Bloco 1 tem quantidade de CDB com até 7
+    # casas decimais (ex.: 1967409.5229) — Numeric(14,2) truncaria.
+    quantidade: Mapped[Decimal | None] = mapped_column(Numeric(20, 8), nullable=True)
+    valor_investido: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
+    valor_atual: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    saldo_inicial: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    moeda: Mapped[str] = mapped_column(String(10), nullable=False, default="BRL")
+    investimento_id: Mapped[int | None] = mapped_column(
+        ForeignKey("investimentos.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    transactions: Mapped[list["PluggyInvestmentTransaction"]] = relationship(
+        back_populates="investment", cascade="all, delete-orphan"
+    )
+
+
+class PluggyInvestmentTransaction(Base):
+    __tablename__ = "pluggy_investment_transactions"
+    __table_args__ = (
+        Index("ix_pluggy_investment_transactions_investment_id_data", "investment_id", "data"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    investment_id: Mapped[int] = mapped_column(ForeignKey("pluggy_investments.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    pluggy_investment_transaction_id: Mapped[str] = mapped_column(
+        String(255), unique=True, index=True
+    )
+    tipo: Mapped[str] = mapped_column(String(50), nullable=False)
+    descricao: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    valor: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    quantidade: Mapped[Decimal | None] = mapped_column(Numeric(20, 8), nullable=True)
+    data: Mapped[date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    investment: Mapped["PluggyInvestment"] = relationship(back_populates="transactions")

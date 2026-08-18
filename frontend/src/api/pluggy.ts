@@ -62,6 +62,74 @@ export interface PluggyTransaction {
   updated_at: string;
 }
 
+export interface PluggyInvestment {
+  id: number;
+  item_id: number;
+  user_id: number;
+  pluggy_investment_id: string;
+  tipo: string;
+  subtipo: string | null;
+  nome: string;
+  codigo: string | null;
+  quantidade: string | null;
+  valor_investido: string | null;
+  valor_atual: string;
+  saldo_inicial: string | null;
+  moeda: string;
+  investimento_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PluggyInvestmentTransaction {
+  id: number;
+  investment_id: number;
+  user_id: number;
+  pluggy_investment_transaction_id: string;
+  tipo: string;
+  descricao: string | null;
+  valor: string;
+  quantidade: string | null;
+  data: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export function fetchPluggyInvestments(investimentoId?: number): Promise<PluggyInvestment[]> {
+  const query = investimentoId !== undefined ? `?investimento_id=${investimentoId}` : "";
+  return apiFetch<PluggyInvestment[]>(`/pluggy/investments${query}`);
+}
+
+export function updatePluggyInvestment(
+  investmentId: number,
+  investimentoId: number | null
+): Promise<PluggyInvestment> {
+  return apiFetch<PluggyInvestment>(`/pluggy/investments/${investmentId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ investimento_id: investimentoId }),
+  });
+}
+
+export function updatePluggyInvestmentSaldoInicial(
+  investmentId: number,
+  saldoInicial: string | null
+): Promise<PluggyInvestment> {
+  return apiFetch<PluggyInvestment>(`/pluggy/investments/${investmentId}/saldo-inicial`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ saldo_inicial: saldoInicial }),
+  });
+}
+
+export function fetchPluggyInvestmentTransactions(
+  investmentId: number
+): Promise<PluggyInvestmentTransaction[]> {
+  return apiFetch<PluggyInvestmentTransaction[]>(
+    `/pluggy/investments/${investmentId}/transactions`
+  );
+}
+
 export function fetchConnectToken(itemId?: string): Promise<ConnectTokenResponse> {
   return apiFetch<ConnectTokenResponse>("/pluggy/connect-token", {
     method: "POST",

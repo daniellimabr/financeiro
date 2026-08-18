@@ -96,6 +96,72 @@ def test_get_transactions_paginates_until_last_page():
     assert [t["id"] for t in transactions] == ["tx-1", "tx-2"]
 
 
+def test_get_investments_paginates_by_page_until_last_page():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/auth":
+            return httpx.Response(200, json={"apiKey": "key-1"})  # pragma: allowlist secret
+        assert request.url.path == "/investments"
+        assert request.url.params["itemId"] == "item-1"
+        page = request.url.params["page"]
+        if page == "1":
+            return httpx.Response(
+                200,
+                json={
+                    "total": 3,
+                    "totalPages": 2,
+                    "page": 1,
+                    "results": [{"id": "inv-1"}, {"id": "inv-2"}],
+                },
+            )
+        assert page == "2"
+        return httpx.Response(
+            200, json={"total": 3, "totalPages": 2, "page": 2, "results": [{"id": "inv-3"}]}
+        )
+
+    client = _make_client(handler)
+
+    investments = client.get_investments("item-1")
+
+    assert [i["id"] for i in investments] == ["inv-1", "inv-2", "inv-3"]
+
+
+def test_get_investment_transactions_sends_from_date_and_paginates():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/auth":
+            return httpx.Response(200, json={"apiKey": "key-1"})  # pragma: allowlist secret
+        assert request.url.path == "/investments/inv-1/transactions"
+        assert request.url.params["from"] == "2026-01-01"
+        page = request.url.params["page"]
+        if page == "1":
+            return httpx.Response(
+                200, json={"total": 2, "totalPages": 2, "page": 1, "results": [{"id": "tx-1"}]}
+            )
+        return httpx.Response(
+            200, json={"total": 2, "totalPages": 2, "page": 2, "results": [{"id": "tx-2"}]}
+        )
+
+    client = _make_client(handler)
+
+    transactions = client.get_investment_transactions("inv-1", from_date=date(2026, 1, 1))
+
+    assert [t["id"] for t in transactions] == ["tx-1", "tx-2"]
+
+
+def test_get_investment_transactions_without_from_date_omits_param():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/auth":
+            return httpx.Response(200, json={"apiKey": "key-1"})  # pragma: allowlist secret
+        captured["params"] = dict(request.url.params)
+        return httpx.Response(200, json={"total": 0, "totalPages": 1, "page": 1, "results": []})
+
+    client = _make_client(handler)
+    client.get_investment_transactions("inv-1")
+
+    assert "from" not in captured["params"]
+
+
 def test_http_error_propagates():
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/auth":

@@ -21,6 +21,25 @@ const ITEM_FIXTURE = {
   updated_at: "2026-08-07T00:00:00Z",
 };
 
+const INVESTMENT_FIXTURE = {
+  id: 1,
+  item_id: 2,
+  user_id: 1,
+  pluggy_investment_id: "inv-ext-1",
+  tipo: "FIXED_INCOME",
+  subtipo: "CDB",
+  nome: "CDB - NU FINANCEIRA",
+  codigo: null,
+  quantidade: "1967409.5229",
+  valor_investido: "19674.095229",
+  valor_atual: "22762.07",
+  saldo_inicial: null,
+  moeda: "BRL",
+  investimento_id: null,
+  created_at: "2026-08-17T00:00:00Z",
+  updated_at: "2026-08-17T00:00:00Z",
+};
+
 const ACCOUNT_FIXTURE = {
   id: 1,
   item_id: 1,
@@ -73,6 +92,7 @@ describe("AccountManagementPage", () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url === "/pluggy/items") return Promise.resolve(jsonResponse([ITEM_FIXTURE]));
+      if (url === "/pluggy/investments") return Promise.resolve(jsonResponse([]));
       if (url === "/pluggy/accounts") return Promise.resolve(jsonResponse([ACCOUNT_FIXTURE]));
       if (url.startsWith("/dashboards/evolucao-saldo-por-conta"))
         return Promise.resolve(jsonResponse([]));
@@ -93,6 +113,7 @@ describe("AccountManagementPage", () => {
       const url = String(input);
       const method = init?.method ?? "GET";
       if (url === "/pluggy/items") return Promise.resolve(jsonResponse([ITEM_FIXTURE]));
+      if (url === "/pluggy/investments") return Promise.resolve(jsonResponse([]));
       if (url === "/pluggy/accounts" && method === "GET")
         return Promise.resolve(jsonResponse([ACCOUNT_FIXTURE]));
       if (url === "/pluggy/accounts/1" && method === "PUT") {
@@ -132,6 +153,7 @@ describe("AccountManagementPage", () => {
       const url = String(input);
       const method = init?.method ?? "GET";
       if (url === "/pluggy/items") return Promise.resolve(jsonResponse([ITEM_FIXTURE]));
+      if (url === "/pluggy/investments") return Promise.resolve(jsonResponse([]));
       if (url === "/pluggy/accounts" && method === "GET")
         return Promise.resolve(jsonResponse([ACCOUNT_FIXTURE]));
       if (url === "/pluggy/accounts/1" && method === "PUT") {
@@ -164,6 +186,7 @@ describe("AccountManagementPage", () => {
       const url = String(input);
       const method = init?.method ?? "GET";
       if (url === "/pluggy/items") return Promise.resolve(jsonResponse([ITEM_FIXTURE]));
+      if (url === "/pluggy/investments") return Promise.resolve(jsonResponse([]));
       if (url === "/pluggy/accounts" && method === "GET")
         return Promise.resolve(jsonResponse([ACCOUNT_FIXTURE, disabledAccount]));
       if (url === "/pluggy/sync" && method === "POST") {
@@ -205,6 +228,8 @@ describe("AccountManagementPage", () => {
       const method = init?.method ?? "GET";
       if (url === "/pluggy/items" && method === "GET") return Promise.resolve(jsonResponse([]));
       if (url === "/pluggy/accounts" && method === "GET") return Promise.resolve(jsonResponse([]));
+      if (url === "/pluggy/investments" && method === "GET")
+        return Promise.resolve(jsonResponse([]));
       if (url === "/pluggy/connect-token" && method === "POST") {
         return Promise.resolve(jsonResponse({ access_token: "connect-token-abc" }));
       }
@@ -235,6 +260,7 @@ describe("AccountManagementPage", () => {
       const url = String(input);
       const method = init?.method ?? "GET";
       if (url === "/pluggy/items") return Promise.resolve(jsonResponse([ITEM_FIXTURE]));
+      if (url === "/pluggy/investments") return Promise.resolve(jsonResponse([]));
       if (url === "/pluggy/accounts" && method === "GET")
         return Promise.resolve(jsonResponse([ACCOUNT_FIXTURE]));
       if (url === "/pluggy/accounts/1/saldo-inicial" && method === "PUT") {
@@ -285,6 +311,7 @@ describe("AccountManagementPage", () => {
       const url = String(input);
       const method = init?.method ?? "GET";
       if (url === "/pluggy/items") return Promise.resolve(jsonResponse([ITEM_FIXTURE]));
+      if (url === "/pluggy/investments") return Promise.resolve(jsonResponse([]));
       if (url === "/pluggy/accounts" && method === "GET")
         return Promise.resolve(jsonResponse([investmentAccount]));
       if (url === "/investimentos") return Promise.resolve(jsonResponse([investimentoFixture]));
@@ -313,10 +340,108 @@ describe("AccountManagementPage", () => {
     });
   });
 
+  it("renders synced investment positions (holdings) with type, code fallback and formatted value", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/pluggy/items") return Promise.resolve(jsonResponse([]));
+      if (url === "/pluggy/accounts") return Promise.resolve(jsonResponse([]));
+      if (url === "/pluggy/investments") return Promise.resolve(jsonResponse([INVESTMENT_FIXTURE]));
+      if (url.startsWith("/dashboards/evolucao-saldo-por-conta"))
+        return Promise.resolve(jsonResponse([]));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<AccountManagementPage />);
+
+    expect(await screen.findByText(/CDB - NU FINANCEIRA/)).toBeInTheDocument();
+    expect(screen.getByText(/FIXED_INCOME \/ CDB/)).toBeInTheDocument();
+    expect(screen.getByText(/R\$\s?22\.762,07/)).toBeInTheDocument();
+  });
+
+  it("linking a position to an investimento saves it via PUT /pluggy/investments/{id}", async () => {
+    const investimentoFixture = {
+      id: 1,
+      user_id: 1,
+      nome: "Reserva de emergência",
+      created_at: "2026-08-14T00:00:00Z",
+      updated_at: "2026-08-14T00:00:00Z",
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      if (url === "/pluggy/items") return Promise.resolve(jsonResponse([]));
+      if (url === "/pluggy/accounts") return Promise.resolve(jsonResponse([]));
+      if (url === "/pluggy/investments" && method === "GET")
+        return Promise.resolve(jsonResponse([INVESTMENT_FIXTURE]));
+      if (url === "/investimentos") return Promise.resolve(jsonResponse([investimentoFixture]));
+      if (url === "/pluggy/investments/1" && method === "PUT") {
+        return Promise.resolve(jsonResponse({ ...INVESTMENT_FIXTURE, investimento_id: 1 }));
+      }
+      if (url.startsWith("/dashboards/evolucao-saldo-por-conta"))
+        return Promise.resolve(jsonResponse([]));
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<AccountManagementPage />);
+
+    const select = await screen.findByLabelText("Investimento de CDB - NU FINANCEIRA");
+    await userEvent.selectOptions(select, "1");
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (c) => String(c[0]) === "/pluggy/investments/1" && (c[1] as RequestInit)?.method === "PUT"
+      );
+      expect(call).toBeDefined();
+      const body = JSON.parse((call?.[1] as RequestInit).body as string);
+      expect(body).toEqual({ investimento_id: 1 });
+    });
+  });
+
+  it("editing the position saldo inicial saves it via PUT /pluggy/investments/{id}/saldo-inicial", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      if (url === "/pluggy/items") return Promise.resolve(jsonResponse([]));
+      if (url === "/pluggy/accounts") return Promise.resolve(jsonResponse([]));
+      if (url === "/pluggy/investments" && method === "GET")
+        return Promise.resolve(jsonResponse([INVESTMENT_FIXTURE]));
+      if (url === "/pluggy/investments/1/saldo-inicial" && method === "PUT") {
+        return Promise.resolve(jsonResponse({ ...INVESTMENT_FIXTURE, saldo_inicial: "20000.00" }));
+      }
+      if (url.startsWith("/dashboards/evolucao-saldo-por-conta"))
+        return Promise.resolve(jsonResponse([]));
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<AccountManagementPage />);
+    await screen.findByText(/CDB - NU FINANCEIRA/);
+    expect(screen.getByText(/não informado/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Editar" }));
+    const input = screen.getByLabelText("Saldo inicial de CDB - NU FINANCEIRA");
+    await userEvent.type(input, "20000");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (c) =>
+          String(c[0]) === "/pluggy/investments/1/saldo-inicial" &&
+          (c[1] as RequestInit)?.method === "PUT"
+      );
+      expect(call).toBeDefined();
+      const body = JSON.parse((call?.[1] as RequestInit).body as string);
+      expect(body).toEqual({ saldo_inicial: "20000" });
+    });
+  });
+
   it("renders the monthly audit table from evolucao-saldo-por-conta data", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url === "/pluggy/items") return Promise.resolve(jsonResponse([ITEM_FIXTURE]));
+      if (url === "/pluggy/investments") return Promise.resolve(jsonResponse([]));
       if (url === "/pluggy/accounts")
         return Promise.resolve(jsonResponse([{ ...ACCOUNT_FIXTURE, saldo_inicial: "1000.00" }]));
       if (url.startsWith("/dashboards/evolucao-saldo-por-conta")) {

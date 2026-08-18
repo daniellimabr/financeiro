@@ -15,6 +15,10 @@ from app.schemas.pluggy import (
     PluggyAccountOut,
     PluggyAccountSaldoInicialIn,
     PluggyAccountUpdateIn,
+    PluggyInvestmentOut,
+    PluggyInvestmentSaldoInicialIn,
+    PluggyInvestmentTransactionOut,
+    PluggyInvestmentUpdateIn,
     PluggyItemIn,
     PluggyItemOut,
     PluggyTransactionOut,
@@ -117,6 +121,59 @@ def update_saldo_inicial(
         return service.update_saldo_inicial(
             db, current_user.id, account_id, saldo_inicial=payload.saldo_inicial
         )
+    except NotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get("/investments", response_model=list[PluggyInvestmentOut])
+def list_investments(
+    investimento_id: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.list_investments(db, current_user.id, investimento_id=investimento_id)
+
+
+@router.put("/investments/{investment_id}", response_model=PluggyInvestmentOut)
+def update_investment(
+    investment_id: int,
+    payload: PluggyInvestmentUpdateIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return service.update_investment(
+            db, current_user.id, investment_id, investimento_id=payload.investimento_id
+        )
+    except NotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.put("/investments/{investment_id}/saldo-inicial", response_model=PluggyInvestmentOut)
+def update_investment_saldo_inicial(
+    investment_id: int,
+    payload: PluggyInvestmentSaldoInicialIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return service.update_investment_saldo_inicial(
+            db, current_user.id, investment_id, saldo_inicial=payload.saldo_inicial
+        )
+    except NotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get(
+    "/investments/{investment_id}/transactions", response_model=list[PluggyInvestmentTransactionOut]
+)
+def list_investment_transactions(
+    investment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return service.list_investment_transactions(db, current_user.id, investment_id)
     except NotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 

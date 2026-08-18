@@ -21,7 +21,15 @@ from app.pluggy_integration.router import get_pluggy_client
 
 
 class FakePluggyClient:
-    def __init__(self, *, item=None, accounts=None, transactions_by_account=None):
+    def __init__(
+        self,
+        *,
+        item=None,
+        accounts=None,
+        transactions_by_account=None,
+        investments=None,
+        investment_transactions_by_investment=None,
+    ):
         self.item = item or {
             "id": "item-ext-1",
             "status": "UPDATED",
@@ -29,6 +37,8 @@ class FakePluggyClient:
         }
         self.accounts = accounts or []
         self.transactions_by_account = transactions_by_account or {}
+        self.investments = investments or []
+        self.investment_transactions_by_investment = investment_transactions_by_investment or {}
 
     def get_item(self, pluggy_item_id):
         return self.item
@@ -38,6 +48,12 @@ class FakePluggyClient:
 
     def get_transactions(self, pluggy_account_id, *, from_date=None):
         return self.transactions_by_account.get(pluggy_account_id, [])
+
+    def get_investments(self, pluggy_item_id):
+        return self.investments
+
+    def get_investment_transactions(self, pluggy_investment_id, *, from_date=None):
+        return self.investment_transactions_by_investment.get(pluggy_investment_id, [])
 
     def create_connect_token(self, *, item_id=None):
         return "connect-token-abc"
@@ -884,5 +900,231 @@ def test_put_ajuste_salario_dezembro_other_users_account_returns_404(client, db_
         "/pluggy/ajuste-salario-dezembro",
         json={"account_id": account["id"], "data": "2025-12-30", "valor": "100.00"},
     )
+
+    assert response.status_code == 404
+
+
+# --- Investments da Pluggy (Sprint 20) ---------------------------------------
+
+
+def _investment_raw_payload(**overrides):
+    data = {
+        "id": "inv-ext-1",
+        "type": "FIXED_INCOME",
+        "subtype": "CDB",
+        "name": "CDB - NU FINANCEIRA",
+        "code": None,
+        "isin": None,
+        "quantity": 1967409.5229,
+        "amountOriginal": 19674.095229,
+        "balance": 22762.07,
+        "currencyCode": "BRL",
+    }
+    data.update(overrides)
+    return data
+
+
+def _investment_transaction_raw_payload(**overrides):
+    data = {
+        "id": "invtx-ext-1",
+        "type": "SELL",
+        "description": None,
+        "amount": 1398.87,
+        "quantity": 109999.8270035,
+        "date": "2026-02-22T00:00:00.000Z",
+    }
+    data.update(overrides)
+    return data
+
+
+def _connect_investment(client, db_session, **fake_client_overrides):
+    fake_client = FakePluggyClient(investments=[_investment_raw_payload()], **fake_client_overrides)
+    _use_fake_client(fake_client)
+    item = client.post("/pluggy/items", json={"pluggy_item_id": "item-ext-1"}).json()
+    client.post(f"/pluggy/items/{item['id']}/sync")
+    investment = client.get("/pluggy/investments").json()[0]
+    return item, investment, fake_client
+
+
+def test_investments_endpoints_without_cookie_return_401(client):
+    assert client.get("/pluggy/investments").status_code == 401
+    assert client.get("/pluggy/investments/1/transactions").status_code == 401
+    assert client.put("/pluggy/investments/1", json={"investimento_id": None}).status_code == 401
+    assert (
+        client.put(
+            "/pluggy/investments/1/saldo-inicial", json={"saldo_inicial": "100.00"}
+        ).status_code
+        == 401
+    )
+
+
+def test_sync_item_without_any_account_still_populates_investments(client, db_session):
+    # Achado real do Bloco 1 (Sprint 20): item "Nubank Investimentos" não
+    # retorna nenhuma conta via /accounts, mas ainda assim tem holdings.
+    _authenticate(client, db_session)
+    _item, investment, _fake_client = _connect_investment(client, db_session)
+
+    assert client.get("/pluggy/accounts").json() == []
+    assert investment["tipo"] == "FIXED_INCOME"
+    assert investment["subtipo"] == "CDB"
+    assert Decimal(investment["valor_atual"]) == Decimal("22762.07")
+
+
+def test_sync_item_populates_investments_and_accounts_together_without_conflict(client, db_session):
+    # Achado real do Bloco 1: item XP retorna contas E holdings — as duas
+    # tabelas populam sem conflito nem duplicação.
+    _authenticate(client, db_session)
+    fake_client = FakePluggyClient(
+        accounts=[_account_raw_payload()],
+        transactions_by_account={"acc-ext-1": []},
+        investments=[_investment_raw_payload(id="inv-xp-1", type="EQUITY", subtype="STOCK")],
+    )
+    _use_fake_client(fake_client)
+    item = client.post("/pluggy/items", json={"pluggy_item_id": "item-ext-1"}).json()
+
+    client.post(f"/pluggy/items/{item['id']}/sync")
+
+    assert len(client.get("/pluggy/accounts").json()) == 1
+    assert len(client.get("/pluggy/investments").json()) == 1
+
+
+def test_update_investment_links_and_unlinks_investimento(client, db_session):
+    user = _authenticate(client, db_session)
+    _item, investment, _fake_client = _connect_investment(client, db_session)
+    investimento = _investimento(db_session, user)
+
+    linked = client.put(
+        f"/pluggy/investments/{investment['id']}",
+        json={"investimento_id": investimento.id},
+    )
+    assert linked.status_code == 200
+    assert linked.json()["investimento_id"] == investimento.id
+
+    unlinked = client.put(f"/pluggy/investments/{investment['id']}", json={"investimento_id": None})
+    assert unlinked.status_code == 200
+    assert unlinked.json()["investimento_id"] is None
+
+
+def test_update_investment_with_other_users_investimento_returns_404(client, db_session):
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    _item, investment, _fake_client = _connect_investment(client, db_session)
+
+    other = User(google_sub="google-2", email="b@example.com", name="Bob")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    other_investimento = _investimento(db_session, other, nome="Do outro")
+
+    response = client.put(
+        f"/pluggy/investments/{investment['id']}",
+        json={"investimento_id": other_investimento.id},
+    )
+
+    assert response.status_code == 404
+
+
+def test_update_other_users_investment_returns_404(client, db_session):
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    _item, investment, _fake_client = _connect_investment(client, db_session)
+
+    client.cookies.clear()
+    _authenticate(client, db_session, google_sub="google-2", email="b@example.com")
+
+    response = client.put(f"/pluggy/investments/{investment['id']}", json={"investimento_id": None})
+
+    assert response.status_code == 404
+
+
+def test_update_investment_saldo_inicial_sets_and_returns_value(client, db_session):
+    _authenticate(client, db_session)
+    _item, investment, _fake_client = _connect_investment(client, db_session)
+
+    response = client.put(
+        f"/pluggy/investments/{investment['id']}/saldo-inicial",
+        json={"saldo_inicial": "20000.00"},
+    )
+
+    assert response.status_code == 200
+    assert Decimal(response.json()["saldo_inicial"]) == Decimal("20000.00")
+
+
+def test_update_investment_saldo_inicial_other_users_investment_returns_404(client, db_session):
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    _item, investment, _fake_client = _connect_investment(client, db_session)
+
+    client.cookies.clear()
+    _authenticate(client, db_session, google_sub="google-2", email="b@example.com")
+
+    response = client.put(
+        f"/pluggy/investments/{investment['id']}/saldo-inicial",
+        json={"saldo_inicial": "100.00"},
+    )
+
+    assert response.status_code == 404
+
+
+def test_list_investments_filters_by_investimento_id(client, db_session):
+    user = _authenticate(client, db_session)
+    _item, investment, _fake_client = _connect_investment(client, db_session)
+    investimento = _investimento(db_session, user)
+    client.put(
+        f"/pluggy/investments/{investment['id']}",
+        json={"investimento_id": investimento.id},
+    )
+
+    linked = client.get("/pluggy/investments", params={"investimento_id": investimento.id}).json()
+    unrelated = client.get("/pluggy/investments", params={"investimento_id": 999}).json()
+
+    assert len(linked) == 1
+    assert linked[0]["id"] == investment["id"]
+    assert unrelated == []
+
+
+def test_user_does_not_see_other_users_investments(client, db_session):
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    _item, _investment, _fake_client = _connect_investment(client, db_session)
+
+    client.cookies.clear()
+    _authenticate(client, db_session, google_sub="google-2", email="b@example.com")
+
+    assert client.get("/pluggy/investments").json() == []
+
+
+def test_list_investment_transactions_returns_history(client, db_session):
+    _authenticate(client, db_session)
+    _item, investment, _fake_client = _connect_investment(
+        client,
+        db_session,
+        investment_transactions_by_investment={
+            "inv-ext-1": [_investment_transaction_raw_payload()]
+        },
+    )
+
+    response = client.get(f"/pluggy/investments/{investment['id']}/transactions")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["tipo"] == "SELL"
+    assert Decimal(body[0]["valor"]) == Decimal("1398.87")
+    assert body[0]["data"] == "2026-02-22"
+
+
+def test_list_investment_transactions_of_other_users_investment_returns_404(client, db_session):
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    _item, investment, _fake_client = _connect_investment(client, db_session)
+
+    client.cookies.clear()
+    _authenticate(client, db_session, google_sub="google-2", email="b@example.com")
+
+    response = client.get(f"/pluggy/investments/{investment['id']}/transactions")
+
+    assert response.status_code == 404
+
+
+def test_list_investment_transactions_of_nonexistent_investment_returns_404(client, db_session):
+    _authenticate(client, db_session)
+
+    response = client.get("/pluggy/investments/999/transactions")
 
     assert response.status_code == 404
