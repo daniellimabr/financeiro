@@ -80,9 +80,16 @@ Competência/Caixa.
 
 Soma de 4 partes, sempre snapshot de hoje: Saldo líquido acumulado (o mesmo
 conceito do card "Saldo Acumulado", incluindo contas líquidas sem "Saldo
-inicial" pelo saldo ao vivo delas) + saldo de contas de investimento (ao
-vivo) + Ativos − Passivos. Clique no card para ver o detalhamento das 4
-partes.
+inicial" pelo saldo ao vivo delas) + saldo em investimentos (ao vivo) +
+Ativos − Passivos. Clique no card para ver o detalhamento das 4 partes.
+
+O saldo em investimentos passou, na Sprint 20, a somar as **posições/
+holdings** sincronizadas via Investments da Pluggy (CDBs, ações, títulos do
+Tesouro etc., vinculadas a um Investimento na tela "Gestão de contas") —
+essa é a fonte preferencial por item conectado. Só entra pelo saldo bruto da
+conta bancária tipo "Investimento" quando aquele item **não** tem nenhuma
+posição sincronizada (ex.: item que só expõe a conta genérica, sem holdings
+dedicadas) — sem dobrar contagem caso um item retorne as duas fontes.
 
 ## Saldo por conta (drill-down do card "Saldo")
 
