@@ -203,7 +203,8 @@ Financeiro v3/
 │           ├── 0013_data_caixa_e_competencia_cartao.py  # pluggy_transactions.data_caixa; backfill: cartão sempre desloca data_competencia +1 mês, data_caixa populado p/ toda transação (_backfill extraída como função plana, testável fora do contexto op do alembic) (Sprint 16)
 │           ├── 0014_data_editada_manualmente.py  # pluggy_transactions.data_editada_manualmente (Boolean, not null, default False) — sem backfill (Sprint 18)
 │           ├── 0015_gestao_de_investimentos.py  # tabelas investimentos/investimento_categorization_rules; investimento_id em pluggy_accounts/pluggy_transactions; seed grupo "Investimentos" + subcategorias Aporte/Resgate (Sprint 19)
-│           └── 0016_investments_da_pluggy.py  # tabelas pluggy_investments (holdings) / pluggy_investment_transactions (ledger de transações); indice com nome encurtado `ix_pluggy_investment_tx_ext_id` pra respeitar limite de 63 caracteres do Postgres (Sprint 20)
+│           ├── 0016_investments_da_pluggy.py  # tabelas pluggy_investments (holdings) / pluggy_investment_transactions (ledger de transações); indice com nome encurtado `ix_pluggy_investment_tx_ext_id` pra respeitar limite de 63 caracteres do Postgres (Sprint 20)
+│           └── 0017_sugestao_holding_e_snapshot_mensal.py  # colunas de sugestão em pluggy_investments (investimento_sugerido_id/_confianca/_fonte_tipo/_fonte_id/_score); tabela nova pluggy_investment_snapshots (snapshot mensal por holding, UniqueConstraint investment_id+ano_mes) (Sprint 21)
 ├── frontend/                       # React 19 + Vite + TypeScript (Sprint 1)
 │   ├── package.json                # dependências frontend (React, TanStack Query, ESLint, Prettier, Vitest)
 │   ├── tsconfig.json
@@ -309,7 +310,10 @@ Financeiro v3/
 │   │   │   ├── usePluggyInvestments.ts       # GET /pluggy/investments, filtro opcional investimentoId (Sprint 20, novo)
 │   │   │   ├── useUpdatePluggyInvestment.ts  # mutation PUT /pluggy/investments/{id} — link/unlink investimento_id, invalida pluggyInvestments/investimentoEvolucao (Sprint 20, novo)
 │   │   │   ├── useUpdatePluggyInvestmentSaldoInicial.ts  # mutation PUT /pluggy/investments/{id}/saldo-inicial (Sprint 20, novo)
-│   │   │   └── usePluggyInvestmentTransactions.ts  # GET /pluggy/investments/{id}/transactions, habilitado sob demanda (linha expandida) (Sprint 20, novo)
+│   │   │   ├── usePluggyInvestmentTransactions.ts  # GET /pluggy/investments/{id}/transactions, habilitado sob demanda (linha expandida) (Sprint 20, novo)
+│   │   │   ├── useBaselineProposal.ts        # GET /pluggy/investments/baseline-dez-2025, habilitado sob demanda (Sprint 21, novo)
+│   │   │   ├── useConfirmBaseline.ts         # mutation POST /pluggy/investments/baseline-dez-2025, invalida pluggyInvestments/investimentoEvolucao/evolucaoMensal (Sprint 21, novo)
+│   │   │   └── useEvolucaoMensal.ts          # GET /investimentos/{id}/evolucao-mensal (Sprint 21, novo)
 │   │   └── pages/
 │   │       ├── LoginPage.tsx       # botão "Entrar com Google" (link para /auth/google/login)
 │   │       ├── ProtectedPage.tsx   # nome/e-mail do usuário + abas Início/Dashboards/Categorizar/Gestão de contas/Ativos (Sprint 5; aba Transações removida e Conectar conta renomeada na Sprint 7; aba Ativos na Sprint 8); aba Início removida (Dashboards vira a aba inicial), aba Passivos nova, Gestão de Contas move pro final — ordem: Dashboards/Categorizar/Ativos/Passivos/Gestão de Contas (Sprint 10); aba Natureza nova, entre Passivos e Gestão de Contas (Sprint 12); aba Projeção nova, entre Natureza e Gestão de Contas (Sprint 14); aba "Gestão de contas" vira "Configurações" (renderiza ConfiguracoesPage), última do menu (Sprint 15); aba Investimentos nova, entre Ativos e Passivos (Sprint 19)
@@ -341,7 +345,9 @@ Financeiro v3/
 │       ├── check-sprint14.mjs      # tela Projeção — 3 cards carregam, hipotética mensal/única recalcula os cards sem disparar chamada de rede nova a /dashboards/projecao ou /tendencia (contagem de request via Playwright), remover restaura os valores originais, trocar horizonte dispara chamada nova; só leitura + interação local, nenhuma mutação persistida (Sprint 14)
 │       ├── check-sprint15.mjs      # logout, 3 seções de Configurações, edição de dia de corte/ajuste de salário de dez-25/saldo inicial por conta (todas revertidas ao valor original ao final), tabela de auditoria, cards "Saldo Acumulado"/"Saldo Anterior" (alerta em jan/2026 vs. navegação em outro mês), desktop+mobile (Sprint 15)
 │       ├── check-sprint16.mjs      # toggle Competência/Caixa no Dashboard/Ativos/Passivos, drill-down de Patrimônio com rótulos novos + link pro drill-down de Saldo Acumulado; só leitura, nenhuma mutação; desktop+mobile (Sprint 16)
-│       └── check-sprint20.mjs      # Gestão de Investimentos — cria 1 Investimento de teste, vincula TAEE11 real (ação da XP) e valida tag "Posições", drilldown com view "Posições" (tabela tipo/subtipo/nome/quantidade/valor), expande histórico de transações, reverte tudo (desvincula, exclui); valida que estado final está limpo; desktop+mobile (Sprint 20)
+│       ├── check-sprint20.mjs      # Gestão de Investimentos — cria 1 Investimento de teste, vincula TAEE11 real (ação da XP) e valida tag "Posições", drilldown com view "Posições" (tabela tipo/subtipo/nome/quantidade/valor), expande histórico de transações, reverte tudo (desvincula, exclui); valida que estado final está limpo; desktop+mobile (Sprint 20)
+│       ├── check-sprint21.mjs      # smoke read-only: proposta de baseline renderiza tabela, aba "Série histórica" renderiza dado/estado vazio, sem mutar nada; desktop+mobile (Sprint 21)
+│       └── check-sprint21-final.mjs  # verificação pós-confirmação real do baseline — screenshots de Investimentos (cards/drilldown Posições+Série histórica) e Patrimônio; só navega/fotografa, não muta (Sprint 21)
 ├── .github/
 │   └── workflows/
 │       └── ci.yml                  # GitHub Actions: pytest+ruff (backend), vitest+eslint+tsc (frontend) (Sprint 1)

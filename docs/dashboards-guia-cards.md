@@ -91,6 +91,18 @@ conta bancária tipo "Investimento" quando aquele item **não** tem nenhuma
 posição sincronizada (ex.: item que só expõe a conta genérica, sem holdings
 dedicadas) — sem dobrar contagem caso um item retorne as duas fontes.
 
+Desde a Sprint 21, cada holding pode ter `saldo_inicial` (baseline em
+31/12/2025) preenchido a partir de uma proposta gerada automaticamente e
+revisada pelo CEO (confiança "alta"/"estimada" por linha — nunca gravado sem
+revisão). O "Rendimento estimado" mostrado no card de cada Investimento em
+`InvestimentosPage` (`saldo_atual − saldo_base − aportes + resgates`) muda de
+valor quando esse baseline é preenchido, sem nenhuma mudança na fórmula do
+card "Patrimônio" em si (`get_evolucao`, snapshot atual, não foi alterada).
+A série histórica mês a mês (saldo/valorização/rendimento/dividendos/
+aportes/resgates) fica na tela Investimentos (drill-down > "Série
+histórica"), não no Dashboard — ver
+[PRD-021](prd/PRD-021-vinculo-holdings-serie-historica.md).
+
 ## Saldo por conta (drill-down do card "Saldo")
 
 Lista o saldo bancário **atual** de cada conta conectada — sempre snapshot de

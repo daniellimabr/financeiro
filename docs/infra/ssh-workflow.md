@@ -15,17 +15,24 @@ a forma padronizada de operar sem esbarrar nessa política. Esta é uma restriç
 ambiente, não uma preferência — não simplificar removendo o venv ou voltando a usar
 `ssh.exe` diretamente.
 
-## Duas VMs, duas regras de autonomia
+## Uma VM hoje, duas regras de autonomia previstas
 
-O projeto usa **duas instâncias Oracle Cloud Free Tier separadas**:
+**Correção registrada em 2026-08-18 (Sprint 21):** não existe ambiente de produção
+provisionado. A VM de **dev** — criada em 2026-08-04 porque Docker/WSL2 são bloqueados no
+notebook corporativo — é hoje o **único ambiente rodando o app**, e tem dados financeiros
+reais da família sincronizados via Pluggy (achado ao vivo do Bloco 0 da Sprint 21: 22
+holdings reais de Nubank Investimentos/XP). A tabela abaixo registra a política de
+autonomia por VM — a linha de dev é a que vale na prática agora; a de prod é a regra que
+passa a valer no momento em que uma VM de produção for provisionada:
 
 | VM | Propósito | Dados | Autonomia do Claude |
 |---|---|---|---|
-| **dev** | Ambiente de desenvolvimento/sandbox (substitui Docker local, bloqueado no notebook) | Nenhum dado real | **Executa comandos SSH livremente, sem aprovação por comando** — autorizado pelo CEO em 2026-08-04 |
-| **prod** | Produção — dados financeiros reais da família | Dados reais | **Todo comando exige aprovação explícita do CEO antes da execução**, mesmo usando este wrapper — regra original, inalterada (ver Política de Autonomia em [CLAUDE.md](../../CLAUDE.md)) |
+| **dev** | Único ambiente real hoje (substitui Docker local, bloqueado no notebook) | **Dados reais** da família, sincronizados via Pluggy | **Executa comandos SSH livremente, sem aprovação por comando** — autorizado pelo CEO em 2026-08-04. Ações sensíveis dentro dela (ex.: gravar baseline financeiro real) ainda passam por revisão explícita do CEO, mesmo sem exigir aprovação de SSH por comando |
+| **prod** | Reservado para quando uma segunda VM de produção for provisionada — não existe hoje | — | **Todo comando exigirá aprovação explícita do CEO antes da execução**, mesmo usando este wrapper — regra já decidida, só ainda não aplicável (ver Política de Autonomia em [CLAUDE.md](../../CLAUDE.md)) |
 
-A autonomia ampliada em dev é exclusiva da VM de dev. **Nunca** se estende à VM de prod,
-mesmo que o mesmo script (`ssh_vm.py`) seja usado para os dois alvos.
+Enquanto só a VM de dev existir, ela concentra tanto a autonomia de execução (SSH livre)
+quanto os dados reais — não tratar "dev" como sinônimo de "sandbox sem consequência" só
+porque o nome sugere isso.
 
 ## DNS e portas
 

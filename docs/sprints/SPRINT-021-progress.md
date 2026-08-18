@@ -22,10 +22,10 @@ Atualizado a cada tarefa concluída. Não é o relatório final (tarefa 21) — 
 - [x] 15. Tela de revisão do baseline
 - [x] 16. UI de série histórica
 - [x] 17. Testes frontend (186 passando, lint/prettier limpos)
-- [ ] 18. Deploy VM dev + validação ao vivo
-- [ ] 19. Deploy produção (aprovação do CEO)
-- [ ] 20. Atualizar docs vivos
-- [ ] 21. Relatório de sprint
+- [x] 18. Deploy VM dev + validação ao vivo (achou e corrigiu bug real de colgroup ausente nas tabelas novas)
+- [x] 19. Baseline real aprovado e aplicado (não existe ambiente de prod — correção do CEO, 2026-08-18: dev é o único ambiente com dados reais). CDBs/Tesouro vinculados às 4 caixinhas via reconciliação manual com extrato real (motor de sugestão não resolve holdings com nome idêntico/código nulo — achado registrado). Baseline confirmado, reconstrução retroativa + snapshot do mês corrente gravados, validado ao vivo em Investimentos/Patrimônio
+- [x] 20. Atualizar docs vivos (+ correção prod/dev em CLAUDE.md/ssh-workflow.md/OVERVIEW.md)
+- [x] 21. Relatório de sprint — [SPRINT-021-vinculo-holdings-serie-historica-report.md](SPRINT-021-vinculo-holdings-serie-historica-report.md)
 
 ## Achado do Bloco 0 (payload real, dev VM — 22 holdings reais)
 

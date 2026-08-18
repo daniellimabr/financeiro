@@ -11,7 +11,7 @@ Fases em épicos, derivados do escopo funcional do bootstrap. PRDs individuais s
 | E3 | Categorização ✅ | Regras + memória de revisão manual; associação despesa↔ativo (item 2) — concluído na Sprint 4 (2026-08-14) |
 | E4 | Gestão de dados mestres ✅ | Categorias/subcategorias/natureza (item 10); ativos/passivos (item 9) — concluído na Sprint 2 (2026-08-06) |
 | E5 | Dashboards core ✅ | Receita/despesa/saldo/patrimônio com drill-down; filtros ano/mês (itens 3, 7) — concluído na Sprint 5 (2026-08-14) |
-| E6 | Dashboards analíticos ✅ | Tendência histórica, percentual de representatividade, despesas por ativo (itens 4, 5, 6) — parte 1 (tendência/percentual/design system) ✅ Sprint 6; parte 2 (Gestão de Ativos) ✅ Sprint 8; parte 3 (cards Ativos/Passivos, drilldowns, refinamentos de Dashboard) ✅ Sprint 9 — épico fechado. Patrimônio/evolução de investimentos segue adiado por falta de série histórica no schema |
+| E6 | Dashboards analíticos ✅ | Tendência histórica, percentual de representatividade, despesas por ativo (itens 4, 5, 6) — parte 1 (tendência/percentual/design system) ✅ Sprint 6; parte 2 (Gestão de Ativos) ✅ Sprint 8; parte 3 (cards Ativos/Passivos, drilldowns, refinamentos de Dashboard) ✅ Sprint 9 — épico fechado. Série histórica de investimentos (lacuna registrada desde a Sprint 5/6) fechada na Sprint 21 |
 | E7 | Conta e perfil ✅ | Perfil de usuário, logout; tela de Configurações (absorve Gestão de Contas) + regra de competência de salário + saldo inicial por conta/Saldo Acumulado — ✅ Sprint 15 (2026-08-17). Multiusuário/item 11 (UI de convidar/remover) adiado pra sprint futura, decisão do CEO — arquitetura já suporta |
 | E8 | Migração de dados legados ✅ | Import de categorias (Sprint 2) + memória de classificação do v1 (Sprint 4) — concluído em 2026-08-14 |
 | E9 | Natureza e projeção de custos ✅ | Classificação de subcategoria por natureza (fixo recorrente/variável recorrente/eventual) + dashboard de visibilidade — ✅ Sprint 12 (2026-08-16); rótulo "Eventual", funil Natureza>Categoria>Subcategoria>Transação e redesign de tabelas/botões do app — ✅ Sprint 13 (2026-08-16); projeção de custos futuros (receita/despesa/saldo) com simulação efêmera de hipotéticas — ✅ Sprint 14 (2026-08-16) — épico fechado |
@@ -97,7 +97,8 @@ Sprint 8, que paginará o endpoint.
   simples (SVG inline), em cada linha do drill-down de categoria.
   Patrimônio fica de fora — não há série histórica de saldo/valor de ativo
   no schema (mesma limitação já registrada na Sprint 5), com nota visual
-  explícita no card.
+  explícita no card. Fechado para investimentos na Sprint 21
+  (`pluggy_investment_snapshots` + série mensal em `InvestimentosPage`).
 - Percentual de representatividade em cada nível do funil (categoria % do
   total do período; meio de pagamento % da categoria; linha de extrato %
   do meio de pagamento, calculado no frontend contra o total já conhecido).
@@ -801,6 +802,20 @@ PRD: [PRD-020-integracao-completa-investments-pluggy.md](prd/PRD-020-integracao-
 Plano: [SPRINT-020-integracao-completa-investments-pluggy-plan.md](sprints/SPRINT-020-integracao-completa-investments-pluggy-plan.md).
 Relatório: [SPRINT-020-integracao-completa-investments-pluggy-report.md](sprints/SPRINT-020-integracao-completa-investments-pluggy-report.md).
 
+### ✅ Sprint 21 — Vínculo automático holdings↔Investimento + série histórica mensal (cross-epic, sem épico prévio) concluída em 2026-08-18
+
+Pedido direto do CEO na aprovação da Sprint 20. Bloco 0 (investigação read-only, rodou na VM de dev — achado que corrigiu a premissa de duas VMs prod/dev registrada até então: **não existe ambiente de produção**; a VM de dev é o único ambiente com dados reais da Pluggy hoje, ver correção em [docs/infra/ssh-workflow.md](infra/ssh-workflow.md) e no CLAUDE.md) confirmou os campos reais de holdings `FIXED_INCOME` (`purchaseDate`/`rate`/`rateType`/`fixedAnnualRate`) e `EQUITY` (zero transações observadas, sem `type` de dividendo identificável).
+
+Motor de sugestão holding→Investimento (`categorization/engine.py`, cascata código-exato→similaridade de nome), aplicado dentro de `sync_item`. Algoritmo de baseline dez/2025 fechado com um refinamento em relação ao PRD: taxa CDI/IPCA não é fixa (depende de índice histórico não integrado — mesma fronteira de "cotação de mercado" já fora de escopo pra ações), então só três casos têm confiança "alta": posição comprada depois do baseline (saldo=0, fato) e taxa verdadeiramente fixa (`fixedAnnualRate`, juros compostos); o resto cai em fórmula reversa de fluxo, confiança "estimada". Migration `0017` (colunas de sugestão + tabela `pluggy_investment_snapshots`), reconstrução retroativa jan-ago/2026, job de snapshot mensal idempotente. Novo endpoint `GET /investimentos/{id}/evolucao-mensal`, sem alterar `get_evolucao` (regressão testada explicitamente).
+
+**Achado real na validação ao vivo:** o motor de sugestão não resolve holdings de CDB com nome idêntico e `code`/`isin` nulos (as 18 posições Nubank aparecem todas como "CDB - NU FINANCEIRA S.A. ..." — Pluggy não expõe qual "caixinha" cada uma pertence). Vínculo das 18 posições (14 caixinha "Quitar o AP", 1 "Turbo Ultravioleta 120% CDI", 1 "Reserva de Emergência", 2 "Tesouro Direto Nubank") reconstruído manualmente por correspondência exata de valor de aporte contra o extrato real do CEO, não pelo motor automático — registrado como limitação conhecida, candidata a melhoria futura (ver "Registro de reavaliações futuras").
+
+563 testes backend (+31, 98% cobertura nos módulos tocados) + 186 testes frontend (+5), suíte completa verde, lint/prettier limpos. Um bug real de layout encontrado e corrigido na validação ao vivo: tabelas novas (revisão de baseline, série histórica) sem `<colgroup>` (convenção obrigatória de toda `.dash-table` desde a Sprint 13) causavam texto vazando entre colunas com nome de holding longo — corrigido com colgroup + largura de coluna dedicada. Baseline real aprovado pelo CEO linha a linha e confirmado; validado ao vivo em Investimentos (cards, drilldown Posições/Série histórica) e Patrimônio ("Saldo em investimentos" bateu exato com a soma das 22 holdings).
+
+PRD: [PRD-021-vinculo-holdings-serie-historica.md](prd/PRD-021-vinculo-holdings-serie-historica.md).
+Plano: [SPRINT-021-vinculo-holdings-serie-historica-plan.md](sprints/SPRINT-021-vinculo-holdings-serie-historica-plan.md).
+Progresso/achados detalhados: [SPRINT-021-progress.md](sprints/SPRINT-021-progress.md).
+
 ## Registro de reavaliações futuras
 
 - **Understand Anything:** reavaliar instalação quando o codebase ultrapassar ~100 arquivos (ver ADR-002-plugins).
@@ -810,3 +825,5 @@ Relatório: [SPRINT-020-integracao-completa-investments-pluggy-report.md](sprint
 - **Persistir despesas/receitas hipotéticas como cenários salvos:** decisão explícita do CEO na sessão de planejamento da Sprint 14 (2026-08-16) — a simulação da tela "Projeção" fica efêmera (sem CRUD, sem tabela) por ora. Se o CEO quiser voltar a um cenário entre sessões (ex.: comparar "com reforma" vs. "sem reforma" ao longo de semanas), viraria candidata a sprint futura com tabela nova + CRUD — sem PRD/plano ainda.
 - **Heurística de dia útil para o lag Pluggy vs. extrato bancário real:** decisão explícita do CEO na sessão de planejamento da Sprint 16 (2026-08-17) — transações de fim de semana às vezes aparecem no extrato do Itaú só no próximo dia útil (até 2 dias depois da data bruta que a Pluggy reporta), sem outro campo no payload (`postDate`/`settlementDate`) para corrigir automaticamente. Não implementado por ora (risco de heurística errada, sem tratar feriados); candidata a revisão futura se a Pluggy passar a expor um campo de liquidação, ou se o CEO priorizar uma heurística mesmo com o risco.
 - **Toggle competência/caixa nas telas "Natureza"/"Projeção":** fora de escopo da Sprint 16 (toggle só no Dashboard) — candidata a extensão futura se o CEO quiser o mesmo regime nessas telas.
+- **Sugestão automática pra holdings CDB com nome idêntico/código nulo:** achado real da Sprint 21 — a cascata código-exato→similaridade de nome não resolve as 18 posições de CDB da Nubank (nome genérico igual, sem ticker/ISIN). Vínculo dessa sprint foi reconstruído manualmente por correspondência de valor de aporte contra o extrato real do CEO. Sem PRD/plano ainda; candidata a sprint futura se o CEO priorizar automatizar (possível caminho: correspondência por data+valor de aporte, mas exige mais investigação de payload).
+- **Microtransações de investimento na fila de Categorização:** feedback do CEO na sessão de execução da Sprint 21 — ele prefere controlar aporte/resgate pelas transações de conta corrente (Itaú/Nubank/XP), não precisar classificar as transações internas de holding. Registrado como item de backlog, não investigado nem escopado nesta sprint.

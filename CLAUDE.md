@@ -23,8 +23,8 @@ CEO: idealiza, aprova planos, valida entregas. CTO (Claude Code): planeja, arqui
 
 | Tema | Decisão |
 |---|---|
-| Infra | Oracle Cloud VM Free Tier; banco no mesmo servidor (prod). + instância separada de **dev** (Oracle Free Tier) desde 2026-08-04 — Docker/WSL2 bloqueados no notebook corporativo, então o ambiente de desenvolvimento roda numa VM própria, sem dados reais |
-| SSH | Sempre a partir de venv Python, via **paramiko** (não o binário `ssh.exe`) — ver [docs/infra/ssh-workflow.md](docs/infra/ssh-workflow.md). VM de **dev**: Claude executa livremente. VM de **prod**: aprovação do CEO por comando, como sempre |
+| Infra | Oracle Cloud VM Free Tier — **não existe ambiente de produção ainda** (correção do CEO, 2026-08-18: a VM de **dev**, provisionada em 2026-08-04 porque Docker/WSL2 são bloqueados no notebook corporativo, é hoje o único ambiente rodando o app, com dados reais da Pluggy sincronizados nela). Ver [docs/infra/ssh-workflow.md](docs/infra/ssh-workflow.md) |
+| SSH | Sempre a partir de venv Python, via **paramiko** (não o binário `ssh.exe`) — ver [docs/infra/ssh-workflow.md](docs/infra/ssh-workflow.md). VM de **dev** (único ambiente real hoje): Claude executa livremente. Se/quando uma VM de **prod** for provisionada: aprovação do CEO por comando, sem exceção |
 | Sync Pluggy | Manual (botão); rotina agendada é backlog futuro |
 | Categorização | Regras + memória de revisões do usuário. Sem LLM na pipeline |
 | Dashboards | Leitura direta/agregação simples. Sem tempo real, sem cache complexo |
