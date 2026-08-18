@@ -1,5 +1,5 @@
 :80 {
-	@api path /auth/* /health /category-groups* /subcategories* /assets* /liabilities* /pluggy* /categorization* /dashboards*
+	@api path /auth/* /health /category-groups* /subcategories* /assets* /liabilities* /pluggy* /categorization* /dashboards* /investimentos*
 
 	handle @api {
 		reverse_proxy api:8000
