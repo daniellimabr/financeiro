@@ -489,7 +489,15 @@ export function AccountManagementPage() {
           )}
           {baselineProposal.data && baselineProposal.data.length > 0 && (
             <div className="dash-table-wrap">
-              <table className="dash-table">
+              <table className="dash-table baseline-table">
+                <colgroup>
+                  <col className="col-holding" />
+                  <col className="col-tipo" />
+                  <col className="col-saldo-atual" />
+                  <col className="col-saldo-proposto" />
+                  <col className="col-confianca" />
+                  <col className="col-motivo" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>Holding</th>

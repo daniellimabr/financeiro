@@ -486,7 +486,17 @@ function InvestimentoSerieHistorica({ investimentoId }: { investimentoId: number
         </ResponsiveContainer>
       </div>
       <div className="dash-table-wrap">
-        <table className="dash-table">
+        <table className="dash-table serie-historica-table">
+          <colgroup>
+            <col className="col-mes" />
+            <col className="col-saldo" />
+            <col className="col-valorizacao" />
+            <col className="col-rendimento" />
+            <col className="col-dividendos" />
+            <col className="col-aportes" />
+            <col className="col-resgates" />
+            <col className="col-confianca" />
+          </colgroup>
           <thead>
             <tr>
               <th>Mês</th>

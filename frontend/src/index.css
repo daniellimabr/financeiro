@@ -1199,6 +1199,67 @@ input {
   width: 15%;
 }
 
+/* Revisão de baseline dez/2025 (AccountManagementPage, Sprint 21) — Holding e
+   Motivo são texto longo (nome de CDB da Nubank chega a ~80 caracteres),
+   sem colgroup o table-layout:fixed dividia a largura igualmente entre as 6
+   colunas e o white-space:nowrap herdado de .dash-table fazia o texto vazar
+   por cima da coluna seguinte. */
+.baseline-table .col-holding {
+  width: 22%;
+}
+
+.baseline-table .col-tipo {
+  width: 110px;
+}
+
+.baseline-table .col-saldo-atual {
+  width: 120px;
+}
+
+.baseline-table .col-saldo-proposto {
+  width: 150px;
+}
+
+.baseline-table .col-confianca {
+  width: 90px;
+}
+
+.baseline-table .col-motivo {
+  width: 26%;
+}
+
+/* `<col>` só estiliza largura (spec do CSS não propaga overflow/text-overflow
+   pra células a partir do colgroup) — Holding/Motivo continuam texto livre e
+   podem exceder a largura da coluna, então o corte com "..." precisa vir do
+   seletor nas células de verdade (mesmo padrão de :first-child/:nth-child já
+   usado em .cat-review-table pra alinhamento). */
+.baseline-table td:first-child,
+.baseline-table th:first-child,
+.baseline-table td:last-child,
+.baseline-table th:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Série histórica mensal (InvestimentosPage, Sprint 21) — 8 colunas curtas,
+   mesmo princípio de colgroup explícito das outras variantes de .dash-table. */
+.serie-historica-table .col-mes {
+  width: 90px;
+}
+
+.serie-historica-table .col-saldo,
+.serie-historica-table .col-valorizacao,
+.serie-historica-table .col-rendimento,
+.serie-historica-table .col-dividendos {
+  width: 110px;
+}
+
+.serie-historica-table .col-aportes,
+.serie-historica-table .col-resgates,
+.serie-historica-table .col-confianca {
+  width: 100px;
+}
+
 @media (max-width: 640px) {
   /* Linha ganhou tendência + percentual na Sprint 6 — em telas estreitas,
      6 elementos (chevron/nome/tendência/barra/valor/%) espremiam o valor e
