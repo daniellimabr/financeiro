@@ -115,6 +115,11 @@ class PluggyInvestmentOut(BaseModel):
     saldo_inicial: Decimal | None
     moeda: str
     investimento_id: int | None
+    investimento_sugerido_id: int | None
+    investimento_sugestao_confianca: str | None
+    investimento_sugestao_fonte_tipo: str | None
+    investimento_sugestao_fonte_id: int | None
+    investimento_sugestao_score: Decimal | None
     created_at: datetime
     updated_at: datetime
 
@@ -125,6 +130,28 @@ class PluggyInvestmentUpdateIn(BaseModel):
 
 class PluggyInvestmentSaldoInicialIn(BaseModel):
     saldo_inicial: Decimal | None = None
+
+
+class BaselineProposalLineOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    investment_id: int
+    nome: str
+    tipo: str
+    codigo: str | None
+    saldo_atual: Decimal
+    saldo_inicial_proposto: Decimal
+    confianca: str
+    motivo: str
+
+
+class BaselineConfirmLineIn(BaseModel):
+    investment_id: int
+    saldo_inicial: Decimal
+
+
+class BaselineConfirmIn(BaseModel):
+    linhas: list[BaselineConfirmLineIn] = Field(min_length=1)
 
 
 class PluggyInvestmentTransactionOut(BaseModel):

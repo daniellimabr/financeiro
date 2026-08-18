@@ -10,6 +10,8 @@ from app.models.user import User
 from app.pluggy_integration import service
 from app.pluggy_integration.client import PluggyClient
 from app.schemas.pluggy import (
+    BaselineConfirmIn,
+    BaselineProposalLineOut,
     ConnectTokenIn,
     ConnectTokenOut,
     PluggyAccountOut,
@@ -176,6 +178,30 @@ def list_investment_transactions(
         return service.list_investment_transactions(db, current_user.id, investment_id)
     except NotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get("/investments/baseline-dez-2025", response_model=list[BaselineProposalLineOut])
+def get_baseline_proposal(
+    db: Session = Depends(get_db),
+    client: PluggyClient = Depends(get_pluggy_client),
+    current_user: User = Depends(get_current_user),
+):
+    return service.propose_baseline_dez_2025(db, client, current_user.id)
+
+
+@router.post("/investments/baseline-dez-2025", response_model=list[PluggyInvestmentOut])
+def confirm_baseline_proposal(
+    payload: BaselineConfirmIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        linhas = [(linha.investment_id, linha.saldo_inicial) for linha in payload.linhas]
+        investments = service.confirm_baseline_dez_2025(db, current_user.id, linhas)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    service.reconstruct_historical_snapshots(db, current_user.id)
+    return investments
 
 
 @router.get("/ajuste-salario-dezembro", response_model=SalarioAjusteDezembroOut | None)

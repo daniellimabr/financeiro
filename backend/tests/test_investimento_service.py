@@ -427,6 +427,114 @@ def test_get_evolucao_missing_investimento_raises_not_found(db_session, user):
         service.get_evolucao(db_session, user.id, 999)
 
 
+# --- Sprint 21: get_evolucao_mensal ---------------------------------------
+
+
+def _snapshot(
+    db_session,
+    holding,
+    *,
+    ano_mes,
+    saldo,
+    valorizacao=Decimal("0"),
+    rendimento=Decimal("0"),
+    dividendos=None,
+    aportes=Decimal("0"),
+    resgates=Decimal("0"),
+    confianca="reconstruido",
+):
+    from app.models.pluggy import PluggyInvestmentSnapshot
+
+    snap = PluggyInvestmentSnapshot(
+        investment_id=holding.id,
+        user_id=holding.user_id,
+        ano_mes=ano_mes,
+        saldo=saldo,
+        valorizacao=valorizacao,
+        rendimento=rendimento,
+        dividendos=dividendos,
+        aportes=aportes,
+        resgates=resgates,
+        confianca=confianca,
+    )
+    db_session.add(snap)
+    db_session.commit()
+    db_session.refresh(snap)
+    return snap
+
+
+def test_get_evolucao_mensal_returns_empty_when_no_holdings(db_session, user):
+    investimento = service.create_investimento(db_session, user.id, nome="Sem holding")
+
+    assert service.get_evolucao_mensal(db_session, user.id, investimento.id) == []
+
+
+def test_get_evolucao_mensal_missing_investimento_raises_not_found(db_session, user):
+    with pytest.raises(NotFoundError):
+        service.get_evolucao_mensal(db_session, user.id, 999)
+
+
+def test_get_evolucao_mensal_aggregates_across_holdings_by_month(db_session, user):
+    investimento = service.create_investimento(db_session, user.id, nome="Com holdings")
+    holding_a = _investment(
+        db_session, user, valor_atual=Decimal("6000.00"), investimento_id=investimento.id
+    )
+    holding_b = _investment(
+        db_session, user, valor_atual=Decimal("2000.00"), investimento_id=investimento.id
+    )
+    _snapshot(db_session, holding_a, ano_mes="2026-01", saldo=Decimal("5000.00"))
+    _snapshot(db_session, holding_b, ano_mes="2026-01", saldo=Decimal("1500.00"))
+    _snapshot(
+        db_session,
+        holding_a,
+        ano_mes="2026-02",
+        saldo=Decimal("6000.00"),
+        rendimento=Decimal("1000.00"),
+        confianca="real",
+    )
+
+    evolucao = service.get_evolucao_mensal(db_session, user.id, investimento.id)
+
+    assert [e.ano_mes for e in evolucao] == ["2026-01", "2026-02"]
+    jan = evolucao[0]
+    assert jan.saldo == Decimal("6500.00")
+    assert jan.confianca == "reconstruido"
+    fev = evolucao[1]
+    assert fev.saldo == Decimal("6000.00")
+    assert fev.rendimento == Decimal("1000.00")
+    assert fev.confianca == "real"
+
+
+def test_get_evolucao_mensal_isolated_by_user(db_session, user, other_user):
+    investimento = service.create_investimento(db_session, other_user.id, nome="Do outro")
+    holding = _investment(
+        db_session, other_user, valor_atual=Decimal("999.00"), investimento_id=investimento.id
+    )
+    _snapshot(db_session, holding, ano_mes="2026-01", saldo=Decimal("900.00"))
+
+    with pytest.raises(NotFoundError):
+        service.get_evolucao_mensal(db_session, user.id, investimento.id)
+
+
+def test_get_evolucao_unchanged_by_snapshots(db_session, user):
+    # Regressão explícita: get_evolucao (snapshot atual) não deve ser afetado
+    # pela existência de pluggy_investment_snapshots (Sprint 21).
+    investimento = service.create_investimento(db_session, user.id, nome="Regressão")
+    holding = _investment(
+        db_session,
+        user,
+        valor_atual=Decimal("6000.00"),
+        saldo_inicial=Decimal("5000.00"),
+        investimento_id=investimento.id,
+    )
+    _snapshot(db_session, holding, ano_mes="2026-01", saldo=Decimal("999999.00"))
+
+    evolucao = service.get_evolucao(db_session, user.id, investimento.id)
+
+    assert evolucao.saldo_base == Decimal("5000.00")
+    assert evolucao.saldo_atual == Decimal("6000.00")
+
+
 def test_get_evolucao_isolated_by_user(db_session, user, other_user):
     investimento = service.create_investimento(db_session, other_user.id, nome="Do outro")
     _account(

@@ -14,6 +14,7 @@ from app.models.liability import Liability, LiabilityTipo
 from app.models.pluggy import (
     PluggyAccount,
     PluggyAccountTipo,
+    PluggyInvestment,
     PluggyItem,
     PluggyItemStatus,
     PluggyTransaction,
@@ -86,6 +87,131 @@ def _confirmed_transaction(db_session, user, subcategory, descricao):
     db_session.commit()
     db_session.refresh(tx)
     return tx
+
+
+def _holding(
+    db_session,
+    user,
+    *,
+    tipo="FIXED_INCOME",
+    nome="CDB Fake",
+    codigo=None,
+    investimento_id=None,
+):
+    n = next(_SEQ)
+    item = PluggyItem(
+        user_id=user.id,
+        pluggy_item_id=f"item-hold-{n}",
+        connector_id=1,
+        connector_name="Banco Fake",
+        status=PluggyItemStatus.updated,
+        cutoff_date=date(2026, 1, 1),
+    )
+    db_session.add(item)
+    db_session.flush()
+    holding = PluggyInvestment(
+        item_id=item.id,
+        user_id=user.id,
+        pluggy_investment_id=f"hold-{n}",
+        tipo=tipo,
+        nome=nome,
+        codigo=codigo,
+        valor_atual=Decimal("100.00"),
+        investimento_id=investimento_id,
+    )
+    db_session.add(holding)
+    db_session.commit()
+    db_session.refresh(holding)
+    return holding
+
+
+def test_suggest_holding_investimento_returns_none_when_nothing_matches(db_session):
+    user = _user(db_session)
+    _holding(db_session, user, nome="Sem nada parecido")
+
+    holding = _holding(db_session, user, nome="Outra posicao qualquer", codigo=None)
+
+    assert engine.suggest_holding_investimento(db_session, user.id, holding) is None
+
+
+def test_suggest_holding_investimento_matches_by_codigo_exato(db_session):
+    user = _user(db_session)
+    investimento = Investimento(user_id=user.id, nome="XP Ações")
+    db_session.add(investimento)
+    db_session.commit()
+    db_session.refresh(investimento)
+    linked = _holding(
+        db_session,
+        user,
+        tipo="EQUITY",
+        nome="HAPV3",
+        codigo="HAPV3",
+        investimento_id=investimento.id,
+    )
+
+    new_holding = _holding(db_session, user, tipo="EQUITY", nome="HAPV3", codigo="HAPV3")
+
+    suggestion = engine.suggest_holding_investimento(db_session, user.id, new_holding)
+
+    assert suggestion is not None
+    assert suggestion.investimento_id == investimento.id
+    assert suggestion.confianca == "alta"
+    assert suggestion.fonte_tipo == "codigo_exato"
+    assert suggestion.fonte_id == linked.id
+
+
+def test_suggest_holding_investimento_codigo_exato_ignores_holdings_without_link(db_session):
+    user = _user(db_session)
+    _holding(db_session, user, tipo="EQUITY", nome="VALE3", codigo="VALE3", investimento_id=None)
+
+    new_holding = _holding(db_session, user, tipo="EQUITY", nome="VALE3", codigo="VALE3")
+
+    assert engine.suggest_holding_investimento(db_session, user.id, new_holding) is None
+
+
+def test_suggest_holding_investimento_falls_back_to_nome_similar(db_session):
+    user = _user(db_session)
+    investimento = Investimento(user_id=user.id, nome="CDB Nu Financeira")
+    db_session.add(investimento)
+    db_session.commit()
+    db_session.refresh(investimento)
+
+    holding = _holding(db_session, user, nome="CDB Nu Financeira S.A.", codigo=None)
+
+    suggestion = engine.suggest_holding_investimento(db_session, user.id, holding)
+
+    assert suggestion is not None
+    assert suggestion.investimento_id == investimento.id
+    assert suggestion.confianca == "alta"
+    assert suggestion.fonte_tipo == "nome_similar"
+    assert suggestion.score >= 0.86
+
+
+def test_suggest_holding_investimento_codigo_exato_wins_over_nome_similar(db_session):
+    user = _user(db_session)
+    investimento_nome = Investimento(user_id=user.id, nome="CDB Nu Financeira S.A.")
+    investimento_codigo = Investimento(user_id=user.id, nome="Outro nome qualquer")
+    db_session.add_all([investimento_nome, investimento_codigo])
+    db_session.commit()
+    db_session.refresh(investimento_nome)
+    db_session.refresh(investimento_codigo)
+    _holding(
+        db_session,
+        user,
+        tipo="EQUITY",
+        nome="Outro nome qualquer",
+        codigo="ABCD3",
+        investimento_id=investimento_codigo.id,
+    )
+
+    holding = _holding(
+        db_session, user, tipo="EQUITY", nome="CDB Nu Financeira S.A.", codigo="ABCD3"
+    )
+
+    suggestion = engine.suggest_holding_investimento(db_session, user.id, holding)
+
+    assert suggestion.investimento_id == investimento_codigo.id
+    assert suggestion.fonte_tipo == "codigo_exato"
 
 
 def test_suggest_category_returns_none_when_nothing_matches(db_session):

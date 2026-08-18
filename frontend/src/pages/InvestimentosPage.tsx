@@ -1,4 +1,5 @@
 import { Fragment, useMemo, useState, type FormEvent } from "react";
+import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import type { Investimento, InvestimentoInput } from "../api/investimentos";
 import type { PluggyInvestment } from "../api/pluggy";
@@ -14,6 +15,7 @@ import { TransactionsTable } from "../components/TransactionsTable";
 import { TrendChart } from "../components/TrendChart";
 import { useCreateInvestimento } from "../hooks/useCreateInvestimento";
 import { useDeleteInvestimento } from "../hooks/useDeleteInvestimento";
+import { useEvolucaoMensal } from "../hooks/useEvolucaoMensal";
 import { useInvestimentoEvolucao } from "../hooks/useInvestimentoEvolucao";
 import { useInvestimentoGastos } from "../hooks/useInvestimentoGastos";
 import { useInvestimentoGastosTendencia } from "../hooks/useInvestimentoGastosTendencia";
@@ -24,7 +26,7 @@ import { usePluggyInvestmentTransactions } from "../hooks/usePluggyInvestmentTra
 import { useUpdateInvestimento } from "../hooks/useUpdateInvestimento";
 import { formatCurrency } from "../utils/format";
 
-type DrillView = "extrato" | "posicoes";
+type DrillView = "extrato" | "posicoes" | "serie";
 
 const EMPTY_FORM: InvestimentoInput = { nome: "" };
 
@@ -240,16 +242,27 @@ export function InvestimentosPage() {
             >
               Posições
             </button>
+            <button
+              type="button"
+              aria-pressed={drillView === "serie"}
+              onClick={() => setDrillView("serie")}
+            >
+              Série histórica
+            </button>
           </div>
-          {drillView === "extrato" ? (
+          {drillView === "extrato" && (
             <InvestimentoDrilldown
               investimentoId={selectedInvestimento.id}
               tipo={drillTipo}
               filter={filter}
               pontos={trendByInvestimento.get(selectedInvestimento.id)}
             />
-          ) : (
+          )}
+          {drillView === "posicoes" && (
             <InvestimentoPosicoes posicoes={posicoesDe(selectedInvestimento.id)} />
+          )}
+          {drillView === "serie" && (
+            <InvestimentoSerieHistorica investimentoId={selectedInvestimento.id} />
           )}
         </div>
       )}
@@ -412,6 +425,99 @@ function InvestimentoPosicoes({ posicoes }: { posicoes: PluggyInvestment[] }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+function InvestimentoSerieHistorica({ investimentoId }: { investimentoId: number }) {
+  const { data: serie, isLoading, isError } = useEvolucaoMensal(investimentoId);
+
+  if (isLoading) return <p>Carregando...</p>;
+  if (isError) return <p role="alert">Não foi possível carregar a série histórica.</p>;
+  if (!serie || serie.length === 0) {
+    return (
+      <p className="dash-empty">
+        Nenhum snapshot mensal ainda — confirme o baseline de dez/2025 em "Gestão de contas" pra
+        popular a série histórica.
+      </p>
+    );
+  }
+
+  const temReconstruido = serie.some((ponto) => ponto.confianca === "reconstruido");
+  const chartData = serie.map((ponto) => ({ mes: ponto.ano_mes, saldo: Number(ponto.saldo) }));
+
+  return (
+    <>
+      {temReconstruido && (
+        <p className="dash-empty">
+          Meses marcados "reconstruido" são reconstrução por fluxo de caixa (sem fonte de cotação
+          histórica pra ações nem de índice CDI/IPCA histórico pra renda fixa indexada) —
+          valorização/rendimento reais só a partir do primeiro snapshot do job mensal.
+        </p>
+      )}
+      <div className="dash-chart">
+        <ResponsiveContainer width="100%" height={160}>
+          <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 4, left: 4 }}>
+            <XAxis
+              dataKey="mes"
+              tick={{ fontSize: 11, fill: "var(--text)" }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis hide />
+            <Tooltip
+              formatter={(value) => formatCurrency(value as number)}
+              contentStyle={{
+                background: "var(--surface)",
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+                fontSize: 12,
+              }}
+              labelStyle={{ color: "var(--text-h)" }}
+            />
+            <Line
+              type="monotone"
+              dataKey="saldo"
+              stroke="var(--receita)"
+              strokeWidth={2}
+              dot={{ r: 3 }}
+              isAnimationActive={false}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="dash-table-wrap">
+        <table className="dash-table">
+          <thead>
+            <tr>
+              <th>Mês</th>
+              <th>Saldo</th>
+              <th>Valorização</th>
+              <th>Rendimento</th>
+              <th>Dividendos</th>
+              <th>Aportes</th>
+              <th>Resgates</th>
+              <th>Confiança</th>
+            </tr>
+          </thead>
+          <tbody>
+            {serie.map((ponto) => (
+              <tr key={ponto.ano_mes}>
+                <td>{ponto.ano_mes}</td>
+                <td>{formatCurrency(ponto.saldo)}</td>
+                <td>{formatCurrency(ponto.valorizacao)}</td>
+                <td>{formatCurrency(ponto.rendimento)}</td>
+                <td>{formatCurrency(ponto.dividendos)}</td>
+                <td>{formatCurrency(ponto.aportes)}</td>
+                <td>{formatCurrency(ponto.resgates)}</td>
+                <td>
+                  <span className="tag">{ponto.confianca}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 

@@ -120,3 +120,26 @@ def test_get_evolucao_missing_investimento_returns_404(client, db_session):
     response = client.get("/investimentos/999/evolucao")
 
     assert response.status_code == 404
+
+
+def test_evolucao_mensal_without_cookie_returns_401(client):
+    response = client.get("/investimentos/1/evolucao-mensal")
+    assert response.status_code == 401
+
+
+def test_get_evolucao_mensal_empty_when_no_holdings(client, db_session):
+    _authenticate(client, db_session)
+    investimento = client.post("/investimentos", json=INVESTIMENTO_PAYLOAD).json()
+
+    response = client.get(f"/investimentos/{investimento['id']}/evolucao-mensal")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_get_evolucao_mensal_missing_investimento_returns_404(client, db_session):
+    _authenticate(client, db_session)
+
+    response = client.get("/investimentos/999/evolucao-mensal")
+
+    assert response.status_code == 404

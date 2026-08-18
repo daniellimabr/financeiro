@@ -3,6 +3,8 @@ import { useState } from "react";
 import type { PeriodoHistorico } from "../api/dashboards";
 import { fetchConnectToken } from "../api/pluggy";
 import { PeriodFilter } from "../components/PeriodFilter";
+import { useBaselineProposal } from "../hooks/useBaselineProposal";
+import { useConfirmBaseline } from "../hooks/useConfirmBaseline";
 import { useEvolucaoSaldoPorConta } from "../hooks/useEvolucaoSaldoPorConta";
 import { useInvestimentos } from "../hooks/useInvestimentos";
 import { usePluggyAccounts } from "../hooks/usePluggyAccounts";
@@ -52,6 +54,25 @@ export function AccountManagementPage() {
 
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
   const [syncSelection, setSyncSelection] = useState<Record<number, boolean>>({});
+
+  const [baselineOpen, setBaselineOpen] = useState(false);
+  const [baselineDrafts, setBaselineDrafts] = useState<Record<number, string>>({});
+  const baselineProposal = useBaselineProposal(baselineOpen);
+  const confirmBaseline = useConfirmBaseline();
+
+  function handleConfirmBaseline() {
+    if (!baselineProposal.data) return;
+    const linhas = baselineProposal.data.map((line) => ({
+      investmentId: line.investment_id,
+      saldoInicial: baselineDrafts[line.investment_id] ?? line.saldo_inicial_proposto,
+    }));
+    confirmBaseline.mutate(linhas, {
+      onSuccess: () => {
+        setBaselineOpen(false);
+        setBaselineDrafts({});
+      },
+    });
+  }
 
   const now = new Date();
   const [auditoriaAno, setAuditoriaAno] = useState(now.getFullYear());
@@ -363,7 +384,7 @@ export function AccountManagementPage() {
                 Investimento:{" "}
                 <select
                   aria-label={`Investimento de ${label}`}
-                  value={investment.investimento_id ?? ""}
+                  value={investment.investimento_id ?? investment.investimento_sugerido_id ?? ""}
                   onChange={(event) =>
                     updateInvestment.mutate({
                       investmentId: investment.id,
@@ -378,6 +399,29 @@ export function AccountManagementPage() {
                     </option>
                   ))}
                 </select>
+                {investment.investimento_id === null &&
+                  investment.investimento_sugerido_id !== null && (
+                    <>
+                      {" "}
+                      <span
+                        className="tag"
+                        title="Sugestão automática (código/nome parecido) — ainda não confirmada"
+                      >
+                        sugestão · confiança {investment.investimento_sugestao_confianca}
+                      </span>{" "}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateInvestment.mutate({
+                            investmentId: investment.id,
+                            investimentoId: investment.investimento_sugerido_id,
+                          })
+                        }
+                      >
+                        Aceitar sugestão
+                      </button>
+                    </>
+                  )}
               </div>
               <div className="tag">
                 Saldo inicial (31/12/2025):{" "}
@@ -422,6 +466,100 @@ export function AccountManagementPage() {
           );
         })}
       </ul>
+
+      <h3>Baseline de saldo em 31/12/2025</h3>
+      <p className="dash-empty">
+        Proposta gerada por holding a partir do payload real da Pluggy (juros compostos quando a
+        taxa é fixa; senão estimativa por fluxo) — confiança marcada por linha. Ações não têm fonte
+        de cotação histórica: a proposta pra elas é sempre "estimada". Nada é gravado até confirmar.
+      </p>
+      {!baselineOpen && (
+        <button type="button" onClick={() => setBaselineOpen(true)}>
+          Revisar proposta de baseline
+        </button>
+      )}
+      {baselineOpen && (
+        <>
+          {baselineProposal.isLoading && <p>Carregando proposta...</p>}
+          {baselineProposal.isError && (
+            <p role="alert">Não foi possível carregar a proposta de baseline.</p>
+          )}
+          {baselineProposal.data && baselineProposal.data.length === 0 && (
+            <p className="dash-empty">Nenhuma holding sincronizada.</p>
+          )}
+          {baselineProposal.data && baselineProposal.data.length > 0 && (
+            <div className="dash-table-wrap">
+              <table className="dash-table">
+                <thead>
+                  <tr>
+                    <th>Holding</th>
+                    <th>Tipo</th>
+                    <th>Saldo atual</th>
+                    <th>Saldo proposto (31/12/2025)</th>
+                    <th>Confiança</th>
+                    <th>Motivo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {baselineProposal.data.map((line) => {
+                    const label = line.codigo ?? line.nome;
+                    return (
+                      <tr key={line.investment_id}>
+                        <td>{label}</td>
+                        <td>{line.tipo}</td>
+                        <td>{formatCurrency(line.saldo_atual)}</td>
+                        <td>
+                          <input
+                            aria-label={`Saldo inicial proposto de ${label}`}
+                            type="number"
+                            step="0.01"
+                            value={
+                              baselineDrafts[line.investment_id] ?? line.saldo_inicial_proposto
+                            }
+                            onChange={(event) =>
+                              setBaselineDrafts((prev) => ({
+                                ...prev,
+                                [line.investment_id]: event.target.value,
+                              }))
+                            }
+                          />
+                        </td>
+                        <td>
+                          <span className="tag">{line.confianca}</span>
+                        </td>
+                        <td>{line.motivo}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {confirmBaseline.isError && <p role="alert">Não foi possível confirmar o baseline.</p>}
+          <div className="dash-filter">
+            <button
+              type="button"
+              disabled={
+                !baselineProposal.data ||
+                baselineProposal.data.length === 0 ||
+                confirmBaseline.isPending
+              }
+              onClick={handleConfirmBaseline}
+            >
+              Confirmar baseline
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setBaselineOpen(false);
+                setBaselineDrafts({});
+              }}
+            >
+              Fechar
+            </button>
+          </div>
+        </>
+      )}
 
       <h3>Auditoria de saldo por conta</h3>
       <p className="dash-empty">

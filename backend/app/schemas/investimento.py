@@ -26,3 +26,16 @@ class InvestimentoEvolucaoOut(BaseModel):
     total_aportes: Decimal
     total_resgates: Decimal
     rendimento_estimado: Decimal
+
+
+class EvolucaoMensalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    ano_mes: str
+    saldo: Decimal
+    valorizacao: Decimal
+    rendimento: Decimal
+    dividendos: Decimal
+    aportes: Decimal
+    resgates: Decimal
+    confianca: str

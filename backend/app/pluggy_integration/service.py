@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from zoneinfo import ZoneInfo
@@ -6,6 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.categorization.competencia import caixa, competencia_padrao, competencia_salario
+from app.categorization.engine import suggest_holding_investimento
 from app.categorization.service import salario_subcategory_id
 from app.config import settings
 from app.exceptions import InvalidStateError, NotFoundError
@@ -15,6 +17,7 @@ from app.models.pluggy import (
     PluggyAccount,
     PluggyAccountTipo,
     PluggyInvestment,
+    PluggyInvestmentSnapshot,
     PluggyInvestmentTransaction,
     PluggyItem,
     PluggyItemStatus,
@@ -193,6 +196,356 @@ def update_investment_saldo_inicial(
     return investment
 
 
+_BASELINE_DATA = date(2025, 12, 31)
+
+
+@dataclass
+class BaselineProposalLine:
+    investment_id: int
+    nome: str
+    tipo: str
+    codigo: str | None
+    saldo_atual: Decimal
+    saldo_inicial_proposto: Decimal
+    confianca: str
+    motivo: str
+
+
+def propose_baseline_dez_2025(
+    db: Session, client: PluggyClient, user_id: int
+) -> list[BaselineProposalLine]:
+    """Gera a proposta de saldo em 31/12/2025 por holding, sem persistir nada
+    — o CEO revisa/ajusta linha a linha antes de `confirm_baseline_dez_2025`.
+    Algoritmo fechado no Bloco 0 da Sprint 21 (ver SPRINT-021-progress.md):
+    (1) posição comprada depois do baseline -> 0, confiança alta (fato, não
+    estimativa); (2) taxa verdadeiramente fixa (`fixedAnnualRate`, sem índice
+    variável) e comprada antes do baseline -> juros compostos, confiança
+    alta; (3) resto (CDI/IPCA indexado, ou EQUITY) -> fórmula reversa de
+    fluxo, confiança "estimada" — CDI/IPCA histórico e cotação de ações são
+    fontes de mercado fora de escopo (mesmo princípio já usado pra ações).
+    """
+    holdings = (
+        db.query(PluggyInvestment)
+        .filter(PluggyInvestment.user_id == user_id)
+        .order_by(PluggyInvestment.nome)
+        .all()
+    )
+    if not holdings:
+        return []
+
+    items_by_id = {
+        item.id: item
+        for item in db.query(PluggyItem).filter(PluggyItem.id.in_({h.item_id for h in holdings}))
+    }
+    raw_by_investment_id: dict[str, dict] = {}
+    fetched_pluggy_item_ids: set[str] = set()
+    for holding in holdings:
+        pluggy_item_id = items_by_id[holding.item_id].pluggy_item_id
+        if pluggy_item_id in fetched_pluggy_item_ids:
+            continue
+        for raw in client.get_investments(pluggy_item_id):
+            raw_by_investment_id[raw["id"]] = raw
+        fetched_pluggy_item_ids.add(pluggy_item_id)
+
+    return [
+        _propose_baseline_line(db, holding, raw_by_investment_id.get(holding.pluggy_investment_id))
+        for holding in holdings
+    ]
+
+
+def _propose_baseline_line(
+    db: Session, holding: PluggyInvestment, raw: dict | None
+) -> BaselineProposalLine:
+    purchase_date_raw = raw.get("purchaseDate") if raw else None
+    purchase_date = _parse_investment_date(purchase_date_raw) if purchase_date_raw else None
+
+    if purchase_date is not None and purchase_date > _BASELINE_DATA:
+        return BaselineProposalLine(
+            investment_id=holding.id,
+            nome=holding.nome,
+            tipo=holding.tipo,
+            codigo=holding.codigo,
+            saldo_atual=holding.valor_atual,
+            saldo_inicial_proposto=Decimal("0"),
+            confianca="alta",
+            motivo="Posição comprada depois de 31/12/2025 — não existia no baseline.",
+        )
+
+    fixed_annual_rate = raw.get("fixedAnnualRate") if raw else None
+    rate_type = raw.get("rateType") if raw else None
+    amount_original = raw.get("amountOriginal") if raw else None
+    if (
+        purchase_date is not None
+        and fixed_annual_rate is not None
+        and rate_type is None
+        and amount_original
+    ):
+        saldo = _juros_compostos(
+            Decimal(str(amount_original)),
+            Decimal(str(fixed_annual_rate)),
+            purchase_date,
+            _BASELINE_DATA,
+        )
+        return BaselineProposalLine(
+            investment_id=holding.id,
+            nome=holding.nome,
+            tipo=holding.tipo,
+            codigo=holding.codigo,
+            saldo_atual=holding.valor_atual,
+            saldo_inicial_proposto=saldo,
+            confianca="alta",
+            motivo=(
+                f"Juros compostos a {fixed_annual_rate}% a.a. (taxa fixa) desde "
+                f"{purchase_date.isoformat()}."
+            ),
+        )
+
+    net_aportes = _net_aportes_desde_cutoff(db, holding.id)
+    saldo_estimado = max(holding.valor_atual - net_aportes, Decimal("0"))
+    return BaselineProposalLine(
+        investment_id=holding.id,
+        nome=holding.nome,
+        tipo=holding.tipo,
+        codigo=holding.codigo,
+        saldo_atual=holding.valor_atual,
+        saldo_inicial_proposto=saldo_estimado,
+        confianca="estimada",
+        motivo=(
+            "Estimado por fluxo reverso (saldo atual − aportes líquidos desde jan/2026) — "
+            "sem fonte de cotação/índice histórico integrada (fora de escopo)."
+        ),
+    )
+
+
+def _juros_compostos(
+    principal: Decimal, annual_rate_pct: Decimal, start: date, end: date
+) -> Decimal:
+    if end <= start:
+        return principal
+    days = (end - start).days
+    daily_rate = (1 + float(annual_rate_pct) / 100) ** (1 / 365) - 1
+    valor = float(principal) * (1 + daily_rate) ** days
+    return Decimal(str(round(valor, 2)))
+
+
+def _net_aportes_desde_cutoff(db: Session, investment_id: int) -> Decimal:
+    buys = (
+        db.query(func.coalesce(func.sum(PluggyInvestmentTransaction.valor), 0))
+        .filter(
+            PluggyInvestmentTransaction.investment_id == investment_id,
+            PluggyInvestmentTransaction.tipo == "BUY",
+        )
+        .scalar()
+    )
+    sells = (
+        db.query(func.coalesce(func.sum(PluggyInvestmentTransaction.valor), 0))
+        .filter(
+            PluggyInvestmentTransaction.investment_id == investment_id,
+            PluggyInvestmentTransaction.tipo == "SELL",
+        )
+        .scalar()
+    )
+    return Decimal(str(buys)) - Decimal(str(sells))
+
+
+def confirm_baseline_dez_2025(
+    db: Session, user_id: int, linhas: list[tuple[int, Decimal]]
+) -> list[PluggyInvestment]:
+    """Grava `saldo_inicial` só após o CEO revisar/ajustar a proposta —
+    nunca chamado automaticamente pelo sync."""
+    investments = [get_investment(db, user_id, investment_id) for investment_id, _ in linhas]
+    for investment, (_, saldo_inicial) in zip(investments, linhas, strict=True):
+        investment.saldo_inicial = saldo_inicial
+    db.commit()
+    for investment in investments:
+        db.refresh(investment)
+    return investments
+
+
+def reconstruct_historical_snapshots(db: Session, user_id: int) -> list[PluggyInvestmentSnapshot]:
+    """Popula retroativamente jan/2026 até o mês anterior ao corrente, por
+    holding com baseline já aprovado (`saldo_inicial IS NOT NULL` —
+    holdings sem baseline aprovado são ignoradas). Sem fonte de valorização
+    histórica real (mesma limitação de mercado do baseline), cada mês
+    reconstruído carrega só o saldo por fluxo acumulado (aportes/resgates
+    conhecidos pela data real de cada `pluggy_investment_transaction`);
+    valorização/rendimento ficam zerados nos meses reconstruídos e só
+    aparecem a partir do primeiro snapshot real do job mensal (quando o
+    saldo observado de verdade diverge do fluxo acumulado). `confianca=
+    "reconstruido"` marca a diferença pra UI.
+    """
+    holdings = (
+        db.query(PluggyInvestment)
+        .filter(PluggyInvestment.user_id == user_id, PluggyInvestment.saldo_inicial.isnot(None))
+        .order_by(PluggyInvestment.id)
+        .all()
+    )
+    snapshots = [
+        snap for holding in holdings for snap in _reconstruct_holding_snapshots(db, holding)
+    ]
+    db.commit()
+    return snapshots
+
+
+def _months_between(start: date, end_exclusive: date) -> list[str]:
+    months = []
+    year, month = start.year, start.month
+    while (year, month) < (end_exclusive.year, end_exclusive.month):
+        months.append(f"{year:04d}-{month:02d}")
+        month += 1
+        if month > 12:
+            month, year = 1, year + 1
+    return months
+
+
+def _reconstruct_holding_snapshots(
+    db: Session, holding: PluggyInvestment
+) -> list[PluggyInvestmentSnapshot]:
+    hoje = datetime.now(_BRT).date()
+    meses = _months_between(date(2026, 1, 1), date(hoje.year, hoje.month, 1))
+    transactions = (
+        db.query(PluggyInvestmentTransaction)
+        .filter(PluggyInvestmentTransaction.investment_id == holding.id)
+        .order_by(PluggyInvestmentTransaction.data)
+        .all()
+    )
+
+    saldo_acumulado = holding.saldo_inicial
+    result = []
+    for ano_mes in meses:
+        ano, mes = int(ano_mes[:4]), int(ano_mes[5:7])
+        aportes = sum(
+            (tx.valor for tx in transactions if tx.tipo == "BUY" and _no_mes(tx.data, ano, mes)),
+            Decimal("0"),
+        )
+        resgates = sum(
+            (tx.valor for tx in transactions if tx.tipo == "SELL" and _no_mes(tx.data, ano, mes)),
+            Decimal("0"),
+        )
+        saldo_acumulado = saldo_acumulado + aportes - resgates
+        result.append(
+            _upsert_snapshot(
+                db,
+                holding,
+                ano_mes,
+                saldo=saldo_acumulado,
+                valorizacao=Decimal("0"),
+                rendimento=Decimal("0"),
+                dividendos=Decimal("0") if holding.tipo == "EQUITY" else None,
+                aportes=aportes,
+                resgates=resgates,
+                confianca="reconstruido",
+            )
+        )
+    return result
+
+
+def _no_mes(data: date, ano: int, mes: int) -> bool:
+    return data.year == ano and data.month == mes
+
+
+def _upsert_snapshot(
+    db: Session,
+    holding: PluggyInvestment,
+    ano_mes: str,
+    *,
+    saldo: Decimal,
+    valorizacao: Decimal,
+    rendimento: Decimal,
+    dividendos: Decimal | None,
+    aportes: Decimal,
+    resgates: Decimal,
+    confianca: str,
+) -> PluggyInvestmentSnapshot:
+    snapshot = (
+        db.query(PluggyInvestmentSnapshot)
+        .filter(
+            PluggyInvestmentSnapshot.investment_id == holding.id,
+            PluggyInvestmentSnapshot.ano_mes == ano_mes,
+        )
+        .one_or_none()
+    )
+    if snapshot is None:
+        snapshot = PluggyInvestmentSnapshot(
+            investment_id=holding.id, user_id=holding.user_id, ano_mes=ano_mes
+        )
+        db.add(snapshot)
+    snapshot.saldo = saldo
+    snapshot.valorizacao = valorizacao
+    snapshot.rendimento = rendimento
+    snapshot.dividendos = dividendos
+    snapshot.aportes = aportes
+    snapshot.resgates = resgates
+    snapshot.confianca = confianca
+    db.flush()
+    return snapshot
+
+
+def snapshot_current_month(
+    db: Session, holding: PluggyInvestment
+) -> PluggyInvestmentSnapshot | None:
+    """Grava/atualiza o snapshot do mês corrente pra uma holding, chamado a
+    cada sync (mesmo princípio de "mês corrente é provisório" já usado
+    noutras partes do sistema — meses fechados nunca são revisitados aqui).
+    Idempotente via `UniqueConstraint(investment_id, ano_mes)` — rodar 2x no
+    mesmo mês faz upsert, não duplica. Não faz nada se o baseline ainda não
+    foi aprovado (`saldo_inicial IS NULL`) — não há base pra calcular
+    valorização/rendimento residual.
+    """
+    if holding.saldo_inicial is None:
+        return None
+
+    hoje = datetime.now(_BRT).date()
+    ano_mes = f"{hoje.year:04d}-{hoje.month:02d}"
+    mes_transactions = (
+        db.query(PluggyInvestmentTransaction)
+        .filter(
+            PluggyInvestmentTransaction.investment_id == holding.id,
+            PluggyInvestmentTransaction.data >= date(hoje.year, hoje.month, 1),
+        )
+        .all()
+    )
+    aportes = sum((tx.valor for tx in mes_transactions if tx.tipo == "BUY"), Decimal("0"))
+    resgates = sum((tx.valor for tx in mes_transactions if tx.tipo == "SELL"), Decimal("0"))
+
+    snapshot_anterior = (
+        db.query(PluggyInvestmentSnapshot)
+        .filter(
+            PluggyInvestmentSnapshot.investment_id == holding.id,
+            PluggyInvestmentSnapshot.ano_mes < ano_mes,
+        )
+        .order_by(PluggyInvestmentSnapshot.ano_mes.desc())
+        .first()
+    )
+    saldo_anterior = (
+        snapshot_anterior.saldo if snapshot_anterior is not None else holding.saldo_inicial
+    )
+
+    saldo_atual = holding.valor_atual
+    residual = saldo_atual - saldo_anterior - aportes + resgates
+    if holding.tipo == "EQUITY":
+        # Nenhuma transação de dividendo foi observada no achado real do
+        # Bloco 0 — dividendos ficam 0 até a Pluggy reportar um `type`
+        # identificável; toda a diferença cai em valorização.
+        valorizacao, rendimento, dividendos = residual, Decimal("0"), Decimal("0")
+    else:
+        valorizacao, rendimento, dividendos = Decimal("0"), residual, None
+
+    snapshot = _upsert_snapshot(
+        db,
+        holding,
+        ano_mes,
+        saldo=saldo_atual,
+        valorizacao=valorizacao,
+        rendimento=rendimento,
+        dividendos=dividendos,
+        aportes=aportes,
+        resgates=resgates,
+        confianca="real",
+    )
+    return snapshot
+
+
 def list_investment_transactions(
     db: Session, user_id: int, investment_id: int
 ) -> list[PluggyInvestmentTransaction]:
@@ -354,11 +707,14 @@ def sync_item(db: Session, client: PluggyClient, user_id: int, item_id: int) -> 
     investments_raw = client.get_investments(item.pluggy_item_id)
     for investment_raw in investments_raw:
         investment = _upsert_investment(db, item, investment_raw)
+        if investment.investimento_id is None:
+            _apply_holding_suggestion(db, investment)
         investment_transactions_raw = client.get_investment_transactions(
             investment_raw["id"], from_date=item.cutoff_date
         )
         for investment_tx_raw in investment_transactions_raw:
             _upsert_investment_transaction(db, investment, investment_tx_raw)
+        snapshot_current_month(db, investment)
 
     item.last_synced_at = datetime.now(UTC)
     db.commit()
@@ -454,6 +810,25 @@ def _upsert_investment(db: Session, item: PluggyItem, raw: dict) -> PluggyInvest
 
     db.flush()
     return investment
+
+
+def _apply_holding_suggestion(db: Session, investment: PluggyInvestment) -> None:
+    # Só chamada para holdings ainda sem investimento_id (verificado pelo
+    # chamador) — nunca sobrescreve um vínculo manual já feito pelo usuário.
+    suggestion = suggest_holding_investimento(db, investment.user_id, investment)
+    if suggestion is not None:
+        investment.investimento_sugerido_id = suggestion.investimento_id
+        investment.investimento_sugestao_confianca = suggestion.confianca
+        investment.investimento_sugestao_fonte_tipo = suggestion.fonte_tipo
+        investment.investimento_sugestao_fonte_id = suggestion.fonte_id
+        investment.investimento_sugestao_score = suggestion.score
+    else:
+        investment.investimento_sugerido_id = None
+        investment.investimento_sugestao_confianca = None
+        investment.investimento_sugestao_fonte_tipo = None
+        investment.investimento_sugestao_fonte_id = None
+        investment.investimento_sugestao_score = None
+    db.flush()
 
 
 def _upsert_investment_transaction(

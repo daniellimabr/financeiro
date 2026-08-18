@@ -212,12 +212,24 @@ class PluggyInvestment(Base):
     investimento_id: Mapped[int | None] = mapped_column(
         ForeignKey("investimentos.id"), nullable=True
     )
+    investimento_sugerido_id: Mapped[int | None] = mapped_column(
+        ForeignKey("investimentos.id"), nullable=True
+    )
+    investimento_sugestao_confianca: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    investimento_sugestao_fonte_tipo: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    investimento_sugestao_fonte_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    investimento_sugestao_score: Mapped[Decimal | None] = mapped_column(
+        Numeric(4, 3), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
     transactions: Mapped[list["PluggyInvestmentTransaction"]] = relationship(
+        back_populates="investment", cascade="all, delete-orphan"
+    )
+    snapshots: Mapped[list["PluggyInvestmentSnapshot"]] = relationship(
         back_populates="investment", cascade="all, delete-orphan"
     )
 
@@ -245,3 +257,43 @@ class PluggyInvestmentTransaction(Base):
     )
 
     investment: Mapped["PluggyInvestment"] = relationship(back_populates="transactions")
+
+
+class PluggyInvestmentSnapshot(Base):
+    """Snapshot mensal de saldo/valorização/rendimento por holding (Sprint 21).
+
+    Meses fechados são imutáveis uma vez gravados; o mês corrente pode ser
+    regravado a cada sync até fechar (idempotência via UniqueConstraint
+    (investment_id, ano_mes), upsert no job/reconstrução).
+    """
+
+    __tablename__ = "pluggy_investment_snapshots"
+    __table_args__ = (
+        Index("ux_pluggy_investment_snapshots_inv_mes", "investment_id", "ano_mes", unique=True),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    investment_id: Mapped[int] = mapped_column(ForeignKey("pluggy_investments.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    # "YYYY-MM" — string simples, o mesmo mês nunca precisa de aritmética de
+    # data, só igualdade/ordenação lexicográfica (que já funciona pro formato).
+    ano_mes: Mapped[str] = mapped_column(String(7), nullable=False)
+    saldo: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    valorizacao: Mapped[Decimal] = mapped_column(
+        Numeric(14, 2), nullable=False, default=Decimal("0")
+    )
+    rendimento: Mapped[Decimal] = mapped_column(
+        Numeric(14, 2), nullable=False, default=Decimal("0")
+    )
+    # Só preenchido para holdings EQUITY (achado do Bloco 0: FIXED_INCOME nunca
+    # reporta transação de dividendo/cupom separada).
+    dividendos: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    aportes: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=Decimal("0"))
+    resgates: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=Decimal("0"))
+    confianca: Mapped[str] = mapped_column(String(20), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    investment: Mapped["PluggyInvestment"] = relationship(back_populates="snapshots")

@@ -334,6 +334,78 @@ describe("InvestimentosPage", () => {
     ).toBe(true);
   });
 
+  it("opens the drilldown Série histórica view rendering the monthly snapshot table", async () => {
+    const evolucaoMensalFixture = [
+      {
+        ano_mes: "2026-01",
+        saldo: "5000.00",
+        valorizacao: "0.00",
+        rendimento: "0.00",
+        dividendos: "0.00",
+        aportes: "0.00",
+        resgates: "0.00",
+        confianca: "reconstruido",
+      },
+      {
+        ano_mes: "2026-02",
+        saldo: "5500.00",
+        valorizacao: "0.00",
+        rendimento: "500.00",
+        dividendos: "0.00",
+        aportes: "0.00",
+        resgates: "0.00",
+        confianca: "real",
+      },
+    ];
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/investimentos/1/evolucao-mensal") {
+        return Promise.resolve(jsonResponse(evolucaoMensalFixture));
+      }
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url === "/investimentos") return Promise.resolve(jsonResponse([INVESTIMENTO_FIXTURE]));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<InvestimentosPage />);
+    await screen.findByText("Reserva de emergência");
+
+    const grid = screen.getByText("Reserva de emergência").closest(".dash-tile") as HTMLElement;
+    await userEvent.click(within(grid).getByRole("button", { name: "Ver extrato no período" }));
+    await userEvent.click(screen.getByRole("button", { name: "Série histórica" }));
+
+    expect(await screen.findByText("2026-01")).toBeInTheDocument();
+    expect(screen.getByText("2026-02")).toBeInTheDocument();
+    expect(screen.getByText("R$ 5.000,00")).toBeInTheDocument();
+    expect(screen.getByText("R$ 5.500,00")).toBeInTheDocument();
+    expect(screen.getByText("reconstruido")).toBeInTheDocument();
+    expect(screen.getByText("real")).toBeInTheDocument();
+    expect(screen.getByText(/Meses marcados "reconstruido"/)).toBeInTheDocument();
+  });
+
+  it("shows an empty state for Série histórica when no snapshot exists yet", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/investimentos/1/evolucao-mensal") return Promise.resolve(jsonResponse([]));
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url === "/investimentos") return Promise.resolve(jsonResponse([INVESTIMENTO_FIXTURE]));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<InvestimentosPage />);
+    await screen.findByText("Reserva de emergência");
+
+    const grid = screen.getByText("Reserva de emergência").closest(".dash-tile") as HTMLElement;
+    await userEvent.click(within(grid).getByRole("button", { name: "Ver extrato no período" }));
+    await userEvent.click(screen.getByRole("button", { name: "Série histórica" }));
+
+    expect(await screen.findByText(/Nenhum snapshot mensal ainda/)).toBeInTheDocument();
+  });
+
   it("renders a sparkline on the card when trend data is available", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);

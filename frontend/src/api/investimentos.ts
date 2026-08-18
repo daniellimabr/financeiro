@@ -50,3 +50,18 @@ export function deleteInvestimento(investimentoId: number): Promise<void> {
 export function fetchInvestimentoEvolucao(investimentoId: number): Promise<InvestimentoEvolucao> {
   return apiFetch<InvestimentoEvolucao>(`/investimentos/${investimentoId}/evolucao`);
 }
+
+export interface EvolucaoMensal {
+  ano_mes: string;
+  saldo: string;
+  valorizacao: string;
+  rendimento: string;
+  dividendos: string;
+  aportes: string;
+  resgates: string;
+  confianca: string;
+}
+
+export function fetchEvolucaoMensal(investimentoId: number): Promise<EvolucaoMensal[]> {
+  return apiFetch<EvolucaoMensal[]>(`/investimentos/${investimentoId}/evolucao-mensal`);
+}

@@ -36,6 +36,11 @@ const INVESTMENT_FIXTURE = {
   saldo_inicial: null,
   moeda: "BRL",
   investimento_id: null,
+  investimento_sugerido_id: null,
+  investimento_sugestao_confianca: null,
+  investimento_sugestao_fonte_tipo: null,
+  investimento_sugestao_fonte_id: null,
+  investimento_sugestao_score: null,
   created_at: "2026-08-17T00:00:00Z",
   updated_at: "2026-08-17T00:00:00Z",
 };
@@ -434,6 +439,135 @@ describe("AccountManagementPage", () => {
       expect(call).toBeDefined();
       const body = JSON.parse((call?.[1] as RequestInit).body as string);
       expect(body).toEqual({ saldo_inicial: "20000" });
+    });
+  });
+
+  it("pre-selects a pending suggestion with confidence and accepts it via the button", async () => {
+    const suggested = {
+      ...INVESTMENT_FIXTURE,
+      investimento_sugerido_id: 1,
+      investimento_sugestao_confianca: "alta",
+      investimento_sugestao_fonte_tipo: "codigo_exato",
+    };
+    const investimentoFixture = {
+      id: 1,
+      user_id: 1,
+      nome: "Reserva de emergência",
+      created_at: "2026-08-14T00:00:00Z",
+      updated_at: "2026-08-14T00:00:00Z",
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      if (url === "/pluggy/items") return Promise.resolve(jsonResponse([]));
+      if (url === "/pluggy/accounts") return Promise.resolve(jsonResponse([]));
+      if (url === "/pluggy/investments" && method === "GET")
+        return Promise.resolve(jsonResponse([suggested]));
+      if (url === "/investimentos") return Promise.resolve(jsonResponse([investimentoFixture]));
+      if (url === "/pluggy/investments/1" && method === "PUT") {
+        return Promise.resolve(jsonResponse({ ...suggested, investimento_id: 1 }));
+      }
+      if (url.startsWith("/dashboards/evolucao-saldo-por-conta"))
+        return Promise.resolve(jsonResponse([]));
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<AccountManagementPage />);
+
+    const select = (await screen.findByLabelText(
+      "Investimento de CDB - NU FINANCEIRA"
+    )) as HTMLSelectElement;
+    expect(select.value).toBe("1");
+    expect(screen.getByText(/sugestão · confiança alta/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Aceitar sugestão" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (c) => String(c[0]) === "/pluggy/investments/1" && (c[1] as RequestInit)?.method === "PUT"
+      );
+      expect(call).toBeDefined();
+      const body = JSON.parse((call?.[1] as RequestInit).body as string);
+      expect(body).toEqual({ investimento_id: 1 });
+    });
+  });
+
+  it("does not show a suggestion badge once a holding is already linked", async () => {
+    const linked = { ...INVESTMENT_FIXTURE, investimento_id: 1, investimento_sugerido_id: 2 };
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/pluggy/items") return Promise.resolve(jsonResponse([]));
+      if (url === "/pluggy/accounts") return Promise.resolve(jsonResponse([]));
+      if (url === "/pluggy/investments") return Promise.resolve(jsonResponse([linked]));
+      if (url === "/investimentos") return Promise.resolve(jsonResponse([]));
+      if (url.startsWith("/dashboards/evolucao-saldo-por-conta"))
+        return Promise.resolve(jsonResponse([]));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<AccountManagementPage />);
+    await screen.findByText(/CDB - NU FINANCEIRA/);
+
+    expect(screen.queryByText(/sugestão · confiança/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Aceitar sugestão" })).not.toBeInTheDocument();
+  });
+
+  it("reviews the baseline proposal and confirms an edited value", async () => {
+    const proposalLine = {
+      investment_id: 1,
+      nome: "CDB - NU FINANCEIRA",
+      tipo: "FIXED_INCOME",
+      codigo: null,
+      saldo_atual: "22762.07",
+      saldo_inicial_proposto: "20000.00",
+      confianca: "estimada",
+      motivo: "Estimado por fluxo reverso.",
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      if (url === "/pluggy/items") return Promise.resolve(jsonResponse([]));
+      if (url === "/pluggy/accounts") return Promise.resolve(jsonResponse([]));
+      if (url === "/pluggy/investments" && method === "GET")
+        return Promise.resolve(jsonResponse([INVESTMENT_FIXTURE]));
+      if (url.startsWith("/dashboards/evolucao-saldo-por-conta"))
+        return Promise.resolve(jsonResponse([]));
+      if (url === "/pluggy/investments/baseline-dez-2025" && method === "GET") {
+        return Promise.resolve(jsonResponse([proposalLine]));
+      }
+      if (url === "/pluggy/investments/baseline-dez-2025" && method === "POST") {
+        return Promise.resolve(
+          jsonResponse([{ ...INVESTMENT_FIXTURE, saldo_inicial: "21000.00" }])
+        );
+      }
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<AccountManagementPage />);
+    await screen.findByText(/CDB - NU FINANCEIRA/);
+
+    await userEvent.click(screen.getByRole("button", { name: "Revisar proposta de baseline" }));
+
+    const input = await screen.findByLabelText("Saldo inicial proposto de CDB - NU FINANCEIRA");
+    expect((input as HTMLInputElement).value).toBe("20000.00");
+    expect(screen.getByText("estimada")).toBeInTheDocument();
+
+    await userEvent.clear(input);
+    await userEvent.type(input, "21000");
+    await userEvent.click(screen.getByRole("button", { name: "Confirmar baseline" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (c) =>
+          String(c[0]) === "/pluggy/investments/baseline-dez-2025" &&
+          (c[1] as RequestInit)?.method === "POST"
+      );
+      expect(call).toBeDefined();
+      const body = JSON.parse((call?.[1] as RequestInit).body as string);
+      expect(body).toEqual({ linhas: [{ investment_id: 1, saldo_inicial: "21000" }] });
     });
   });
 

@@ -1128,3 +1128,66 @@ def test_list_investment_transactions_of_nonexistent_investment_returns_404(clie
     response = client.get("/pluggy/investments/999/transactions")
 
     assert response.status_code == 404
+
+
+# --- Sprint 21: baseline dez/2025 -----------------------------------------
+
+
+def test_baseline_endpoints_without_cookie_return_401(client):
+    assert client.get("/pluggy/investments/baseline-dez-2025").status_code == 401
+    assert (
+        client.post("/pluggy/investments/baseline-dez-2025", json={"linhas": []}).status_code == 401
+    )
+
+
+def test_get_baseline_proposal_returns_lines(client, db_session):
+    _authenticate(client, db_session)
+    _item, investment, _fake_client = _connect_investment(client, db_session)
+
+    response = client.get("/pluggy/investments/baseline-dez-2025")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["investment_id"] == investment["id"]
+    assert body[0]["confianca"] in ("alta", "estimada")
+
+
+def test_confirm_baseline_proposal_persists_saldo_inicial(client, db_session):
+    _authenticate(client, db_session)
+    _item, investment, _fake_client = _connect_investment(client, db_session)
+
+    response = client.post(
+        "/pluggy/investments/baseline-dez-2025",
+        json={"linhas": [{"investment_id": investment["id"], "saldo_inicial": "20000.00"}]},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body[0]["saldo_inicial"] == "20000.00"
+
+    holding_response = client.get("/pluggy/investments").json()[0]
+    assert holding_response["saldo_inicial"] == "20000.00"
+
+
+def test_confirm_baseline_proposal_of_other_users_investment_returns_404(client, db_session):
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    _item, investment, _fake_client = _connect_investment(client, db_session)
+
+    client.cookies.clear()
+    _authenticate(client, db_session, google_sub="google-2", email="b@example.com")
+
+    response = client.post(
+        "/pluggy/investments/baseline-dez-2025",
+        json={"linhas": [{"investment_id": investment["id"], "saldo_inicial": "1.00"}]},
+    )
+
+    assert response.status_code == 404
+
+
+def test_investment_out_exposes_suggestion_fields(client, db_session):
+    _authenticate(client, db_session)
+    _item, investment, _fake_client = _connect_investment(client, db_session)
+
+    assert "investimento_sugerido_id" in investment
+    assert "investimento_sugestao_confianca" in investment

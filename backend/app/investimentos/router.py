@@ -6,7 +6,12 @@ from app.db import get_db
 from app.exceptions import NotFoundError
 from app.investimentos import service
 from app.models.user import User
-from app.schemas.investimento import InvestimentoEvolucaoOut, InvestimentoIn, InvestimentoOut
+from app.schemas.investimento import (
+    EvolucaoMensalOut,
+    InvestimentoEvolucaoOut,
+    InvestimentoIn,
+    InvestimentoOut,
+)
 
 router = APIRouter(prefix="/investimentos")
 
@@ -72,5 +77,17 @@ def get_evolucao(
 ):
     try:
         return service.get_evolucao(db, current_user.id, investimento_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get("/{investimento_id}/evolucao-mensal", response_model=list[EvolucaoMensalOut])
+def get_evolucao_mensal(
+    investimento_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return service.get_evolucao_mensal(db, current_user.id, investimento_id)
     except NotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

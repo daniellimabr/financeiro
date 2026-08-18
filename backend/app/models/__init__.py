@@ -6,6 +6,7 @@ from app.models.liability import Liability
 from app.models.pluggy import (
     PluggyAccount,
     PluggyInvestment,
+    PluggyInvestmentSnapshot,
     PluggyInvestmentTransaction,
     PluggyItem,
     PluggyTransaction,
@@ -20,6 +21,7 @@ __all__ = [
     "Liability",
     "PluggyAccount",
     "PluggyInvestment",
+    "PluggyInvestmentSnapshot",
     "PluggyInvestmentTransaction",
     "PluggyItem",
     "PluggyTransaction",

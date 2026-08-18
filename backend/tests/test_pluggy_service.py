@@ -1126,3 +1126,285 @@ def test_list_investment_transactions_isolated_by_user(db_session, user, other_u
 
     with pytest.raises(NotFoundError):
         service.list_investment_transactions(db_session, other_user.id, investment.id)
+
+
+# --- Sprint 21: sugestão holding->Investimento ---------------------------
+
+
+def test_sync_item_applies_codigo_exato_suggestion_for_unlinked_holding(db_session, user):
+    investimento = Investimento(user_id=user.id, nome="Ações XP")
+    db_session.add(investimento)
+    db_session.commit()
+    db_session.refresh(investimento)
+
+    client = FakePluggyClient(
+        item=_item_raw(), accounts=[], investments=[_investment_raw(code="HAPV3", isin="BR123")]
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    linked = service.list_investments(db_session, user.id)[0]
+    service.update_investment(db_session, user.id, linked.id, investimento_id=investimento.id)
+
+    client2 = FakePluggyClient(
+        item=_item_raw(id="item-ext-2"),
+        accounts=[],
+        investments=[_investment_raw(id="inv-ext-2", code="HAPV3", isin="BR123")],
+    )
+    item2 = service.register_item(db_session, client2, user.id, "item-ext-2")
+    service.sync_item(db_session, client2, user.id, item2.id)
+
+    novo = next(i for i in service.list_investments(db_session, user.id) if i.id != linked.id)
+    assert novo.investimento_id is None
+    assert novo.investimento_sugerido_id == investimento.id
+    assert novo.investimento_sugestao_confianca == "alta"
+    assert novo.investimento_sugestao_fonte_tipo == "codigo_exato"
+
+
+def test_sync_item_never_overwrites_manually_linked_holding(db_session, user):
+    investimento_manual = Investimento(user_id=user.id, nome="Manual")
+    db_session.add(investimento_manual)
+    db_session.commit()
+    db_session.refresh(investimento_manual)
+
+    client = FakePluggyClient(item=_item_raw(), accounts=[], investments=[_investment_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    investment = service.list_investments(db_session, user.id)[0]
+    service.update_investment(
+        db_session, user.id, investment.id, investimento_id=investimento_manual.id
+    )
+
+    # Novo sync — mesmo que exista uma holding parecida por nome, o vínculo
+    # manual não pode ser sobrescrito nem a sugestão recalculada.
+    outro_investimento = Investimento(user_id=user.id, nome="CDB - NU FINANCEIRA")
+    db_session.add(outro_investimento)
+    db_session.commit()
+    service.sync_item(db_session, client, user.id, item.id)
+
+    db_session.refresh(investment)
+    assert investment.investimento_id == investimento_manual.id
+    assert investment.investimento_sugerido_id is None
+
+
+def test_sync_item_no_match_leaves_suggestion_fields_none(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(), accounts=[], investments=[_investment_raw(name="Sem nada parecido")]
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+
+    service.sync_item(db_session, client, user.id, item.id)
+
+    investment = service.list_investments(db_session, user.id)[0]
+    assert investment.investimento_sugerido_id is None
+    assert investment.investimento_sugestao_confianca is None
+
+
+# --- Sprint 21: baseline dez/2025 -----------------------------------------
+
+
+def test_propose_baseline_purchase_after_baseline_date_is_zero_alta(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[],
+        investments=[_investment_raw(purchaseDate="2026-01-19T03:00:00.000Z")],
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+
+    proposal = service.propose_baseline_dez_2025(db_session, client, user.id)
+
+    assert len(proposal) == 1
+    assert proposal[0].saldo_inicial_proposto == Decimal("0")
+    assert proposal[0].confianca == "alta"
+
+
+def test_propose_baseline_fixed_rate_uses_compound_interest(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[],
+        investments=[
+            _investment_raw(
+                purchaseDate="2025-01-01T03:00:00.000Z",
+                rateType=None,
+                fixedAnnualRate=10.0,
+                amountOriginal=1000.0,
+                balance=1099.73,
+            )
+        ],
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+
+    proposal = service.propose_baseline_dez_2025(db_session, client, user.id)
+
+    line = proposal[0]
+    assert line.confianca == "alta"
+    assert Decimal("1090") < line.saldo_inicial_proposto < Decimal("1100")
+
+
+def test_propose_baseline_cdi_indexed_falls_back_to_reverse_flow(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[],
+        investments=[
+            _investment_raw(
+                purchaseDate="2025-05-12T03:00:00.000Z", rateType="CDI", balance=22762.07
+            )
+        ],
+        investment_transactions_by_investment={
+            "inv-ext-1": [
+                _investment_transaction_raw(
+                    id="tx1", type="BUY", amount=5000.00, date="2026-03-01T00:00:00.000Z"
+                )
+            ],
+        },
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+
+    proposal = service.propose_baseline_dez_2025(db_session, client, user.id)
+
+    line = proposal[0]
+    assert line.confianca == "estimada"
+    assert line.saldo_inicial_proposto == Decimal("22762.07") - Decimal("5000.00")
+
+
+def test_confirm_baseline_persists_saldo_inicial(db_session, user):
+    client = FakePluggyClient(item=_item_raw(), accounts=[], investments=[_investment_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    investment = service.list_investments(db_session, user.id)[0]
+
+    updated = service.confirm_baseline_dez_2025(
+        db_session, user.id, [(investment.id, Decimal("20000.00"))]
+    )
+
+    assert updated[0].saldo_inicial == Decimal("20000.00")
+
+
+def test_confirm_baseline_other_user_raises_not_found(db_session, user, other_user):
+    client = FakePluggyClient(item=_item_raw(), accounts=[], investments=[_investment_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    investment = service.list_investments(db_session, user.id)[0]
+
+    with pytest.raises(NotFoundError):
+        service.confirm_baseline_dez_2025(
+            db_session, other_user.id, [(investment.id, Decimal("1.00"))]
+        )
+
+
+# --- Sprint 21: série histórica mensal ------------------------------------
+
+
+def test_reconstruct_historical_snapshots_accumulates_flow_per_month(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[],
+        investments=[_investment_raw(balance=5800.00)],
+        investment_transactions_by_investment={
+            "inv-ext-1": [
+                _investment_transaction_raw(
+                    id="tx1", type="BUY", amount=1000.00, date="2026-02-10T00:00:00.000Z"
+                ),
+                _investment_transaction_raw(
+                    id="tx2", type="SELL", amount=200.00, date="2026-03-05T00:00:00.000Z"
+                ),
+            ],
+        },
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    investment = service.list_investments(db_session, user.id)[0]
+    service.confirm_baseline_dez_2025(db_session, user.id, [(investment.id, Decimal("5000.00"))])
+
+    snapshots = service.reconstruct_historical_snapshots(db_session, user.id)
+
+    jan = next(s for s in snapshots if s.ano_mes == "2026-01")
+    assert jan.saldo == Decimal("5000.00")
+    assert jan.confianca == "reconstruido"
+    fev = next(s for s in snapshots if s.ano_mes == "2026-02")
+    assert fev.saldo == Decimal("6000.00")
+    assert fev.aportes == Decimal("1000.00")
+    mar = next(s for s in snapshots if s.ano_mes == "2026-03")
+    assert mar.saldo == Decimal("5800.00")
+    assert mar.resgates == Decimal("200.00")
+
+
+def test_reconstruct_historical_snapshots_skips_holdings_without_baseline(db_session, user):
+    client = FakePluggyClient(item=_item_raw(), accounts=[], investments=[_investment_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+
+    assert service.reconstruct_historical_snapshots(db_session, user.id) == []
+
+
+def test_snapshot_current_month_is_idempotent(db_session, user):
+    from app.models.pluggy import PluggyInvestmentSnapshot
+
+    client = FakePluggyClient(
+        item=_item_raw(), accounts=[], investments=[_investment_raw(balance=6000.00)]
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    investment = service.list_investments(db_session, user.id)[0]
+    service.confirm_baseline_dez_2025(db_session, user.id, [(investment.id, Decimal("5000.00"))])
+    db_session.refresh(investment)
+
+    service.snapshot_current_month(db_session, investment)
+    db_session.commit()
+    service.snapshot_current_month(db_session, investment)
+    db_session.commit()
+
+    hoje = date.today()
+    ano_mes = f"{hoje.year:04d}-{hoje.month:02d}"
+    rows = (
+        db_session.query(PluggyInvestmentSnapshot)
+        .filter(
+            PluggyInvestmentSnapshot.investment_id == investment.id,
+            PluggyInvestmentSnapshot.ano_mes == ano_mes,
+        )
+        .all()
+    )
+    assert len(rows) == 1
+    assert rows[0].confianca == "real"
+
+
+def test_snapshot_current_month_fixed_income_residual_is_rendimento(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(), accounts=[], investments=[_investment_raw(balance=5500.00)]
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    investment = service.list_investments(db_session, user.id)[0]
+    service.confirm_baseline_dez_2025(db_session, user.id, [(investment.id, Decimal("5000.00"))])
+    db_session.refresh(investment)
+
+    snapshot = service.snapshot_current_month(db_session, investment)
+
+    assert snapshot.rendimento == Decimal("500.00")
+    assert snapshot.valorizacao == Decimal("0")
+    assert snapshot.dividendos is None
+
+
+def test_snapshot_current_month_equity_residual_is_valorizacao(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[],
+        investments=[
+            _investment_raw(
+                type="EQUITY", subtype="STOCK", code="HAPV3", isin="BR123", balance=120.00
+            )
+        ],
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    investment = service.list_investments(db_session, user.id)[0]
+    service.confirm_baseline_dez_2025(db_session, user.id, [(investment.id, Decimal("100.00"))])
+    db_session.refresh(investment)
+
+    snapshot = service.snapshot_current_month(db_session, investment)
+
+    assert snapshot.valorizacao == Decimal("20.00")
+    assert snapshot.rendimento == Decimal("0")
+    assert snapshot.dividendos == Decimal("0")

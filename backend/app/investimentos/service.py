@@ -10,6 +10,7 @@ from app.models.investimento import Investimento
 from app.models.pluggy import (
     PluggyAccount,
     PluggyInvestment,
+    PluggyInvestmentSnapshot,
     PluggyTransaction,
     PluggyTransactionCategorizacaoStatus,
 )
@@ -173,3 +174,62 @@ def get_evolucao(db: Session, user_id: int, investimento_id: int) -> Evolucao:
         total_resgates=total_resgates,
         rendimento_estimado=rendimento_estimado,
     )
+
+
+@dataclass
+class EvolucaoMensal:
+    ano_mes: str
+    saldo: Decimal
+    valorizacao: Decimal
+    rendimento: Decimal
+    dividendos: Decimal
+    aportes: Decimal
+    resgates: Decimal
+    confianca: str
+
+
+def get_evolucao_mensal(db: Session, user_id: int, investimento_id: int) -> list[EvolucaoMensal]:
+    """Série mês a mês (Sprint 21) — extensão de `get_evolucao` (snapshot
+    atual), sem alterar seu cálculo. Agrega `pluggy_investment_snapshots` das
+    holdings vinculadas a este `Investimento`; contas (`PluggyAccount`) não
+    têm snapshot mensal nesta sprint (fora de escopo — só holdings de
+    investimento têm histórico jan-ago/2026 reconstruído + job mensal).
+    """
+    get_investimento(db, user_id, investimento_id)
+
+    holding_ids = [
+        row[0]
+        for row in db.query(PluggyInvestment.id).filter(
+            PluggyInvestment.user_id == user_id,
+            PluggyInvestment.investimento_id == investimento_id,
+        )
+    ]
+    if not holding_ids:
+        return []
+
+    snapshots = (
+        db.query(PluggyInvestmentSnapshot)
+        .filter(PluggyInvestmentSnapshot.investment_id.in_(holding_ids))
+        .order_by(PluggyInvestmentSnapshot.ano_mes)
+        .all()
+    )
+
+    por_mes: dict[str, list[PluggyInvestmentSnapshot]] = {}
+    for snap in snapshots:
+        por_mes.setdefault(snap.ano_mes, []).append(snap)
+
+    return [
+        EvolucaoMensal(
+            ano_mes=ano_mes,
+            saldo=sum((r.saldo for r in rows), Decimal("0")),
+            valorizacao=sum((r.valorizacao for r in rows), Decimal("0")),
+            rendimento=sum((r.rendimento for r in rows), Decimal("0")),
+            dividendos=sum((r.dividendos or Decimal("0") for r in rows), Decimal("0")),
+            aportes=sum((r.aportes for r in rows), Decimal("0")),
+            resgates=sum((r.resgates for r in rows), Decimal("0")),
+            confianca="reconstruido"
+            if any(r.confianca == "reconstruido" for r in rows)
+            else "real",
+        )
+        for ano_mes, rows in sorted(por_mes.items())
+    ]

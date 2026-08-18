@@ -77,8 +77,43 @@ export interface PluggyInvestment {
   saldo_inicial: string | null;
   moeda: string;
   investimento_id: number | null;
+  investimento_sugerido_id: number | null;
+  investimento_sugestao_confianca: string | null;
+  investimento_sugestao_fonte_tipo: string | null;
+  investimento_sugestao_fonte_id: number | null;
+  investimento_sugestao_score: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface BaselineProposalLine {
+  investment_id: number;
+  nome: string;
+  tipo: string;
+  codigo: string | null;
+  saldo_atual: string;
+  saldo_inicial_proposto: string;
+  confianca: string;
+  motivo: string;
+}
+
+export function fetchBaselineProposal(): Promise<BaselineProposalLine[]> {
+  return apiFetch<BaselineProposalLine[]>("/pluggy/investments/baseline-dez-2025");
+}
+
+export function confirmBaselineProposal(
+  linhas: { investmentId: number; saldoInicial: string }[]
+): Promise<PluggyInvestment[]> {
+  return apiFetch<PluggyInvestment[]>("/pluggy/investments/baseline-dez-2025", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      linhas: linhas.map((linha) => ({
+        investment_id: linha.investmentId,
+        saldo_inicial: linha.saldoInicial,
+      })),
+    }),
+  });
 }
 
 export interface PluggyInvestmentTransaction {
