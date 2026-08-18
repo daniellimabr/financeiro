@@ -4,6 +4,7 @@
 - **PRD:** [PRD-021-vinculo-holdings-serie-historica.md](../prd/PRD-021-vinculo-holdings-serie-historica.md)
 - **Progresso/achados detalhados da execução:** [SPRINT-021-progress.md](SPRINT-021-progress.md)
 - **Data do relatório:** 2026-08-18
+- **Status:** ✅ aprovada pelo CEO em 2026-08-18
 
 ## Resumo
 
@@ -141,7 +142,6 @@ histórica), `docs/roadmap.md` (fecha lacuna E6, entrada Sprint 21, 2 itens novo
 - **Microtransações de investimento na fila de Categorização** — feedback do CEO durante a
   execução; ele prefere controlar aporte/resgate pela conta corrente, não pela transação
   interna da holding. Não investigado nem escopado nesta sprint; registrado no roadmap.
-- **4 posições de ações XP (HAPV3, VALE3, TAEE11, BBSE3) seguem sem vínculo** — o CEO só
-  confirmou os 18 vínculos de CDB/Tesouro nesta sessão; os 4 vínculos de ação são
-  inequívocos por ticker (mesmo padrão `XP - <TICKER>` já usado nos `Investimento`
-  existentes) mas não foram aplicados sem pedido explícito.
+- ~~4 posições de ações XP (HAPV3, VALE3, TAEE11, BBSE3) seguem sem vínculo~~ — resolvido:
+  o CEO vinculou manualmente pela UI após o fechamento deste relatório. As 22 holdings reais
+  estão com `investimento_id` preenchido.
