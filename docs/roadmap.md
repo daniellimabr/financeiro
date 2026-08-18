@@ -816,6 +816,32 @@ PRD: [PRD-021-vinculo-holdings-serie-historica.md](prd/PRD-021-vinculo-holdings-
 Plano: [SPRINT-021-vinculo-holdings-serie-historica-plan.md](sprints/SPRINT-021-vinculo-holdings-serie-historica-plan.md).
 Progresso/achados detalhados: [SPRINT-021-progress.md](sprints/SPRINT-021-progress.md).
 
+### Sprint 22 — Manutenção de Investimentos + drilldown de Ativos/Patrimônio (cross-epic, sem épico prévio)
+
+Planejada em sessão própria (2026-08-18), a partir de 4 pontos que o CEO levantou usando o app
+na prática pós-Sprint 21: (1) transações internas de conta `tipo=investimento` continuam
+poluindo a fila de Categorização — formaliza o item de backlog registrado na Sprint 21
+("Microtransações de investimento na fila de Categorização"); (2) dado morto de contas XP que
+o CEO desativou (`sync_enabled=false`) segue no banco, sem forma de removê-lo pela UI; (3) a
+série histórica do Investimento "Quitar o AP" mostra um pico artificial de R$22.674,22 de
+rendimento em agosto/2026, causado pelo próprio desenho de reconstrução retroativa da Sprint 21
+(meses jan-jul zerados por construção, todo o crescimento acumulado cai no primeiro snapshot
+real), possivelmente amplificado por baseline subestimado em 4 das 14 holdings vinculadas; (4)
+os cards Ativos/Patrimônio do Dashboard não refletem o modelo mental do CEO de que Investimentos
+e Saldo Acumulado também são "Ativos" — drilldowns de ambos os cards levam a telas de gasto do
+período em vez de valor atual itemizado.
+
+Decisões confirmadas com o CEO via perguntas diretas nesta sessão: microtransações de
+investimento saem da fila **e** dos totais de Receita/Despesa (mesmo tratamento de
+"Transferência interna"); remoção de dado de conta vira funcionalidade reutilizável (botão
+"Excluir conta" em Gestão de Contas), não script pontual; o fix do rendimento de "Quitar o AP"
+reaudita o baseline das holdings suspeitas **e** redistribui o crescimento reconstruído mês a
+mês, não só ajusta a UI. Investigação confirmou que os drilldowns de Ativos/Patrimônio podem
+mudar sem alterar a fórmula somada de `Summary.ativos`/`patrimonio` (mudança aditiva na UI).
+
+PRD: [PRD-022-manutencao-investimentos-e-drilldown-patrimonio.md](prd/PRD-022-manutencao-investimentos-e-drilldown-patrimonio.md).
+Plano: [SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-plan.md](sprints/SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-plan.md).
+
 ## Registro de reavaliações futuras
 
 - **Understand Anything:** reavaliar instalação quando o codebase ultrapassar ~100 arquivos (ver ADR-002-plugins).

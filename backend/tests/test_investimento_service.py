@@ -205,6 +205,32 @@ def test_list_investimentos_isolated_by_user(db_session, user, other_user):
     assert service.list_investimentos(db_session, user.id) == []
 
 
+def test_list_investimentos_com_valor_atual_sums_accounts_and_holdings(db_session, user):
+    investimento = service.create_investimento(db_session, user.id, nome="Reserva")
+    _account(db_session, user, saldo=Decimal("300.00"), investimento_id=investimento.id)
+    _investment(db_session, user, valor_atual=Decimal("700.00"), investimento_id=investimento.id)
+
+    resultado = service.list_investimentos_com_valor_atual(db_session, user.id)
+
+    assert len(resultado) == 1
+    assert resultado[0].id == investimento.id
+    assert resultado[0].valor_atual == Decimal("1000.00")
+
+
+def test_list_investimentos_com_valor_atual_zero_when_nothing_linked(db_session, user):
+    service.create_investimento(db_session, user.id, nome="Sem vínculo")
+
+    resultado = service.list_investimentos_com_valor_atual(db_session, user.id)
+
+    assert resultado[0].valor_atual == Decimal("0")
+
+
+def test_list_investimentos_com_valor_atual_isolated_by_user(db_session, user, other_user):
+    service.create_investimento(db_session, other_user.id, nome="Do outro")
+
+    assert service.list_investimentos_com_valor_atual(db_session, user.id) == []
+
+
 def test_get_investimento_other_users_raises_not_found(db_session, user, other_user):
     investimento = service.create_investimento(db_session, other_user.id, nome="Do outro")
 

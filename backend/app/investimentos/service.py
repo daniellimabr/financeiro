@@ -56,6 +56,57 @@ def list_investimentos(db: Session, user_id: int) -> list[Investimento]:
     )
 
 
+@dataclass
+class InvestimentoComValorAtual:
+    id: int
+    user_id: int
+    nome: str
+    valor_atual: Decimal
+    created_at: object
+    updated_at: object
+
+
+def list_investimentos_com_valor_atual(
+    db: Session, user_id: int
+) -> list[InvestimentoComValorAtual]:
+    """Mesma listagem de `list_investimentos`, com `valor_atual` agregado
+    (contas + holdings vinculadas, mesma fonte usada em `get_evolucao`) —
+    pronta pro drilldown do card Ativos/Patrimônio (Sprint 22), sem N+1: uma
+    query agregada por fonte, não uma chamada de `get_evolucao` por linha."""
+    investimentos = list_investimentos(db, user_id)
+    if not investimentos:
+        return []
+    ids = [i.id for i in investimentos]
+    saldo_contas = dict(
+        db.query(PluggyAccount.investimento_id, func.coalesce(func.sum(PluggyAccount.saldo), 0))
+        .filter(PluggyAccount.user_id == user_id, PluggyAccount.investimento_id.in_(ids))
+        .group_by(PluggyAccount.investimento_id)
+        .all()
+    )
+    saldo_holdings = dict(
+        db.query(
+            PluggyInvestment.investimento_id,
+            func.coalesce(func.sum(PluggyInvestment.valor_atual), 0),
+        )
+        .filter(PluggyInvestment.user_id == user_id, PluggyInvestment.investimento_id.in_(ids))
+        .group_by(PluggyInvestment.investimento_id)
+        .all()
+    )
+    return [
+        InvestimentoComValorAtual(
+            id=i.id,
+            user_id=i.user_id,
+            nome=i.nome,
+            valor_atual=(
+                Decimal(str(saldo_contas.get(i.id, 0))) + Decimal(str(saldo_holdings.get(i.id, 0)))
+            ),
+            created_at=i.created_at,
+            updated_at=i.updated_at,
+        )
+        for i in investimentos
+    ]
+
+
 def get_investimento(db: Session, user_id: int, investimento_id: int) -> Investimento:
     investimento = (
         db.query(Investimento)

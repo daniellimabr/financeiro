@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
@@ -136,6 +136,31 @@ def update_account(
     db.commit()
     db.refresh(account)
     return account
+
+
+def delete_account(db: Session, user_id: int, account_id: int) -> None:
+    """Exclui uma conta desativada e suas transações — reutilizável (botão
+    "Excluir conta" em Gestão de Contas), não script pontual. `PluggyAccount.
+    transactions` já tem `cascade="all, delete-orphan"`, cobrindo a exclusão
+    das `PluggyTransaction` da própria conta; a única desassociação manual
+    necessária é `descricao_sugestao_origem_id` em transações de **outras**
+    contas que apontem pra uma transação desta conta como origem da sugestão
+    (FK auto-referenciada sem `ON DELETE`, rejeitaria a exclusão em cascata
+    sem isso). `PluggyInvestment` nunca é tocado — holdings vivem no nível do
+    item (`item_id`), não da conta.
+    """
+    account = get_account(db, user_id, account_id)
+    transaction_ids = [
+        row[0]
+        for row in db.query(PluggyTransaction.id).filter(PluggyTransaction.account_id == account.id)
+    ]
+    if transaction_ids:
+        db.query(PluggyTransaction).filter(
+            PluggyTransaction.user_id == user_id,
+            PluggyTransaction.descricao_sugestao_origem_id.in_(transaction_ids),
+        ).update({PluggyTransaction.descricao_sugestao_origem_id: None}, synchronize_session=False)
+    db.delete(account)
+    db.commit()
 
 
 def update_saldo_inicial(
@@ -329,11 +354,19 @@ def _juros_compostos(
 
 
 def _net_aportes_desde_cutoff(db: Session, investment_id: int) -> Decimal:
+    # Achado real do Bloco 0 da Sprint 22: sem o filtro de data, uma compra
+    # original registrada *antes* do baseline (ex.: 06/10/2025) era somada
+    # aqui como se fosse um aporte novo — subtraindo do saldo atual capital
+    # que já deveria estar dentro do próprio baseline, subestimando
+    # `saldo_inicial_proposto` em holdings com histórico de transação
+    # anterior a 31/12/2025 (gap de ~R$22k confirmado contra 3 holdings reais
+    # do investimento "Quitar o AP": ids com BUY pré-corte).
     buys = (
         db.query(func.coalesce(func.sum(PluggyInvestmentTransaction.valor), 0))
         .filter(
             PluggyInvestmentTransaction.investment_id == investment_id,
             PluggyInvestmentTransaction.tipo == "BUY",
+            PluggyInvestmentTransaction.data > _BASELINE_DATA,
         )
         .scalar()
     )
@@ -342,6 +375,7 @@ def _net_aportes_desde_cutoff(db: Session, investment_id: int) -> Decimal:
         .filter(
             PluggyInvestmentTransaction.investment_id == investment_id,
             PluggyInvestmentTransaction.tipo == "SELL",
+            PluggyInvestmentTransaction.data > _BASELINE_DATA,
         )
         .scalar()
     )
@@ -366,13 +400,18 @@ def reconstruct_historical_snapshots(db: Session, user_id: int) -> list[PluggyIn
     """Popula retroativamente jan/2026 até o mês anterior ao corrente, por
     holding com baseline já aprovado (`saldo_inicial IS NOT NULL` —
     holdings sem baseline aprovado são ignoradas). Sem fonte de valorização
-    histórica real (mesma limitação de mercado do baseline), cada mês
-    reconstruído carrega só o saldo por fluxo acumulado (aportes/resgates
-    conhecidos pela data real de cada `pluggy_investment_transaction`);
-    valorização/rendimento ficam zerados nos meses reconstruídos e só
-    aparecem a partir do primeiro snapshot real do job mensal (quando o
-    saldo observado de verdade diverge do fluxo acumulado). `confianca=
-    "reconstruido"` marca a diferença pra UI.
+    histórica real (mesma limitação de mercado do baseline), o crescimento
+    total observado (`holding.valor_atual` de hoje menos o saldo projetado só
+    por fluxo de aportes/resgates) é distribuído pró-rata pelos dias em que a
+    posição esteve aberta em cada mês — não mais zerado e concentrado inteiro
+    no primeiro snapshot real (achado real da Sprint 22: CDB "Quitar o AP"
+    mostrava R$22k de "rendimento" só no mês do primeiro sync pós-baseline).
+    `snapshot_current_month` (chamado a cada sync, não alterado por este
+    ajuste) automaticamente herda o resíduo correto do mês corrente, porque
+    seu cálculo já é por subtração contra o `saldo` do último mês reconstruído
+    — ao reconstruir com a fatia correta aqui, o que sobra pro mês corrente
+    também fica correto, sem precisar duplicar a lógica de residual.
+    `confianca="reconstruido"` marca a diferença pra UI.
     """
     holdings = (
         db.query(PluggyInvestment)
@@ -398,6 +437,25 @@ def _months_between(start: date, end_exclusive: date) -> list[str]:
     return months
 
 
+def _mes_bounds(ano: int, mes: int) -> tuple[date, date]:
+    inicio = date(ano, mes, 1)
+    fim = date(ano, 12, 31) if mes == 12 else date(ano, mes + 1, 1) - timedelta(days=1)
+    return inicio, fim
+
+
+def _dias_posicao_aberta_no_mes(
+    effective_start: date, effective_end: date, ano: int, mes: int
+) -> int:
+    """Dias em que a posição esteve aberta (comprada e ainda não totalmente
+    resgatada) dentro do mês — usado como peso da redistribuição pró-rata do
+    crescimento observado. `effective_end` já vem limitado a "hoje" (nunca
+    conta dias futuros do mês corrente)."""
+    mes_inicio, mes_fim = _mes_bounds(ano, mes)
+    lo = max(effective_start, mes_inicio)
+    hi = min(effective_end, mes_fim)
+    return max((hi - lo).days + 1, 0)
+
+
 def _reconstruct_holding_snapshots(
     db: Session, holding: PluggyInvestment
 ) -> list[PluggyInvestmentSnapshot]:
@@ -409,6 +467,38 @@ def _reconstruct_holding_snapshots(
         .order_by(PluggyInvestmentTransaction.data)
         .all()
     )
+
+    # Crescimento total observado até hoje (mesma fórmula de resíduo que
+    # snapshot_current_month usa para um único mês, aqui aplicada ao período
+    # inteiro jan/2026-hoje) — distribuído a seguir pró-rata pelos meses
+    # reconstruídos; o que sobrar fica implicitamente para snapshot_current_month
+    # calcular no mês corrente (ver docstring de reconstruct_historical_snapshots).
+    net_aportes_total = sum(
+        (tx.valor for tx in transactions if tx.tipo == "BUY"), Decimal("0")
+    ) - sum((tx.valor for tx in transactions if tx.tipo == "SELL"), Decimal("0"))
+    residual_total = holding.valor_atual - holding.saldo_inicial - net_aportes_total
+
+    buys_no_periodo = [tx.data for tx in transactions if tx.tipo == "BUY"]
+    sells_no_periodo = [tx.data for tx in transactions if tx.tipo == "SELL"]
+    if holding.saldo_inicial != 0:
+        effective_start = date(2026, 1, 1)
+    else:
+        effective_start = min(buys_no_periodo) if buys_no_periodo else date(2026, 1, 1)
+    if holding.valor_atual == 0 and sells_no_periodo:
+        effective_end = max(sells_no_periodo)
+    else:
+        effective_end = hoje
+
+    pesos_reconstrucao = {
+        ano_mes: _dias_posicao_aberta_no_mes(
+            effective_start, effective_end, int(ano_mes[:4]), int(ano_mes[5:7])
+        )
+        for ano_mes in meses
+    }
+    peso_mes_atual = _dias_posicao_aberta_no_mes(
+        effective_start, effective_end, hoje.year, hoje.month
+    )
+    total_dias = sum(pesos_reconstrucao.values()) + peso_mes_atual
 
     saldo_acumulado = holding.saldo_inicial
     result = []
@@ -422,15 +512,22 @@ def _reconstruct_holding_snapshots(
             (tx.valor for tx in transactions if tx.tipo == "SELL" and _no_mes(tx.data, ano, mes)),
             Decimal("0"),
         )
-        saldo_acumulado = saldo_acumulado + aportes - resgates
+        crescimento_alocado = (
+            (residual_total * pesos_reconstrucao[ano_mes] / total_dias).quantize(Decimal("0.01"))
+            if total_dias > 0
+            else Decimal("0")
+        )
+        saldo_acumulado = saldo_acumulado + aportes - resgates + crescimento_alocado
+        valorizacao = crescimento_alocado if holding.tipo == "EQUITY" else Decimal("0")
+        rendimento = Decimal("0") if holding.tipo == "EQUITY" else crescimento_alocado
         result.append(
             _upsert_snapshot(
                 db,
                 holding,
                 ano_mes,
                 saldo=saldo_acumulado,
-                valorizacao=Decimal("0"),
-                rendimento=Decimal("0"),
+                valorizacao=valorizacao,
+                rendimento=rendimento,
                 dividendos=Decimal("0") if holding.tipo == "EQUITY" else None,
                 aportes=aportes,
                 resgates=resgates,

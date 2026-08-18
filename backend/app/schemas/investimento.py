@@ -18,6 +18,14 @@ class InvestimentoOut(BaseModel):
     updated_at: datetime
 
 
+class InvestimentoComValorAtualOut(InvestimentoOut):
+    # Valor atual agregado (contas + holdings vinculadas), pronto pro
+    # drilldown do card Ativos/Patrimônio — GET /investimentos continua
+    # servindo CRUD (create/update/get retornam InvestimentoOut sem esse
+    # campo, calculado só na listagem).
+    valor_atual: Decimal
+
+
 class InvestimentoEvolucaoOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

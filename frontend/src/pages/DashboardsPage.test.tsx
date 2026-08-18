@@ -110,6 +110,32 @@ const PASSIVO_FIXTURE = [
   { liability_id: 1, liability_nome: "Financiamento carro", total: "500.00" },
 ];
 
+const LIABILITIES_FIXTURE = [
+  {
+    id: 1,
+    user_id: 1,
+    nome: "Financiamento carro",
+    tipo: "financiamento",
+    valor_total: "60000.00",
+    saldo_devedor: "7200.00",
+    status: "ativo",
+    data_quitacao: null,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  },
+];
+
+const INVESTIMENTOS_FIXTURE = [
+  {
+    id: 1,
+    user_id: 1,
+    nome: "Reserva de emergência",
+    valor_atual: "300.00",
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  },
+];
+
 // 7 pontos (histórico default de 6 meses + 1 ponto extra pro card "Saldo
 // Anterior", ver useDashboardSaldoAcumulado) — o penúltimo ponto (dez/2025,
 // 11500.00) é o "mês anterior" ao último (jan/2026, 12000.00, mês filtrado).
@@ -254,6 +280,9 @@ function routedFetchMock() {
     if (url.startsWith("/subcategories"))
       return Promise.resolve(jsonResponse(SUBCATEGORIES_FIXTURE));
     if (url.startsWith("/assets")) return Promise.resolve(jsonResponse(ASSETS_FIXTURE));
+    if (url.startsWith("/liabilities")) return Promise.resolve(jsonResponse(LIABILITIES_FIXTURE));
+    if (url.startsWith("/investimentos"))
+      return Promise.resolve(jsonResponse(INVESTIMENTOS_FIXTURE));
     if (url.startsWith("/pluggy/transactions"))
       return Promise.resolve(jsonResponse([TRANSACAO_FIXTURE, TRANSACAO_FIXTURE_2]));
     throw new Error(`Unexpected fetch: ${url}`);
@@ -519,6 +548,21 @@ describe("DashboardsPage", () => {
     expect(screen.getByRole("group", { name: "Tipo de transação" })).toBeInTheDocument();
   });
 
+  it("shows valor atual por Investimento and saldo por conta alongside the gasto accordion in the ativos drilldown", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /^Ativos/ }));
+    await screen.findByRole("button", { name: /Carro/ });
+
+    expect(screen.getByText("Valor atual por Investimento")).toBeInTheDocument();
+    expect(screen.getByText("Reserva de emergência")).toBeInTheDocument();
+    expect(screen.getByText("Saldo por conta")).toBeInTheDocument();
+    expect(screen.getByText("R$ 1.200,00")).toBeInTheDocument();
+  });
+
   it("opens the passivos drilldown without a despesa/receita toggle when the Passivos card is clicked", async () => {
     vi.stubGlobal("fetch", routedFetchMock());
 
@@ -583,7 +627,79 @@ describe("DashboardsPage", () => {
     const detalheButtons = screen.getAllByRole("button", { name: "Ver detalhe" });
     await userEvent.click(detalheButtons[0]);
 
-    expect(await screen.findByRole("button", { name: /Carro/ })).toBeInTheDocument();
+    // Ativos: lista itemizada de valor atual (useAssets), não mais o
+    // accordion de gasto do período — "Carro" aparece como célula de tabela,
+    // não como botão expansível.
+    expect(await screen.findByText("Carro")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Carro/ })).not.toBeInTheDocument();
+  });
+
+  it("patrimonio's Passivos Ver detalhe opens the itemized valor atual list, not the gasto accordion", async () => {
+    const fetchMock = routedFetchMock();
+    vi.stubGlobal("fetch", fetchMock);
+    const originalFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/dashboards/patrimonio/breakdown")) {
+        return Promise.resolve(
+          jsonResponse({
+            ativos: "150000.00",
+            passivos: "7200.00",
+            saldo_liquido_acumulado: "1200.00",
+            saldo_investimentos: "300.00",
+            total: "143700.00",
+          })
+        );
+      }
+      return originalFetch(input);
+    });
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /^Patrimônio/ }));
+    await screen.findByText("R$ 143.700,00");
+
+    const detalheButtons = screen.getAllByRole("button", { name: "Ver detalhe" });
+    await userEvent.click(detalheButtons[1]);
+
+    expect(await screen.findByText("Financiamento carro")).toBeInTheDocument();
+    expect(screen.getAllByText("R$ 7.200,00").length).toBeGreaterThan(0);
+  });
+
+  it("patrimonio's Saldo em investimentos Ver detalhe opens the Investimento valor atual list", async () => {
+    const fetchMock = routedFetchMock();
+    vi.stubGlobal("fetch", fetchMock);
+    const originalFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/dashboards/patrimonio/breakdown")) {
+        return Promise.resolve(
+          jsonResponse({
+            ativos: "150000.00",
+            passivos: "7200.00",
+            saldo_liquido_acumulado: "1200.00",
+            saldo_investimentos: "300.00",
+            total: "143700.00",
+          })
+        );
+      }
+      return originalFetch(input);
+    });
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /^Patrimônio/ }));
+    await screen.findByText("R$ 143.700,00");
+
+    const detalheButtons = screen.getAllByRole("button", { name: "Ver detalhe" });
+    await userEvent.click(detalheButtons[3]);
+
+    expect(await screen.findByText("Reserva de emergência")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Investimentos — valor atual" })
+    ).toBeInTheDocument();
   });
 
   it("adds regime=caixa to summary/tendencia/saldo-acumulado requests when the Caixa toggle is selected", async () => {

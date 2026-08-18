@@ -8,6 +8,7 @@ from app.investimentos import service
 from app.models.user import User
 from app.schemas.investimento import (
     EvolucaoMensalOut,
+    InvestimentoComValorAtualOut,
     InvestimentoEvolucaoOut,
     InvestimentoIn,
     InvestimentoOut,
@@ -16,11 +17,11 @@ from app.schemas.investimento import (
 router = APIRouter(prefix="/investimentos")
 
 
-@router.get("", response_model=list[InvestimentoOut])
+@router.get("", response_model=list[InvestimentoComValorAtualOut])
 def list_investimentos(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
-    return service.list_investimentos(db, current_user.id)
+    return service.list_investimentos_com_valor_atual(db, current_user.id)
 
 
 @router.post("", response_model=InvestimentoOut, status_code=status.HTTP_201_CREATED)

@@ -5,6 +5,7 @@ import { fetchConnectToken } from "../api/pluggy";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { useBaselineProposal } from "../hooks/useBaselineProposal";
 import { useConfirmBaseline } from "../hooks/useConfirmBaseline";
+import { useDeleteAccount } from "../hooks/useDeleteAccount";
 import { useEvolucaoSaldoPorConta } from "../hooks/useEvolucaoSaldoPorConta";
 import { useInvestimentos } from "../hooks/useInvestimentos";
 import { usePluggyAccounts } from "../hooks/usePluggyAccounts";
@@ -33,6 +34,7 @@ export function AccountManagementPage() {
   const { data: investimentos } = useInvestimentos();
   const registerItem = useRegisterPluggyItem();
   const updateAccount = useUpdatePluggyAccount();
+  const deleteAccount = useDeleteAccount();
   const updateInvestment = useUpdatePluggyInvestment();
   const syncItems = useSyncPluggyItems();
 
@@ -128,6 +130,16 @@ export function AccountManagementPage() {
     updateAccount.mutate({ accountId, apelido, syncEnabled: !syncEnabled, investimentoId });
   }
 
+  function handleDeleteAccount(accountId: number, nome: string) {
+    if (
+      window.confirm(
+        `Excluir "${nome}"? A conta e suas transações sincronizadas serão removidas permanentemente.`
+      )
+    ) {
+      deleteAccount.mutate(accountId);
+    }
+  }
+
   function setInvestimento(
     accountId: number,
     apelido: string | null,
@@ -208,6 +220,7 @@ export function AccountManagementPage() {
       </div>
       {connectError && <p role="alert">{connectError}</p>}
       {syncItems.isError && <p role="alert">Não foi possível sincronizar as contas.</p>}
+      {deleteAccount.isError && <p role="alert">Não foi possível excluir a conta.</p>}
 
       {syncDialogOpen && (
         <div role="dialog" aria-label="Sincronizar MeuPluggy" className="dash-filter">
@@ -299,6 +312,19 @@ export function AccountManagementPage() {
                   }
                 >
                   {account.sync_enabled ? "Remover da sincronização" : "Incluir na sincronização"}
+                </button>
+                <button
+                  type="button"
+                  className="btn-danger"
+                  disabled={account.sync_enabled || deleteAccount.isPending}
+                  title={
+                    account.sync_enabled
+                      ? "Remova a conta da sincronização antes de excluir"
+                      : undefined
+                  }
+                  onClick={() => handleDeleteAccount(account.id, account.apelido ?? account.nome)}
+                >
+                  Excluir conta
                 </button>
               </>
             )}

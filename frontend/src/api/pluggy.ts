@@ -208,6 +208,10 @@ export function updatePluggyAccount(
   });
 }
 
+export function deleteAccount(accountId: number): Promise<void> {
+  return apiFetch<void>(`/pluggy/accounts/${accountId}`, { method: "DELETE" });
+}
+
 export function updatePluggyAccountSaldoInicial(
   accountId: number,
   saldoInicial: string | null

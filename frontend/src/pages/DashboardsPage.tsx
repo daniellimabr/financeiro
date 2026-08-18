@@ -45,12 +45,15 @@ import { RegimeToggle } from "../components/RegimeToggle";
 import { TransactionsTable } from "../components/TransactionsTable";
 import { TrendChart } from "../components/TrendChart";
 import { useAssetGastos } from "../hooks/useAssetGastos";
+import { useAssets } from "../hooks/useAssets";
 import { useCategoryGroups } from "../hooks/useCategoryGroups";
 import { useDashboardByCategoria } from "../hooks/useDashboardByCategoria";
 import { useDashboardCategoriaTendencia } from "../hooks/useDashboardCategoriaTendencia";
 import { useDashboardSaldoAcumulado } from "../hooks/useDashboardSaldoAcumulado";
 import { useDashboardSummary } from "../hooks/useDashboardSummary";
 import { useDashboardTendencia } from "../hooks/useDashboardTendencia";
+import { useInvestimentos } from "../hooks/useInvestimentos";
+import { useLiabilities } from "../hooks/useLiabilities";
 import { useLiabilityGastos } from "../hooks/useLiabilityGastos";
 import { usePatrimonioBreakdown } from "../hooks/usePatrimonioBreakdown";
 import { useSaldoPorConta } from "../hooks/useSaldoPorConta";
@@ -70,6 +73,17 @@ const ACCOUNT_TIPO_LABEL: Record<string, string> = {
   investimento: "Investimento",
 };
 
+const ASSET_TIPO_LABEL: Record<string, string> = {
+  imovel: "Imóvel",
+  veiculo: "Veículo",
+  outro: "Outro",
+};
+
+const LIABILITY_TIPO_LABEL: Record<string, string> = {
+  financiamento: "Financiamento",
+  outro: "Outro",
+};
+
 function formatPercent(value: string | number): string {
   return `${Number(value).toFixed(1)}%`;
 }
@@ -80,7 +94,16 @@ interface PeriodoFiltro {
 }
 
 type DrillKind =
-  "receita" | "despesa" | "ativos" | "passivos" | "saldo" | "patrimonio" | "saldoAcumulado";
+  | "receita"
+  | "despesa"
+  | "ativos"
+  | "passivos"
+  | "saldo"
+  | "patrimonio"
+  | "saldoAcumulado"
+  | "patrimonioAtivos"
+  | "patrimonioPassivos"
+  | "patrimonioInvestimentos";
 
 function toggleId(list: number[], id: number): number[] {
   return list.includes(id) ? list.filter((existing) => existing !== id) : [...list, id];
@@ -165,6 +188,9 @@ export function DashboardsPage() {
     saldo: "Saldo",
     patrimonio: "Patrimônio",
     saldoAcumulado: "Saldo Acumulado",
+    patrimonioAtivos: "Ativos — valor atual",
+    patrimonioPassivos: "Passivos — valor atual",
+    patrimonioInvestimentos: "Investimentos — valor atual",
   };
 
   function clicarSaldoAnterior() {
@@ -347,6 +373,10 @@ export function DashboardsPage() {
                 expandedRows={drill.expandedRows}
                 onToggleRow={toggleRow}
               />
+              <h3>Valor atual por Investimento</h3>
+              <InvestimentosValorAtualList />
+              <h3>Saldo por conta</h3>
+              <SaldoPorContaList />
             </>
           )}
 
@@ -364,6 +394,12 @@ export function DashboardsPage() {
           {drill.kind === "patrimonio" && (
             <PatrimonioBreakdownPanel regime={regime} onNavigate={(kind) => abrirFunil(kind)} />
           )}
+
+          {drill.kind === "patrimonioAtivos" && <AssetsValorAtualList />}
+
+          {drill.kind === "patrimonioPassivos" && <LiabilitiesValorAtualList />}
+
+          {drill.kind === "patrimonioInvestimentos" && <InvestimentosValorAtualList />}
 
           {drill.kind === "saldoAcumulado" && (
             <>
@@ -765,12 +801,137 @@ function SaldoPorContaList() {
   );
 }
 
+function InvestimentosValorAtualList() {
+  const query = useInvestimentos();
+  const sorted = useMemo(
+    () => [...(query.data ?? [])].sort((a, b) => Number(b.valor_atual) - Number(a.valor_atual)),
+    [query.data]
+  );
+
+  if (query.isLoading) return <p>Carregando...</p>;
+  if (query.isError) return <p role="alert">Não foi possível carregar os investimentos.</p>;
+  if (sorted.length === 0) return <p className="dash-empty">Nenhum investimento cadastrado.</p>;
+
+  return (
+    <div className="dash-table-wrap">
+      <table className="dash-table">
+        <colgroup>
+          <col className="col-nome" />
+          <col className="col-valor" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Investimento</th>
+            <th>Valor atual</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((investimento) => (
+            <tr key={investimento.id}>
+              <td>{investimento.nome}</td>
+              <td>{formatCurrency(investimento.valor_atual)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AssetsValorAtualList() {
+  const query = useAssets();
+  const ativos = useMemo(
+    () =>
+      (query.data ?? [])
+        .filter((asset) => asset.status === "ativo")
+        .sort((a, b) => Number(b.valor_atual) - Number(a.valor_atual)),
+    [query.data]
+  );
+
+  if (query.isLoading) return <p>Carregando...</p>;
+  if (query.isError) return <p role="alert">Não foi possível carregar os ativos.</p>;
+  if (ativos.length === 0) return <p className="dash-empty">Nenhum ativo cadastrado.</p>;
+
+  return (
+    <div className="dash-table-wrap">
+      <table className="dash-table">
+        <colgroup>
+          <col className="col-nome" />
+          <col className="col-tipo" />
+          <col className="col-valor" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Ativo</th>
+            <th>Tipo</th>
+            <th>Valor atual</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ativos.map((asset) => (
+            <tr key={asset.id}>
+              <td>{asset.nome}</td>
+              <td>{ASSET_TIPO_LABEL[asset.tipo] ?? asset.tipo}</td>
+              <td>{formatCurrency(asset.valor_atual)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function LiabilitiesValorAtualList() {
+  const query = useLiabilities();
+  const ativos = useMemo(
+    () =>
+      (query.data ?? [])
+        .filter((liability) => liability.status === "ativo")
+        .sort((a, b) => Number(b.saldo_devedor) - Number(a.saldo_devedor)),
+    [query.data]
+  );
+
+  if (query.isLoading) return <p>Carregando...</p>;
+  if (query.isError) return <p role="alert">Não foi possível carregar os passivos.</p>;
+  if (ativos.length === 0) return <p className="dash-empty">Nenhum passivo cadastrado.</p>;
+
+  return (
+    <div className="dash-table-wrap">
+      <table className="dash-table">
+        <colgroup>
+          <col className="col-nome" />
+          <col className="col-tipo" />
+          <col className="col-valor" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Passivo</th>
+            <th>Tipo</th>
+            <th>Saldo devedor</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ativos.map((liability) => (
+            <tr key={liability.id}>
+              <td>{liability.nome}</td>
+              <td>{LIABILITY_TIPO_LABEL[liability.tipo] ?? liability.tipo}</td>
+              <td>{formatCurrency(liability.saldo_devedor)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function PatrimonioBreakdownPanel({
   regime,
   onNavigate,
 }: {
   regime: Regime;
-  onNavigate: (kind: "ativos" | "passivos" | "saldo" | "saldoAcumulado") => void;
+  onNavigate: (
+    kind: "patrimonioAtivos" | "patrimonioPassivos" | "patrimonioInvestimentos" | "saldoAcumulado"
+  ) => void;
 }) {
   const query = usePatrimonioBreakdown(regime);
 
@@ -801,7 +962,7 @@ function PatrimonioBreakdownPanel({
             <td>Ativos</td>
             <td>{formatCurrency(ativos)}</td>
             <td>
-              <button type="button" onClick={() => onNavigate("ativos")}>
+              <button type="button" onClick={() => onNavigate("patrimonioAtivos")}>
                 Ver detalhe
               </button>
             </td>
@@ -810,7 +971,7 @@ function PatrimonioBreakdownPanel({
             <td>Passivos</td>
             <td>-{formatCurrency(passivos)}</td>
             <td>
-              <button type="button" onClick={() => onNavigate("passivos")}>
+              <button type="button" onClick={() => onNavigate("patrimonioPassivos")}>
                 Ver detalhe
               </button>
             </td>
@@ -828,7 +989,7 @@ function PatrimonioBreakdownPanel({
             <td>Saldo em investimentos</td>
             <td>{formatCurrency(saldo_investimentos)}</td>
             <td>
-              <button type="button" onClick={() => onNavigate("saldo")}>
+              <button type="button" onClick={() => onNavigate("patrimonioInvestimentos")}>
                 Ver detalhe
               </button>
             </td>

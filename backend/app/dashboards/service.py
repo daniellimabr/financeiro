@@ -12,6 +12,7 @@ from app.models.category import SEM_CATEGORIA_ID, CategoryGroup, Natureza, Subca
 from app.models.investimento import Investimento
 from app.models.liability import Liability, LiabilityStatus
 from app.models.pluggy import (
+    INVESTIMENTO_PROVENTOS_CATEGORIAS_PLUGGY,
     PluggyAccount,
     PluggyAccountTipo,
     PluggyInvestment,
@@ -217,7 +218,7 @@ def _pagamento_fatura_subcategory_id(db: Session) -> int | None:
 
 
 def _base_query(
-    db: Session, user_id: int, *, excluir_investimento: bool = False, regime: Regime = "competencia"
+    db: Session, user_id: int, *, excluir_investimento: bool = True, regime: Regime = "competencia"
 ) -> Query:
     query = (
         db.query(PluggyTransaction)
@@ -225,6 +226,11 @@ def _base_query(
         .outerjoin(Subcategory, PluggyTransaction.subcategory_id == Subcategory.id)
         .outerjoin(CategoryGroup, Subcategory.group_id == CategoryGroup.id)
         .filter(PluggyTransaction.user_id == user_id)
+        .filter(
+            func.coalesce(PluggyTransaction.categoria_pluggy, "").notin_(
+                INVESTIMENTO_PROVENTOS_CATEGORIAS_PLUGGY
+            )
+        )
     )
 
     if regime == "caixa":

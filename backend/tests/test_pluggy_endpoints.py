@@ -734,6 +734,55 @@ def test_update_other_users_account_returns_404(client, db_session):
     assert response.status_code == 404
 
 
+# --- DELETE /pluggy/accounts/{id} ----------------------------------------
+
+
+def test_delete_account_without_cookie_returns_401(client):
+    response = client.delete("/pluggy/accounts/1")
+    assert response.status_code == 401
+
+
+def test_delete_account_removes_it(client, db_session):
+    _authenticate(client, db_session)
+    _item, account, _fake_client = _connect_account(client, db_session)
+
+    response = client.delete(f"/pluggy/accounts/{account['id']}")
+
+    assert response.status_code == 204
+    assert client.get("/pluggy/accounts").json() == []
+
+
+def test_delete_nonexistent_account_returns_404(client, db_session):
+    _authenticate(client, db_session)
+
+    response = client.delete("/pluggy/accounts/999")
+
+    assert response.status_code == 404
+
+
+def test_delete_other_users_account_returns_404(client, db_session):
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    _, account, _fake_client = _connect_account(client, db_session)
+
+    client.cookies.clear()
+    _authenticate(client, db_session, google_sub="google-2", email="b@example.com")
+
+    response = client.delete(f"/pluggy/accounts/{account['id']}")
+
+    assert response.status_code == 404
+
+
+def test_delete_account_second_attempt_returns_404(client, db_session):
+    _authenticate(client, db_session)
+    _item, account, _fake_client = _connect_account(client, db_session)
+
+    first = client.delete(f"/pluggy/accounts/{account['id']}")
+    second = client.delete(f"/pluggy/accounts/{account['id']}")
+
+    assert first.status_code == 204
+    assert second.status_code == 404
+
+
 def test_sync_endpoint_syncs_all_items_when_no_filter(client, db_session):
     _authenticate(client, db_session)
     item, _account, fake_client = _connect_account(client, db_session)

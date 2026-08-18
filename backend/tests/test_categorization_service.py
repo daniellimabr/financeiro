@@ -92,6 +92,7 @@ def _transaction(
     subcategoria_sugerida_id=None,
     data=date(2026, 1, 15),
     account_tipo=PluggyAccountTipo.corrente,
+    categoria_pluggy=None,
 ):
     n = next(_SEQ)
     item = PluggyItem(
@@ -126,6 +127,7 @@ def _transaction(
         categorizacao_status=status_categorizacao,
         subcategory_id=subcategory_id,
         subcategoria_sugerida_id=subcategoria_sugerida_id,
+        categoria_pluggy=categoria_pluggy,
     )
     db_session.add(tx)
     db_session.commit()
@@ -173,6 +175,42 @@ def test_list_transactions_applies_suggestion_but_never_confirms(db_session, use
         assert result.sugestao_fonte_tipo == "regra"
         assert result.subcategory_id is None
         assert result.categorizacao_status == PluggyTransactionCategorizacaoStatus.pendente
+
+
+def test_list_transactions_excludes_investimento_proventos_categoria_pluggy(db_session, user):
+    # Achado real do Bloco 0 da Sprint 22: dividendo/JCP/taxa de investimentos
+    # administrados (XP) chega numa conta corrente vinculada à corretora,
+    # marcada pela Pluggy com essas categorias — sai da fila de Categorização
+    # (o CEO não quer administrar/categorizar isso manualmente).
+    _transaction(
+        db_session, user, "Dividendo TAEE11", categoria_pluggy="Proceeds interests and dividends"
+    )
+    _transaction(db_session, user, "Taxa de intermediação", categoria_pluggy="Taxes on investments")
+
+    items, total = service.list_transactions(db_session, user.id)
+
+    assert items == []
+    assert total == 0
+
+
+def test_list_transactions_investment_aporte_still_appears(db_session, user):
+    # Aporte/resgate continua na fila normal — categoria "Investments" é
+    # distinta das categorias de provento excluídas acima (decisão do CEO,
+    # Sprint 19/22: ele controla aporte/resgate pela conta corrente).
+    _transaction(db_session, user, "Aplicação RDB", categoria_pluggy="Investments")
+
+    items, total = service.list_transactions(db_session, user.id)
+
+    assert total == 1
+
+
+def test_list_transactions_excludes_conta_investimento(db_session, user):
+    _transaction(db_session, user, "Rendimento CDB", account_tipo=PluggyAccountTipo.investimento)
+
+    items, total = service.list_transactions(db_session, user.id)
+
+    assert items == []
+    assert total == 0
 
 
 def test_list_transactions_isolated_by_user(db_session, user, other_user):

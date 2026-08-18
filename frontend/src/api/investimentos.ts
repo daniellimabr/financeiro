@@ -4,6 +4,7 @@ export interface Investimento {
   id: number;
   user_id: number;
   nome: string;
+  valor_atual: string;
   created_at: string;
   updated_at: string;
 }

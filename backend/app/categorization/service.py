@@ -17,6 +17,8 @@ from app.models.category import CategoryGroup, Subcategory
 from app.models.investimento import Investimento
 from app.models.liability import Liability
 from app.models.pluggy import (
+    INVESTIMENTO_PROVENTOS_CATEGORIAS_PLUGGY,
+    PluggyAccount,
     PluggyAccountTipo,
     PluggyTransaction,
     PluggyTransactionCategorizacaoStatus,
@@ -68,7 +70,17 @@ def list_transactions(
     page: int = 1,
     page_size: int = 20,
 ) -> tuple[list[PluggyTransaction], int]:
-    query = db.query(PluggyTransaction).filter(PluggyTransaction.user_id == user_id)
+    query = (
+        db.query(PluggyTransaction)
+        .join(PluggyAccount, PluggyTransaction.account_id == PluggyAccount.id)
+        .filter(PluggyTransaction.user_id == user_id)
+        .filter(PluggyAccount.tipo != PluggyAccountTipo.investimento)
+        .filter(
+            func.coalesce(PluggyTransaction.categoria_pluggy, "").notin_(
+                INVESTIMENTO_PROVENTOS_CATEGORIAS_PLUGGY
+            )
+        )
+    )
 
     if status == "pendente":
         query = query.filter(

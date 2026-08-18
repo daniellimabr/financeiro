@@ -29,6 +29,7 @@ def test_create_and_list_investimento(client, db_session):
     list_response = client.get("/investimentos")
     assert list_response.status_code == 200
     assert len(list_response.json()) == 1
+    assert list_response.json()[0]["valor_atual"] == "0"
 
 
 def test_user_does_not_see_other_users_investimentos(client, db_session):

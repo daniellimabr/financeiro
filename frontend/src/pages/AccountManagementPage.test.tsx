@@ -185,6 +185,86 @@ describe("AccountManagementPage", () => {
     });
   });
 
+  it("disables the delete button while the account is still sync_enabled", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/pluggy/items") return Promise.resolve(jsonResponse([ITEM_FIXTURE]));
+      if (url === "/pluggy/investments") return Promise.resolve(jsonResponse([]));
+      if (url === "/pluggy/accounts") return Promise.resolve(jsonResponse([ACCOUNT_FIXTURE]));
+      if (url.startsWith("/dashboards/evolucao-saldo-por-conta"))
+        return Promise.resolve(jsonResponse([]));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<AccountManagementPage />);
+    await screen.findByText(/Conta Corrente/);
+
+    expect(screen.getByRole("button", { name: "Excluir conta" })).toBeDisabled();
+  });
+
+  it("enables the delete button and calls DELETE once the account is out of sync", async () => {
+    const disabledAccount = { ...ACCOUNT_FIXTURE, sync_enabled: false };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      if (url === "/pluggy/items") return Promise.resolve(jsonResponse([ITEM_FIXTURE]));
+      if (url === "/pluggy/investments") return Promise.resolve(jsonResponse([]));
+      if (url === "/pluggy/accounts" && method === "GET")
+        return Promise.resolve(jsonResponse([disabledAccount]));
+      if (url === "/pluggy/accounts/1" && method === "DELETE") {
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      if (url.startsWith("/dashboards/evolucao-saldo-por-conta"))
+        return Promise.resolve(jsonResponse([]));
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    renderWithQueryClient(<AccountManagementPage />);
+    await screen.findByText(/Conta Corrente/);
+
+    const deleteButton = screen.getByRole("button", { name: "Excluir conta" });
+    expect(deleteButton).toBeEnabled();
+    await userEvent.click(deleteButton);
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (c) => String(c[0]) === "/pluggy/accounts/1" && (c[1] as RequestInit)?.method === "DELETE"
+      );
+      expect(call).toBeDefined();
+    });
+  });
+
+  it("does not call DELETE when the confirmation dialog is dismissed", async () => {
+    const disabledAccount = { ...ACCOUNT_FIXTURE, sync_enabled: false };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      if (url === "/pluggy/items") return Promise.resolve(jsonResponse([ITEM_FIXTURE]));
+      if (url === "/pluggy/investments") return Promise.resolve(jsonResponse([]));
+      if (url === "/pluggy/accounts" && method === "GET")
+        return Promise.resolve(jsonResponse([disabledAccount]));
+      if (url.startsWith("/dashboards/evolucao-saldo-por-conta"))
+        return Promise.resolve(jsonResponse([]));
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    renderWithQueryClient(<AccountManagementPage />);
+    await screen.findByText(/Conta Corrente/);
+
+    await userEvent.click(screen.getByRole("button", { name: "Excluir conta" }));
+
+    expect(
+      fetchMock.mock.calls.some(
+        (c) => String(c[0]) === "/pluggy/accounts/1" && (c[1] as RequestInit)?.method === "DELETE"
+      )
+    ).toBe(false);
+  });
+
   it("opens the unified sync dialog pre-selected from sync_enabled and confirms with the matching item_ids", async () => {
     const disabledAccount = { ...ACCOUNT_FIXTURE, id: 2, sync_enabled: false, nome: "Poupança" };
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {

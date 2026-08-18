@@ -83,6 +83,7 @@ def _transaction(
     data,
     data_competencia=None,
     subcategory_id=None,
+    categoria_pluggy=None,
 ):
     n = next(_SEQ)
     tx = PluggyTransaction(
@@ -95,6 +96,7 @@ def _transaction(
         data=data,
         data_competencia=data_competencia if data_competencia is not None else data,
         subcategory_id=subcategory_id,
+        categoria_pluggy=categoria_pluggy,
         status=PluggyTransactionStatus.efetivada,
     )
     db_session.add(tx)
@@ -266,6 +268,58 @@ def test_get_patrimonio_breakdown_isolated_by_user(db_session, user):
     breakdown = service.get_patrimonio_breakdown(db_session, user.id)
 
     assert breakdown.total == Decimal("0")
+
+
+def test_get_summary_excludes_investimento_proventos_categoria_pluggy(db_session, user):
+    # Achado real do Bloco 0 da Sprint 22: dividendo/JCP/taxa de investimentos
+    # administrados (XP) chega numa conta tipo=corrente vinculada à
+    # corretora, marcado pela Pluggy com essas duas categorias — o CEO não
+    # quer administrar/categorizar isso, mesmo tratamento hoje dado a
+    # "Transferência interna".
+    account = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="74.02",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 1, 10),
+        categoria_pluggy="Proceeds interests and dividends",
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="0.12",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+        categoria_pluggy="Taxes on investments",
+    )
+
+    summary = service.get_summary(db_session, user.id, ano=2026, mes=1)
+
+    assert summary.receita == Decimal("0")
+    assert summary.despesa == Decimal("0")
+
+
+def test_get_summary_investment_aporte_still_counts(db_session, user):
+    # Aporte/resgate continua contando normalmente — é transação da conta
+    # corrente de origem/destino, categoria "Investments" (diferente das
+    # categorias de provento excluídas acima), decisão fixada na Sprint 19.
+    account = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="500.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 10),
+        categoria_pluggy="Investments",
+    )
+
+    summary = service.get_summary(db_session, user.id, ano=2026, mes=1)
+
+    assert summary.despesa == Decimal("500.00")
 
 
 def test_get_summary_ativos_passivos_match_patrimonio_base(db_session, user):

@@ -542,6 +542,95 @@ def test_update_account_other_users_account_raises_not_found(db_session, user, o
         )
 
 
+# --- Sprint 22: excluir conta (Gestão de Contas) --------------------------
+
+
+def test_delete_account_removes_account_and_transactions(db_session, user):
+    client = FakePluggyClient(item=_item_raw(), accounts=[_account_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    client.transactions_by_account["acc-ext-1"] = [_transaction_raw()]
+    service.sync_item(db_session, client, user.id, item.id)
+    account = service.list_accounts(db_session, user.id)[0]
+    assert len(service.list_transactions(db_session, user.id)) == 1
+
+    service.delete_account(db_session, user.id, account.id)
+
+    assert service.list_accounts(db_session, user.id) == []
+    assert service.list_transactions(db_session, user.id) == []
+
+
+def test_delete_account_desassocia_descricao_sugestao_origem(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[_account_raw(), _account_raw(id="acc-ext-2", name="Outra conta")],
+        transactions_by_account={
+            "acc-ext-1": [_transaction_raw(id="tx-origem", description="Mercado")],
+            "acc-ext-2": [_transaction_raw(id="tx-dependente", description="Mercado 2")],
+        },
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+
+    accounts = service.list_accounts(db_session, user.id)
+    tx_origem = (
+        db_session.query(PluggyTransaction)
+        .filter(PluggyTransaction.pluggy_transaction_id == "tx-origem")
+        .one()
+    )
+    tx_dependente = (
+        db_session.query(PluggyTransaction)
+        .filter(PluggyTransaction.pluggy_transaction_id == "tx-dependente")
+        .one()
+    )
+    account_a = next(a for a in accounts if a.id == tx_origem.account_id)
+    tx_dependente.descricao_sugestao_origem_id = tx_origem.id
+    db_session.commit()
+
+    service.delete_account(db_session, user.id, account_a.id)
+
+    db_session.refresh(tx_dependente)
+    assert tx_dependente.descricao_sugestao_origem_id is None
+
+
+def test_delete_account_never_touches_investment_holdings_of_same_item(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[_account_raw()],
+        investments=[_investment_raw()],
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    account = service.list_accounts(db_session, user.id)[0]
+    assert len(service.list_investments(db_session, user.id)) == 1
+
+    service.delete_account(db_session, user.id, account.id)
+
+    assert len(service.list_investments(db_session, user.id)) == 1
+
+
+def test_delete_account_other_user_raises_not_found(db_session, user, other_user):
+    client = FakePluggyClient(item=_item_raw(), accounts=[_account_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    account = service.list_accounts(db_session, user.id)[0]
+
+    with pytest.raises(NotFoundError):
+        service.delete_account(db_session, other_user.id, account.id)
+
+
+def test_delete_account_second_attempt_raises_not_found(db_session, user):
+    client = FakePluggyClient(item=_item_raw(), accounts=[_account_raw()])
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    account = service.list_accounts(db_session, user.id)[0]
+
+    service.delete_account(db_session, user.id, account.id)
+
+    with pytest.raises(NotFoundError):
+        service.delete_account(db_session, user.id, account.id)
+
+
 def test_sync_items_syncs_all_items_when_none_specified(db_session, user):
     client = FakePluggyClient(
         item=_item_raw(), accounts=[_account_raw()], transactions_by_account={"acc-ext-1": []}
@@ -1269,6 +1358,39 @@ def test_propose_baseline_cdi_indexed_falls_back_to_reverse_flow(db_session, use
     assert line.saldo_inicial_proposto == Decimal("22762.07") - Decimal("5000.00")
 
 
+def test_propose_baseline_ignores_buy_transaction_before_cutoff(db_session, user):
+    """Achado real do Bloco 0 da Sprint 22: uma BUY registrada *antes* do
+    corte (a compra original da posição, não um aporte novo) não pode ser
+    subtraída do saldo atual — senão o baseline reverso subestima o capital
+    que já existia em 31/12/2025 (bug real: 3 holdings de "Quitar o AP"
+    ficaram ~R$22k abaixo do correto por causa disso)."""
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[],
+        investments=[
+            _investment_raw(
+                purchaseDate="2025-10-06T03:00:00.000Z", rateType="CDI", balance=5496.86
+            )
+        ],
+        investment_transactions_by_investment={
+            "inv-ext-1": [
+                _investment_transaction_raw(
+                    id="tx1", type="BUY", amount=5000.00, date="2025-10-06T00:00:00.000Z"
+                )
+            ],
+        },
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+
+    proposal = service.propose_baseline_dez_2025(db_session, client, user.id)
+
+    line = proposal[0]
+    assert line.confianca == "estimada"
+    # Sem o fix, isso daria 5496.86 - 5000.00 = 496.86 (bug real observado).
+    assert line.saldo_inicial_proposto == Decimal("5496.86")
+
+
 def test_confirm_baseline_persists_saldo_inicial(db_session, user):
     client = FakePluggyClient(item=_item_raw(), accounts=[], investments=[_investment_raw()])
     item = service.register_item(db_session, client, user.id, "item-ext-1")
@@ -1337,6 +1459,87 @@ def test_reconstruct_historical_snapshots_skips_holdings_without_baseline(db_ses
     service.sync_item(db_session, client, user.id, item.id)
 
     assert service.reconstruct_historical_snapshots(db_session, user.id) == []
+
+
+# --- Sprint 22: redistribuição pró-rata do rendimento reconstruído --------
+
+
+def test_reconstruct_historical_snapshots_distributes_growth_instead_of_dumping(db_session, user):
+    """Achado real da Sprint 22: baseline 5000, valor atual hoje 5674 (sem
+    nenhum aporte/resgate registrado) — resíduo de 674 tem que ficar
+    espalhado pelos meses reconstruídos + mês corrente, nunca concentrado
+    inteiro num único mês (o bug que gerou o pico de R$22k em "Quitar o AP")."""
+    client = FakePluggyClient(
+        item=_item_raw(), accounts=[], investments=[_investment_raw(balance=5674.00)]
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    investment = service.list_investments(db_session, user.id)[0]
+    service.confirm_baseline_dez_2025(db_session, user.id, [(investment.id, Decimal("5000.00"))])
+    db_session.refresh(investment)
+
+    snapshots = service.reconstruct_historical_snapshots(db_session, user.id)
+    db_session.refresh(investment)
+    atual = service.snapshot_current_month(db_session, investment)
+    db_session.commit()
+
+    residual_total = Decimal("674.00")
+    soma_reconstruido = sum((s.rendimento for s in snapshots), Decimal("0"))
+    assert soma_reconstruido + atual.rendimento == residual_total
+    # Nenhum mês isolado carrega o resíduo inteiro — prova de que foi
+    # espalhado, não dumped num só (nem no mês corrente, nem num reconstruído).
+    assert atual.rendimento < residual_total
+    for snap in snapshots:
+        assert snap.rendimento < residual_total
+        assert snap.rendimento > Decimal("0")
+
+
+def test_reconstruct_historical_snapshots_idempotent(db_session, user):
+    client = FakePluggyClient(
+        item=_item_raw(), accounts=[], investments=[_investment_raw(balance=5674.00)]
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    investment = service.list_investments(db_session, user.id)[0]
+    service.confirm_baseline_dez_2025(db_session, user.id, [(investment.id, Decimal("5000.00"))])
+    db_session.refresh(investment)
+
+    snaps1 = service.reconstruct_historical_snapshots(db_session, user.id)
+    primeira = {s.ano_mes: (s.saldo, s.rendimento) for s in snaps1}
+    snaps2 = service.reconstruct_historical_snapshots(db_session, user.id)
+    segunda = {s.ano_mes: (s.saldo, s.rendimento) for s in snaps2}
+
+    assert primeira == segunda
+
+
+def test_reconstruct_historical_snapshots_zero_weight_before_purchase(db_session, user):
+    """Holding comprada em 30/04/2026 (depois do baseline, saldo_inicial=0) —
+    meses de jan a mar/2026 não podem receber nenhuma fatia do crescimento:
+    a posição simplesmente não existia ainda."""
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[],
+        investments=[_investment_raw(balance=13802.53)],
+        investment_transactions_by_investment={
+            "inv-ext-1": [
+                _investment_transaction_raw(
+                    id="tx1", type="BUY", amount=13383.41, date="2026-04-30T00:00:00.000Z"
+                ),
+            ],
+        },
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    investment = service.list_investments(db_session, user.id)[0]
+    service.confirm_baseline_dez_2025(db_session, user.id, [(investment.id, Decimal("0.00"))])
+    db_session.refresh(investment)
+
+    snapshots = service.reconstruct_historical_snapshots(db_session, user.id)
+
+    for ano_mes in ("2026-01", "2026-02", "2026-03"):
+        snap = next(s for s in snapshots if s.ano_mes == ano_mes)
+        assert snap.saldo == Decimal("0")
+        assert snap.rendimento == Decimal("0")
 
 
 def test_snapshot_current_month_is_idempotent(db_session, user):
