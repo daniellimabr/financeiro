@@ -1013,6 +1013,24 @@ registro histórico da decisão de produto original, mas não devem ser executad
 PRD: [PRD-027-ocultar-gasto-comparativo-categorias.md](prd/PRD-027-ocultar-gasto-comparativo-categorias.md).
 Plano: [SPRINT-027-ocultar-gasto-comparativo-categorias-plan.md](sprints/SPRINT-027-ocultar-gasto-comparativo-categorias-plan.md).
 
+### Sprint 28 — Card Ativos (saldo de conta corrente + total completo) e Patrimônio redesenhado (cross-epic, sem épico prévio)
+
+Planejada em sessão própria (2026-08-19), a partir de 3 pontos que o CEO levantou usando o app na
+prática pós-Sprint 26: o drilldown "Despesas por Ativo" sai do card "Ativos" (gasto do período não
+pertence a composição de patrimônio), dando lugar a um novo drilldown "Saldo por Conta Corrente";
+o total do card "Ativos" (hoje só soma Gestão de Ativos) passa a somar também Investimentos e o
+saldo ao vivo das contas correntes — mesmo modelo mental do CEO já registrado no PRD-022; e a
+parcela "Saldo líquido acumulado" do card Patrimônio, que não batia com o card "Saldo Acumulado" do
+Dashboard no mesmo dia, tem a causa raiz confirmada por leitura de código nesta sessão de
+planejamento (`_saldo_liquido_fallback`, termo extra somado só dentro de Patrimônio, nunca exposto
+pelo card) — corrigida via redesenho completo da fórmula de Patrimônio, decidido pelo CEO:
+`Patrimônio = Ativos − Passivos + Saldo Acumulado do Mês` (3 partes em vez de 4, Investimentos passa
+a viver dentro de "Ativos", Patrimônio deixa de olhar conta corrente diretamente). Card "Saldo
+Acumulado" do Dashboard não muda, só sai de dentro da fórmula de Patrimônio.
+
+PRD: [PRD-028-ativos-saldo-conta-corrente-patrimonio-redesenhado.md](prd/PRD-028-ativos-saldo-conta-corrente-patrimonio-redesenhado.md).
+Plano: [SPRINT-028-ativos-saldo-conta-corrente-patrimonio-redesenhado-plan.md](sprints/SPRINT-028-ativos-saldo-conta-corrente-patrimonio-redesenhado-plan.md).
+
 ## Registro de reavaliações futuras
 
 - **Understand Anything:** reavaliar instalação quando o codebase ultrapassar ~100 arquivos (ver ADR-002-plugins).
