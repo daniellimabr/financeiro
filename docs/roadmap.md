@@ -854,6 +854,7 @@ CEO por comando. Drilldowns de Ativos/Patrimônio redesenhados (valor atual item
 alterar a fórmula somada de nenhum card. 586 testes backend (+23, 98% cobertura) + 192 frontend
 (+6), suíte completa verde. Deploy na VM de dev e validação ao vivo via
 `scripts/browser-check/check-sprint22.mjs` (novo), sem erros de console.
+**Sprint aprovada pelo CEO em 2026-08-18.**
 
 PRD: [PRD-022-manutencao-investimentos-e-drilldown-patrimonio.md](prd/PRD-022-manutencao-investimentos-e-drilldown-patrimonio.md).
 Plano: [SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-plan.md](sprints/SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-plan.md).

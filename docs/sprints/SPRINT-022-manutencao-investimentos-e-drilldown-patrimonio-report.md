@@ -2,6 +2,7 @@
 
 - **Plano:** [SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-plan.md](./SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-plan.md)
 - **Data do relatório:** 2026-08-18
+- **Status:** aprovado pelo CEO em 2026-08-18
 
 ## Resumo
 
