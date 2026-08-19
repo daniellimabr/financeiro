@@ -66,3 +66,25 @@ export interface EvolucaoMensal {
 export function fetchEvolucaoMensal(investimentoId: number): Promise<EvolucaoMensal[]> {
   return apiFetch<EvolucaoMensal[]>(`/investimentos/${investimentoId}/evolucao-mensal`);
 }
+
+export interface InvestimentoTransacao {
+  data: string;
+  tipo: string;
+  descricao: string | null;
+  valor: string;
+  origem: "conta" | "holding";
+  holding_nome: string | null;
+}
+
+export function fetchInvestimentoTransacoes(
+  investimentoId: number,
+  { ano, mes }: { ano?: number; mes?: number } = {}
+): Promise<InvestimentoTransacao[]> {
+  const params = new URLSearchParams();
+  if (ano !== undefined) params.set("ano", String(ano));
+  if (mes !== undefined) params.set("mes", String(mes));
+  const query = params.toString();
+  return apiFetch<InvestimentoTransacao[]>(
+    `/investimentos/${investimentoId}/transacoes${query ? `?${query}` : ""}`
+  );
+}

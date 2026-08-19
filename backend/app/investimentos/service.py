@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import func
@@ -11,6 +12,7 @@ from app.models.pluggy import (
     PluggyAccount,
     PluggyInvestment,
     PluggyInvestmentSnapshot,
+    PluggyInvestmentTransaction,
     PluggyTransaction,
     PluggyTransactionCategorizacaoStatus,
 )
@@ -284,3 +286,78 @@ def get_evolucao_mensal(db: Session, user_id: int, investimento_id: int) -> list
         )
         for ano_mes, rows in sorted(por_mes.items())
     ]
+
+
+@dataclass
+class InvestimentoTransacao:
+    data: date
+    tipo: str
+    descricao: str | None
+    valor: Decimal
+    origem: str
+    holding_nome: str | None
+
+
+def get_transacoes(
+    db: Session,
+    user_id: int,
+    investimento_id: int,
+    *,
+    ano: int | None = None,
+    mes: int | None = None,
+) -> list[InvestimentoTransacao]:
+    """Extrato unificado (Sprint 23): une `PluggyTransaction` (conta bancária
+    vinculada) e `PluggyInvestmentTransaction` (movimento por holding) — um
+    investimento só-holdings (ex. "Quitar o AP") nunca populava a primeira
+    fonte, então o extrato de hoje ficava sempre vazio pra ele."""
+    get_investimento(db, user_id, investimento_id)
+
+    conta_query = db.query(PluggyTransaction).filter(
+        PluggyTransaction.user_id == user_id,
+        PluggyTransaction.investimento_id == investimento_id,
+    )
+    if ano is not None:
+        conta_query = conta_query.filter(func.extract("year", PluggyTransaction.data) == ano)
+    if mes is not None:
+        conta_query = conta_query.filter(func.extract("month", PluggyTransaction.data) == mes)
+
+    holding_query = (
+        db.query(PluggyInvestmentTransaction, PluggyInvestment.nome)
+        .join(PluggyInvestment, PluggyInvestmentTransaction.investment_id == PluggyInvestment.id)
+        .filter(
+            PluggyInvestment.user_id == user_id,
+            PluggyInvestment.investimento_id == investimento_id,
+        )
+    )
+    if ano is not None:
+        holding_query = holding_query.filter(
+            func.extract("year", PluggyInvestmentTransaction.data) == ano
+        )
+    if mes is not None:
+        holding_query = holding_query.filter(
+            func.extract("month", PluggyInvestmentTransaction.data) == mes
+        )
+
+    transacoes = [
+        InvestimentoTransacao(
+            data=tx.data,
+            tipo=tx.tipo,
+            descricao=tx.descricao_usuario or tx.descricao,
+            valor=tx.valor,
+            origem="conta",
+            holding_nome=None,
+        )
+        for tx in conta_query.all()
+    ] + [
+        InvestimentoTransacao(
+            data=tx.data,
+            tipo=tx.tipo,
+            descricao=tx.descricao,
+            valor=tx.valor,
+            origem="holding",
+            holding_nome=holding_nome,
+        )
+        for tx, holding_nome in holding_query.all()
+    ]
+    transacoes.sort(key=lambda t: t.data, reverse=True)
+    return transacoes

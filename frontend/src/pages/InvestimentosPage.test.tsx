@@ -22,24 +22,6 @@ const EVOLUCAO_FIXTURE = {
   rendimento_estimado: "50.00",
 };
 
-const CARTEIRA_FIXTURE = {
-  id: 1,
-  item_id: 1,
-  user_id: 1,
-  pluggy_account_id: "acc-1",
-  tipo: "investimento",
-  nome: "Nubank Investimentos",
-  apelido: null,
-  numero_mascarado: null,
-  saldo: "1200.00",
-  moeda: "BRL",
-  sync_enabled: true,
-  saldo_inicial: "1000.00",
-  investimento_id: 1,
-  created_at: "2026-01-01T00:00:00Z",
-  updated_at: "2026-01-01T00:00:00Z",
-};
-
 const HOLDING_FIXTURE = {
   id: 1,
   item_id: 2,
@@ -73,22 +55,22 @@ const HOLDING_TRANSACTION_FIXTURE = {
   updated_at: "2026-02-22T00:00:00Z",
 };
 
-const TRANSACAO_FIXTURE = {
-  id: 1,
-  account_id: 2,
-  user_id: 1,
-  pluggy_transaction_id: "tx-1",
+const TRANSACAO_CONTA_FIXTURE = {
+  data: "2026-01-10",
+  tipo: "debito",
   descricao: "PIX Itaú->Nubank",
   valor: "-150.00",
-  tipo: "debito",
-  data: "2026-01-10",
-  data_competencia: "2026-01-10",
-  data_editada_manualmente: false,
-  subcategory_id: null,
-  categoria_pluggy: null,
-  status: "efetivada",
-  created_at: "2026-01-10T00:00:00Z",
-  updated_at: "2026-01-10T00:00:00Z",
+  origem: "conta",
+  holding_nome: null,
+};
+
+const TRANSACAO_HOLDING_FIXTURE = {
+  data: "2026-01-03",
+  tipo: "BUY",
+  descricao: null,
+  valor: "5000.00",
+  origem: "holding",
+  holding_nome: "CDB - NU FINANCEIRA",
 };
 
 function jsonResponse(body: unknown, status = 200) {
@@ -103,15 +85,14 @@ function renderWithQueryClient(ui: ReactNode) {
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
-// Toda renderização de InvestimentosPage dispara /pluggy/accounts (carteiras
-// vinculadas) e /dashboards/por-investimento/tendencia (sparkline) — helper
-// cobre essas rotas em todo teste, além de dar uma evolução zerada default
-// pra qualquer card renderizado.
+// Toda renderização de InvestimentosPage dispara /dashboards/por-investimento/tendencia
+// (sparkline) — helper cobre essa rota em todo teste, além de dar uma evolução
+// zerada default pra qualquer card renderizado. /pluggy/accounts não é mais
+// buscada pela página desde a Sprint 23 (card parou de listar carteiras).
 function baseHandlers(url: string): Promise<Response> | null {
   if (url.startsWith("/dashboards/por-investimento/tendencia")) {
     return Promise.resolve(jsonResponse([]));
   }
-  if (url === "/pluggy/accounts") return Promise.resolve(jsonResponse([]));
   if (url === "/pluggy/investments") return Promise.resolve(jsonResponse([]));
   if (url.endsWith("/evolucao")) return Promise.resolve(jsonResponse(EVOLUCAO_FIXTURE));
   return null;
@@ -123,10 +104,10 @@ describe("InvestimentosPage", () => {
     vi.restoreAllMocks();
   });
 
-  it("lists investimentos as cards with saldo atual, rendimento estimado and carteiras vinculadas", async () => {
+  it("lists investimentos as cards with saldo atual and rendimento estimado, without loose carteiras/posições text (Sprint 23)", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
-      if (url === "/pluggy/accounts") return Promise.resolve(jsonResponse([CARTEIRA_FIXTURE]));
+      if (url === "/pluggy/investments") return Promise.resolve(jsonResponse([HOLDING_FIXTURE]));
       const base = baseHandlers(url);
       if (base) return base;
       if (url === "/investimentos") return Promise.resolve(jsonResponse([INVESTIMENTO_FIXTURE]));
@@ -139,7 +120,8 @@ describe("InvestimentosPage", () => {
     expect(await screen.findByText("Reserva de emergência")).toBeInTheDocument();
     expect(await screen.findByText("R$ 1.200,00")).toBeInTheDocument();
     expect(await screen.findByText(/Rendimento estimado: R\$\s?50,00/)).toBeInTheDocument();
-    expect(screen.getByText(/Carteiras: Nubank Investimentos/)).toBeInTheDocument();
+    expect(screen.queryByText(/Carteiras:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Posições:/)).not.toBeInTheDocument();
   });
 
   it("creates a new investimento via POST /investimentos", async () => {
@@ -240,7 +222,34 @@ describe("InvestimentosPage", () => {
     });
   });
 
-  it("opens the drilldown outside the card showing the period's total and linked transactions, toggling Aporte/Resgate", async () => {
+  it("opens the drilldown outside the card defaulting to Posições (Sprint 23)", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/pluggy/investments") return Promise.resolve(jsonResponse([HOLDING_FIXTURE]));
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url === "/investimentos") return Promise.resolve(jsonResponse([INVESTIMENTO_FIXTURE]));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<InvestimentosPage />);
+    await screen.findByText("Reserva de emergência");
+
+    const grid = screen.getByText("Reserva de emergência").closest(".dash-tile") as HTMLElement;
+    await userEvent.click(within(grid).getByRole("button", { name: "Ver posições" }));
+
+    expect(screen.getByRole("button", { name: "Posições" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    const posicaoText = await screen.findByText("CDB - NU FINANCEIRA");
+    const funnel = posicaoText.closest(".dash-funnel");
+    expect(funnel).not.toBeNull();
+    expect(grid.contains(funnel)).toBe(false);
+  });
+
+  it("shows the unified extrato (conta + holding) in the Extrato tab, toggling Aporte/Resgate's period total", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       const base = baseHandlers(url);
@@ -253,9 +262,8 @@ describe("InvestimentosPage", () => {
           jsonResponse([{ investimento_id: 1, investimento_nome: "Reserva de emergência", total }])
         );
       }
-      if (url.startsWith("/pluggy/transactions")) {
-        expect(url).toContain("investimento_id=1");
-        return Promise.resolve(jsonResponse([TRANSACAO_FIXTURE]));
+      if (url.startsWith("/investimentos/1/transacoes")) {
+        return Promise.resolve(jsonResponse([TRANSACAO_HOLDING_FIXTURE, TRANSACAO_CONTA_FIXTURE]));
       }
       throw new Error(`Unexpected fetch: ${url}`);
     });
@@ -265,39 +273,27 @@ describe("InvestimentosPage", () => {
     await screen.findByText("Reserva de emergência");
 
     const grid = screen.getByText("Reserva de emergência").closest(".dash-tile") as HTMLElement;
-    await userEvent.click(within(grid).getByRole("button", { name: "Ver extrato no período" }));
+    await userEvent.click(within(grid).getByRole("button", { name: "Ver posições" }));
+    await userEvent.click(screen.getByRole("button", { name: "Extrato" }));
 
     expect(await screen.findByText("R$ 150,00")).toBeInTheDocument();
+    // origem "conta" (com descricao) e "holding" (sem descricao, cai no holding_nome)
     expect(screen.getByText("PIX Itaú->Nubank")).toBeInTheDocument();
-    const funnel = screen.getByText("PIX Itaú->Nubank").closest(".dash-funnel");
-    expect(funnel).not.toBeNull();
-    expect(grid.contains(funnel)).toBe(false);
+    expect(screen.getByText("CDB - NU FINANCEIRA")).toBeInTheDocument();
+    expect(screen.getByText("Conta")).toBeInTheDocument();
+    expect(screen.getByText("Holding")).toBeInTheDocument();
+    expect(document.querySelector(".extrato-unificado-table colgroup")).not.toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "Resgate" }));
 
     await waitFor(() => {
       const calls = fetchMock.mock.calls.map((call) => String(call[0]));
       expect(
-        calls.some((url) => url.includes("/pluggy/transactions") && url.includes("tipo=credito"))
+        calls.some(
+          (url) => url.includes("/dashboards/por-investimento") && url.includes("tipo=credito")
+        )
       ).toBe(true);
     });
-  });
-
-  it("lists linked posições (holdings) on the card", async () => {
-    const fetchMock = vi.fn((input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url === "/pluggy/investments") return Promise.resolve(jsonResponse([HOLDING_FIXTURE]));
-      const base = baseHandlers(url);
-      if (base) return base;
-      if (url === "/investimentos") return Promise.resolve(jsonResponse([INVESTIMENTO_FIXTURE]));
-      throw new Error(`Unexpected fetch: ${url}`);
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    renderWithQueryClient(<InvestimentosPage />);
-
-    expect(await screen.findByText("Reserva de emergência")).toBeInTheDocument();
-    expect(screen.getByText(/Posições: CDB - NU FINANCEIRA/)).toBeInTheDocument();
   });
 
   it("opens the drilldown Posições view showing the holding and its expandable transaction history", async () => {
@@ -318,17 +314,18 @@ describe("InvestimentosPage", () => {
     await screen.findByText("Reserva de emergência");
 
     const grid = screen.getByText("Reserva de emergência").closest(".dash-tile") as HTMLElement;
-    await userEvent.click(within(grid).getByRole("button", { name: "Ver extrato no período" }));
-    await userEvent.click(screen.getByRole("button", { name: "Posições" }));
+    await userEvent.click(within(grid).getByRole("button", { name: "Ver posições" }));
 
     expect(await screen.findByText("CDB - NU FINANCEIRA")).toBeInTheDocument();
     expect(screen.getByText("FIXED_INCOME / CDB")).toBeInTheDocument();
     expect(screen.getByText("R$ 22.762,07")).toBeInTheDocument();
+    expect(document.querySelector(".posicoes-table colgroup")).not.toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "Ver histórico" }));
 
     expect(await screen.findByText("SELL")).toBeInTheDocument();
     expect(screen.getByText("R$ 1.398,87")).toBeInTheDocument();
+    expect(document.querySelector(".posicao-historico-table colgroup")).not.toBeNull();
     expect(
       fetchMock.mock.calls.some((c) => String(c[0]) === "/pluggy/investments/1/transactions")
     ).toBe(true);
@@ -373,7 +370,7 @@ describe("InvestimentosPage", () => {
     await screen.findByText("Reserva de emergência");
 
     const grid = screen.getByText("Reserva de emergência").closest(".dash-tile") as HTMLElement;
-    await userEvent.click(within(grid).getByRole("button", { name: "Ver extrato no período" }));
+    await userEvent.click(within(grid).getByRole("button", { name: "Ver posições" }));
     await userEvent.click(screen.getByRole("button", { name: "Série histórica" }));
 
     expect(await screen.findByText("2026-01")).toBeInTheDocument();
@@ -400,7 +397,7 @@ describe("InvestimentosPage", () => {
     await screen.findByText("Reserva de emergência");
 
     const grid = screen.getByText("Reserva de emergência").closest(".dash-tile") as HTMLElement;
-    await userEvent.click(within(grid).getByRole("button", { name: "Ver extrato no período" }));
+    await userEvent.click(within(grid).getByRole("button", { name: "Ver posições" }));
     await userEvent.click(screen.getByRole("button", { name: "Série histórica" }));
 
     expect(await screen.findByText(/Nenhum snapshot mensal ainda/)).toBeInTheDocument();

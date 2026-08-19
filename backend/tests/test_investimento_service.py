@@ -10,6 +10,7 @@ from app.models.pluggy import (
     PluggyAccount,
     PluggyAccountTipo,
     PluggyInvestment,
+    PluggyInvestmentTransaction,
     PluggyItem,
     PluggyItemStatus,
     PluggyTransaction,
@@ -181,6 +182,32 @@ def _transaction(
         investimento_id=investimento_id,
         status=PluggyTransactionStatus.efetivada,
         categorizacao_status=status_categorizacao,
+    )
+    db_session.add(tx)
+    db_session.commit()
+    db_session.refresh(tx)
+    return tx
+
+
+def _investment_transaction(
+    db_session,
+    user,
+    investment,
+    *,
+    valor,
+    tipo="BUY",
+    descricao=None,
+    data=date(2026, 1, 15),
+):
+    n = next(_SEQ)
+    tx = PluggyInvestmentTransaction(
+        investment_id=investment.id,
+        user_id=user.id,
+        pluggy_investment_transaction_id=f"inv-tx-{n}",
+        tipo=tipo,
+        descricao=descricao,
+        valor=Decimal(valor),
+        data=data,
     )
     db_session.add(tx)
     db_session.commit()
@@ -573,3 +600,100 @@ def test_get_evolucao_isolated_by_user(db_session, user, other_user):
 
     with pytest.raises(NotFoundError):
         service.get_evolucao(db_session, user.id, investimento.id)
+
+
+# --- Sprint 23: get_transacoes (extrato unificado) ------------------------
+
+
+def test_get_transacoes_only_holdings_returns_holding_side(db_session, user):
+    # Regressão do bug real: "Quitar o AP" (só-holdings, sem carteira
+    # bancária vinculada) resultava em extrato sempre vazio.
+    investimento = service.create_investimento(db_session, user.id, nome="Quitar o AP")
+    holding = _investment(db_session, user, investimento_id=investimento.id)
+    _investment_transaction(
+        db_session, user, holding, valor="5000.00", tipo="BUY", data=date(2026, 1, 3)
+    )
+
+    transacoes = service.get_transacoes(db_session, user.id, investimento.id)
+
+    assert len(transacoes) == 1
+    assert transacoes[0].origem == "holding"
+    assert transacoes[0].tipo == "BUY"
+    assert transacoes[0].valor == Decimal("5000.00")
+    assert transacoes[0].holding_nome == holding.nome
+
+
+def test_get_transacoes_unites_conta_and_holding_sources(db_session, user):
+    investimento = service.create_investimento(db_session, user.id, nome="Misto")
+    account = _account(db_session, user, investimento_id=investimento.id)
+    aporte = _aporte_subcategory(db_session)
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-1000.00",
+        tipo=PluggyTransactionTipo.debito,
+        subcategory_id=aporte.id,
+        investimento_id=investimento.id,
+        data=date(2026, 1, 10),
+    )
+    holding = _investment(db_session, user, investimento_id=investimento.id)
+    _investment_transaction(
+        db_session, user, holding, valor="2000.00", tipo="BUY", data=date(2026, 1, 20)
+    )
+
+    transacoes = service.get_transacoes(db_session, user.id, investimento.id)
+
+    assert [t.origem for t in transacoes] == ["holding", "conta"]  # data desc
+
+
+def test_get_transacoes_filters_by_ano_mes(db_session, user):
+    investimento = service.create_investimento(db_session, user.id, nome="Filtro")
+    holding = _investment(db_session, user, investimento_id=investimento.id)
+    _investment_transaction(db_session, user, holding, valor="100.00", data=date(2026, 1, 15))
+    _investment_transaction(db_session, user, holding, valor="200.00", data=date(2026, 2, 15))
+    _investment_transaction(db_session, user, holding, valor="300.00", data=date(2025, 1, 15))
+
+    transacoes = service.get_transacoes(db_session, user.id, investimento.id, ano=2026, mes=1)
+
+    assert len(transacoes) == 1
+    assert transacoes[0].valor == Decimal("100.00")
+
+
+def test_get_transacoes_uses_descricao_usuario_override(db_session, user):
+    investimento = service.create_investimento(db_session, user.id, nome="Override")
+    account = _account(db_session, user, investimento_id=investimento.id)
+    tx = _transaction(
+        db_session,
+        user,
+        account,
+        valor="-500.00",
+        tipo=PluggyTransactionTipo.debito,
+        investimento_id=investimento.id,
+    )
+    tx.descricao_usuario = "Aporte mensal renomeado"
+    db_session.commit()
+
+    transacoes = service.get_transacoes(db_session, user.id, investimento.id)
+
+    assert transacoes[0].descricao == "Aporte mensal renomeado"
+
+
+def test_get_transacoes_isolated_by_user(db_session, user, other_user):
+    investimento = service.create_investimento(db_session, other_user.id, nome="Do outro")
+    holding = _investment(db_session, other_user, investimento_id=investimento.id)
+    _investment_transaction(db_session, other_user, holding, valor="999.00")
+
+    with pytest.raises(NotFoundError):
+        service.get_transacoes(db_session, user.id, investimento.id)
+
+
+def test_get_transacoes_missing_investimento_raises_not_found(db_session, user):
+    with pytest.raises(NotFoundError):
+        service.get_transacoes(db_session, user.id, 999)
+
+
+def test_get_transacoes_empty_when_nothing_linked(db_session, user):
+    investimento = service.create_investimento(db_session, user.id, nome="Vazio")
+
+    assert service.get_transacoes(db_session, user.id, investimento.id) == []

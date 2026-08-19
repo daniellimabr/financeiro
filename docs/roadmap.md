@@ -860,6 +860,60 @@ PRD: [PRD-022-manutencao-investimentos-e-drilldown-patrimonio.md](prd/PRD-022-ma
 Plano: [SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-plan.md](sprints/SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-plan.md).
 Relatório: [SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-report.md](sprints/SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-report.md).
 
+### Sprint 23 — Investimentos: drilldown de posições e extrato unificado (cross-epic, sem épico prévio)
+
+Planejada em sessão própria (2026-08-19), a partir de 2 pontos que o CEO levantou usando
+`InvestimentosPage` na prática pós-Sprint 22: (1) os cards de Investimento exibem carteiras/posições
+como texto corrido, poluindo o card — o botão "Posições" já cobre esse propósito como uma das 3 abas
+do drilldown, mas só é alcançado depois de abrir a aba "Extrato" (default), não é o ponto de
+entrada; as tabelas dessa aba (`InvestimentoPosicoes`/`PosicaoHistorico`) também são as únicas
+`.dash-table` do projeto sem `<colgroup>`, causando overlap visual de coluna com nome de holding
+longo; (2) o botão "Extrato" não mostra nenhum movimento para investimentos só-holdings (ex.
+"Quitar o AP", 14 CDBs Nubank) — hoje só lê `PluggyTransaction.investimento_id` (transação
+bancária), nunca `PluggyInvestmentTransaction` (movimento por holding).
+
+Escopo: Bloco 0 de investigação real na VM de dev (campos/volume/intervalo de
+`PluggyInvestmentTransaction` de "Quitar o AP") antes de fechar o schema; endpoint novo
+`GET /investimentos/{id}/transacoes?ano=&mes=` unindo as duas fontes (conta + holdings); card de
+Investimento sem texto solto de posições, abrindo direto na view "Posições"; `<colgroup>` nas
+tabelas de posições/histórico. Sem migration prevista.
+
+PRD: [PRD-023-investimentos-drilldown-extrato-unificado.md](prd/PRD-023-investimentos-drilldown-extrato-unificado.md).
+Plano: [SPRINT-023-investimentos-drilldown-extrato-unificado-plan.md](sprints/SPRINT-023-investimentos-drilldown-extrato-unificado-plan.md).
+
+### Sprint 24 — Dashboard: layout, cards, navegação e cores (cross-epic, sem épico prévio)
+
+Planejada em sessão própria (2026-08-19), no mesmo pedido do CEO que originou a Sprint 23 —
+dividida em duas sprints separadas por área (Investimentos vs. Dashboard), decisão explícita do
+CEO na sessão de planejamento, mesmo padrão das divisões 7/8/9 e 12/13/14/15. Onze pontos levantados
+usando `DashboardsPage`/`CategorizationReviewPage` na prática: disclaimers redundantes em Saldo
+Acumulado/Patrimônio; grid de 8 cards sem hierarquia (Ativos/Passivos/Patrimônio deveriam ficar
+juntos numa primeira linha); navegação de mês por clique no card já existe (Sprint 15) mas sem seta
+visível, e "Saldo Acumulado" não navega pro mês seguinte; colisão real de cor entre "Empréstimos" e
+"Transferência Interna" no funil de despesas (`i % 8` com 15 grupos, só 8 cores); card "Saldo" abre
+uma lista de contas desalinhada do que o card representa (fluxo do período, não snapshot); "Saldo
+Acumulado" falta memória de cálculo; card "Ativos" falta drilldown Investimento→Holding; card
+"Passivos" falta lista de todos os passivos (Ativos já tem o equivalente desde a Sprint 22); card
+"Patrimônio" é tabela com "Ver detalhe" em vez de accordion; drilldown de Ativos usa cor fixa por
+tipo de transação, não por ativo; Categorização não tem botão de sincronizar.
+
+Decisões confirmadas com o CEO via perguntas diretas nesta sessão: card Patrimônio vira accordion
+expansível in-place (não mantém navegação nem só restiliza a tabela); botão "Sincronizar contas" em
+Categorização sincroniza tudo direto num clique, sem diálogo de seleção de contas (diferente do
+padrão de Gestão de Contas). Escopo: reagrupamento de grid em 2 linhas; ícone de seta em Saldo
+Anterior (cosmético, comportamento já existe) e seta funcional de mês seguinte em Saldo Acumulado;
+paleta categórica expandida de 8 para 16 cores (`categoryColors.ts` generalizado, reaproveitado
+também para cor por ativo); memórias de cálculo em Saldo/Saldo Acumulado a partir de dados já
+carregados (sem endpoint novo previsto); accordions novos em Ativos→Investimentos, Passivos e
+Patrimônio, reaproveitando componentes já existentes (`AssetsValorAtualList`,
+`LiabilitiesValorAtualList`, `InvestimentosValorAtualList`); botão de sync em Categorização
+reaproveitando `useSyncPluggyItems` já usado em Gestão de Contas. Sem mudança na fórmula de
+`Summary.ativos`/`patrimonio`/`saldo` — tudo aditivo em apresentação/drilldown. Sem migration
+prevista.
+
+PRD: [PRD-024-dashboard-layout-cards-navegacao.md](prd/PRD-024-dashboard-layout-cards-navegacao.md).
+Plano: [SPRINT-024-dashboard-layout-cards-navegacao-plan.md](sprints/SPRINT-024-dashboard-layout-cards-navegacao-plan.md).
+
 ## Registro de reavaliações futuras
 
 - **Understand Anything:** reavaliar instalação quando o codebase ultrapassar ~100 arquivos (ver ADR-002-plugins).

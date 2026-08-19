@@ -144,3 +144,50 @@ def test_get_evolucao_mensal_missing_investimento_returns_404(client, db_session
     response = client.get("/investimentos/999/evolucao-mensal")
 
     assert response.status_code == 404
+
+
+def test_transacoes_without_cookie_returns_401(client):
+    response = client.get("/investimentos/1/transacoes")
+    assert response.status_code == 401
+
+
+def test_get_transacoes_empty_when_nothing_linked(client, db_session):
+    _authenticate(client, db_session)
+    investimento = client.post("/investimentos", json=INVESTIMENTO_PAYLOAD).json()
+
+    response = client.get(f"/investimentos/{investimento['id']}/transacoes")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_get_transacoes_missing_investimento_returns_404(client, db_session):
+    _authenticate(client, db_session)
+
+    response = client.get("/investimentos/999/transacoes")
+
+    assert response.status_code == 404
+
+
+def test_get_other_users_transacoes_returns_404(client, db_session):
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    investimento = client.post("/investimentos", json=INVESTIMENTO_PAYLOAD).json()
+
+    client.cookies.clear()
+    _authenticate(client, db_session, google_sub="google-2", email="b@example.com")
+
+    response = client.get(f"/investimentos/{investimento['id']}/transacoes")
+
+    assert response.status_code == 404
+
+
+def test_get_transacoes_accepts_ano_mes_filters(client, db_session):
+    _authenticate(client, db_session)
+    investimento = client.post("/investimentos", json=INVESTIMENTO_PAYLOAD).json()
+
+    response = client.get(
+        f"/investimentos/{investimento['id']}/transacoes", params={"ano": 2026, "mes": 1}
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []

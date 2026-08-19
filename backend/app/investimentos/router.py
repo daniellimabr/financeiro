@@ -12,6 +12,7 @@ from app.schemas.investimento import (
     InvestimentoEvolucaoOut,
     InvestimentoIn,
     InvestimentoOut,
+    InvestimentoTransacaoOut,
 )
 
 router = APIRouter(prefix="/investimentos")
@@ -90,5 +91,19 @@ def get_evolucao_mensal(
 ):
     try:
         return service.get_evolucao_mensal(db, current_user.id, investimento_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get("/{investimento_id}/transacoes", response_model=list[InvestimentoTransacaoOut])
+def get_transacoes(
+    investimento_id: int,
+    ano: int | None = None,
+    mes: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return service.get_transacoes(db, current_user.id, investimento_id, ano=ano, mes=mes)
     except NotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

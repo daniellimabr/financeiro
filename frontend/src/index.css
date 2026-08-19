@@ -1260,6 +1260,59 @@ input {
   width: 100px;
 }
 
+/* Extrato unificado, Posições e histórico de posição (InvestimentosPage,
+   Sprint 23) — únicas .dash-table do projeto sem colgroup até aqui, o que
+   deixava nome de holding longo vazar sobre a coluna vizinha. Larguras
+   seguem o mesmo padrão de .txn-table/.cat-review-table (col-data ~90px,
+   col-descricao com teto percentual, col-valor ~110px). */
+.extrato-unificado-table .col-data,
+.posicao-historico-table .col-data {
+  width: 90px;
+}
+
+.extrato-unificado-table .col-tipo,
+.posicao-historico-table .col-tipo,
+.posicoes-table .col-tipo {
+  width: 110px;
+}
+
+.extrato-unificado-table .col-descricao,
+.posicao-historico-table .col-descricao {
+  width: 30%;
+}
+
+.extrato-unificado-table .col-valor,
+.posicao-historico-table .col-valor,
+.posicoes-table .col-valor {
+  width: 110px;
+}
+
+.extrato-unificado-table .col-origem {
+  width: 90px;
+}
+
+.posicoes-table .col-nome {
+  width: 30%;
+}
+
+.posicoes-table .col-quantidade {
+  width: 120px;
+}
+
+.posicoes-table .col-acao {
+  width: 130px;
+}
+
+/* Descrição/Nome não são a 1ª/última coluna nestas 3 tabelas (diferente de
+   .baseline-table), então o corte com "..." usa a posição real via
+   nth-child em vez de :first-child/:last-child. */
+.extrato-unificado-table td:nth-child(3),
+.posicao-historico-table td:nth-child(3),
+.posicoes-table td:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 @media (max-width: 640px) {
   /* Linha ganhou tendência + percentual na Sprint 6 — em telas estreitas,
      6 elementos (chevron/nome/tendência/barra/valor/%) espremiam o valor e

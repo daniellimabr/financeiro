@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -47,3 +47,14 @@ class EvolucaoMensalOut(BaseModel):
     aportes: Decimal
     resgates: Decimal
     confianca: str
+
+
+class InvestimentoTransacaoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    data: date
+    tipo: str
+    descricao: str | None
+    valor: Decimal
+    origem: str
+    holding_nome: str | None

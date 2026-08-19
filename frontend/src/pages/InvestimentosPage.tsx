@@ -11,7 +11,6 @@ import type {
 } from "../api/dashboards";
 import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
-import { TransactionsTable } from "../components/TransactionsTable";
 import { TrendChart } from "../components/TrendChart";
 import { useCreateInvestimento } from "../hooks/useCreateInvestimento";
 import { useDeleteInvestimento } from "../hooks/useDeleteInvestimento";
@@ -20,7 +19,7 @@ import { useInvestimentoEvolucao } from "../hooks/useInvestimentoEvolucao";
 import { useInvestimentoGastos } from "../hooks/useInvestimentoGastos";
 import { useInvestimentoGastosTendencia } from "../hooks/useInvestimentoGastosTendencia";
 import { useInvestimentos } from "../hooks/useInvestimentos";
-import { usePluggyAccounts } from "../hooks/usePluggyAccounts";
+import { useInvestimentoTransacoes } from "../hooks/useInvestimentoTransacoes";
 import { usePluggyInvestments } from "../hooks/usePluggyInvestments";
 import { usePluggyInvestmentTransactions } from "../hooks/usePluggyInvestmentTransactions";
 import { useUpdateInvestimento } from "../hooks/useUpdateInvestimento";
@@ -41,7 +40,6 @@ export function InvestimentosPage() {
   const [drillTipo, setDrillTipo] = useState<TransacaoTipo>("debito");
 
   const investimentosQuery = useInvestimentos();
-  const { data: accounts } = usePluggyAccounts();
   const { data: investments } = usePluggyInvestments();
   const createInvestimento = useCreateInvestimento();
   const updateInvestimento = useUpdateInvestimento();
@@ -53,7 +51,7 @@ export function InvestimentosPage() {
   const [formState, setFormState] = useState<InvestimentoInput>(EMPTY_FORM);
 
   const [selectedInvestimentoId, setSelectedInvestimentoId] = useState<number | null>(null);
-  const [drillView, setDrillView] = useState<DrillView>("extrato");
+  const [drillView, setDrillView] = useState<DrillView>("posicoes");
 
   const investimentos = investimentosQuery.data ?? [];
   const selectedInvestimento =
@@ -66,10 +64,6 @@ export function InvestimentosPage() {
   }, [tendenciaQuery.data]);
 
   const trendColor = drillTipo === "credito" ? "var(--receita)" : "var(--despesa)";
-
-  function carteirasDe(investimentoId: number) {
-    return (accounts ?? []).filter((account) => account.investimento_id === investimentoId);
-  }
 
   function posicoesDe(investimentoId: number) {
     return (investments ?? []).filter(
@@ -118,7 +112,7 @@ export function InvestimentosPage() {
 
   function toggleDrilldown(investimentoId: number) {
     setSelectedInvestimentoId((prev) => (prev === investimentoId ? null : investimentoId));
-    setDrillView("extrato");
+    setDrillView("posicoes");
   }
 
   return (
@@ -203,8 +197,6 @@ export function InvestimentosPage() {
           <InvestimentoCard
             key={investimento.id}
             investimento={investimento}
-            carteiras={carteirasDe(investimento.id)}
-            posicoes={posicoesDe(investimento.id)}
             pontos={trendByInvestimento.get(investimento.id)}
             trendColor={trendColor}
             expanded={selectedInvestimentoId === investimento.id}
@@ -272,8 +264,6 @@ export function InvestimentosPage() {
 
 function InvestimentoCard({
   investimento,
-  carteiras,
-  posicoes,
   pontos,
   trendColor,
   expanded,
@@ -282,8 +272,6 @@ function InvestimentoCard({
   onDelete,
 }: {
   investimento: Investimento;
-  carteiras: { id: number; apelido: string | null; nome: string }[];
-  posicoes: PluggyInvestment[];
   pontos: PontoTendencia[] | undefined;
   trendColor: string;
   expanded: boolean;
@@ -303,20 +291,10 @@ function InvestimentoCard({
           Rendimento estimado: {formatCurrency(evolucao.rendimento_estimado)}
         </span>
       )}
-      <span className="tag">
-        {carteiras.length === 0
-          ? "Nenhuma carteira vinculada"
-          : `Carteiras: ${carteiras.map((c) => c.apelido ?? c.nome).join(", ")}`}
-      </span>
-      <span className="tag">
-        {posicoes.length === 0
-          ? "Nenhuma posição vinculada"
-          : `Posições: ${posicoes.map((p) => p.codigo ?? p.nome).join(", ")}`}
-      </span>
       <CardSparkline pontos={pontos} color={trendColor} />
       <div className="dash-filter">
         <button type="button" aria-expanded={expanded} onClick={onToggleDrilldown}>
-          {expanded ? "Fechar extrato" : "Ver extrato no período"}
+          {expanded ? "Fechar posições" : "Ver posições"}
         </button>
         <button className="btn-ghost" type="button" onClick={onEdit}>
           Editar
@@ -341,31 +319,68 @@ function InvestimentoDrilldown({
   pontos: PontoTendencia[] | undefined;
 }) {
   const gastosQuery = useInvestimentoGastos(tipo, filter);
+  const transacoesQuery = useInvestimentoTransacoes(investimentoId, filter);
 
   const total =
     gastosQuery.data?.find((item) => item.investimento_id === investimentoId)?.total ?? "0";
   const color = tipo === "credito" ? "var(--receita)" : "var(--despesa)";
   const rotulo = tipo === "credito" ? "Resgate" : "Aporte";
 
-  if (gastosQuery.isLoading) return <p>Carregando...</p>;
-  if (gastosQuery.isError) {
-    return <p role="alert">Não foi possível carregar o extrato do investimento.</p>;
-  }
+  const transacoes = transacoesQuery.data ?? [];
 
   return (
     <>
       {pontos && pontos.length > 1 && <TrendChart pontos={pontos} color={color} />}
-      <p>
-        {rotulo} no período: <strong style={{ color }}>{formatCurrency(total)}</strong>
-      </p>
-      <TransactionsTable
-        filter={filter}
-        investimentoId={investimentoId}
-        tipo={tipo}
-        showAtivo={false}
-        showInvestimento={false}
-        emptyMessage="Nenhuma transação vinculada neste período."
-      />
+      {!gastosQuery.isLoading && !gastosQuery.isError && (
+        <p>
+          {rotulo} no período: <strong style={{ color }}>{formatCurrency(total)}</strong>
+        </p>
+      )}
+      {gastosQuery.isError && <p role="alert">Não foi possível carregar o total do período.</p>}
+      {transacoesQuery.isLoading && <p>Carregando...</p>}
+      {transacoesQuery.isError && (
+        <p role="alert">Não foi possível carregar o extrato do investimento.</p>
+      )}
+      {!transacoesQuery.isLoading && !transacoesQuery.isError && transacoes.length === 0 && (
+        <p className="dash-empty">Nenhuma transação vinculada neste período.</p>
+      )}
+      {transacoes.length > 0 && (
+        <div className="dash-table-wrap">
+          <table className="dash-table extrato-unificado-table">
+            <colgroup>
+              <col className="col-data" />
+              <col className="col-tipo" />
+              <col className="col-descricao" />
+              <col className="col-valor" />
+              <col className="col-origem" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Tipo</th>
+                <th>Descrição</th>
+                <th>Valor</th>
+                <th>Origem</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transacoes.map((transacao, index) => (
+                <tr key={`${transacao.origem}-${transacao.data}-${index}`}>
+                  <td>{transacao.data}</td>
+                  <td>{transacao.tipo}</td>
+                  <td>{transacao.descricao ?? transacao.holding_nome ?? "—"}</td>
+                  <td>{formatCurrency(transacao.valor)}</td>
+                  <td>
+                    <span className="tag">
+                      {transacao.origem === "holding" ? "Holding" : "Conta"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </>
   );
 }
@@ -379,7 +394,14 @@ function InvestimentoPosicoes({ posicoes }: { posicoes: PluggyInvestment[] }) {
 
   return (
     <div className="dash-table-wrap">
-      <table className="dash-table">
+      <table className="dash-table posicoes-table">
+        <colgroup>
+          <col className="col-tipo" />
+          <col className="col-nome" />
+          <col className="col-quantidade" />
+          <col className="col-valor" />
+          <col className="col-acao" />
+        </colgroup>
         <thead>
           <tr>
             <th>Tipo</th>
@@ -541,7 +563,13 @@ function PosicaoHistorico({ investmentId }: { investmentId: number }) {
   }
 
   return (
-    <table className="dash-table">
+    <table className="dash-table posicao-historico-table">
+      <colgroup>
+        <col className="col-data" />
+        <col className="col-tipo" />
+        <col className="col-descricao" />
+        <col className="col-valor" />
+      </colgroup>
       <thead>
         <tr>
           <th>Data</th>
