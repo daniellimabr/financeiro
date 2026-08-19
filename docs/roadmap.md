@@ -936,6 +936,53 @@ PRD: [PRD-024-dashboard-layout-cards-navegacao.md](prd/PRD-024-dashboard-layout-
 Plano: [SPRINT-024-dashboard-layout-cards-navegacao-plan.md](sprints/SPRINT-024-dashboard-layout-cards-navegacao-plan.md).
 Relatório: [SPRINT-024-dashboard-layout-cards-navegacao-report.md](sprints/SPRINT-024-dashboard-layout-cards-navegacao-report.md).
 
+### Sprint 25 — Escala visual, tela Ativos e cards Ativos/Passivos/Patrimônio/Saldo Acumulado (cross-epic, sem épico prévio)
+
+Planejada em sessão própria (2026-08-19), a partir de 13 pontos que o CEO levantou usando o app na
+prática pós-Sprint 24 — dividido em 3 sprints temáticas nesta sessão de planejamento (Sprint 25,
+26, 27), mesmo padrão das divisões 7/8/9, 12/13/14/15, 23/24. Escopo: reduzir os tokens
+`--text-*`/`--space-*` de `index.css` em ~20% (equivalente visual a "zoom 80%"); tela Ativos perde
+o toggle Competência/Caixa e o extrato do drilldown por ativo vira accordion
+Categoria→Subcategoria→Transação; investigação (Bloco 0) do caso "Receitas/Estornos" aparecendo no
+drilldown de despesa antes de decidir o fix; card "Ativos" do Dashboard ganha a seção "Valor atual
+por Ativo" (1ª), mantém "Valor atual por Investimento" (2ª, corrigindo cor única) e renomeia o
+accordion de gasto pra "Despesas por Ativo" (última), removendo "Saldo por conta"; card "Passivos"
+troca a lista "Passivos — saldo devedor" por estilo drilldown (barra+%); percentual do total vira
+padrão obrigatório em todo drilldown de valor atual; validação de que o disclaimer de Patrimônio
+(já corrigido no QA pós-Sprint 24) segue ausente; card "Saldo Acumulado" ganha a fórmula visível
+(Saldo do mês anterior + Receita − Despesa).
+
+PRD: [PRD-025-escala-visual-tela-ativos-cards-dashboard.md](prd/PRD-025-escala-visual-tela-ativos-cards-dashboard.md).
+Plano: [SPRINT-025-escala-visual-tela-ativos-cards-dashboard-plan.md](sprints/SPRINT-025-escala-visual-tela-ativos-cards-dashboard-plan.md).
+
+### Sprint 26 — Interatividade de gráficos (ampliar + hover + clique = filtro), sistema inteiro (cross-epic, sem épico prévio)
+
+Planejada na mesma sessão (2026-08-19), 2ª das 3 sprints temáticas. Escopo: o "mini gráfico" por
+linha do funil de Despesa/Receita (`RowTrend`, SVG manual sem interação) migra pra base Recharts, 3x
+mais largo, com tooltip mês/ano+valor; `RowTrend`/`CardSparkline`/`TrendChart` ganham clique num
+ponto de dado que filtra a tela pelo mês daquele ponto (destaque no hover) — replicado em toda tela
+que usa esses componentes (Dashboard, Ativos, Passivos, Investimentos, Natureza, Projeção).
+Consolidar os 3 componentes de gráfico de linha num só, parametrizado, é decisão de design deixada
+para a sessão de execução (evitar abstração prematura antes de ver os 3 casos lado a lado).
+
+PRD: [PRD-026-interatividade-graficos-dashboard.md](prd/PRD-026-interatividade-graficos-dashboard.md).
+Plano: [SPRINT-026-interatividade-graficos-dashboard-plan.md](sprints/SPRINT-026-interatividade-graficos-dashboard-plan.md).
+
+### Sprint 27 — Simulação "ocultar gasto" e gráfico comparativo de categorias (cross-epic, sem épico prévio)
+
+Planejada na mesma sessão (2026-08-19), 3ª das 3 sprints temáticas — a mais nova em decisões de
+produto, resolvidas com o CEO por perguntas diretas: "ocultar gasto" (toggle de binóculo por linha
+de transação dentro do funil Despesa/Receita aberto) recalcula só o total/gráfico daquele funil, não
+os cards de resumo do topo (Saldo, Patrimônio, Saldo Acumulado) — escopo "tela inteira" rejeitado
+porque os cards vêm de endpoints agregados separados, exigiria parâmetro de exclusão threaded por
+vários endpoints; estado 100% local/efêmero, mesmo padrão de `applyHipoteticas` da tela Projeção
+(Sprint 14) — sem persistência. Gráfico comparativo de composição de gasto por categoria ao longo
+dos últimos meses aparece dentro do próprio funil Despesa/Receita ao ser aberto, não em seção fixa
+separada.
+
+PRD: [PRD-027-ocultar-gasto-comparativo-categorias.md](prd/PRD-027-ocultar-gasto-comparativo-categorias.md).
+Plano: [SPRINT-027-ocultar-gasto-comparativo-categorias-plan.md](sprints/SPRINT-027-ocultar-gasto-comparativo-categorias-plan.md).
+
 ## Registro de reavaliações futuras
 
 - **Understand Anything:** reavaliar instalação quando o codebase ultrapassar ~100 arquivos (ver ADR-002-plugins).
