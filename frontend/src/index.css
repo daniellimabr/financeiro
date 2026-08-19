@@ -113,23 +113,24 @@
   --sans: var(--font-body);
   --mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
 
-  /* Escala de espaçamento */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 24px;
-  --space-6: 32px;
-  --space-7: 48px;
+  /* Escala de espaçamento — reduzida em ~20% na Sprint 25 (equivalente
+     visual a zoom 80%, pedido direto do CEO usando o app na prática). */
+  --space-1: 3px;
+  --space-2: 6px;
+  --space-3: 10px;
+  --space-4: 13px;
+  --space-5: 19px;
+  --space-6: 26px;
+  --space-7: 38px;
 
-  /* Escala tipográfica */
-  --text-2xs: 11px;
-  --text-xs: 12px;
-  --text-sm: 13.5px;
-  --text-base: 16px;
-  --text-lg: 19px;
-  --text-xl: 24px;
-  --text-2xl: 32px;
+  /* Escala tipográfica — reduzida em ~20% na Sprint 25, mesmo motivo. */
+  --text-2xs: 9px;
+  --text-xs: 10px;
+  --text-sm: 11px;
+  --text-base: 13px;
+  --text-lg: 15px;
+  --text-xl: 19px;
+  --text-2xl: 26px;
 
   font: var(--text-base) / 1.45 var(--sans);
   letter-spacing: 0.1px;
@@ -1396,11 +1397,15 @@ input {
    longo (ex. razão social de CDB) vazava sobre a coluna de valor, mesmo
    bug já corrigido em InvestimentoPosicoes/PosicaoHistorico na Sprint 23. */
 .holdings-table .col-nome {
-  width: 70%;
+  width: 60%;
 }
 
 .holdings-table .col-valor {
   width: 130px;
+}
+
+.holdings-table .col-percentual {
+  width: 60px;
 }
 
 .holdings-table td:first-child {

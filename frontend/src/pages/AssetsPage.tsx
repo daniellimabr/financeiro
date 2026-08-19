@@ -5,23 +5,33 @@ import type {
   PeriodoFilter,
   PeriodoHistorico,
   PontoTendencia,
-  Regime,
   TransacaoTipo,
 } from "../api/dashboards";
 import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
-import { RegimeToggle } from "../components/RegimeToggle";
 import { TransactionsTable } from "../components/TransactionsTable";
 import { TrendChart } from "../components/TrendChart";
 import { useAssetGastos } from "../hooks/useAssetGastos";
 import { useAssetGastosTendencia } from "../hooks/useAssetGastosTendencia";
 import { useAssets } from "../hooks/useAssets";
+import { useCategoryGroups } from "../hooks/useCategoryGroups";
 import { useCreateAsset } from "../hooks/useCreateAsset";
 import { useDeleteAsset } from "../hooks/useDeleteAsset";
+import { usePluggyTransactions } from "../hooks/usePluggyTransactions";
 import { useSellAsset } from "../hooks/useSellAsset";
+import { useSubcategories } from "../hooks/useSubcategories";
 import { useUpdateAsset } from "../hooks/useUpdateAsset";
-import { buildColorIndexFromIds, groupColorVar } from "../utils/categoryColors";
+import {
+  buildColorIndexFromIds,
+  buildSubcategoryTintIndex,
+  groupColorVar,
+  subcategoryColorVar,
+} from "../utils/categoryColors";
 import { formatCurrency } from "../utils/format";
+import { Row } from "./DashboardsPage";
+
+const SEM_CATEGORIA_ID = 0;
+const SEM_CATEGORIA_NOME = "Sem categoria";
 
 const TIPO_LABEL: Record<string, string> = {
   imovel: "Imóvel",
@@ -49,14 +59,13 @@ export function AssetsPage() {
   const filter: PeriodoFilter = { ano, mes };
 
   const [drillTipo, setDrillTipo] = useState<TransacaoTipo>("debito");
-  const [regime, setRegime] = useState<Regime>("competencia");
 
   const assetsQuery = useAssets();
   const createAsset = useCreateAsset();
   const updateAsset = useUpdateAsset();
   const sellAsset = useSellAsset();
   const deleteAsset = useDeleteAsset();
-  const tendenciaQuery = useAssetGastosTendencia(drillTipo, ano, mes, PERIODO_HISTORICO, regime);
+  const tendenciaQuery = useAssetGastosTendencia(drillTipo, ano, mes, PERIODO_HISTORICO);
 
   const [editingAssetId, setEditingAssetId] = useState<number | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -174,7 +183,6 @@ export function AssetsPage() {
             Receita
           </button>
         </div>
-        <RegimeToggle value={regime} onChange={setRegime} />
         <button type="button" onClick={openCreateForm}>
           Novo ativo
         </button>
@@ -341,10 +349,10 @@ export function AssetsPage() {
             </button>
           </div>
           <AssetDrilldown
+            key={selectedAsset.id}
             assetId={selectedAsset.id}
             tipo={drillTipo}
             filter={filter}
-            regime={regime}
             pontos={trendByAsset.get(selectedAsset.id)}
             color={groupColorVar(selectedAsset.id, colorIndex)}
           />
@@ -383,18 +391,16 @@ function AssetDrilldown({
   assetId,
   tipo,
   filter,
-  regime,
   pontos,
   color,
 }: {
   assetId: number;
   tipo: TransacaoTipo;
   filter: PeriodoFilter;
-  regime: Regime;
   pontos: PontoTendencia[] | undefined;
   color: string;
 }) {
-  const gastosQuery = useAssetGastos(tipo, { ...filter, regime });
+  const gastosQuery = useAssetGastos(tipo, filter);
 
   const total = gastosQuery.data?.find((item) => item.asset_id === assetId)?.total ?? "0";
   const rotulo = tipo === "credito" ? "Receita" : "Gasto";
@@ -410,13 +416,188 @@ function AssetDrilldown({
       <p>
         {rotulo} no período: <strong style={{ color }}>{formatCurrency(total)}</strong>
       </p>
-      <TransactionsTable
-        filter={filter}
-        assetId={assetId}
-        tipo={tipo}
-        showAtivo={false}
-        emptyMessage="Nenhuma transação vinculada neste período."
-      />
+      <AssetExtratoAccordion assetId={assetId} tipo={tipo} filter={filter} />
     </>
+  );
+}
+
+interface AssetSubcategoriaTotal {
+  subcategory_id: number;
+  subcategory_nome: string;
+  total: number;
+}
+
+interface AssetGrupoTotal {
+  group_id: number;
+  group_nome: string;
+  total: number;
+  percentual: number;
+  subcategorias: AssetSubcategoriaTotal[];
+}
+
+// Accordion Categoria → Subcategoria → Transação escopado a um único ativo
+// (Sprint 25) — substitui a tabela plana que existia antes. Reaproveita a
+// mesma lógica de agrupamento do funil Despesa/Receita do Dashboard
+// (GrupoAccordion/SubcategoriaAccordion em DashboardsPage.tsx), mas como não
+// existe endpoint agregado "por categoria dentro de um ativo", os totais são
+// somados aqui a partir da lista de transações já filtrada por asset_id
+// (poucas dezenas de itens por ativo/mês, sem custo perceptível). O nível
+// folha reaproveita o TransactionsTable existente (mesmo componente do
+// funil), preservando edição inline de categoria e ordenação.
+function AssetExtratoAccordion({
+  assetId,
+  tipo,
+  filter,
+}: {
+  assetId: number;
+  tipo: TransacaoTipo;
+  filter: PeriodoFilter;
+}) {
+  const txQuery = usePluggyTransactions({
+    ano: filter.ano,
+    mes: filter.mes,
+    assetId,
+    tipo,
+    competencia: true,
+  });
+  const groupsQuery = useCategoryGroups();
+  const subcategoriesQuery = useSubcategories();
+
+  const [expandedGrupos, setExpandedGrupos] = useState<number[]>([]);
+  const [expandedSubcategorias, setExpandedSubcategorias] = useState<number[]>([]);
+
+  const groupColorIndex = useMemo(
+    () => buildColorIndexFromIds((groupsQuery.data ?? []).map((g) => g.id)),
+    [groupsQuery.data]
+  );
+  const subcategoryTintIndex = useMemo(
+    () => buildSubcategoryTintIndex(subcategoriesQuery.data ?? []),
+    [subcategoriesQuery.data]
+  );
+
+  const grupos = useMemo<AssetGrupoTotal[]>(() => {
+    const transacoes = txQuery.data ?? [];
+    const subcategories = subcategoriesQuery.data ?? [];
+    const groups = groupsQuery.data ?? [];
+    const totalGeral = transacoes.reduce((sum, tx) => sum + Math.abs(Number(tx.valor)), 0);
+
+    const porGrupo = new Map<number, AssetGrupoTotal>();
+    for (const tx of transacoes) {
+      const subcategoryId = tx.subcategoria_sugerida_id ?? tx.subcategory_id;
+      const subcategory =
+        subcategoryId !== null ? subcategories.find((s) => s.id === subcategoryId) : undefined;
+      const groupId = subcategory?.group_id ?? SEM_CATEGORIA_ID;
+      const groupNome = subcategory
+        ? (groups.find((g) => g.id === subcategory.group_id)?.nome ?? SEM_CATEGORIA_NOME)
+        : SEM_CATEGORIA_NOME;
+      const subcategoryKey = subcategoryId ?? SEM_CATEGORIA_ID;
+      const subcategoryNome = subcategory?.nome ?? SEM_CATEGORIA_NOME;
+
+      const grupo = porGrupo.get(groupId) ?? {
+        group_id: groupId,
+        group_nome: groupNome,
+        total: 0,
+        percentual: 0,
+        subcategorias: [],
+      };
+      grupo.total += Math.abs(Number(tx.valor));
+      let sub = grupo.subcategorias.find((s) => s.subcategory_id === subcategoryKey);
+      if (!sub) {
+        sub = { subcategory_id: subcategoryKey, subcategory_nome: subcategoryNome, total: 0 };
+        grupo.subcategorias.push(sub);
+      }
+      sub.total += Math.abs(Number(tx.valor));
+      porGrupo.set(groupId, grupo);
+    }
+
+    return [...porGrupo.values()]
+      .map((grupo) => ({
+        ...grupo,
+        percentual: totalGeral > 0 ? (grupo.total / totalGeral) * 100 : 0,
+        subcategorias: [...grupo.subcategorias].sort((a, b) => b.total - a.total),
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [txQuery.data, subcategoriesQuery.data, groupsQuery.data]);
+
+  function toggleGrupo(id: number) {
+    setExpandedGrupos((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+  function toggleSubcategoria(id: number) {
+    setExpandedSubcategorias((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
+
+  if (txQuery.isLoading) return <p>Carregando...</p>;
+  if (txQuery.isError) {
+    return <p role="alert">Não foi possível carregar o extrato do ativo.</p>;
+  }
+  if (grupos.length === 0) {
+    return <p className="dash-empty">Nenhuma transação vinculada neste período.</p>;
+  }
+
+  const max = grupos[0]?.total ?? 1;
+
+  return (
+    <ul className="dash-list dash-accordion">
+      {grupos.map((grupo) => (
+        <li key={grupo.group_id}>
+          <div className="dash-accordion-item">
+            <Row
+              nome={grupo.group_nome}
+              total={String(grupo.total)}
+              percentual={grupo.percentual.toFixed(2)}
+              max={max}
+              color={groupColorVar(grupo.group_id, groupColorIndex)}
+              expanded={expandedGrupos.includes(grupo.group_id)}
+              onClick={() => toggleGrupo(grupo.group_id)}
+            />
+            {expandedGrupos.includes(grupo.group_id) && (
+              <div className="dash-accordion-panel">
+                <ul className="dash-list dash-accordion">
+                  {grupo.subcategorias.map((sub) => {
+                    const subMax = grupo.subcategorias[0]?.total ?? 1;
+                    const subPercentual = grupo.total > 0 ? (sub.total / grupo.total) * 100 : 0;
+                    return (
+                      <li key={sub.subcategory_id}>
+                        <div className="dash-accordion-item">
+                          <Row
+                            nome={sub.subcategory_nome}
+                            total={String(sub.total)}
+                            percentual={subPercentual.toFixed(2)}
+                            max={subMax}
+                            color={subcategoryColorVar(
+                              sub.subcategory_id,
+                              grupo.group_id,
+                              groupColorIndex,
+                              subcategoryTintIndex
+                            )}
+                            expanded={expandedSubcategorias.includes(sub.subcategory_id)}
+                            onClick={() => toggleSubcategoria(sub.subcategory_id)}
+                          />
+                          {expandedSubcategorias.includes(sub.subcategory_id) && (
+                            <div className="dash-accordion-panel">
+                              <TransactionsTable
+                                filter={filter}
+                                assetId={assetId}
+                                categoriaId={sub.subcategory_id}
+                                tipo={tipo}
+                                totalParaPercentual={String(sub.total)}
+                                showAtivo={false}
+                                emptyMessage="Nenhuma transação nesta categoria."
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }

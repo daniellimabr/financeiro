@@ -66,8 +66,18 @@ function renderWithQueryClient(ui: ReactNode) {
 
 // Toda renderização de AssetsPage dispara /dashboards/por-ativo/tendencia (sparkline
 // dos cards) mesmo sem nenhum card expandido — helper cobre essa rota em todo teste.
-function baseHandlers(url: string): Promise<Response> | null {
+// O accordion de extrato por ativo (Sprint 25) sempre busca /category-groups e
+// /subcategories pra montar o agrupamento Categoria→Subcategoria, mesmo com a lista
+// de transações vazia — testes que não se importam com nomes reais de categoria
+// usam o default (listas vazias); os que precisam de nomes passam `overrides`.
+function baseHandlers(
+  url: string,
+  overrides?: { groups?: unknown[]; subcategories?: unknown[] }
+): Promise<Response> | null {
   if (url.startsWith("/dashboards/por-ativo/tendencia")) return Promise.resolve(jsonResponse([]));
+  if (url === "/category-groups") return Promise.resolve(jsonResponse(overrides?.groups ?? []));
+  if (url === "/subcategories")
+    return Promise.resolve(jsonResponse(overrides?.subcategories ?? []));
   return null;
 }
 
@@ -94,6 +104,23 @@ describe("AssetsPage", () => {
     expect(screen.getByText("Moto antiga")).toBeInTheDocument();
     expect(screen.getByText("R$ 7.000,00")).toBeInTheDocument();
     expect(screen.getByText("Vendido em 2026-05-01")).toBeInTheDocument();
+  });
+
+  it("does not show a Competência/Caixa toggle — regime is always competência", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url === "/assets") return Promise.resolve(jsonResponse([ASSET_ATIVO]));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<AssetsPage />);
+    await screen.findByText("Carro");
+
+    expect(screen.queryByRole("button", { name: "Competência" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Caixa" })).not.toBeInTheDocument();
   });
 
   it("creates a new asset via POST /assets", async () => {
@@ -227,7 +254,7 @@ describe("AssetsPage", () => {
     });
   });
 
-  it("opens the drilldown outside the card showing the period's gasto total and linked transactions", async () => {
+  it("opens the drilldown outside the card showing the period's gasto total and the transaction grouped as Sem categoria", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       const base = baseHandlers(url);
@@ -255,11 +282,20 @@ describe("AssetsPage", () => {
     await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
 
     expect(await screen.findByText("R$ 300,00")).toBeInTheDocument();
-    expect(screen.getByText("Posto Ipiranga")).toBeInTheDocument();
     // o funil renderiza fora do card, como painel próprio da página
-    const funnel = screen.getByText("Posto Ipiranga").closest(".dash-funnel");
+    const funnel = screen.getByText("R$ 300,00").closest(".dash-funnel") as HTMLElement;
     expect(funnel).not.toBeNull();
     expect(grid.contains(funnel)).toBe(false);
+
+    // transação sem subcategoria cai no grupo "Sem categoria" — precisa expandir
+    // Categoria → Subcategoria pra chegar na transação (accordion, não mais tabela plana)
+    expect(within(funnel).getAllByText("Sem categoria")[0]).toBeInTheDocument();
+    expect(screen.queryByText("Posto Ipiranga")).not.toBeInTheDocument();
+
+    await userEvent.click(within(funnel).getAllByRole("button", { name: /Sem categoria/ })[0]);
+    await userEvent.click(within(funnel).getAllByRole("button", { name: /Sem categoria/ })[1]);
+
+    expect(await screen.findByText("Posto Ipiranga")).toBeInTheDocument();
   });
 
   it("toggling despesa/receita refetches por-ativo and the drilldown with the selected tipo", async () => {
@@ -296,41 +332,7 @@ describe("AssetsPage", () => {
     });
   });
 
-  it("toggling Competência/Caixa refetches por-ativo with the selected regime", async () => {
-    const fetchMock = vi.fn((input: RequestInfo | URL) => {
-      const url = String(input);
-      const base = baseHandlers(url);
-      if (base) return base;
-      if (url === "/assets") return Promise.resolve(jsonResponse([ASSET_ATIVO]));
-      if (url.startsWith("/dashboards/por-ativo")) {
-        const regime = url.includes("regime=caixa") ? "caixa" : "competencia";
-        const total = regime === "caixa" ? "999.00" : "300.00";
-        return Promise.resolve(jsonResponse([{ asset_id: 1, asset_nome: "Carro", total }]));
-      }
-      if (url.startsWith("/pluggy/transactions")) return Promise.resolve(jsonResponse([]));
-      throw new Error(`Unexpected fetch: ${url}`);
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    renderWithQueryClient(<AssetsPage />);
-    await screen.findByText("Carro");
-
-    const grid = screen.getByText("Carro").closest(".dash-tile") as HTMLElement;
-    await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
-    expect(await screen.findByText("R$ 300,00")).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: "Caixa" }));
-
-    expect(await screen.findByText("R$ 999,00")).toBeInTheDocument();
-    await waitFor(() => {
-      const calls = fetchMock.mock.calls.map((call) => String(call[0]));
-      expect(
-        calls.some((url) => url.startsWith("/dashboards/por-ativo") && url.includes("regime=caixa"))
-      ).toBe(true);
-    });
-  });
-
-  it("the drilldown table shows an editable Categoria and can be sorted by Data/Valor", async () => {
+  it("the drilldown accordion groups a single-category asset's transactions under Categoria → Subcategoria, table shows an editable Categoria and can be sorted by Data/Valor", async () => {
     const GROUPS = [
       {
         id: 1,
@@ -349,18 +351,25 @@ describe("AssetsPage", () => {
         updated_at: "2026-01-01T00:00:00Z",
       },
     ];
-    const TX_A = { ...TRANSACAO_FIXTURE, id: 1, data: "2026-01-10", valor: "-150.00" };
+    const TX_A = {
+      ...TRANSACAO_FIXTURE,
+      id: 1,
+      data: "2026-01-10",
+      valor: "-150.00",
+      subcategory_id: 20,
+    };
     const TX_B = {
       ...TRANSACAO_FIXTURE,
       id: 2,
       data: "2026-01-20",
       descricao: "Zona Azul",
       valor: "-30.00",
+      subcategory_id: 20,
     };
 
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
-      const base = baseHandlers(url);
+      const base = baseHandlers(url, { groups: GROUPS, subcategories: SUBCATEGORIES });
       if (base) return base;
       if (url === "/assets") return Promise.resolve(jsonResponse([ASSET_ATIVO]));
       if (url.startsWith("/dashboards/por-ativo")) {
@@ -370,8 +379,6 @@ describe("AssetsPage", () => {
       }
       if (url.startsWith("/pluggy/transactions"))
         return Promise.resolve(jsonResponse([TX_A, TX_B]));
-      if (url === "/subcategories") return Promise.resolve(jsonResponse(SUBCATEGORIES));
-      if (url === "/category-groups") return Promise.resolve(jsonResponse(GROUPS));
       throw new Error(`Unexpected fetch: ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -381,6 +388,10 @@ describe("AssetsPage", () => {
 
     const grid = screen.getByText("Carro").closest(".dash-tile") as HTMLElement;
     await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
+
+    // ambas transações caem no mesmo grupo/subcategoria (Transporte / Combustível)
+    await userEvent.click(await screen.findByRole("button", { name: /Transporte/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Combustível/ }));
 
     expect(await screen.findByText("Posto Ipiranga")).toBeInTheDocument();
     expect(screen.getByLabelText("Categoria de Posto Ipiranga")).toBeInTheDocument();
@@ -403,7 +414,7 @@ describe("AssetsPage", () => {
     expect(rowsInOrder()[0]).toContain("Zona Azul"); // -30 é o maior valor (desc)
   });
 
-  it("the drilldown table can be sorted by Categoria", async () => {
+  it("the drilldown accordion separates transactions from different categorias into independent group rows", async () => {
     const GROUPS = [
       {
         id: 1,
@@ -440,18 +451,20 @@ describe("AssetsPage", () => {
       ...TRANSACAO_FIXTURE,
       id: 1,
       descricao: "Posto Ipiranga",
+      valor: "-150.00",
       subcategory_id: 20,
     };
     const TX_B = {
       ...TRANSACAO_FIXTURE,
       id: 2,
       descricao: "Zona Azul",
+      valor: "-30.00",
       subcategory_id: 10,
     };
 
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
-      const base = baseHandlers(url);
+      const base = baseHandlers(url, { groups: GROUPS, subcategories: SUBCATEGORIES });
       if (base) return base;
       if (url === "/assets") return Promise.resolve(jsonResponse([ASSET_ATIVO]));
       if (url.startsWith("/dashboards/por-ativo")) {
@@ -459,10 +472,17 @@ describe("AssetsPage", () => {
           jsonResponse([{ asset_id: 1, asset_nome: "Carro", total: "180.00" }])
         );
       }
-      if (url.startsWith("/pluggy/transactions"))
-        return Promise.resolve(jsonResponse([TX_A, TX_B]));
-      if (url === "/subcategories") return Promise.resolve(jsonResponse(SUBCATEGORIES));
-      if (url === "/category-groups") return Promise.resolve(jsonResponse(GROUPS));
+      if (url.startsWith("/pluggy/transactions")) {
+        // simula o filtro real do backend (subcategory_id) — sem isso, o leaf
+        // de um grupo mostraria transações do outro grupo também.
+        const params = new URLSearchParams(url.split("?")[1] ?? "");
+        const subcategoryId = params.get("subcategory_id");
+        const items =
+          subcategoryId === null
+            ? [TX_A, TX_B]
+            : [TX_A, TX_B].filter((tx) => String(tx.subcategory_id) === subcategoryId);
+        return Promise.resolve(jsonResponse(items));
+      }
       throw new Error(`Unexpected fetch: ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -472,21 +492,22 @@ describe("AssetsPage", () => {
 
     const grid = screen.getByText("Carro").closest(".dash-tile") as HTMLElement;
     await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
-    await screen.findByText("Posto Ipiranga");
 
-    const table = screen.getByText("Posto Ipiranga").closest("table") as HTMLElement;
-    const rowsInOrder = () =>
-      within(table)
-        .getAllByRole("row")
-        .slice(1)
-        .map((row) => row.textContent);
+    // dois grupos independentes, cada um com sua própria % do total do ativo
+    // (150/180 = 83.3%, 30/180 = 16.7%)
+    const transporteRow = await screen.findByRole("button", { name: /Transporte/ });
+    const alimentacaoRow = screen.getByRole("button", { name: /Alimentação/ });
+    expect(transporteRow).toHaveTextContent("83.3%");
+    expect(alimentacaoRow).toHaveTextContent("16.7%");
 
-    await userEvent.click(within(table).getByRole("button", { name: "Categoria" }));
-    // "Alimentação / Mercado" (Zona Azul) vem antes de "Transporte / Combustível" (Posto Ipiranga) — asc
-    expect(rowsInOrder()[0]).toContain("Zona Azul");
+    await userEvent.click(transporteRow);
+    await userEvent.click(screen.getByRole("button", { name: /Combustível/ }));
+    expect(await screen.findByText("Posto Ipiranga")).toBeInTheDocument();
+    expect(screen.queryByText("Zona Azul")).not.toBeInTheDocument();
 
-    await userEvent.click(within(table).getByRole("button", { name: "Categoria" }));
-    expect(rowsInOrder()[0]).toContain("Posto Ipiranga"); // desc
+    await userEvent.click(alimentacaoRow);
+    await userEvent.click(screen.getByRole("button", { name: /Mercado/ }));
+    expect(await screen.findByText("Zona Azul")).toBeInTheDocument();
   });
 
   it("colors the asset drilldown by asset id (categorical palette), not by transaction tipo", async () => {

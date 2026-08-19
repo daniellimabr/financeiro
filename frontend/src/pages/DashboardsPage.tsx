@@ -41,7 +41,6 @@ import {
   type TransacaoTipo,
 } from "../api/dashboards";
 import type { PluggyInvestment } from "../api/pluggy";
-import { AccountTipoIcon } from "../components/AccountTipoIcon";
 import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { RegimeToggle } from "../components/RegimeToggle";
@@ -61,7 +60,6 @@ import { useLiabilities } from "../hooks/useLiabilities";
 import { useLiabilityGastos } from "../hooks/useLiabilityGastos";
 import { usePatrimonioBreakdown } from "../hooks/usePatrimonioBreakdown";
 import { usePluggyInvestments } from "../hooks/usePluggyInvestments";
-import { useSaldoPorConta } from "../hooks/useSaldoPorConta";
 import { useSubcategories } from "../hooks/useSubcategories";
 import {
   buildColorIndexFromIds,
@@ -71,21 +69,9 @@ import {
 } from "../utils/categoryColors";
 import { formatCurrency } from "../utils/format";
 
-const ACCOUNT_TIPO_LABEL: Record<string, string> = {
-  corrente: "Conta corrente",
-  poupanca: "Poupança",
-  cartao_credito: "Cartão de crédito",
-  investimento: "Investimento",
-};
-
 const ASSET_TIPO_LABEL: Record<string, string> = {
   imovel: "Imóvel",
   veiculo: "Veículo",
-  outro: "Outro",
-};
-
-const LIABILITY_TIPO_LABEL: Record<string, string> = {
-  financiamento: "Financiamento",
   outro: "Outro",
 };
 
@@ -396,6 +382,11 @@ export function DashboardsPage() {
 
           {drill.kind === "ativos" && (
             <>
+              <h3>Valor atual por Ativo</h3>
+              <AssetsValorAtualList />
+              <h3>Valor atual por Investimento</h3>
+              <InvestimentosValorAtualList />
+              <h3>Despesas por Ativo</h3>
               <div className="dash-toggle" role="group" aria-label="Tipo de transação">
                 <button
                   type="button"
@@ -419,10 +410,6 @@ export function DashboardsPage() {
                 expandedRows={drill.expandedRows}
                 onToggleRow={toggleRow}
               />
-              <h3>Valor atual por Investimento</h3>
-              <InvestimentosValorAtualList />
-              <h3>Saldo por conta</h3>
-              <SaldoPorContaList />
             </>
           )}
 
@@ -580,6 +567,7 @@ function SaldoAcumuladoMemoriaCalculo({
 
   return (
     <div className="dash-memoria-calculo">
+      <p>Fórmula: Saldo do mês anterior + Receita do mês − Despesa do mês = Saldo Acumulado</p>
       <p>
         Saldo inicial das contas (âncora): <strong>{formatCurrency(String(ancora))}</strong>
       </p>
@@ -978,38 +966,6 @@ function PassivosAccordion({
   );
 }
 
-function SaldoPorContaList() {
-  const query = useSaldoPorConta();
-  const sorted = useMemo(
-    () => [...(query.data ?? [])].sort((a, b) => Number(b.saldo) - Number(a.saldo)),
-    [query.data]
-  );
-
-  if (query.isLoading) return <p>Carregando...</p>;
-  if (query.isError) return <p role="alert">Não foi possível carregar o saldo por conta.</p>;
-  if (sorted.length === 0) return <p className="dash-empty">Nenhuma conta cadastrada.</p>;
-
-  return (
-    <ul className="dash-list">
-      {sorted.map((conta) => (
-        <li key={conta.account_id} className="dash-row">
-          <AccountTipoIcon tipo={conta.account_tipo} />
-          <span className="nm">{conta.account_nome}</span>
-          <span className="tag">
-            {ACCOUNT_TIPO_LABEL[conta.account_tipo] ?? conta.account_tipo}
-          </span>
-          <span className="amt">
-            {formatCurrency(conta.saldo)}
-            {conta.limite_credito !== null && (
-              <span className="amt-detail"> (limite {formatCurrency(conta.limite_credito)})</span>
-            )}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 // Accordion Investimento → Holding (Sprint 24) — cada linha de investimento
 // expande buscando suas holdings sob demanda (usePluggyInvestments só
 // monta/busca quando a linha é expandida, sem query antecipada). Reaproveitado
@@ -1019,6 +975,12 @@ function InvestimentosValorAtualList() {
   const [expandedIds, setExpandedIds] = useState<number[]>([]);
   const sorted = useMemo(
     () => [...(query.data ?? [])].sort((a, b) => Number(b.valor_atual) - Number(a.valor_atual)),
+    [query.data]
+  );
+  // Cor por investimento (não mais var(--accent) fixo) — mesmo padrão de
+  // buildColorIndexFromIds/groupColorVar já usado por AtivosAccordion.
+  const colorIndex = useMemo(
+    () => buildColorIndexFromIds((query.data ?? []).map((investimento) => investimento.id)),
     [query.data]
   );
 
@@ -1037,7 +999,7 @@ function InvestimentosValorAtualList() {
               nome={investimento.nome}
               total={investimento.valor_atual}
               max={max}
-              color="var(--accent)"
+              color={groupColorVar(investimento.id, colorIndex)}
               expanded={expandedIds.includes(investimento.id)}
               onClick={() => setExpandedIds((prev) => toggleId(prev, investimento.id))}
             />
@@ -1059,6 +1021,10 @@ function InvestimentoHoldingsList({ investimentoId }: { investimentoId: number }
     () => [...(query.data ?? [])].sort((a, b) => Number(b.valor_atual) - Number(a.valor_atual)),
     [query.data]
   );
+  const totalGeral = useMemo(
+    () => (query.data ?? []).reduce((sum, holding) => sum + Number(holding.valor_atual), 0),
+    [query.data]
+  );
 
   if (query.isLoading) return <p>Carregando...</p>;
   if (query.isError) return <p role="alert">Não foi possível carregar as holdings.</p>;
@@ -1071,20 +1037,27 @@ function InvestimentoHoldingsList({ investimentoId }: { investimentoId: number }
         <colgroup>
           <col className="col-nome" />
           <col className="col-valor" />
+          <col className="col-percentual" />
         </colgroup>
         <thead>
           <tr>
             <th>Holding</th>
             <th>Saldo atual</th>
+            <th>%</th>
           </tr>
         </thead>
         <tbody>
-          {sorted.map((holding: PluggyInvestment) => (
-            <tr key={holding.id}>
-              <td>{holding.nome}</td>
-              <td>{formatCurrency(holding.valor_atual)}</td>
-            </tr>
-          ))}
+          {sorted.map((holding: PluggyInvestment) => {
+            const percentual =
+              totalGeral > 0 ? (Number(holding.valor_atual) / totalGeral) * 100 : 0;
+            return (
+              <tr key={holding.id}>
+                <td>{holding.nome}</td>
+                <td>{formatCurrency(holding.valor_atual)}</td>
+                <td className="pct-col">{formatPercent(percentual)}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -1100,6 +1073,10 @@ function AssetsValorAtualList() {
         .sort((a, b) => Number(b.valor_atual) - Number(a.valor_atual)),
     [query.data]
   );
+  const totalGeral = useMemo(
+    () => ativos.reduce((sum, asset) => sum + Number(asset.valor_atual), 0),
+    [ativos]
+  );
 
   if (query.isLoading) return <p>Carregando...</p>;
   if (query.isError) return <p role="alert">Não foi possível carregar os ativos.</p>;
@@ -1112,28 +1089,38 @@ function AssetsValorAtualList() {
           <col className="col-nome" />
           <col className="col-tipo" />
           <col className="col-valor" />
+          <col className="col-percentual" />
         </colgroup>
         <thead>
           <tr>
             <th>Ativo</th>
             <th>Tipo</th>
             <th>Valor atual</th>
+            <th>%</th>
           </tr>
         </thead>
         <tbody>
-          {ativos.map((asset) => (
-            <tr key={asset.id}>
-              <td>{asset.nome}</td>
-              <td>{ASSET_TIPO_LABEL[asset.tipo] ?? asset.tipo}</td>
-              <td>{formatCurrency(asset.valor_atual)}</td>
-            </tr>
-          ))}
+          {ativos.map((asset) => {
+            const percentual = totalGeral > 0 ? (Number(asset.valor_atual) / totalGeral) * 100 : 0;
+            return (
+              <tr key={asset.id}>
+                <td>{asset.nome}</td>
+                <td>{ASSET_TIPO_LABEL[asset.tipo] ?? asset.tipo}</td>
+                <td>{formatCurrency(asset.valor_atual)}</td>
+                <td className="pct-col">{formatPercent(percentual)}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
 }
 
+// Sprint 25: troca a tabela plana pelo mesmo estilo barra+% de
+// "Valor atual por Investimento" (dash-row), mas sem accordion — o CEO pediu
+// só o estilo visual, sem conteúdo expansível e sem cor distinta por item
+// (usa var(--despesa), mesma cor estática de PassivosAccordion).
 function LiabilitiesValorAtualList() {
   const query = useLiabilities();
   const ativos = useMemo(
@@ -1143,37 +1130,36 @@ function LiabilitiesValorAtualList() {
         .sort((a, b) => Number(b.saldo_devedor) - Number(a.saldo_devedor)),
     [query.data]
   );
+  const totalGeral = useMemo(
+    () => ativos.reduce((sum, liability) => sum + Number(liability.saldo_devedor), 0),
+    [ativos]
+  );
 
   if (query.isLoading) return <p>Carregando...</p>;
   if (query.isError) return <p role="alert">Não foi possível carregar os passivos.</p>;
   if (ativos.length === 0) return <p className="dash-empty">Nenhum passivo cadastrado.</p>;
 
+  const max = Number(ativos[0]?.saldo_devedor ?? 1);
+  const color = "var(--despesa)";
+
   return (
-    <div className="dash-table-wrap">
-      <table className="dash-table">
-        <colgroup>
-          <col className="col-nome" />
-          <col className="col-tipo" />
-          <col className="col-valor" />
-        </colgroup>
-        <thead>
-          <tr>
-            <th>Passivo</th>
-            <th>Tipo</th>
-            <th>Saldo devedor</th>
-          </tr>
-        </thead>
-        <tbody>
-          {ativos.map((liability) => (
-            <tr key={liability.id}>
-              <td>{liability.nome}</td>
-              <td>{LIABILITY_TIPO_LABEL[liability.tipo] ?? liability.tipo}</td>
-              <td>{formatCurrency(liability.saldo_devedor)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ul className="dash-list">
+      {ativos.map((liability) => {
+        const percentual =
+          totalGeral > 0 ? (Number(liability.saldo_devedor) / totalGeral) * 100 : 0;
+        const pct = max > 0 ? Math.max(4, (Number(liability.saldo_devedor) / max) * 100) : 0;
+        return (
+          <li key={liability.id} className="dash-row">
+            <span className="nm">{liability.nome}</span>
+            <span className="track">
+              <span className="fillbar" style={{ width: `${pct}%`, background: color }} />
+            </span>
+            <span className="amt">{formatCurrency(liability.saldo_devedor)}</span>
+            <span className="pct">{formatPercent(percentual)}</span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
