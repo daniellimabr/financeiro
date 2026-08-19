@@ -24,6 +24,7 @@ import { useInvestimentos } from "../hooks/useInvestimentos";
 import { usePluggyAccounts } from "../hooks/usePluggyAccounts";
 import { useSetCategory } from "../hooks/useSetCategory";
 import { useSubcategories } from "../hooks/useSubcategories";
+import { useSyncPluggyItems } from "../hooks/useSyncPluggyItems";
 import { useTableSort } from "../hooks/useTableSort";
 import { formatCurrency } from "../utils/format";
 import {
@@ -71,6 +72,7 @@ export function CategorizationReviewPage() {
   const { data: accounts } = usePluggyAccounts();
   const setCategory = useSetCategory();
   const bulkConfirm = useBulkConfirmCategorization();
+  const syncItems = useSyncPluggyItems();
 
   const [selectedSubcategory, setSelectedSubcategory] = useState<
     Record<number, number | undefined>
@@ -251,11 +253,19 @@ export function CategorizationReviewPage() {
             ))}
           </select>
         </label>
+        <button
+          type="button"
+          onClick={() => syncItems.mutate(undefined)}
+          disabled={syncItems.isPending}
+        >
+          {syncItems.isPending ? "Sincronizando..." : "Sincronizar contas"}
+        </button>
       </div>
 
       {isLoading && <p>Carregando...</p>}
       {data && data.total === 0 && <p>Nenhuma transação encontrada.</p>}
       {setCategory.isError && <p role="alert">Não foi possível confirmar a categoria.</p>}
+      {syncItems.isError && <p role="alert">Não foi possível sincronizar as contas.</p>}
 
       {pendentesDaPagina.length > 0 && (
         <div className="dash-filter">

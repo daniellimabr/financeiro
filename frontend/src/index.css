@@ -58,13 +58,17 @@
   --danger: #a3374a;
   --danger-bg: rgba(163, 55, 74, 0.1);
 
-  /* Paleta categórica (Sprint 9, feedback pós-entrega) — identidade de
-     Categoria/Tipo no funil de drill-down, nunca a cor despesa/receita
-     (que segue reservada aos cards de resumo). 8 matizes validados via
-     dataviz skill (scripts/validate_palette.js) contra a superfície real
-     do app: ΔE CVD adjacente ≥8.4, normal-vision ≥19.3 em ambos os modos.
-     Atribuição por índice estável (id do grupo/subcategoria), nunca por
-     ranking — texto sempre acompanha a cor, nunca é o único identificador. */
+  /* Paleta categórica (Sprint 9, feedback pós-entrega; expandida de 8 pra
+     16 na Sprint 24 — a colisão real Empréstimos/Transferência Interna
+     era `i % 8` com >8 grupos cadastrados) — identidade de Categoria/Tipo
+     no funil de drill-down e de Ativo no drilldown de Ativos, nunca a cor
+     despesa/receita (que segue reservada aos cards de resumo). 16 matizes
+     validados via dataviz skill (scripts/validate_palette.js) contra a
+     superfície real do app: ΔE CVD adjacente ≥6.4 (dentro do piso, com
+     rótulo de texto sempre visível como codificação secundária), normal-
+     vision ≥15.8 em ambos os modos. Atribuição por índice estável (id da
+     entidade), nunca por ranking — texto sempre acompanha a cor, nunca é
+     o único identificador. */
   --cat-1: #2a78d6; /* azul */
   --cat-2: #eb6834; /* laranja */
   --cat-3: #1baf7a; /* água */
@@ -73,6 +77,14 @@
   --cat-6: #008300; /* verde */
   --cat-7: #4a3aa7; /* violeta */
   --cat-8: #e34948; /* vermelho */
+  --cat-9: #0089ab; /* petróleo */
+  --cat-10: #a56a35; /* marrom */
+  --cat-11: #c23f79; /* rosa */
+  --cat-12: #4f5fc4; /* índigo */
+  --cat-13: #697a10; /* oliva */
+  --cat-14: #8a3f8a; /* ameixa */
+  --cat-15: #b8481f; /* terracota */
+  --cat-16: #14795a; /* verde-azulado */
 
   /* Natureza (Sprint 12) — 3 tons novos p/ os cards Fixo recorrente/
      Variável recorrente/Custo eventual, deliberadamente fora da paleta
@@ -157,6 +169,14 @@
     --cat-6: #008300;
     --cat-7: #9085e9;
     --cat-8: #e66767;
+    --cat-9: #1687a3;
+    --cat-10: #c2853f;
+    --cat-11: #dd5a92;
+    --cat-12: #6d7bd9;
+    --cat-13: #7c8c1a;
+    --cat-14: #a855a8;
+    --cat-15: #c85a2e;
+    --cat-16: #1f9a72;
 
     --nat-fixa: #7fa3c9;
     --nat-variavel: #c9ac5c;
@@ -193,6 +213,14 @@
   --cat-6: #008300;
   --cat-7: #9085e9;
   --cat-8: #e66767;
+  --cat-9: #1687a3;
+  --cat-10: #c2853f;
+  --cat-11: #dd5a92;
+  --cat-12: #6d7bd9;
+  --cat-13: #7c8c1a;
+  --cat-14: #a855a8;
+  --cat-15: #c85a2e;
+  --cat-16: #1f9a72;
 
   --nat-fixa: #7fa3c9;
   --nat-variavel: #c9ac5c;
@@ -630,11 +658,40 @@ input {
 }
 
 .dash-tile .k {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
   font-size: var(--text-xs);
   font-weight: 600;
   color: var(--text);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+/* "Saldo Acumulado" (Sprint 24) — o label divide espaço com o botão de
+   seta pro mês seguinte, um <button> real aninhado dentro do tile (que
+   virou <div role="button"> pra acomodar as duas ações sem <button> dentro
+   de <button>, inválido em HTML). */
+.dash-tile .k.v-row {
+  justify-content: space-between;
+}
+
+.dash-tile-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+}
+
+.dash-tile-arrow:hover {
+  border-color: var(--accent);
+  color: var(--accent-text);
 }
 
 .dash-tile .v {
@@ -1186,17 +1243,36 @@ input {
   width: 70px;
 }
 
-/* Breakdown de Patrimônio (DashboardsPage) — 3 colunas fixas, 5 linhas. */
-.patrimonio-table .col-componente {
-  width: 55%;
+/* Breakdown de Patrimônio (DashboardsPage, Sprint 24) — accordion de 4
+   partes expansível in-place, substitui a tabela com "Ver detalhe" das
+   sprints anteriores; reaproveita .dash-list/.dash-accordion/.dash-row. */
+.patrimonio-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
-.patrimonio-table .col-valor {
-  width: 30%;
+.patrimonio-total {
+  align-self: flex-end;
+  font-size: var(--text-base);
+  color: var(--text-h);
 }
 
-.patrimonio-table .col-acoes {
-  width: 15%;
+/* Memória de cálculo dos cards Saldo/Saldo Acumulado (Sprint 24) — texto
+   corrido com a conta, sem tabela quando não há série (card Saldo). */
+.dash-memoria-calculo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.dash-memoria-calculo .dash-table {
+  margin-top: var(--space-1);
+}
+
+.saldo-acumulado-memoria-table .col-mes {
+  width: 90px;
 }
 
 /* Revisão de baseline dez/2025 (AccountManagementPage, Sprint 21) — Holding e

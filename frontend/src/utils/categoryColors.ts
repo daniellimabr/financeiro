@@ -1,22 +1,25 @@
 import type { CategoryGroup, Subcategory } from "../api/categories";
 
-// 8 matizes validados (dataviz skill) em --cat-1..--cat-8 (index.css).
-// Atribuição por índice estável (id do grupo/subcategoria em ordem
-// crescente), nunca por ranking do período — a mesma categoria mantém a
-// mesma cor independente do filtro ano/mês (ver skill dataviz: "color
-// follows the entity, never its rank").
-const PALETTE_SIZE = 8;
+// 16 matizes validados (dataviz skill, scripts/validate_palette.js) em
+// --cat-1..--cat-16 (index.css) — expandido de 8 na Sprint 24 pra eliminar a
+// colisão matemática de `i % 8` com >8 grupos cadastrados. Atribuição por
+// índice estável (id da entidade em ordem crescente), nunca por ranking do
+// período — a mesma entidade mantém a mesma cor independente do filtro
+// ano/mês (ver skill dataviz: "color follows the entity, never its rank").
+// Reaproveitada tanto por categoria/grupo (funil de despesas/receitas)
+// quanto por ativo (drilldown de Ativos) — mesma fonte de verdade.
+const PALETTE_SIZE = 16;
 const TINT_STEPS = [85, 65, 45, 25];
 
-export function buildGroupColorIndex(groups: CategoryGroup[]): Map<number, number> {
-  const sorted = [...groups].sort((a, b) => a.id - b.id);
+export function buildColorIndexFromIds(ids: number[]): Map<number, number> {
+  const sorted = [...new Set(ids)].sort((a, b) => a - b);
   const map = new Map<number, number>();
-  sorted.forEach((group, i) => map.set(group.id, i % PALETTE_SIZE));
+  sorted.forEach((id, i) => map.set(id, i % PALETTE_SIZE));
   return map;
 }
 
-export function groupColorVar(groupId: number, index: Map<number, number>): string {
-  const slot = index.get(groupId);
+export function groupColorVar(id: number, index: Map<number, number>): string {
+  const slot = index.get(id);
   return slot === undefined ? "var(--text)" : `var(--cat-${slot + 1})`;
 }
 
@@ -44,4 +47,10 @@ export function subcategoryColorVar(
   const tintSlot = tintIndex.get(subcategoryId) ?? 0;
   const pct = TINT_STEPS[tintSlot];
   return `color-mix(in oklch, ${base} ${pct}%, var(--surface))`;
+}
+
+// Helper de conveniência pros call sites que ainda têm a lista de grupos
+// (não só os ids) — mesma função de índice, só extrai os ids primeiro.
+export function buildGroupColorIndex(groups: CategoryGroup[]): Map<number, number> {
+  return buildColorIndexFromIds(groups.map((g) => g.id));
 }

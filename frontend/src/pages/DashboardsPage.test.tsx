@@ -136,6 +136,49 @@ const INVESTIMENTOS_FIXTURE = [
   },
 ];
 
+const PLUGGY_INVESTMENTS_FIXTURE = [
+  {
+    id: 1,
+    item_id: 1,
+    user_id: 1,
+    pluggy_investment_id: "inv-1",
+    tipo: "cdb",
+    subtipo: null,
+    nome: "CDB Nubank 120%",
+    codigo: null,
+    quantidade: null,
+    valor_investido: "290.00",
+    valor_atual: "300.00",
+    saldo_inicial: null,
+    moeda: "BRL",
+    investimento_id: 1,
+    investimento_sugerido_id: null,
+    investimento_sugestao_confianca: null,
+    investimento_sugestao_fonte_tipo: null,
+    investimento_sugestao_fonte_id: null,
+    investimento_sugestao_score: null,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  },
+];
+
+const EVOLUCAO_SALDO_FIXTURE = [
+  {
+    account_id: 1,
+    account_nome: "Conta corrente",
+    account_tipo: "corrente",
+    saldo_inicial: "5000.00",
+    pontos: [],
+  },
+  {
+    account_id: 2,
+    account_nome: "Cartão",
+    account_tipo: "cartao_credito",
+    saldo_inicial: "1000.00",
+    pontos: [],
+  },
+];
+
 // 7 pontos (histórico default de 6 meses + 1 ponto extra pro card "Saldo
 // Anterior", ver useDashboardSaldoAcumulado) — o penúltimo ponto (dez/2025,
 // 11500.00) é o "mês anterior" ao último (jan/2026, 12000.00, mês filtrado).
@@ -283,6 +326,10 @@ function routedFetchMock() {
     if (url.startsWith("/liabilities")) return Promise.resolve(jsonResponse(LIABILITIES_FIXTURE));
     if (url.startsWith("/investimentos"))
       return Promise.resolve(jsonResponse(INVESTIMENTOS_FIXTURE));
+    if (url.startsWith("/pluggy/investments"))
+      return Promise.resolve(jsonResponse(PLUGGY_INVESTMENTS_FIXTURE));
+    if (url.startsWith("/dashboards/evolucao-saldo-por-conta"))
+      return Promise.resolve(jsonResponse(EVOLUCAO_SALDO_FIXTURE));
     if (url.startsWith("/pluggy/transactions"))
       return Promise.resolve(jsonResponse([TRANSACAO_FIXTURE, TRANSACAO_FIXTURE_2]));
     throw new Error(`Unexpected fetch: ${url}`);
@@ -575,29 +622,23 @@ describe("DashboardsPage", () => {
     expect(screen.queryByRole("group", { name: "Tipo de transação" })).not.toBeInTheDocument();
   });
 
-  it("opens the saldo por conta drilldown and ignores the ano/mes filter", async () => {
-    const fetchMock = routedFetchMock();
-    vi.stubGlobal("fetch", fetchMock);
+  it("opens the Saldo drilldown showing the memoria de calculo (Receita - Despesa = Saldo), not a list of contas", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
 
     renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
 
     await userEvent.click(screen.getByRole("button", { name: /^SaldoR\$/ }));
-    expect(await screen.findByText("R$ 1.200,00")).toBeInTheDocument();
 
-    await userEvent.selectOptions(screen.getByLabelText("Mês"), "Janeiro");
-
-    await waitFor(() => {
-      const calls = fetchMock.mock.calls.map((call) => String(call[0]));
-      const saldoCalls = calls.filter((url) => url.startsWith("/dashboards/saldo-por-conta"));
-      expect(saldoCalls.every((url) => !url.includes("mes="))).toBe(true);
-    });
-    expect(screen.getByText("R$ 1.200,00")).toBeInTheDocument();
+    expect(await screen.findByText(/Receita R\$ 8\.400,00/)).toBeInTheDocument();
+    expect(screen.getByText(/Despesa R\$ 5\.120,30/)).toBeInTheDocument();
+    expect(screen.getByText(/Saldo R\$ 3\.279,70/)).toBeInTheDocument();
+    // SaldoPorContaList (snapshot bancário) não é mais mostrada aqui — só no
+    // card Ativos.
+    expect(screen.queryByText("Conta corrente")).not.toBeInTheDocument();
   });
 
-  it("opens the patrimonio breakdown showing the 4 parts and links to the existing drilldowns", async () => {
-    const fetchMock = routedFetchMock();
-    vi.stubGlobal("fetch", fetchMock);
+  function stubPatrimonioBreakdown(fetchMock: ReturnType<typeof routedFetchMock>) {
     const originalFetch = fetchMock.getMockImplementation()!;
     fetchMock.mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
@@ -614,6 +655,12 @@ describe("DashboardsPage", () => {
       }
       return originalFetch(input);
     });
+  }
+
+  it("opens the patrimonio breakdown as a 4-part accordion with a total, collapsed by default", async () => {
+    const fetchMock = routedFetchMock();
+    vi.stubGlobal("fetch", fetchMock);
+    stubPatrimonioBreakdown(fetchMock);
 
     renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
@@ -621,38 +668,16 @@ describe("DashboardsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Patrimônio/ }));
 
     expect(await screen.findByText("R$ 143.700,00")).toBeInTheDocument();
-    expect(screen.getAllByText("R$ 150.000,00").length).toBeGreaterThan(0);
-    expect(screen.getByText("R$ 1.200,00")).toBeInTheDocument();
-
-    const detalheButtons = screen.getAllByRole("button", { name: "Ver detalhe" });
-    await userEvent.click(detalheButtons[0]);
-
-    // Ativos: lista itemizada de valor atual (useAssets), não mais o
-    // accordion de gasto do período — "Carro" aparece como célula de tabela,
-    // não como botão expansível.
-    expect(await screen.findByText("Carro")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Carro/ })).not.toBeInTheDocument();
+    const ativosRow = accordionRowButton(/^Ativos/);
+    expect(ativosRow).toHaveAttribute("aria-expanded", "false");
+    // Sem navegação — nenhum botão "Ver detalhe" nem heading separado.
+    expect(screen.queryByRole("button", { name: "Ver detalhe" })).not.toBeInTheDocument();
   });
 
-  it("patrimonio's Passivos Ver detalhe opens the itemized valor atual list, not the gasto accordion", async () => {
+  it("expands the Ativos part of the patrimonio accordion in place, without navigating away", async () => {
     const fetchMock = routedFetchMock();
     vi.stubGlobal("fetch", fetchMock);
-    const originalFetch = fetchMock.getMockImplementation()!;
-    fetchMock.mockImplementation((input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.startsWith("/dashboards/patrimonio/breakdown")) {
-        return Promise.resolve(
-          jsonResponse({
-            ativos: "150000.00",
-            passivos: "7200.00",
-            saldo_liquido_acumulado: "1200.00",
-            saldo_investimentos: "300.00",
-            total: "143700.00",
-          })
-        );
-      }
-      return originalFetch(input);
-    });
+    stubPatrimonioBreakdown(fetchMock);
 
     renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
@@ -660,32 +685,36 @@ describe("DashboardsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Patrimônio/ }));
     await screen.findByText("R$ 143.700,00");
 
-    const detalheButtons = screen.getAllByRole("button", { name: "Ver detalhe" });
-    await userEvent.click(detalheButtons[1]);
+    await userEvent.click(accordionRowButton(/^Ativos/));
+
+    // Ativos: lista itemizada de valor atual (useAssets) — "Carro" aparece
+    // como célula de tabela, não como botão expansível de gasto.
+    expect(await screen.findByText("Carro")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Carro/ })).not.toBeInTheDocument();
+    expect(accordionRowButton(/^Ativos/)).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("expands the Passivos part of the patrimonio accordion showing the itemized valor atual list", async () => {
+    const fetchMock = routedFetchMock();
+    vi.stubGlobal("fetch", fetchMock);
+    stubPatrimonioBreakdown(fetchMock);
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /^Patrimônio/ }));
+    await screen.findByText("R$ 143.700,00");
+
+    await userEvent.click(accordionRowButton(/^Passivos/));
 
     expect(await screen.findByText("Financiamento carro")).toBeInTheDocument();
     expect(screen.getAllByText("R$ 7.200,00").length).toBeGreaterThan(0);
   });
 
-  it("patrimonio's Saldo em investimentos Ver detalhe opens the Investimento valor atual list", async () => {
+  it("expands the Saldo em investimentos part of the patrimonio accordion showing the Investimento accordion", async () => {
     const fetchMock = routedFetchMock();
     vi.stubGlobal("fetch", fetchMock);
-    const originalFetch = fetchMock.getMockImplementation()!;
-    fetchMock.mockImplementation((input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.startsWith("/dashboards/patrimonio/breakdown")) {
-        return Promise.resolve(
-          jsonResponse({
-            ativos: "150000.00",
-            passivos: "7200.00",
-            saldo_liquido_acumulado: "1200.00",
-            saldo_investimentos: "300.00",
-            total: "143700.00",
-          })
-        );
-      }
-      return originalFetch(input);
-    });
+    stubPatrimonioBreakdown(fetchMock);
 
     renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
@@ -693,13 +722,27 @@ describe("DashboardsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Patrimônio/ }));
     await screen.findByText("R$ 143.700,00");
 
-    const detalheButtons = screen.getAllByRole("button", { name: "Ver detalhe" });
-    await userEvent.click(detalheButtons[3]);
+    await userEvent.click(accordionRowButton(/^Saldo em investimentos/));
 
     expect(await screen.findByText("Reserva de emergência")).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Investimentos — valor atual" })
-    ).toBeInTheDocument();
+  });
+
+  it("expands the Saldo líquido acumulado part of the patrimonio accordion showing the trend chart", async () => {
+    const fetchMock = routedFetchMock();
+    vi.stubGlobal("fetch", fetchMock);
+    stubPatrimonioBreakdown(fetchMock);
+
+    const { container } = renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /^Patrimônio/ }));
+    await screen.findByText("R$ 143.700,00");
+
+    await userEvent.click(accordionRowButton(/^Saldo líquido acumulado/));
+
+    await waitFor(() => {
+      expect(container.querySelector(".dash-chart")).not.toBeNull();
+    });
   });
 
   it("adds regime=caixa to summary/tendencia/saldo-acumulado requests when the Caixa toggle is selected", async () => {
@@ -790,13 +833,13 @@ describe("DashboardsPage", () => {
     });
   });
 
-  it("shows the credit limit in parentheses next to a credit card balance", async () => {
+  it("shows the credit limit in parentheses next to a credit card balance in the Ativos card's Saldo por conta", async () => {
     vi.stubGlobal("fetch", routedFetchMock());
 
     renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
 
-    await userEvent.click(screen.getByRole("button", { name: /^SaldoR\$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Ativos/ }));
 
     expect(await screen.findByText(/limite R\$ 5\.000,00/)).toBeInTheDocument();
   });
@@ -856,5 +899,85 @@ describe("DashboardsPage", () => {
     await waitFor(() => {
       expect(container.querySelector(".dash-chart")).not.toBeNull();
     });
+  });
+
+  it("clicking the seta on Saldo Acumulado navigates to the next month without opening the drilldown", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+    await userEvent.selectOptions(screen.getByLabelText("Ano"), "2025");
+    await userEvent.selectOptions(screen.getByLabelText("Mês"), "Novembro");
+
+    await userEvent.click(screen.getByRole("button", { name: "Ver mês seguinte" }));
+
+    await waitFor(() => {
+      expect((screen.getByLabelText("Mês") as HTMLSelectElement).value).toBe("12");
+    });
+    expect((screen.getByLabelText("Ano") as HTMLSelectElement).value).toBe("2025");
+    expect(screen.queryByRole("heading", { name: "Saldo Acumulado" })).not.toBeInTheDocument();
+  });
+
+  it("clicking the seta on Saldo Acumulado in the current real month alerts instead of navigating", async () => {
+    const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
+    vi.stubGlobal("fetch", routedFetchMock());
+    // now() é jan/2026 por padrão no componente — o filtro inicial já é o
+    // mês corrente real, sem precisar mudar o seletor.
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: "Ver mês seguinte" }));
+
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect((screen.getByLabelText("Mês") as HTMLSelectElement).value).toBe(
+      String(new Date().getMonth() + 1)
+    );
+    alertSpy.mockRestore();
+  });
+
+  it("clicking the body of the Saldo Acumulado card opens the drilldown (arrow click does not)", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByText("Saldo Acumulado"));
+
+    expect(await screen.findByRole("heading", { name: "Saldo Acumulado" })).toBeInTheDocument();
+  });
+
+  it("expands an Investimento row to show its holdings (Investimento to Holding accordion)", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /^Ativos/ }));
+    await screen.findByText("Reserva de emergência");
+
+    expect(screen.queryByText("CDB Nubank 120%")).not.toBeInTheDocument();
+
+    await userEvent.click(accordionRowButton(/Reserva de emergência/));
+
+    expect(await screen.findByText("CDB Nubank 120%")).toBeInTheDocument();
+  });
+
+  it("shows the Saldo Acumulado memoria de calculo (ancora + monthly rows) above the trend chart", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /^Saldo Acumulado/ }));
+    await screen.findByRole("heading", { name: "Saldo Acumulado" });
+
+    // Âncora = soma de saldo_inicial (EVOLUCAO_SALDO_FIXTURE: 5000 + 1000)
+    expect(await screen.findByText(/R\$ 6\.000,00/)).toBeInTheDocument();
+    expect(screen.getByText(/Receita do mês R\$ 8\.400,00/)).toBeInTheDocument();
+    expect(screen.getByText(/Despesa do mês R\$ 5\.120,30/)).toBeInTheDocument();
+    // Última linha da tabela é o mês filtrado (01/2026), acumulado = último
+    // ponto da série (12000.00).
+    expect(screen.getAllByText("R$ 12.000,00").length).toBeGreaterThan(0);
   });
 });

@@ -20,6 +20,7 @@ import { useCreateAsset } from "../hooks/useCreateAsset";
 import { useDeleteAsset } from "../hooks/useDeleteAsset";
 import { useSellAsset } from "../hooks/useSellAsset";
 import { useUpdateAsset } from "../hooks/useUpdateAsset";
+import { buildColorIndexFromIds, groupColorVar } from "../utils/categoryColors";
 import { formatCurrency } from "../utils/format";
 
 const TIPO_LABEL: Record<string, string> = {
@@ -78,7 +79,12 @@ export function AssetsPage() {
     return map;
   }, [tendenciaQuery.data]);
 
-  const trendColor = drillTipo === "credito" ? "var(--receita)" : "var(--despesa)";
+  // Cor por ativo (não mais fixa por tipo de transação) — mesma paleta e
+  // fonte de verdade do drilldown de categorias (categoryColors.ts).
+  const colorIndex = useMemo(
+    () => buildColorIndexFromIds(ativos.map((asset) => asset.id)),
+    [ativos]
+  );
 
   function openCreateForm() {
     setEditingAssetId(null);
@@ -296,7 +302,10 @@ export function AssetsPage() {
             <span className="v">{formatCurrency(asset.valor_atual)}</span>
             <strong>{asset.nome}</strong>
             <span className="tag">Adquirido em {asset.data_aquisicao}</span>
-            <CardSparkline pontos={trendByAsset.get(asset.id)} color={trendColor} />
+            <CardSparkline
+              pontos={trendByAsset.get(asset.id)}
+              color={groupColorVar(asset.id, colorIndex)}
+            />
             <div className="dash-filter">
               <button
                 type="button"
@@ -337,6 +346,7 @@ export function AssetsPage() {
             filter={filter}
             regime={regime}
             pontos={trendByAsset.get(selectedAsset.id)}
+            color={groupColorVar(selectedAsset.id, colorIndex)}
           />
         </div>
       )}
@@ -375,17 +385,18 @@ function AssetDrilldown({
   filter,
   regime,
   pontos,
+  color,
 }: {
   assetId: number;
   tipo: TransacaoTipo;
   filter: PeriodoFilter;
   regime: Regime;
   pontos: PontoTendencia[] | undefined;
+  color: string;
 }) {
   const gastosQuery = useAssetGastos(tipo, { ...filter, regime });
 
   const total = gastosQuery.data?.find((item) => item.asset_id === assetId)?.total ?? "0";
-  const color = tipo === "credito" ? "var(--receita)" : "var(--despesa)";
   const rotulo = tipo === "credito" ? "Receita" : "Gasto";
 
   if (gastosQuery.isLoading) return <p>Carregando...</p>;

@@ -640,4 +640,76 @@ describe("CategorizationReviewPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Investimento" }));
     expect(rowsInOrder()[0]).toContain("Compra B"); // desc
   });
+
+  it("clicking Sincronizar contas syncs all accounts and refreshes the queue without a dialog", async () => {
+    let resolveSync: ((value: Response) => void) | undefined;
+    const syncPromise = new Promise<Response>((resolve) => {
+      resolveSync = resolve;
+    });
+
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url.startsWith("/categorization/transactions"))
+        return Promise.resolve(jsonResponse(transactionsPage([BASE_TRANSACTION])));
+      if (url === "/pluggy/sync" && method === "POST") {
+        const body = JSON.parse((init?.body as string) ?? "{}");
+        expect(body).toEqual({ item_ids: null });
+        return syncPromise;
+      }
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<CategorizationReviewPage />);
+    await screen.findByText("Mercado Sao Joao");
+
+    // sem diálogo de seleção de contas — clique único dispara o sync direto
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    const syncButton = screen.getByRole("button", { name: "Sincronizar contas" });
+    await userEvent.click(syncButton);
+
+    expect(await screen.findByRole("button", { name: "Sincronizando..." })).toBeDisabled();
+
+    resolveSync?.(jsonResponse({ results: [] }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Sincronizar contas" })).not.toBeDisabled();
+    });
+
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls.map((call) => String(call[0]));
+      const categorizationCalls = calls.filter((url) =>
+        url.startsWith("/categorization/transactions")
+      );
+      // refetch automático (invalidação) além da chamada inicial
+      expect(categorizationCalls.length).toBeGreaterThan(1);
+    });
+  });
+
+  it("shows an error message when the sync request fails", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url.startsWith("/categorization/transactions"))
+        return Promise.resolve(jsonResponse(transactionsPage([BASE_TRANSACTION])));
+      if (url === "/pluggy/sync" && method === "POST") {
+        return Promise.resolve(jsonResponse({ detail: "Falha na sincronização" }, 500));
+      }
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<CategorizationReviewPage />);
+    await screen.findByText("Mercado Sao Joao");
+
+    await userEvent.click(screen.getByRole("button", { name: "Sincronizar contas" }));
+
+    expect(await screen.findByText("Não foi possível sincronizar as contas.")).toBeInTheDocument();
+  });
 });

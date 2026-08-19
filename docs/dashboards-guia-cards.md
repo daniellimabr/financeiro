@@ -21,16 +21,20 @@ não muda os valores em si:
   competência são o mesmo mês.
 
 O toggle afeta Receita, Despesa, Saldo, Ativos, Passivos, Patrimônio e Saldo
-Acumulado. Não afeta o card "Saldo" na versão de snapshot bancário (ver
-abaixo) nem o drill-down "Saldo por conta" — esses dois sempre mostram o
-saldo atual, sem depender de mês.
+Acumulado. Não afeta o drill-down "Saldo por conta" (acessível pelo card
+"Ativos") — esse é sempre o saldo bancário atual, sem depender de mês.
 
 ## Saldo
 
 Receita menos despesa **do mês/período filtrado** (competência ou caixa,
 conforme o toggle). É um resultado de fluxo — "quanto sobrou (ou faltou) nesse
 mês" — não é o saldo bancário atual. Exclui fatura de cartão e limite de
-crédito (nunca entra aqui).
+crédito (nunca entra aqui). Clicar no card abre a memória de cálculo
+(Receita − Despesa = Saldo, os mesmos três números já carregados no resumo)
+— não mais uma lista de contas: até a Sprint 24 o drill-down mostrava
+`SaldoPorContaList` (um snapshot bancário), desalinhado do que este card
+representa; essa lista continua acessível pelo card "Ativos" (ver "Saldo por
+conta" abaixo).
 
 ## Saldo Acumulado
 
@@ -82,23 +86,34 @@ Exclui:
 Valor atual somado de todos os ativos com status "ativo" (Gestão de Ativos)
 e de todos os passivos com status "ativo" (Gestão de Passivos) — sempre
 snapshot de hoje, não depende do período filtrado nem do toggle
-Competência/Caixa. **A fórmula não mudou na Sprint 22** — só o drilldown do
-card "Ativos" ficou mais completo: além do accordion de gasto por ativo já
-existente (período filtrado), ganhou duas seções adicionais, lado a lado,
-sem afetar o número do card: "Valor atual por Investimento" (mesma fonte do
-card Patrimônio, ver abaixo) e "Saldo por conta" (mesmo drill-down do card
-"Saldo", sem filtro).
+Competência/Caixa. **A fórmula não mudou na Sprint 22 nem na 24** — só os
+drilldowns ficaram mais completos:
+
+- **Ativos**: além do accordion de gasto por ativo já existente (período
+  filtrado, cada item colorido por ativo desde a Sprint 24 — antes era uma
+  cor fixa por tipo de transação), duas seções adicionais lado a lado:
+  "Valor atual por Investimento" (mesma fonte do card Patrimônio, ver
+  abaixo — vira accordion Investimento → Holding na Sprint 24, cada
+  investimento expande mostrando as holdings com saldo atual) e "Saldo por
+  conta" (mesmo drill-down do card "Saldo" original, sem filtro).
+- **Passivos**: desde a Sprint 24, ganhou a lista "Passivos — saldo
+  devedor" (todos os passivos ativos com valor atual) ao lado do accordion
+  de gasto já existente — o mesmo padrão que Ativos já tinha desde a
+  Sprint 22.
 
 ## Patrimônio
 
 Soma de 4 partes, sempre snapshot de hoje: Saldo líquido acumulado (o mesmo
 conceito do card "Saldo Acumulado", incluindo contas líquidas sem "Saldo
 inicial" pelo saldo ao vivo delas) + saldo em investimentos (ao vivo) +
-Ativos − Passivos. Clique no card para ver o detalhamento das 4 partes; a
-fórmula somada não mudou desde a Sprint 16, mas os destinos de "Ver detalhe"
-foram redesenhados na Sprint 22 para virar itemizados de **valor atual**
-(sem depender do período filtrado), em vez de gasto do período ou lista de
-contas sem filtro:
+Ativos − Passivos. Clique no card para ver o detalhamento das 4 partes — a
+fórmula somada não mudou desde a Sprint 16. A Sprint 22 trocou o conteúdo de
+cada parte de gasto do período/lista sem filtro para itemizados de **valor
+atual** (sem depender do período filtrado); a Sprint 24 trocou a forma como
+se chega nesse conteúdo — de uma tabela com botões "Ver detalhe" que
+navegavam pra outra visão do funil, para um **accordion de 4 partes
+expansível in-place** (cada parte expande dentro do próprio painel de
+Patrimônio, sem sair dele):
 
 - **Ativos** → lista de ativos ativos com valor atual (`GET /assets`,
   filtrado por `status=ativo` no frontend).
@@ -140,6 +155,10 @@ próximo de "abrir o app do banco agora".
 
 ## Referências
 
+- [PRD-024](prd/PRD-024-dashboard-layout-cards-navegacao.md) — origem do
+  accordion in-place de Patrimônio, do accordion Investimento → Holding, da
+  memória de cálculo de Saldo/Saldo Acumulado, da lista de Passivos e da
+  cor por ativo — nenhuma mudança de fórmula, só de apresentação/drilldown.
 - [PRD-022](prd/PRD-022-manutencao-investimentos-e-drilldown-patrimonio.md) —
   origem do redesenho dos drilldowns de Ativos/Patrimônio (valor atual
   itemizado) e do campo `valor_atual` em `GET /investimentos`.

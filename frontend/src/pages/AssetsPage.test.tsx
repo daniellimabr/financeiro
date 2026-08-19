@@ -489,6 +489,34 @@ describe("AssetsPage", () => {
     expect(rowsInOrder()[0]).toContain("Posto Ipiranga"); // desc
   });
 
+  it("colors the asset drilldown by asset id (categorical palette), not by transaction tipo", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url === "/assets") return Promise.resolve(jsonResponse([ASSET_ATIVO]));
+      if (url.startsWith("/dashboards/por-ativo")) {
+        return Promise.resolve(
+          jsonResponse([{ asset_id: 1, asset_nome: "Carro", total: "300.00" }])
+        );
+      }
+      if (url.startsWith("/pluggy/transactions")) return Promise.resolve(jsonResponse([]));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<AssetsPage />);
+    await screen.findByText("Carro");
+
+    const grid = screen.getByText("Carro").closest(".dash-tile") as HTMLElement;
+    await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
+
+    const total = await screen.findByText("R$ 300,00");
+    // único ativo cadastrado (id 1) — primeiro slot da paleta categórica, não
+    // mais var(--despesa)/var(--receita) fixo por tipo de transação.
+    expect(total).toHaveStyle({ color: "var(--cat-1)" });
+  });
+
   it("renders a sparkline on the card when trend data is available", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);

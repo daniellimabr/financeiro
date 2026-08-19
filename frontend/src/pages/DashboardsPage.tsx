@@ -30,14 +30,17 @@
  * the finish review, the verdict, and DESIGN.md.
  */
 import { useMemo, useState } from "react";
+import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 
 import {
   type CategoriaTotal,
   type PeriodoHistorico,
   type PontoTendencia,
   type Regime,
+  type TendenciaMes,
   type TransacaoTipo,
 } from "../api/dashboards";
+import type { PluggyInvestment } from "../api/pluggy";
 import { AccountTipoIcon } from "../components/AccountTipoIcon";
 import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
@@ -52,14 +55,16 @@ import { useDashboardCategoriaTendencia } from "../hooks/useDashboardCategoriaTe
 import { useDashboardSaldoAcumulado } from "../hooks/useDashboardSaldoAcumulado";
 import { useDashboardSummary } from "../hooks/useDashboardSummary";
 import { useDashboardTendencia } from "../hooks/useDashboardTendencia";
+import { useEvolucaoSaldoPorConta } from "../hooks/useEvolucaoSaldoPorConta";
 import { useInvestimentos } from "../hooks/useInvestimentos";
 import { useLiabilities } from "../hooks/useLiabilities";
 import { useLiabilityGastos } from "../hooks/useLiabilityGastos";
 import { usePatrimonioBreakdown } from "../hooks/usePatrimonioBreakdown";
+import { usePluggyInvestments } from "../hooks/usePluggyInvestments";
 import { useSaldoPorConta } from "../hooks/useSaldoPorConta";
 import { useSubcategories } from "../hooks/useSubcategories";
 import {
-  buildGroupColorIndex,
+  buildColorIndexFromIds,
   buildSubcategoryTintIndex,
   groupColorVar,
   subcategoryColorVar,
@@ -94,16 +99,7 @@ interface PeriodoFiltro {
 }
 
 type DrillKind =
-  | "receita"
-  | "despesa"
-  | "ativos"
-  | "passivos"
-  | "saldo"
-  | "patrimonio"
-  | "saldoAcumulado"
-  | "patrimonioAtivos"
-  | "patrimonioPassivos"
-  | "patrimonioInvestimentos";
+  "receita" | "despesa" | "ativos" | "passivos" | "saldo" | "patrimonio" | "saldoAcumulado";
 
 function toggleId(list: number[], id: number): number[] {
   return list.includes(id) ? list.filter((existing) => existing !== id) : [...list, id];
@@ -114,6 +110,13 @@ function toggleId(list: number[], id: number): number[] {
 // tratado à parte no clique do card "Saldo Anterior").
 function mesAnterior(ano: number, mes: number): { ano: number; mes: number } {
   return mes === 1 ? { ano: ano - 1, mes: 12 } : { ano, mes: mes - 1 };
+}
+
+// Inverso de mesAnterior — navegação pro mês seguinte no card "Saldo
+// Acumulado" (fronteira tratada à parte no clique: não navega pro mês
+// corrente real em diante, mesmo alerta que mesAnterior usa pra jan/2026).
+function mesSeguinte(ano: number, mes: number): { ano: number; mes: number } {
+  return mes === 12 ? { ano: ano + 1, mes: 1 } : { ano, mes: mes + 1 };
 }
 
 interface DrillState {
@@ -188,9 +191,6 @@ export function DashboardsPage() {
     saldo: "Saldo",
     patrimonio: "Patrimônio",
     saldoAcumulado: "Saldo Acumulado",
-    patrimonioAtivos: "Ativos — valor atual",
-    patrimonioPassivos: "Passivos — valor atual",
-    patrimonioInvestimentos: "Investimentos — valor atual",
   };
 
   function clicarSaldoAnterior() {
@@ -203,6 +203,25 @@ export function DashboardsPage() {
     const anterior = mesAnterior(ano, mes);
     setAno(anterior.ano);
     setMes(anterior.mes);
+  }
+
+  function clicarSaldoAcumuladoSeguinte(event: MouseEvent) {
+    event.stopPropagation();
+    const hoje = new Date();
+    if (ano === hoje.getFullYear() && mes === hoje.getMonth() + 1) {
+      window.alert("Já está no mês corrente — não há mês seguinte para navegar.");
+      return;
+    }
+    const seguinte = mesSeguinte(ano, mes);
+    setAno(seguinte.ano);
+    setMes(seguinte.mes);
+  }
+
+  function teclaSaldoAcumulado(event: KeyboardEvent) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      abrirFunil("saldoAcumulado");
+    }
   }
 
   return (
@@ -237,93 +256,118 @@ export function DashboardsPage() {
       {summaryQuery.isError && <p role="alert">Não foi possível carregar o resumo.</p>}
 
       {summaryQuery.data && (
-        <div className="dash-summary">
-          <button type="button" className="dash-tile clickable" onClick={clicarSaldoAnterior}>
-            <span className="k">
-              Saldo Anterior
-              {saldoAnterior &&
-                ` (${String(saldoAnterior.mes).padStart(2, "0")}/${saldoAnterior.ano})`}
-            </span>
-            <span className="v">{saldoAnterior ? formatCurrency(saldoAnterior.total) : "—"}</span>
-          </button>
-          <button
-            type="button"
-            className="dash-tile clickable"
-            onClick={() => abrirFunil("receita")}
-          >
-            <span className="k">Receita</span>
-            <span className="v receita">{formatCurrency(summaryQuery.data.receita)}</span>
-            <CardSparkline
-              pontos={tendenciaQuery.data?.map((p) => ({
-                ano: p.ano,
-                mes: p.mes,
-                total: p.receita,
-              }))}
-              color="var(--receita)"
-            />
-          </button>
-          <button
-            type="button"
-            className="dash-tile clickable"
-            onClick={() => abrirFunil("despesa")}
-          >
-            <span className="k">Despesa</span>
-            <span className="v despesa">{formatCurrency(summaryQuery.data.despesa)}</span>
-            <CardSparkline
-              pontos={tendenciaQuery.data?.map((p) => ({
-                ano: p.ano,
-                mes: p.mes,
-                total: p.despesa,
-              }))}
-              color="var(--despesa)"
-            />
-          </button>
-          <button type="button" className="dash-tile clickable" onClick={() => abrirFunil("saldo")}>
-            <span className="k">Saldo</span>
-            <span className="v">{formatCurrency(summaryQuery.data.saldo)}</span>
-            <CardSparkline
-              pontos={tendenciaQuery.data?.map((p) => ({ ano: p.ano, mes: p.mes, total: p.saldo }))}
-              color="var(--accent)"
-            />
-          </button>
-          <button
-            type="button"
-            className="dash-tile clickable"
-            onClick={() => abrirFunil("saldoAcumulado")}
-          >
-            <span className="k">Saldo Acumulado</span>
-            <span className="v">
-              {saldoAcumuladoAtual ? formatCurrency(saldoAcumuladoAtual.total) : "—"}
-            </span>
-            <span className="tag">projeção por competência — pode diferir do saldo bancário</span>
-            <CardSparkline pontos={saldoAcumuladoSparkline} color="var(--accent)" />
-          </button>
-          <button
-            type="button"
-            className="dash-tile clickable"
-            onClick={() => abrirFunil("ativos")}
-          >
-            <span className="k">Ativos</span>
-            <span className="v">{formatCurrency(summaryQuery.data.ativos)}</span>
-          </button>
-          <button
-            type="button"
-            className="dash-tile clickable"
-            onClick={() => abrirFunil("passivos")}
-          >
-            <span className="k">Passivos</span>
-            <span className="v">{formatCurrency(summaryQuery.data.passivos)}</span>
-          </button>
-          <button
-            type="button"
-            className="dash-tile clickable"
-            onClick={() => abrirFunil("patrimonio")}
-          >
-            <span className="k">Patrimônio</span>
-            <span className="v">{formatCurrency(summaryQuery.data.patrimonio)}</span>
-            <span className="tag">atual, fora do filtro de período — sem histórico ainda</span>
-          </button>
-        </div>
+        <>
+          <div className="dash-summary">
+            <button
+              type="button"
+              className="dash-tile clickable"
+              onClick={() => abrirFunil("ativos")}
+            >
+              <span className="k">Ativos</span>
+              <span className="v">{formatCurrency(summaryQuery.data.ativos)}</span>
+            </button>
+            <button
+              type="button"
+              className="dash-tile clickable"
+              onClick={() => abrirFunil("passivos")}
+            >
+              <span className="k">Passivos</span>
+              <span className="v">{formatCurrency(summaryQuery.data.passivos)}</span>
+            </button>
+            <button
+              type="button"
+              className="dash-tile clickable"
+              onClick={() => abrirFunil("patrimonio")}
+            >
+              <span className="k">Patrimônio</span>
+              <span className="v">{formatCurrency(summaryQuery.data.patrimonio)}</span>
+              <span className="tag">atual, fora do filtro de período — sem histórico ainda</span>
+            </button>
+          </div>
+
+          <div className="dash-summary">
+            <button type="button" className="dash-tile clickable" onClick={clicarSaldoAnterior}>
+              <span className="k">
+                <ArrowIcon direction="left" />
+                Saldo Anterior
+                {saldoAnterior &&
+                  ` (${String(saldoAnterior.mes).padStart(2, "0")}/${saldoAnterior.ano})`}
+              </span>
+              <span className="v">{saldoAnterior ? formatCurrency(saldoAnterior.total) : "—"}</span>
+            </button>
+            <button
+              type="button"
+              className="dash-tile clickable"
+              onClick={() => abrirFunil("receita")}
+            >
+              <span className="k">Receita</span>
+              <span className="v receita">{formatCurrency(summaryQuery.data.receita)}</span>
+              <CardSparkline
+                pontos={tendenciaQuery.data?.map((p) => ({
+                  ano: p.ano,
+                  mes: p.mes,
+                  total: p.receita,
+                }))}
+                color="var(--receita)"
+              />
+            </button>
+            <button
+              type="button"
+              className="dash-tile clickable"
+              onClick={() => abrirFunil("despesa")}
+            >
+              <span className="k">Despesa</span>
+              <span className="v despesa">{formatCurrency(summaryQuery.data.despesa)}</span>
+              <CardSparkline
+                pontos={tendenciaQuery.data?.map((p) => ({
+                  ano: p.ano,
+                  mes: p.mes,
+                  total: p.despesa,
+                }))}
+                color="var(--despesa)"
+              />
+            </button>
+            <button
+              type="button"
+              className="dash-tile clickable"
+              onClick={() => abrirFunil("saldo")}
+            >
+              <span className="k">Saldo</span>
+              <span className="v">{formatCurrency(summaryQuery.data.saldo)}</span>
+              <CardSparkline
+                pontos={tendenciaQuery.data?.map((p) => ({
+                  ano: p.ano,
+                  mes: p.mes,
+                  total: p.saldo,
+                }))}
+                color="var(--accent)"
+              />
+            </button>
+            <div
+              role="button"
+              tabIndex={0}
+              className="dash-tile clickable"
+              onClick={() => abrirFunil("saldoAcumulado")}
+              onKeyDown={teclaSaldoAcumulado}
+            >
+              <span className="k v-row">
+                Saldo Acumulado
+                <button
+                  type="button"
+                  className="dash-tile-arrow"
+                  aria-label="Ver mês seguinte"
+                  onClick={clicarSaldoAcumuladoSeguinte}
+                >
+                  <ArrowIcon direction="right" />
+                </button>
+              </span>
+              <span className="v">
+                {saldoAcumuladoAtual ? formatCurrency(saldoAcumuladoAtual.total) : "—"}
+              </span>
+              <CardSparkline pontos={saldoAcumuladoSparkline} color="var(--accent)" />
+            </div>
+          </div>
+        </>
       )}
 
       {drill && (
@@ -381,25 +425,32 @@ export function DashboardsPage() {
           )}
 
           {drill.kind === "passivos" && (
-            <PassivosAccordion
-              filter={filter}
-              regime={regime}
-              expandedRows={drill.expandedRows}
-              onToggleRow={toggleRow}
+            <>
+              <PassivosAccordion
+                filter={filter}
+                regime={regime}
+                expandedRows={drill.expandedRows}
+                onToggleRow={toggleRow}
+              />
+              <h3>Passivos — saldo devedor</h3>
+              <LiabilitiesValorAtualList />
+            </>
+          )}
+
+          {drill.kind === "saldo" && summaryQuery.data && (
+            <SaldoMemoriaCalculo
+              receita={summaryQuery.data.receita}
+              despesa={summaryQuery.data.despesa}
+              saldo={summaryQuery.data.saldo}
             />
           )}
 
-          {drill.kind === "saldo" && <SaldoPorContaList />}
-
           {drill.kind === "patrimonio" && (
-            <PatrimonioBreakdownPanel regime={regime} onNavigate={(kind) => abrirFunil(kind)} />
+            <PatrimonioBreakdownPanel
+              regime={regime}
+              saldoAcumuladoSparkline={saldoAcumuladoSparkline}
+            />
           )}
-
-          {drill.kind === "patrimonioAtivos" && <AssetsValorAtualList />}
-
-          {drill.kind === "patrimonioPassivos" && <LiabilitiesValorAtualList />}
-
-          {drill.kind === "patrimonioInvestimentos" && <InvestimentosValorAtualList />}
 
           {drill.kind === "saldoAcumulado" && (
             <>
@@ -411,6 +462,17 @@ export function DashboardsPage() {
                 cartão de crédito entra na competência antes da fatura ser paga. Pra ver o saldo
                 bancário atual por conta, use o card "Saldo".
               </p>
+              {summaryQuery.data && (
+                <SaldoAcumuladoMemoriaCalculo
+                  ano={ano}
+                  mes={mes}
+                  periodoHistorico={periodoHistorico}
+                  tendencia={tendenciaQuery.data}
+                  acumulado={saldoAcumuladoSparkline}
+                  receitaMes={summaryQuery.data.receita}
+                  despesaMes={summaryQuery.data.despesa}
+                />
+              )}
               {saldoAcumuladoSparkline && saldoAcumuladoSparkline.length > 0 ? (
                 <TrendChart pontos={saldoAcumuladoSparkline} color="var(--accent)" />
               ) : (
@@ -421,6 +483,142 @@ export function DashboardsPage() {
         </div>
       )}
     </section>
+  );
+}
+
+// Seta decorativa dos cards "Saldo Anterior"/"Saldo Acumulado" — mesmo
+// padrão de ícone SVG inline de AccountTipoIcon.tsx (viewBox 16x16, stroke
+// currentColor), só com um path por direção em vez de um mapa por tipo.
+function ArrowIcon({ direction }: { direction: "left" | "right" }) {
+  const path = direction === "left" ? "M10 2.5 4 8l6 5.5M4 8h8" : "M6 2.5 12 8l-6 5.5M12 8H4";
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d={path} />
+    </svg>
+  );
+}
+
+// Card "Saldo": memória de cálculo (Receita − Despesa = Saldo do período
+// filtrado) no lugar da lista de contas (snapshot bancário desalinhado do
+// que o card representa — a lista continua acessível via card Ativos).
+function SaldoMemoriaCalculo({
+  receita,
+  despesa,
+  saldo,
+}: {
+  receita: string;
+  despesa: string;
+  saldo: string;
+}) {
+  return (
+    <div className="dash-memoria-calculo">
+      <p>
+        <span style={{ color: "var(--receita)" }}>Receita {formatCurrency(receita)}</span>
+        {" − "}
+        <span style={{ color: "var(--despesa)" }}>Despesa {formatCurrency(despesa)}</span>
+        {" = "}
+        <strong>Saldo {formatCurrency(saldo)}</strong>
+      </p>
+    </div>
+  );
+}
+
+// Card "Saldo Acumulado": memória de cálculo (âncora + acumulação mês a mês
+// até o mês filtrado) + resumo de receita/despesa do mês, acima do
+// TrendChart já existente. Âncora vem de useEvolucaoSaldoPorConta (soma de
+// saldo_inicial por conta) — endpoint já existente, sem mudança de backend.
+function SaldoAcumuladoMemoriaCalculo({
+  ano,
+  mes,
+  periodoHistorico,
+  tendencia,
+  acumulado,
+  receitaMes,
+  despesaMes,
+}: {
+  ano: number;
+  mes: number;
+  periodoHistorico: PeriodoHistorico;
+  tendencia: TendenciaMes[] | undefined;
+  acumulado: PontoTendencia[] | undefined;
+  receitaMes: string;
+  despesaMes: string;
+}) {
+  const evolucaoQuery = useEvolucaoSaldoPorConta(ano, mes, periodoHistorico);
+  const ancora = useMemo(
+    () => (evolucaoQuery.data ?? []).reduce((sum, conta) => sum + Number(conta.saldo_inicial), 0),
+    [evolucaoQuery.data]
+  );
+
+  const linhas = useMemo(() => {
+    if (!tendencia || !acumulado) return [];
+    return acumulado.map((ponto, i) => ({
+      ano: ponto.ano,
+      mes: ponto.mes,
+      receita: tendencia[i]?.receita ?? "0",
+      despesa: tendencia[i]?.despesa ?? "0",
+      total: ponto.total,
+    }));
+  }, [tendencia, acumulado]);
+
+  if (evolucaoQuery.isLoading) return <p>Carregando memória de cálculo...</p>;
+  if (evolucaoQuery.isError) {
+    return <p role="alert">Não foi possível carregar a memória de cálculo.</p>;
+  }
+
+  return (
+    <div className="dash-memoria-calculo">
+      <p>
+        Saldo inicial das contas (âncora): <strong>{formatCurrency(String(ancora))}</strong>
+      </p>
+      <p>
+        <span style={{ color: "var(--receita)" }}>Receita do mês {formatCurrency(receitaMes)}</span>
+        {" · "}
+        <span style={{ color: "var(--despesa)" }}>Despesa do mês {formatCurrency(despesaMes)}</span>
+      </p>
+      {linhas.length > 0 && (
+        <div className="dash-table-wrap">
+          <table className="dash-table saldo-acumulado-memoria-table">
+            <colgroup>
+              <col className="col-mes" />
+              <col className="col-valor" />
+              <col className="col-valor" />
+              <col className="col-valor" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Mês</th>
+                <th>Receita</th>
+                <th>Despesa</th>
+                <th>Acumulado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {linhas.map((linha) => (
+                <tr key={`${linha.ano}-${linha.mes}`}>
+                  <td>
+                    {String(linha.mes).padStart(2, "0")}/{linha.ano}
+                  </td>
+                  <td>{formatCurrency(linha.receita)}</td>
+                  <td>{formatCurrency(linha.despesa)}</td>
+                  <td>{formatCurrency(linha.total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -499,7 +697,7 @@ function GrupoAccordion({
   const subcategoriesQuery = useSubcategories();
 
   const groupColorIndex = useMemo(
-    () => buildGroupColorIndex(groupsQuery.data ?? []),
+    () => buildColorIndexFromIds((groupsQuery.data ?? []).map((g) => g.id)),
     [groupsQuery.data]
   );
   const subcategoryTintIndex = useMemo(
@@ -669,7 +867,16 @@ function AtivosAccordion({
   onToggleRow: (id: number) => void;
 }) {
   const query = useAssetGastos(tipo, { ...filter, regime });
-  const color = tipo === "credito" ? "var(--receita)" : "var(--despesa)";
+  // Cor por ativo (não mais fixa por tipo de transação) — índice construído
+  // a partir de TODOS os ativos cadastrados (useAssets), não só os que
+  // aparecem no período filtrado, pra manter a cor da mesma entidade
+  // estável entre filtros (ver categoryColors.ts: "color follows the
+  // entity, never its rank").
+  const assetsQuery = useAssets();
+  const colorIndex = useMemo(
+    () => buildColorIndexFromIds((assetsQuery.data ?? []).map((asset) => asset.id)),
+    [assetsQuery.data]
+  );
 
   const sorted = useMemo(
     () => [...(query.data ?? [])].sort((a, b) => Number(b.total) - Number(a.total)),
@@ -692,7 +899,7 @@ function AtivosAccordion({
               nome={item.asset_nome}
               total={item.total}
               max={max}
-              color={color}
+              color={groupColorVar(item.asset_id, colorIndex)}
               expanded={expandedRows.includes(item.asset_id)}
               onClick={() => onToggleRow(item.asset_id)}
             />
@@ -801,8 +1008,13 @@ function SaldoPorContaList() {
   );
 }
 
+// Accordion Investimento → Holding (Sprint 24) — cada linha de investimento
+// expande buscando suas holdings sob demanda (usePluggyInvestments só
+// monta/busca quando a linha é expandida, sem query antecipada). Reaproveitado
+// tanto no card Ativos quanto dentro do accordion do card Patrimônio.
 function InvestimentosValorAtualList() {
   const query = useInvestimentos();
+  const [expandedIds, setExpandedIds] = useState<number[]>([]);
   const sorted = useMemo(
     () => [...(query.data ?? [])].sort((a, b) => Number(b.valor_atual) - Number(a.valor_atual)),
     [query.data]
@@ -811,6 +1023,45 @@ function InvestimentosValorAtualList() {
   if (query.isLoading) return <p>Carregando...</p>;
   if (query.isError) return <p role="alert">Não foi possível carregar os investimentos.</p>;
   if (sorted.length === 0) return <p className="dash-empty">Nenhum investimento cadastrado.</p>;
+
+  const max = Number(sorted[0]?.valor_atual ?? 1);
+
+  return (
+    <ul className="dash-list dash-accordion">
+      {sorted.map((investimento) => (
+        <li key={investimento.id}>
+          <div className="dash-accordion-item">
+            <Row
+              nome={investimento.nome}
+              total={investimento.valor_atual}
+              max={max}
+              color="var(--accent)"
+              expanded={expandedIds.includes(investimento.id)}
+              onClick={() => setExpandedIds((prev) => toggleId(prev, investimento.id))}
+            />
+            {expandedIds.includes(investimento.id) && (
+              <div className="dash-accordion-panel">
+                <InvestimentoHoldingsList investimentoId={investimento.id} />
+              </div>
+            )}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function InvestimentoHoldingsList({ investimentoId }: { investimentoId: number }) {
+  const query = usePluggyInvestments(investimentoId);
+  const sorted = useMemo(
+    () => [...(query.data ?? [])].sort((a, b) => Number(b.valor_atual) - Number(a.valor_atual)),
+    [query.data]
+  );
+
+  if (query.isLoading) return <p>Carregando...</p>;
+  if (query.isError) return <p role="alert">Não foi possível carregar as holdings.</p>;
+  if (sorted.length === 0)
+    return <p className="dash-empty">Nenhuma holding vinculada a este investimento.</p>;
 
   return (
     <div className="dash-table-wrap">
@@ -821,15 +1072,15 @@ function InvestimentosValorAtualList() {
         </colgroup>
         <thead>
           <tr>
-            <th>Investimento</th>
-            <th>Valor atual</th>
+            <th>Holding</th>
+            <th>Saldo atual</th>
           </tr>
         </thead>
         <tbody>
-          {sorted.map((investimento) => (
-            <tr key={investimento.id}>
-              <td>{investimento.nome}</td>
-              <td>{formatCurrency(investimento.valor_atual)}</td>
+          {sorted.map((holding: PluggyInvestment) => (
+            <tr key={holding.id}>
+              <td>{holding.nome}</td>
+              <td>{formatCurrency(holding.valor_atual)}</td>
             </tr>
           ))}
         </tbody>
@@ -924,16 +1175,29 @@ function LiabilitiesValorAtualList() {
   );
 }
 
+type PatrimonioParte = "ativos" | "passivos" | "saldoInvestimentos" | "saldoLiquido";
+
+// Accordion de 4 partes expansível in-place (Sprint 24) — substitui a
+// tabela com botões "Ver detalhe" que navegavam pra outra visão do funil.
+// Cada parte reaproveita o mesmo componente já usado pelo card equivalente
+// (Ativos/Passivos/Investimentos) ou o TrendChart já calculado no
+// componente pai (saldoAcumuladoSparkline, evita buscar de novo). Os
+// rótulos com sinal (+/−) compõem a própria memória de cálculo do Total.
 function PatrimonioBreakdownPanel({
   regime,
-  onNavigate,
+  saldoAcumuladoSparkline,
 }: {
   regime: Regime;
-  onNavigate: (
-    kind: "patrimonioAtivos" | "patrimonioPassivos" | "patrimonioInvestimentos" | "saldoAcumulado"
-  ) => void;
+  saldoAcumuladoSparkline: PontoTendencia[] | undefined;
 }) {
   const query = usePatrimonioBreakdown(regime);
+  const [expandidas, setExpandidas] = useState<PatrimonioParte[]>([]);
+
+  function toggle(parte: PatrimonioParte) {
+    setExpandidas((prev) =>
+      prev.includes(parte) ? prev.filter((p) => p !== parte) : [...prev, parte]
+    );
+  }
 
   if (query.isLoading) return <p>Carregando...</p>;
   if (query.isError || !query.data) {
@@ -942,69 +1206,73 @@ function PatrimonioBreakdownPanel({
 
   const { ativos, passivos, saldo_liquido_acumulado, saldo_investimentos, total } = query.data;
 
+  const partes: {
+    key: PatrimonioParte;
+    label: string;
+    valor: string;
+    sinal: "+" | "−";
+    painel: ReactNode;
+  }[] = [
+    { key: "ativos", label: "Ativos", valor: ativos, sinal: "+", painel: <AssetsValorAtualList /> },
+    {
+      key: "passivos",
+      label: "Passivos",
+      valor: passivos,
+      sinal: "−",
+      painel: <LiabilitiesValorAtualList />,
+    },
+    {
+      key: "saldoInvestimentos",
+      label: "Saldo em investimentos",
+      valor: saldo_investimentos,
+      sinal: "+",
+      painel: <InvestimentosValorAtualList />,
+    },
+    {
+      key: "saldoLiquido",
+      label: "Saldo líquido acumulado",
+      valor: saldo_liquido_acumulado,
+      sinal: "+",
+      painel:
+        saldoAcumuladoSparkline && saldoAcumuladoSparkline.length > 0 ? (
+          <TrendChart pontos={saldoAcumuladoSparkline} color="var(--accent)" />
+        ) : (
+          <p className="dash-empty">Nenhuma conta com saldo inicial informado.</p>
+        ),
+    },
+  ];
+
   return (
-    <div className="dash-table-wrap">
-      <table className="dash-table patrimonio-table">
-        <colgroup>
-          <col className="col-componente" />
-          <col className="col-valor" />
-          <col className="col-acoes" />
-        </colgroup>
-        <thead>
-          <tr>
-            <th>Componente</th>
-            <th>Valor</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Ativos</td>
-            <td>{formatCurrency(ativos)}</td>
-            <td>
-              <button type="button" onClick={() => onNavigate("patrimonioAtivos")}>
-                Ver detalhe
+    <div className="patrimonio-breakdown">
+      <ul className="dash-list dash-accordion">
+        {partes.map((parte) => (
+          <li key={parte.key}>
+            <div className="dash-accordion-item">
+              <button
+                type="button"
+                className={`dash-row${expandidas.includes(parte.key) ? " expanded" : ""}`}
+                onClick={() => toggle(parte.key)}
+                aria-expanded={expandidas.includes(parte.key)}
+              >
+                <span className="chev" aria-hidden="true">
+                  ›
+                </span>
+                <span className="nm">{parte.label}</span>
+                <span className="amt">
+                  {parte.sinal === "−" ? "− " : "+ "}
+                  {formatCurrency(parte.valor)}
+                </span>
               </button>
-            </td>
-          </tr>
-          <tr>
-            <td>Passivos</td>
-            <td>-{formatCurrency(passivos)}</td>
-            <td>
-              <button type="button" onClick={() => onNavigate("patrimonioPassivos")}>
-                Ver detalhe
-              </button>
-            </td>
-          </tr>
-          <tr>
-            <td>Saldo líquido acumulado</td>
-            <td>{formatCurrency(saldo_liquido_acumulado)}</td>
-            <td>
-              <button type="button" onClick={() => onNavigate("saldoAcumulado")}>
-                Ver detalhe
-              </button>
-            </td>
-          </tr>
-          <tr>
-            <td>Saldo em investimentos</td>
-            <td>{formatCurrency(saldo_investimentos)}</td>
-            <td>
-              <button type="button" onClick={() => onNavigate("patrimonioInvestimentos")}>
-                Ver detalhe
-              </button>
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <strong>Total</strong>
-            </td>
-            <td>
-              <strong>{formatCurrency(total)}</strong>
-            </td>
-            <td></td>
-          </tr>
-        </tbody>
-      </table>
+              {expandidas.includes(parte.key) && (
+                <div className="dash-accordion-panel">{parte.painel}</div>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+      <p className="patrimonio-total">
+        Total: <strong>{formatCurrency(total)}</strong>
+      </p>
     </div>
   );
 }
