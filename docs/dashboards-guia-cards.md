@@ -86,10 +86,11 @@ Competência/Caixa. **A fórmula não mudou desde a Sprint 22** — só os
 drilldowns ficaram mais completos:
 
 - **Ativos**: o drill-down mostra três seções, nesta ordem:
-  - "Valor atual por Ativo": tabela com todos os ativos ativos, saldo atual
-    e a percentagem que cada um representa do total de ativos (novo na
-    Sprint 25 — era antes só acessível dentro do card Patrimônio). Cada
-    ativo agora aparece com sua percentagem de concentração.
+  - "Valor atual por Ativo": accordion/drilldown list com barra+% (mesmo estilo
+    de "Valor atual por Investimento"), mostrando todos os ativos ativos, saldo
+    atual e a percentagem que cada um representa do total de ativos (novo na
+    Sprint 25, accordion na Sprint 26). Expandir uma linha mostra Tipo + Adquirido
+    em (data de aquisição).
   - "Valor atual por Investimento": accordion Investimento → Holding (Sprint
     24). Cada investimento expande mostrando as holdings vinculadas com saldo
     atual e percentagem de cada holding dentro daquele investimento. Desde a
@@ -129,7 +130,8 @@ Patrimônio, sem sair dele):
 - **Saldo em investimentos** → lista de Investimentos com valor atual
   agregado (contas + holdings vinculadas, `GET /investimentos`, campo
   `valor_atual` novo na Sprint 22 — antes só CRUD, sem valor).
-- **Saldo líquido acumulado** → inalterado (mesmo `TrendChart` de antes).
+- **Saldo líquido acumulado** → inalterado (mesmo gráfico de tendência de antes,
+  `TrendLineChart` variant="card" desde a Sprint 26).
 
 O saldo em investimentos passou, na Sprint 20, a somar as **posições/
 holdings** sincronizadas via Investments da Pluggy (CDBs, ações, títulos do
@@ -162,6 +164,10 @@ atual" que venha a ser adicionado no futuro.
 
 ## Referências
 
+- [PRD-026](prd/PRD-026-interatividade-graficos-dashboard.md) — origem das variantes
+  de gráfico interativo, do clique nos pontos de série histórica navegando por
+  mês/ano, da consolidação de CardSparkline/TrendChart em TrendLineChart, e da
+  mudança de "Valor atual por Ativo" de tabela para accordion (Sprint 26).
 - [PRD-025](prd/PRD-025-escala-visual-tela-ativos-cards-dashboard.md) — origem
   da seção "Valor atual por Ativo" no drill-down de Ativos, das cores distintas
   por investimento, do estilo barra+% para Passivos — saldo devedor, da fórmula
