@@ -892,7 +892,7 @@ PRD: [PRD-023-investimentos-drilldown-extrato-unificado.md](prd/PRD-023-investim
 Plano: [SPRINT-023-investimentos-drilldown-extrato-unificado-plan.md](sprints/SPRINT-023-investimentos-drilldown-extrato-unificado-plan.md).
 Relatório: [SPRINT-023-investimentos-drilldown-extrato-unificado-report.md](sprints/SPRINT-023-investimentos-drilldown-extrato-unificado-report.md).
 
-### Sprint 24 — Dashboard: layout, cards, navegação e cores (cross-epic, sem épico prévio)
+### ✅ Sprint 24 — Dashboard: layout, cards, navegação e cores (cross-epic, sem épico prévio) concluída em 2026-08-19
 
 Planejada em sessão própria (2026-08-19), no mesmo pedido do CEO que originou a Sprint 23 —
 dividida em duas sprints separadas por área (Investimentos vs. Dashboard), decisão explícita do
@@ -922,8 +922,19 @@ reaproveitando `useSyncPluggyItems` já usado em Gestão de Contas. Sem mudança
 `Summary.ativos`/`patrimonio`/`saldo` — tudo aditivo em apresentação/drilldown. Sem migration
 prevista.
 
+**Entregue 100% frontend, sem endpoint novo nem migration** — âncora do Saldo Acumulado reaproveita
+`useEvolucaoSaldoPorConta` (já existente), accordion Investimento→Holding reaproveita
+`usePluggyInvestments`. 598 testes backend (inalterado) + 207 testes frontend (+15), suíte completa
+verde. QA visual ao vivo na VM de dev (`check-sprint24.mjs`, desktop+mobile × claro+escuro) rodou em
+3 rodadas — a 1ª e a 2ª acharam 4 bugs reais (disclaimer de Patrimônio esquecido, nome acessível
+poluído no tile de Saldo Acumulado, sinal duplicado no accordion de Patrimônio quando Saldo líquido
+acumulado é negativo, overlap de coluna na tabela de holdings — mesma classe de bug já corrigida em
+`InvestimentoPosicoes` na Sprint 23), todos corrigidos antes do fechamento; a 3ª rodada fechou sem
+nenhuma falha.
+
 PRD: [PRD-024-dashboard-layout-cards-navegacao.md](prd/PRD-024-dashboard-layout-cards-navegacao.md).
 Plano: [SPRINT-024-dashboard-layout-cards-navegacao-plan.md](sprints/SPRINT-024-dashboard-layout-cards-navegacao-plan.md).
+Relatório: [SPRINT-024-dashboard-layout-cards-navegacao-report.md](sprints/SPRINT-024-dashboard-layout-cards-navegacao-report.md).
 
 ## Registro de reavaliações futuras
 
