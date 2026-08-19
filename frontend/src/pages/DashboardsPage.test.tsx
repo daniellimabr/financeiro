@@ -620,7 +620,10 @@ describe("DashboardsPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /^Ativos/ }));
 
-    expect(await screen.findByRole("button", { name: /Carro/ })).toBeInTheDocument();
+    // "Carro" aparece 2x: na lista "Valor atual por Ativo" (accordion,
+    // Sprint 26) e na lista "Despesas por Ativo" (accordion existente desde
+    // a Sprint 8) — ambas usam o mesmo Row/button.
+    expect(await screen.findAllByRole("button", { name: /Carro/ })).toHaveLength(2);
     expect(screen.getByRole("group", { name: "Tipo de transação" })).toBeInTheDocument();
   });
 
@@ -631,11 +634,9 @@ describe("DashboardsPage", () => {
     await screen.findByText("R$ 8.400,00");
 
     await userEvent.click(screen.getByRole("button", { name: /^Ativos/ }));
-    await screen.findByRole("button", { name: /Carro/ });
+    const [carroRow] = await screen.findAllByRole("button", { name: /Carro/ });
 
-    const funnel = screen
-      .getByRole("button", { name: /Carro/ })
-      .closest(".dash-funnel") as HTMLElement;
+    const funnel = carroRow.closest(".dash-funnel") as HTMLElement;
     const headings = within(funnel)
       .getAllByRole("heading", { level: 3 })
       .map((h) => h.textContent);
@@ -645,7 +646,8 @@ describe("DashboardsPage", () => {
       "Despesas por Ativo",
     ]);
 
-    // "Valor atual por Ativo" (AssetsValorAtualList, tabela) mostra o ativo do fixture
+    // "Valor atual por Ativo" (AssetsValorAtualList, accordion desde a
+    // Sprint 26) mostra o ativo do fixture
     expect(within(funnel).getByText("R$ 50.000,00")).toBeInTheDocument();
     expect(within(funnel).getByText("Reserva de emergência")).toBeInTheDocument();
     expect(within(funnel).queryByText("Saldo por conta")).not.toBeInTheDocument();
@@ -729,11 +731,15 @@ describe("DashboardsPage", () => {
 
     await userEvent.click(accordionRowButton(/^Ativos/));
 
-    // Ativos: lista itemizada de valor atual (useAssets) — "Carro" aparece
-    // como célula de tabela, não como botão expansível de gasto.
-    expect(await screen.findByText("Carro")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Carro/ })).not.toBeInTheDocument();
+    // Ativos: lista itemizada de valor atual (AssetsValorAtualList,
+    // accordion desde a Sprint 26) — "Carro" é o próprio Row expansível,
+    // que ao expandir mostra tipo + data de aquisição (antes só visíveis
+    // como colunas da tabela plana que essa lista substituiu).
+    const carroRow = await screen.findByRole("button", { name: /Carro/ });
     expect(accordionRowButton(/^Ativos/)).toHaveAttribute("aria-expanded", "true");
+
+    await userEvent.click(carroRow);
+    expect(await screen.findByText(/Veículo · Adquirido em 2024-01-01/)).toBeInTheDocument();
   });
 
   it("expands the Passivos part of the patrimonio accordion showing the itemized valor atual list", async () => {

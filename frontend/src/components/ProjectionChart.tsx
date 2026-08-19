@@ -1,10 +1,16 @@
+import type { MouseEvent as ReactMouseEvent } from "react";
+import type { MouseHandlerDataParam } from "recharts";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import type { PontoProjecao, TendenciaMes } from "../api/dashboards";
 import { formatCurrency } from "../utils/format";
+import { resolveClickedPonto } from "../utils/resolveClickedPonto";
 
 interface ChartPonto {
   nome: string;
+  ano: number;
+  mes: number;
+  real: boolean;
   receitaReal?: number;
   despesaReal?: number;
   saldoReal?: number;
@@ -21,15 +27,20 @@ interface ChartPonto {
 export function ProjectionChart({
   historico,
   projecao,
+  onSelecionarMes,
 }: {
   historico: TendenciaMes[];
   projecao: PontoProjecao[];
+  onSelecionarMes?: (ponto: { ano: number; mes: number }) => void;
 }) {
   const data: ChartPonto[] = [
     ...historico.map((p, index) => {
       const isMesBase = index === historico.length - 1;
       return {
         nome: `${p.mes}/${p.ano}`,
+        ano: p.ano,
+        mes: p.mes,
+        real: true,
         receitaReal: Number(p.receita),
         despesaReal: Number(p.despesa),
         saldoReal: Number(p.saldo),
@@ -44,16 +55,40 @@ export function ProjectionChart({
     }),
     ...projecao.map((p) => ({
       nome: `${p.mes}/${p.ano}`,
+      ano: p.ano,
+      mes: p.mes,
+      real: false,
       receitaProjetada: Number(p.receita),
       despesaProjetada: Number(p.despesa),
       saldoProjetada: Number(p.saldo),
     })),
   ];
 
+  // Clique-para-filtrar só se aplica a pontos de histórico real — um ponto
+  // projetado não é "um mês" que a tela possa filtrar de verdade (é média
+  // repetida, ver get_projecao). resolveClickedPonto (mesma lógica pura do
+  // TrendLineChart) resolve o índice pro ponto do array local; o guard
+  // `real` descarta o clique se caiu num ponto só-projetado.
+  function handleClick(state: MouseHandlerDataParam, event: ReactMouseEvent) {
+    if (!onSelecionarMes) return;
+    const index =
+      typeof state.activeIndex === "string" ? Number(state.activeIndex) : state.activeIndex;
+    if (typeof index !== "number" || !data[index]?.real) return;
+    const ponto = resolveClickedPonto(data, index);
+    if (!ponto) return;
+    event.stopPropagation();
+    onSelecionarMes(ponto);
+  }
+
   return (
     <div className="dash-chart">
       <ResponsiveContainer width="100%" height={260}>
-        <LineChart data={data} margin={{ top: 8, right: 16, bottom: 4, left: 4 }}>
+        <LineChart
+          data={data}
+          margin={{ top: 8, right: 16, bottom: 4, left: 4 }}
+          onClick={onSelecionarMes ? handleClick : undefined}
+          style={onSelecionarMes ? { cursor: "pointer" } : undefined}
+        >
           <XAxis
             dataKey="nome"
             tick={{ fontSize: 11, fill: "var(--text)" }}

@@ -41,11 +41,10 @@ import {
   type TransacaoTipo,
 } from "../api/dashboards";
 import type { PluggyInvestment } from "../api/pluggy";
-import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { RegimeToggle } from "../components/RegimeToggle";
 import { TransactionsTable } from "../components/TransactionsTable";
-import { TrendChart } from "../components/TrendChart";
+import { TrendLineChart } from "../components/TrendLineChart";
 import { useAssetGastos } from "../hooks/useAssetGastos";
 import { useAssets } from "../hooks/useAssets";
 import { useCategoryGroups } from "../hooks/useCategoryGroups";
@@ -179,6 +178,15 @@ export function DashboardsPage() {
     saldoAcumulado: "Saldo Acumulado",
   };
 
+  // Clique num ponto de qualquer gráfico de linha (card, mini gráfico de
+  // linha do funil, TrendChart de drilldown) filtra a tela por aquele
+  // mês/ano — mesmo padrão de navegação por clique já usado nos cards
+  // "Saldo Anterior"/"Saldo Acumulado" desde a Sprint 15/24.
+  function selecionarMes(ponto: { ano: number; mes: number }) {
+    setAno(ponto.ano);
+    setMes(ponto.mes);
+  }
+
   function clicarSaldoAnterior() {
     if (ano === 2026 && mes === 1) {
       window.alert(
@@ -287,13 +295,15 @@ export function DashboardsPage() {
             >
               <span className="k">Receita</span>
               <span className="v receita">{formatCurrency(summaryQuery.data.receita)}</span>
-              <CardSparkline
+              <TrendLineChart
+                variant="spark"
                 pontos={tendenciaQuery.data?.map((p) => ({
                   ano: p.ano,
                   mes: p.mes,
                   total: p.receita,
                 }))}
                 color="var(--receita)"
+                onSelecionarMes={selecionarMes}
               />
             </button>
             <button
@@ -303,13 +313,15 @@ export function DashboardsPage() {
             >
               <span className="k">Despesa</span>
               <span className="v despesa">{formatCurrency(summaryQuery.data.despesa)}</span>
-              <CardSparkline
+              <TrendLineChart
+                variant="spark"
                 pontos={tendenciaQuery.data?.map((p) => ({
                   ano: p.ano,
                   mes: p.mes,
                   total: p.despesa,
                 }))}
                 color="var(--despesa)"
+                onSelecionarMes={selecionarMes}
               />
             </button>
             <button
@@ -319,13 +331,15 @@ export function DashboardsPage() {
             >
               <span className="k">Saldo</span>
               <span className="v">{formatCurrency(summaryQuery.data.saldo)}</span>
-              <CardSparkline
+              <TrendLineChart
+                variant="spark"
                 pontos={tendenciaQuery.data?.map((p) => ({
                   ano: p.ano,
                   mes: p.mes,
                   total: p.saldo,
                 }))}
                 color="var(--accent)"
+                onSelecionarMes={selecionarMes}
               />
             </button>
             <div
@@ -352,7 +366,12 @@ export function DashboardsPage() {
               <span className="v">
                 {saldoAcumuladoAtual ? formatCurrency(saldoAcumuladoAtual.total) : "—"}
               </span>
-              <CardSparkline pontos={saldoAcumuladoSparkline} color="var(--accent)" />
+              <TrendLineChart
+                variant="spark"
+                pontos={saldoAcumuladoSparkline}
+                color="var(--accent)"
+                onSelecionarMes={selecionarMes}
+              />
             </div>
           </div>
         </>
@@ -377,6 +396,7 @@ export function DashboardsPage() {
               expandedSubcategorias={drill.expandedSubcategorias}
               onToggleGrupo={toggleGrupo}
               onToggleSubcategoria={toggleSubcategoria}
+              onSelecionarMes={selecionarMes}
             />
           )}
 
@@ -438,6 +458,7 @@ export function DashboardsPage() {
             <PatrimonioBreakdownPanel
               regime={regime}
               saldoAcumuladoSparkline={saldoAcumuladoSparkline}
+              onSelecionarMes={selecionarMes}
             />
           )}
 
@@ -463,7 +484,12 @@ export function DashboardsPage() {
                 />
               )}
               {saldoAcumuladoSparkline && saldoAcumuladoSparkline.length > 0 ? (
-                <TrendChart pontos={saldoAcumuladoSparkline} color="var(--accent)" />
+                <TrendLineChart
+                  variant="card"
+                  pontos={saldoAcumuladoSparkline}
+                  color="var(--accent)"
+                  onSelecionarMes={selecionarMes}
+                />
               ) : (
                 <p className="dash-empty">Nenhuma conta com saldo inicial informado.</p>
               )}
@@ -524,7 +550,7 @@ function SaldoMemoriaCalculo({
 
 // Card "Saldo Acumulado": memória de cálculo (âncora + acumulação mês a mês
 // até o mês filtrado) + resumo de receita/despesa do mês, acima do
-// TrendChart já existente. Âncora vem de useEvolucaoSaldoPorConta (soma de
+// TrendLineChart (variant="card") já existente. Âncora vem de useEvolucaoSaldoPorConta (soma de
 // saldo_inicial por conta) — endpoint já existente, sem mudança de backend.
 function SaldoAcumuladoMemoriaCalculo({
   ano,
@@ -612,31 +638,6 @@ function SaldoAcumuladoMemoriaCalculo({
   );
 }
 
-function RowTrend({ pontos, color }: { pontos: PontoTendencia[]; color: string }) {
-  const values = pontos.map((p) => Number(p.total));
-  const max = Math.max(...values, 0.01);
-  const width = 48;
-  const height = 16;
-  const points = values
-    .map((v, i) => {
-      const x = values.length > 1 ? (i / (values.length - 1)) * width : width / 2;
-      const y = height - (v / max) * height;
-      return `${x},${y}`;
-    })
-    .join(" ");
-  return (
-    <svg
-      className="trend"
-      width={width}
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
-      aria-hidden="true"
-    >
-      <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" />
-    </svg>
-  );
-}
-
 function sumTrends(lists: PontoTendencia[][]): PontoTendencia[] | undefined {
   if (lists.length === 0) return undefined;
   const [first] = lists;
@@ -665,6 +666,7 @@ function GrupoAccordion({
   expandedSubcategorias,
   onToggleGrupo,
   onToggleSubcategoria,
+  onSelecionarMes,
 }: {
   tipo: TransacaoTipo;
   filter: PeriodoFiltro;
@@ -674,6 +676,7 @@ function GrupoAccordion({
   expandedSubcategorias: number[];
   onToggleGrupo: (id: number) => void;
   onToggleSubcategoria: (id: number) => void;
+  onSelecionarMes: (ponto: { ano: number; mes: number }) => void;
 }) {
   const query = useDashboardByCategoria(tipo, { ...filter, regime });
   const tendenciaQuery = useDashboardCategoriaTendencia(
@@ -752,6 +755,7 @@ function GrupoAccordion({
               expanded={expandedGrupos.includes(grupo.group_id)}
               onClick={() => onToggleGrupo(grupo.group_id)}
               trend={grupo.trend}
+              onSelecionarMes={onSelecionarMes}
             />
             {expandedGrupos.includes(grupo.group_id) && (
               <div className="dash-accordion-panel">
@@ -766,6 +770,7 @@ function GrupoAccordion({
                   filter={filter}
                   expandedSubcategorias={expandedSubcategorias}
                   onToggleSubcategoria={onToggleSubcategoria}
+                  onSelecionarMes={onSelecionarMes}
                 />
               </div>
             )}
@@ -787,6 +792,7 @@ function SubcategoriaAccordion({
   filter,
   expandedSubcategorias,
   onToggleSubcategoria,
+  onSelecionarMes,
 }: {
   tipo: TransacaoTipo;
   groupId: number;
@@ -798,6 +804,7 @@ function SubcategoriaAccordion({
   filter: PeriodoFiltro;
   expandedSubcategorias: number[];
   onToggleSubcategoria: (id: number) => void;
+  onSelecionarMes: (ponto: { ano: number; mes: number }) => void;
 }) {
   const max = Number(subcategorias[0]?.total ?? 1);
 
@@ -823,6 +830,7 @@ function SubcategoriaAccordion({
                 expanded={expandedSubcategorias.includes(item.subcategory_id)}
                 onClick={() => onToggleSubcategoria(item.subcategory_id)}
                 trend={trendBySubcategoria.get(item.subcategory_id)}
+                onSelecionarMes={onSelecionarMes}
               />
               {expandedSubcategorias.includes(item.subcategory_id) && (
                 <div className="dash-accordion-panel">
@@ -1064,8 +1072,16 @@ function InvestimentoHoldingsList({ investimentoId }: { investimentoId: number }
   );
 }
 
+// Accordion (Sprint 26) — troca a tabela plana pelo mesmo padrão
+// dash-accordion/Row de InvestimentosValorAtualList (achado do CEO na
+// validação pós-Sprint 25: "Valor atual por Ativo" era a única das 3 seções
+// do card Ativos ainda em formato de tabela). Expande pra mostrar tipo e
+// data de aquisição — os dois dados que a tabela antiga trazia em colunas
+// próprias e que o Row colapsado (nome/barra/valor/%) não tem espaço pra
+// exibir; sem query nova, mesmo useAssets() já carregado.
 function AssetsValorAtualList() {
   const query = useAssets();
+  const [expandedIds, setExpandedIds] = useState<number[]>([]);
   const ativos = useMemo(
     () =>
       (query.data ?? [])
@@ -1077,43 +1093,47 @@ function AssetsValorAtualList() {
     () => ativos.reduce((sum, asset) => sum + Number(asset.valor_atual), 0),
     [ativos]
   );
+  const colorIndex = useMemo(
+    () => buildColorIndexFromIds(ativos.map((asset) => asset.id)),
+    [ativos]
+  );
 
   if (query.isLoading) return <p>Carregando...</p>;
   if (query.isError) return <p role="alert">Não foi possível carregar os ativos.</p>;
   if (ativos.length === 0) return <p className="dash-empty">Nenhum ativo cadastrado.</p>;
 
+  const max = Number(ativos[0]?.valor_atual ?? 1);
+
   return (
-    <div className="dash-table-wrap">
-      <table className="dash-table">
-        <colgroup>
-          <col className="col-nome" />
-          <col className="col-tipo" />
-          <col className="col-valor" />
-          <col className="col-percentual" />
-        </colgroup>
-        <thead>
-          <tr>
-            <th>Ativo</th>
-            <th>Tipo</th>
-            <th>Valor atual</th>
-            <th>%</th>
-          </tr>
-        </thead>
-        <tbody>
-          {ativos.map((asset) => {
-            const percentual = totalGeral > 0 ? (Number(asset.valor_atual) / totalGeral) * 100 : 0;
-            return (
-              <tr key={asset.id}>
-                <td>{asset.nome}</td>
-                <td>{ASSET_TIPO_LABEL[asset.tipo] ?? asset.tipo}</td>
-                <td>{formatCurrency(asset.valor_atual)}</td>
-                <td className="pct-col">{formatPercent(percentual)}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+    <ul className="dash-list dash-accordion">
+      {ativos.map((asset) => {
+        const percentual =
+          totalGeral > 0 ? ((Number(asset.valor_atual) / totalGeral) * 100).toFixed(2) : "0.00";
+        return (
+          <li key={asset.id}>
+            <div className="dash-accordion-item">
+              <Row
+                nome={asset.nome}
+                total={asset.valor_atual}
+                percentual={percentual}
+                max={max}
+                color={groupColorVar(asset.id, colorIndex)}
+                expanded={expandedIds.includes(asset.id)}
+                onClick={() => setExpandedIds((prev) => toggleId(prev, asset.id))}
+              />
+              {expandedIds.includes(asset.id) && (
+                <div className="dash-accordion-panel">
+                  <p>
+                    Tipo: {ASSET_TIPO_LABEL[asset.tipo] ?? asset.tipo} · Adquirido em{" "}
+                    {asset.data_aquisicao}
+                  </p>
+                </div>
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -1174,9 +1194,11 @@ type PatrimonioParte = "ativos" | "passivos" | "saldoInvestimentos" | "saldoLiqu
 function PatrimonioBreakdownPanel({
   regime,
   saldoAcumuladoSparkline,
+  onSelecionarMes,
 }: {
   regime: Regime;
   saldoAcumuladoSparkline: PontoTendencia[] | undefined;
+  onSelecionarMes: (ponto: { ano: number; mes: number }) => void;
 }) {
   const query = usePatrimonioBreakdown(regime);
   const [expandidas, setExpandidas] = useState<PatrimonioParte[]>([]);
@@ -1226,7 +1248,12 @@ function PatrimonioBreakdownPanel({
       valor: saldo_liquido_acumulado,
       painel:
         saldoAcumuladoSparkline && saldoAcumuladoSparkline.length > 0 ? (
-          <TrendChart pontos={saldoAcumuladoSparkline} color="var(--accent)" />
+          <TrendLineChart
+            variant="card"
+            pontos={saldoAcumuladoSparkline}
+            color="var(--accent)"
+            onSelecionarMes={onSelecionarMes}
+          />
         ) : (
           <p className="dash-empty">Nenhuma conta com saldo inicial informado.</p>
         ),
@@ -1277,6 +1304,7 @@ export function Row({
   onClick,
   expanded,
   trend,
+  onSelecionarMes,
 }: {
   nome: string;
   total: string;
@@ -1286,6 +1314,7 @@ export function Row({
   onClick: () => void;
   expanded: boolean;
   trend?: PontoTendencia[];
+  onSelecionarMes?: (ponto: { ano: number; mes: number }) => void;
 }) {
   const pct = max > 0 ? Math.max(4, (Number(total) / max) * 100) : 0;
   return (
@@ -1299,7 +1328,14 @@ export function Row({
         ›
       </span>
       <span className="nm">{nome}</span>
-      {trend && trend.length > 1 && <RowTrend pontos={trend} color={color} />}
+      {trend && trend.length > 1 && (
+        <TrendLineChart
+          variant="row"
+          pontos={trend}
+          color={color}
+          onSelecionarMes={onSelecionarMes}
+        />
+      )}
       <span className="track">
         <span className="fillbar" style={{ width: `${pct}%`, background: color }} />
       </span>

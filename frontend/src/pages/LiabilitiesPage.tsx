@@ -2,11 +2,10 @@ import { useMemo, useState, type FormEvent } from "react";
 
 import type { Liability, LiabilityInput, LiabilityTipo } from "../api/liabilities";
 import type { PeriodoFilter, PontoTendencia, Regime } from "../api/dashboards";
-import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { RegimeToggle } from "../components/RegimeToggle";
 import { TransactionsTable } from "../components/TransactionsTable";
-import { TrendChart } from "../components/TrendChart";
+import { TrendLineChart } from "../components/TrendLineChart";
 import { useCreateLiability } from "../hooks/useCreateLiability";
 import { useDeleteLiability } from "../hooks/useDeleteLiability";
 import { useLiabilities } from "../hooks/useLiabilities";
@@ -35,6 +34,13 @@ export function LiabilitiesPage() {
   const [ano, setAno] = useState(now.getFullYear());
   const [mes, setMes] = useState(now.getMonth() + 1);
   const filter: PeriodoFilter = { ano, mes };
+
+  // Clique num ponto de gráfico de linha filtra a tela por aquele mês/ano
+  // (Sprint 26) — mesmo helper replicado em cada tela que usa TrendLineChart.
+  function selecionarMes(ponto: { ano: number; mes: number }) {
+    setAno(ponto.ano);
+    setMes(ponto.mes);
+  }
 
   const [regime, setRegime] = useState<Regime>("competencia");
 
@@ -222,7 +228,12 @@ export function LiabilitiesPage() {
             <span className="v">{formatCurrency(liability.saldo_devedor)}</span>
             <strong>{liability.nome}</strong>
             <span className="tag">Total: {formatCurrency(liability.valor_total)}</span>
-            <CardSparkline pontos={trendByLiability.get(liability.id)} color="var(--despesa)" />
+            <TrendLineChart
+              variant="spark"
+              pontos={trendByLiability.get(liability.id)}
+              color="var(--despesa)"
+              onSelecionarMes={selecionarMes}
+            />
             <div className="dash-filter">
               <button
                 type="button"
@@ -270,6 +281,7 @@ export function LiabilitiesPage() {
             filter={filter}
             regime={regime}
             pontos={trendByLiability.get(selectedLiability.id)}
+            onSelecionarMes={selecionarMes}
           />
         </div>
       )}
@@ -307,11 +319,13 @@ function LiabilityDrilldown({
   filter,
   regime,
   pontos,
+  onSelecionarMes,
 }: {
   liabilityId: number;
   filter: PeriodoFilter;
   regime: Regime;
   pontos: PontoTendencia[] | undefined;
+  onSelecionarMes: (ponto: { ano: number; mes: number }) => void;
 }) {
   const gastosQuery = useLiabilityGastos({ ...filter, regime });
 
@@ -325,7 +339,14 @@ function LiabilityDrilldown({
 
   return (
     <>
-      {pontos && pontos.length > 1 && <TrendChart pontos={pontos} color={color} />}
+      {pontos && pontos.length > 1 && (
+        <TrendLineChart
+          variant="card"
+          pontos={pontos}
+          color={color}
+          onSelecionarMes={onSelecionarMes}
+        />
+      )}
       <p>
         Gasto no período: <strong style={{ color }}>{formatCurrency(total)}</strong>
       </p>

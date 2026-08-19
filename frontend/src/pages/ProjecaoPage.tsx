@@ -41,6 +41,15 @@ export function ProjecaoPage() {
   const [ano, setAno] = useState(now.getFullYear());
   const [mes, setMes] = useState(now.getMonth() + 1);
   const [horizonte, setHorizonte] = useState<PeriodoHistorico>(6);
+
+  // Clique num ponto de histórico real do gráfico filtra a tela por aquele
+  // mês/ano (Sprint 26) — pontos projetados não são clicáveis, ver
+  // ProjectionChart. Mesmo helper replicado em cada tela com TrendLineChart.
+  function selecionarMes(ponto: { ano: number; mes: number }) {
+    setAno(ponto.ano);
+    setMes(ponto.mes);
+  }
+
   const [hipoteticas, setHipoteticas] = useState<Hipotetica[]>([]);
   const [formState, setFormState] = useState(EMPTY_FORM);
 
@@ -144,7 +153,11 @@ export function ProjecaoPage() {
 
       {historicoQuery.data && projecaoQuery.data && (
         <>
-          <ProjectionChart historico={historicoQuery.data} projecao={projecaoAjustada} />
+          <ProjectionChart
+            historico={historicoQuery.data}
+            projecao={projecaoAjustada}
+            onSelecionarMes={selecionarMes}
+          />
           <p className="dash-empty">
             Linha sólida: histórico real. Linha tracejada: projeção (média dos últimos meses de
             subcategorias fixo/variável recorrente) — sem crescimento, inflação ou sazonalidade.

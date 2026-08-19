@@ -9,9 +9,8 @@ import type {
   PontoTendencia,
   TransacaoTipo,
 } from "../api/dashboards";
-import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
-import { TrendChart } from "../components/TrendChart";
+import { TrendLineChart } from "../components/TrendLineChart";
 import { useCreateInvestimento } from "../hooks/useCreateInvestimento";
 import { useDeleteInvestimento } from "../hooks/useDeleteInvestimento";
 import { useEvolucaoMensal } from "../hooks/useEvolucaoMensal";
@@ -36,6 +35,13 @@ export function InvestimentosPage() {
   const [ano, setAno] = useState(now.getFullYear());
   const [mes, setMes] = useState(now.getMonth() + 1);
   const filter: PeriodoFilter = { ano, mes };
+
+  // Clique num ponto de gráfico de linha filtra a tela por aquele mês/ano
+  // (Sprint 26) — mesmo helper replicado em cada tela que usa TrendLineChart.
+  function selecionarMes(ponto: { ano: number; mes: number }) {
+    setAno(ponto.ano);
+    setMes(ponto.mes);
+  }
 
   const [drillTipo, setDrillTipo] = useState<TransacaoTipo>("debito");
 
@@ -203,6 +209,7 @@ export function InvestimentosPage() {
             onToggleDrilldown={() => toggleDrilldown(investimento.id)}
             onEdit={() => openEditForm(investimento)}
             onDelete={() => handleDelete(investimento.id, investimento.nome)}
+            onSelecionarMes={selecionarMes}
           />
         ))}
       </div>
@@ -248,6 +255,7 @@ export function InvestimentosPage() {
               tipo={drillTipo}
               filter={filter}
               pontos={trendByInvestimento.get(selectedInvestimento.id)}
+              onSelecionarMes={selecionarMes}
             />
           )}
           {drillView === "posicoes" && (
@@ -270,6 +278,7 @@ function InvestimentoCard({
   onToggleDrilldown,
   onEdit,
   onDelete,
+  onSelecionarMes,
 }: {
   investimento: Investimento;
   pontos: PontoTendencia[] | undefined;
@@ -278,6 +287,7 @@ function InvestimentoCard({
   onToggleDrilldown: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onSelecionarMes: (ponto: { ano: number; mes: number }) => void;
 }) {
   const evolucaoQuery = useInvestimentoEvolucao(investimento.id);
   const evolucao = evolucaoQuery.data;
@@ -291,7 +301,12 @@ function InvestimentoCard({
           Rendimento estimado: {formatCurrency(evolucao.rendimento_estimado)}
         </span>
       )}
-      <CardSparkline pontos={pontos} color={trendColor} />
+      <TrendLineChart
+        variant="spark"
+        pontos={pontos}
+        color={trendColor}
+        onSelecionarMes={onSelecionarMes}
+      />
       <div className="dash-filter">
         <button type="button" aria-expanded={expanded} onClick={onToggleDrilldown}>
           {expanded ? "Fechar posições" : "Ver posições"}
@@ -312,11 +327,13 @@ function InvestimentoDrilldown({
   tipo,
   filter,
   pontos,
+  onSelecionarMes,
 }: {
   investimentoId: number;
   tipo: TransacaoTipo;
   filter: PeriodoFilter;
   pontos: PontoTendencia[] | undefined;
+  onSelecionarMes: (ponto: { ano: number; mes: number }) => void;
 }) {
   const gastosQuery = useInvestimentoGastos(tipo, filter);
   const transacoesQuery = useInvestimentoTransacoes(investimentoId, filter);
@@ -330,7 +347,14 @@ function InvestimentoDrilldown({
 
   return (
     <>
-      {pontos && pontos.length > 1 && <TrendChart pontos={pontos} color={color} />}
+      {pontos && pontos.length > 1 && (
+        <TrendLineChart
+          variant="card"
+          pontos={pontos}
+          color={color}
+          onSelecionarMes={onSelecionarMes}
+        />
+      )}
       {!gastosQuery.isLoading && !gastosQuery.isError && (
         <p>
           {rotulo} no período: <strong style={{ color }}>{formatCurrency(total)}</strong>

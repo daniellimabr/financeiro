@@ -8,10 +8,10 @@ import {
   type PontoTendencia,
   type TransacaoTipo,
 } from "../api/dashboards";
-import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { SortableHeader } from "../components/SortableHeader";
 import { TransactionsTable } from "../components/TransactionsTable";
+import { TrendLineChart } from "../components/TrendLineChart";
 import { useCategoryGroups } from "../hooks/useCategoryGroups";
 import { useDashboardByCategoria } from "../hooks/useDashboardByCategoria";
 import { useDashboardByNatureza } from "../hooks/useDashboardByNatureza";
@@ -54,6 +54,14 @@ export function NaturezaPage() {
   const now = new Date();
   const [ano, setAno] = useState(now.getFullYear());
   const [mes, setMes] = useState(now.getMonth() + 1);
+
+  // Clique num ponto de gráfico de linha filtra a tela por aquele mês/ano
+  // (Sprint 26) — mesmo helper replicado em cada tela que usa TrendLineChart.
+  function selecionarMes(ponto: { ano: number; mes: number }) {
+    setAno(ponto.ano);
+    setMes(ponto.mes);
+  }
+
   const [tipo, setTipo] = useState<TransacaoTipo>("debito");
   const [selectedNatureza, setSelectedNatureza] = useState<NaturezaValue | null>(null);
   const [expandedGrupos, setExpandedGrupos] = useState<number[]>([]);
@@ -203,7 +211,12 @@ export function NaturezaPage() {
                   {formatCurrency(item?.total ?? "0")}
                 </span>
                 <span className="tag">{formatPercent(item?.percentual ?? "0")} do período</span>
-                <CardSparkline pontos={trendByNatureza.get(natureza)} color={color} />
+                <TrendLineChart
+                  variant="spark"
+                  pontos={trendByNatureza.get(natureza)}
+                  color={color}
+                  onSelecionarMes={selecionarMes}
+                />
               </button>
             );
           })}

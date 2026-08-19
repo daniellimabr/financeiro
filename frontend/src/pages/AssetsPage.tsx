@@ -7,10 +7,9 @@ import type {
   PontoTendencia,
   TransacaoTipo,
 } from "../api/dashboards";
-import { CardSparkline } from "../components/CardSparkline";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { TransactionsTable } from "../components/TransactionsTable";
-import { TrendChart } from "../components/TrendChart";
+import { TrendLineChart } from "../components/TrendLineChart";
 import { useAssetGastos } from "../hooks/useAssetGastos";
 import { useAssetGastosTendencia } from "../hooks/useAssetGastosTendencia";
 import { useAssets } from "../hooks/useAssets";
@@ -57,6 +56,13 @@ export function AssetsPage() {
   const [ano, setAno] = useState(now.getFullYear());
   const [mes, setMes] = useState(now.getMonth() + 1);
   const filter: PeriodoFilter = { ano, mes };
+
+  // Clique num ponto de gráfico de linha filtra a tela por aquele mês/ano
+  // (Sprint 26) — mesmo helper replicado em cada tela que usa TrendLineChart.
+  function selecionarMes(ponto: { ano: number; mes: number }) {
+    setAno(ponto.ano);
+    setMes(ponto.mes);
+  }
 
   const [drillTipo, setDrillTipo] = useState<TransacaoTipo>("debito");
 
@@ -310,9 +316,11 @@ export function AssetsPage() {
             <span className="v">{formatCurrency(asset.valor_atual)}</span>
             <strong>{asset.nome}</strong>
             <span className="tag">Adquirido em {asset.data_aquisicao}</span>
-            <CardSparkline
+            <TrendLineChart
+              variant="spark"
               pontos={trendByAsset.get(asset.id)}
               color={groupColorVar(asset.id, colorIndex)}
+              onSelecionarMes={selecionarMes}
             />
             <div className="dash-filter">
               <button
@@ -355,6 +363,7 @@ export function AssetsPage() {
             filter={filter}
             pontos={trendByAsset.get(selectedAsset.id)}
             color={groupColorVar(selectedAsset.id, colorIndex)}
+            onSelecionarMes={selecionarMes}
           />
         </div>
       )}
@@ -393,12 +402,14 @@ function AssetDrilldown({
   filter,
   pontos,
   color,
+  onSelecionarMes,
 }: {
   assetId: number;
   tipo: TransacaoTipo;
   filter: PeriodoFilter;
   pontos: PontoTendencia[] | undefined;
   color: string;
+  onSelecionarMes: (ponto: { ano: number; mes: number }) => void;
 }) {
   const gastosQuery = useAssetGastos(tipo, filter);
 
@@ -412,7 +423,14 @@ function AssetDrilldown({
 
   return (
     <>
-      {pontos && pontos.length > 1 && <TrendChart pontos={pontos} color={color} />}
+      {pontos && pontos.length > 1 && (
+        <TrendLineChart
+          variant="card"
+          pontos={pontos}
+          color={color}
+          onSelecionarMes={onSelecionarMes}
+        />
+      )}
       <p>
         {rotulo} no período: <strong style={{ color }}>{formatCurrency(total)}</strong>
       </p>
