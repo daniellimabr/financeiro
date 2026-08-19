@@ -1315,9 +1315,82 @@ PRD: [PRD-021-vinculo-holdings-serie-historica.md](../prd/PRD-021-vinculo-holdin
 Plano: [SPRINT-021-vinculo-holdings-serie-historica-plan.md](../sprints/SPRINT-021-vinculo-holdings-serie-historica-plan.md).
 Progresso/achados: [SPRINT-021-progress.md](../sprints/SPRINT-021-progress.md).
 
-## Qualidade (Sprint 1 → Sprint 21)
+## Manutenção de Investimentos + drilldown de Ativos/Patrimônio (Sprint 22)
 
-- **Testes backend:** 563 testes (+31, Sprint 21), 98% cobertura nos módulos tocados
+- **Bloco 0 (investigação read-only na VM de dev) derrubou a premissa central do PRD:** não
+  existe nenhuma `pluggy_account` com `tipo=investimento` no dado real — Nubank Investimentos só
+  retorna holdings via `/investments` (achado já da Sprint 19), XP só retorna conta `corrente`.
+  A fila de Categorização (30 pendências reais) era 100% dividendo/JCP/taxa legítima
+  (`categoria_pluggy` = "Proceeds interests and dividends"/"Taxes on investments"), não
+  transação de conta tipo=investimento. O CEO confirmou (perguntado diretamente) que quer esse
+  fluxo fora da fila **e** dos totais mesmo assim — escopo mudou de "excluir por `account_tipo`"
+  para "excluir por `categoria_pluggy`" (novo par de constantes em `app/models/pluggy.py`,
+  `INVESTIMENTO_PROVENTOS_CATEGORIAS_PLUGGY`, compartilhado entre `dashboards/service.py`
+  (`_base_query`, aplicado incondicionalmente, mesmo padrão de "Transferência interna") e
+  `categorization/service.py::list_transactions`). A exclusão por `account_tipo=investimento`
+  também foi implementada como salvaguarda defensiva (`_base_query` default
+  `excluir_investimento=True`, `list_transactions` com join a `PluggyAccount`) — hoje é um no-op
+  contra dado real, mas cobre qualquer conector futuro que devolva esse tipo de conta.
+- **`DELETE /pluggy/accounts/{id}` + botão "Excluir conta"** (`AccountManagementPage.tsx`,
+  habilitado só quando `sync_enabled=false`): `delete_account` desassocia
+  `descricao_sugestao_origem_id` de transações de **outras** contas que apontem pra uma
+  transação da conta sendo excluída (FK auto-referenciada sem `ON DELETE`) — cascade ORM já
+  cobre as `PluggyTransaction` da própria conta. Nunca toca `PluggyInvestment` (holdings vivem
+  no `item_id`, não na conta). Aplicado às 2 contas XP reais desativadas na VM de dev (ambas
+  vazias, 0 transações) — aprovação explícita do CEO por comando antes de rodar.
+- **Bug real encontrado e corrigido em `_net_aportes_desde_cutoff`** (usado pela proposta de
+  baseline dez/2025, `propose_baseline_dez_2025`): somava toda `pluggy_investment_transaction`
+  `BUY`/`SELL` sem filtro de data — uma compra original registrada **antes** do baseline
+  (31/12/2025) era subtraída do saldo atual como se fosse aporte novo, subestimando
+  `saldo_inicial_proposto`. Confirmado contra 3 holdings reais do investimento "Quitar o AP"
+  (Nubank CDB 100% CDI): gap de ~R$22.000 entre o baseline gravado na Sprint 21 e o recalculado
+  com o fix — quase idêntico ao pico de R$22.674,22 de "rendimento" que o CEO reportou em
+  agosto/2026. Corrigido com filtro `data > _BASELINE_DATA`; a mesma classe de bug apareceu de
+  novo (achada só ao validar contra dado real) dentro de `_reconstruct_holding_snapshots`'s
+  próprio cálculo de `net_aportes_total` — corrigida com o mesmo filtro.
+- **Redistribuição pró-rata do rendimento reconstruído** (`_reconstruct_holding_snapshots`):
+  em vez de zerar valorização/rendimento em todo mês reconstruído e concentrar o crescimento
+  observado inteiro no primeiro snapshot `confianca="real"` (design original da Sprint 21,
+  causa raiz do pico), o resíduo total (`valor_atual − saldo_inicial − aportes líquidos desde o
+  baseline`) é distribuído pró-rata pelos dias em que a posição esteve aberta em cada mês
+  (`_dias_posicao_aberta_no_mes`, usa `saldo_inicial`/data da primeira `BUY`/data da última
+  `SELL` pra delimitar a janela). `snapshot_current_month` não precisou mudar — como já lê o
+  `saldo` do último snapshot reconstruído por subtração, herda automaticamente a fatia correta
+  do mês corrente, preservando o total exato por construção. Baseline corrigido + reconstrução
+  rodados contra dado real da VM de dev, validados linha a linha com o CEO: pico sumiu, rendimento
+  mensal de "Quitar o AP" ficou entre R$12–154 (~R$674 no total, plausível pra ~R$67k a CDI).
+- **`GET /investimentos` passa a expor `valor_atual`** (`InvestimentoComValorAtualOut`,
+  `list_investimentos_com_valor_atual` — soma `PluggyAccount.saldo` + `PluggyInvestment.
+  valor_atual` agregados por `investimento_id`, 2 queries agregadas, sem N+1). Endpoints de
+  CRUD (`POST`/`PUT`/`GET {id}`) continuam retornando `InvestimentoOut` sem esse campo.
+- **Drilldowns do Dashboard redesenhados, sem mudar a fórmula somada dos cards** (ver
+  [dashboards-guia-cards.md](../dashboards-guia-cards.md) pra detalhe): card "Ativos" ganha duas
+  seções novas (valor atual por Investimento, saldo por conta) ao lado do accordion de gasto já
+  existente; os 3 botões "Ver detalhe" do painel de Patrimônio (Ativos/Passivos/Saldo em
+  investimentos) passam a abrir lista itemizada de valor atual (`useAssets`/`useLiabilities`/
+  `useInvestimentos`, filtrado por `status=ativo` no frontend) em vez de gasto do período ou
+  `SaldoPorContaList` sem filtro — 3 `DrillKind` novos (`patrimonioAtivos`/`patrimonioPassivos`/
+  `patrimonioInvestimentos`), distintos dos `ativos`/`passivos` usados pelos cards de topo (que
+  mantiveram o comportamento antigo). "Saldo líquido acumulado" não mudou.
+- **Testes:** 586 backend (+23, 98% cobertura) + 192 frontend (+6), suíte completa verde, lint/
+  prettier limpos. Validação ao vivo (`scripts/browser-check/check-sprint22.mjs`, novo): fila de
+  Categorização sem as 30 transações de proventos, botão "Excluir conta" desabilitado pra contas
+  sincronizando, série histórica de "Quitar o AP" sem pico (valores batendo com o SQL real), os
+  4 drilldowns novos — sem erro de console.
+
+PRD: [PRD-022-manutencao-investimentos-e-drilldown-patrimonio.md](../prd/PRD-022-manutencao-investimentos-e-drilldown-patrimonio.md).
+Plano: [SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-plan.md](../sprints/SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-plan.md).
+
+## Qualidade (Sprint 1 → Sprint 22)
+
+- **Testes backend:** 586 testes (+23, Sprint 22), 98% cobertura. Sprint 22: exclusão de
+  proventos de investimento por `categoria_pluggy` (`_base_query`/`list_transactions`,
+  regressão explícita de aporte/resgate continuando a contar), `delete_account` (desassociação
+  completa, isolamento, 404 idempotente numa segunda tentativa), fix de
+  `_net_aportes_desde_cutoff`/`_reconstruct_holding_snapshots` ignorando transação pré-baseline,
+  redistribuição pró-rata do rendimento reconstruído (soma exata preservada, idempotência,
+  peso zero antes da compra), `list_investimentos_com_valor_atual` (soma contas+holdings,
+  isolamento). 563 testes (+31, Sprint 21), 98% cobertura nos módulos tocados
   (`app/pluggy_integration/`, `app/categorization/engine.py`, `app/investimentos/`). Sprint 21:
   motor de sugestão holding→Investimento (código exato, similaridade, sem sobrescrever
   vínculo manual), baseline dez/2025 (3 casos do algoritmo: pós-corte, taxa fixa, fallback de
@@ -1396,7 +1469,12 @@ Progresso/achados: [SPRINT-021-progress.md](../sprints/SPRINT-021-progress.md).
   sem subcategoria→eventual, exclusão de `excluir_de_totais`, isolamento
   por usuário, sempre 3 buckets mesmo sem dado, percentual somando 100%;
   endpoints novos 401 sem cookie, isolamento entre usuários. Sprint 10 (100% em `app/dashboards/` e `app/categorization/`): `suggest_asset` mirror completo dos testes de categoria (regra > histórico exato > similaridade `>=0.86`, isolamento); `has_asset`/`group_id` isolados e combinados entre si e com filtros existentes; `get_patrimonio_breakdown` batendo exatamente com `summary.patrimonio`; `cartao_credito`+`credito` excluído da receita (o achado do NuTag) enquanto `corrente`+`credito` continua contando normalmente; `GET /dashboards/patrimonio/breakdown` isolado por usuário, 401 sem cookie. Auth (Sprint 1), dados mestres (Sprint 2, 97%), Pluggy (Sprint 3, 98%), categorização (Sprint 4, paginação/filtro ano-mes pós-Sprint 6) — ver histórico nos relatórios de sprint. Dashboards (Sprint 5+6, 100% em `app/dashboards/`): período vazio, período só com "Transferência interna" (totais zerados), misto débito/crédito, sinal do saldo de `cartao_credito` na fórmula de patrimônio, ativos/passivos inativos excluídos, borda de mês (`data_competencia` no limite entre meses), soma de `/por-categoria` batendo com `/summary`, isolamento entre usuários; tendência terminando no mês filtrado (não no calendário), mês sem transação aparecendo zerado, tendência por categoria com bucket "Não categorizado", percentual somando 100% (menos arredondamento) e retornando `0` com denominador zero. Categorização/Pluggy (Sprint 7, 99%): filtro status/tipo em todas as combinações, bulk-confirm parcial (linha inválida não bloqueia as demais), `set_category` em transação já confirmada, propagação de descrição (match normalizado + mesma categoria, isolamento por usuário, "primeira grava, segunda não sobrescreve"), `sync_item`/`sync_items` pulando conta com `sync_enabled=False`, `apelido` preservado em resync. Gestão de Ativos (Sprint 8, 100% em `app/assets/` e `app/dashboards/`): `get_por_ativo` filtrando por `tipo` (período vazio, ativo sem transação vinculada, isolamento), `get_tendencia_por_ativo` zero-preenchendo meses sem transação e isolado por `tipo`/usuário, filtro `asset_id`/`tipo` em `/pluggy/transactions` combinados com outros filtros, `delete_asset` desassociando transações vinculadas em vez de falhar. Ativos/Passivos no Dashboard (Sprint 9, 100% em `app/dashboards/`): `suggest_liability` (substring, isolamento, sem match), `set_transaction_liability` (sets/clears, 404 cross-user), `delete_liability` desassociando (crítico, mirror de `delete_asset`), `get_por_passivo`/`get_tendencia_por_passivo` (nunca soma crédito, zero-preenchida, isolamento), `get_saldo_por_conta` (apelido→nome, isolamento), `summary.ativos`/`summary.passivos` batendo com a mesma base de `patrimonio`, filtro `liability_id` combinado com outros filtros, `account_tipo` na resposta de `/pluggy/transactions`. Revisão pós-entrega: `_upsert_account` persistindo/deixando `None` os campos de `creditData`, `get_saldo_por_conta` de cartão somando a janela da fatura (limite, exclui fora da janela, nunca soma crédito, cai pro saldo bruto sem `fatura_vencimento`), `_subtract_month` (rollover de ano, clamp de dia).
-- **Testes frontend:** 186 testes (+5, Sprint 21), Vitest + Testing Library. Sprint 21:
+- **Testes frontend:** 192 testes (+6, Sprint 22), Vitest + Testing Library. Sprint 22:
+  `AccountManagementPage.test.tsx` (botão "Excluir conta" desabilitado/habilitado conforme
+  `sync_enabled`, chamada `DELETE`, confirmação cancelável); `DashboardsPage.test.tsx` (seções
+  novas de valor atual por Investimento/saldo por conta no drilldown "Ativos", os 3 novos
+  destinos itemizados de "Ver detalhe" do painel de Patrimônio) — suíte 100% verde, sem
+  regressão. 186 testes (+5, Sprint 21), Vitest + Testing Library. Sprint 21:
   `AccountManagementPage.test.tsx` (sugestão pré-selecionada com badge de confiança +
   "Aceitar sugestão", tela de revisão de baseline com input editável por linha confirmando
   via `POST /pluggy/investments/baseline-dez-2025`), `InvestimentosPage.test.tsx` (aba "Série

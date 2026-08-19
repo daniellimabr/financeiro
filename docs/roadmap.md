@@ -816,7 +816,7 @@ PRD: [PRD-021-vinculo-holdings-serie-historica.md](prd/PRD-021-vinculo-holdings-
 Plano: [SPRINT-021-vinculo-holdings-serie-historica-plan.md](sprints/SPRINT-021-vinculo-holdings-serie-historica-plan.md).
 Progresso/achados detalhados: [SPRINT-021-progress.md](sprints/SPRINT-021-progress.md).
 
-### Sprint 22 — Manutenção de Investimentos + drilldown de Ativos/Patrimônio (cross-epic, sem épico prévio)
+### ✅ Sprint 22 — Manutenção de Investimentos + drilldown de Ativos/Patrimônio (cross-epic, sem épico prévio) concluída em 2026-08-18
 
 Planejada em sessão própria (2026-08-18), a partir de 4 pontos que o CEO levantou usando o app
 na prática pós-Sprint 21: (1) transações internas de conta `tipo=investimento` continuam
@@ -839,8 +839,25 @@ reaudita o baseline das holdings suspeitas **e** redistribui o crescimento recon
 mês, não só ajusta a UI. Investigação confirmou que os drilldowns de Ativos/Patrimônio podem
 mudar sem alterar a fórmula somada de `Summary.ativos`/`patrimonio` (mudança aditiva na UI).
 
+**Bloco 0 (investigação real na VM de dev) derrubou a premissa do ponto 1:** não existe
+`pluggy_account` com `tipo=investimento` no dado real — a fila de Categorização era 100%
+dividendo/JCP/taxa legítima de investimentos administrados (XP), identificável pela própria
+`categoria_pluggy` da Pluggy. O CEO confirmou (perguntado direto) que quer esse fluxo fora da
+fila e dos totais mesmo assim — exclusão implementada por `categoria_pluggy`, não por tipo de
+conta (que ficou como salvaguarda defensiva, hoje um no-op). A investigação do ponto 3 também
+achou a causa raiz real: um bug em `_net_aportes_desde_cutoff` (sem filtro de data) subestimava
+o baseline de 3 holdings do investimento "Quitar o AP" em ~R$22.000 — quase todo o pico
+reportado. Corrigido, mais o algoritmo de redistribuição pró-rata do rendimento reconstruído;
+baseline reauditado e correção aplicada contra dado real, validados linha a linha com o CEO.
+Exclusão das 2 contas XP reais desativadas (ambas vazias) aplicada com aprovação explícita do
+CEO por comando. Drilldowns de Ativos/Patrimônio redesenhados (valor atual itemizado), sem
+alterar a fórmula somada de nenhum card. 586 testes backend (+23, 98% cobertura) + 192 frontend
+(+6), suíte completa verde. Deploy na VM de dev e validação ao vivo via
+`scripts/browser-check/check-sprint22.mjs` (novo), sem erros de console.
+
 PRD: [PRD-022-manutencao-investimentos-e-drilldown-patrimonio.md](prd/PRD-022-manutencao-investimentos-e-drilldown-patrimonio.md).
 Plano: [SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-plan.md](sprints/SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-plan.md).
+Relatório: [SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-report.md](sprints/SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-report.md).
 
 ## Registro de reavaliações futuras
 
@@ -852,4 +869,3 @@ Plano: [SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-plan.md](spri
 - **Heurística de dia útil para o lag Pluggy vs. extrato bancário real:** decisão explícita do CEO na sessão de planejamento da Sprint 16 (2026-08-17) — transações de fim de semana às vezes aparecem no extrato do Itaú só no próximo dia útil (até 2 dias depois da data bruta que a Pluggy reporta), sem outro campo no payload (`postDate`/`settlementDate`) para corrigir automaticamente. Não implementado por ora (risco de heurística errada, sem tratar feriados); candidata a revisão futura se a Pluggy passar a expor um campo de liquidação, ou se o CEO priorizar uma heurística mesmo com o risco.
 - **Toggle competência/caixa nas telas "Natureza"/"Projeção":** fora de escopo da Sprint 16 (toggle só no Dashboard) — candidata a extensão futura se o CEO quiser o mesmo regime nessas telas.
 - **Sugestão automática pra holdings CDB com nome idêntico/código nulo:** achado real da Sprint 21 — a cascata código-exato→similaridade de nome não resolve as 18 posições de CDB da Nubank (nome genérico igual, sem ticker/ISIN). Vínculo dessa sprint foi reconstruído manualmente por correspondência de valor de aporte contra o extrato real do CEO. Sem PRD/plano ainda; candidata a sprint futura se o CEO priorizar automatizar (possível caminho: correspondência por data+valor de aporte, mas exige mais investigação de payload).
-- **Microtransações de investimento na fila de Categorização:** feedback do CEO na sessão de execução da Sprint 21 — ele prefere controlar aporte/resgate pelas transações de conta corrente (Itaú/Nubank/XP), não precisar classificar as transações internas de holding. Registrado como item de backlog, não investigado nem escopado nesta sprint.

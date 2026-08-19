@@ -68,20 +68,46 @@ Exclui:
 - `credito` em conta de cartão de crédito (pagamento de fatura ou
   estorno/reversão — nunca é receita real).
 - Categorias marcadas para excluir de totais (configuração por grupo).
+- Desde a Sprint 22, dividendo/JCP/taxa de investimentos administrados por
+  corretora (identificado pela própria `categoria_pluggy` da Pluggy:
+  "Proceeds interests and dividends" / "Taxes on investments") — chega numa
+  conta corrente vinculada à corretora (não numa conta tipo "Investimento",
+  achado real do Bloco 0), e o CEO decidiu não precisar administrar/
+  categorizar esse fluxo. Mesma exclusão vale na fila de Categorização.
+  Aporte/resgate continuam contando normalmente (categoria "Investments",
+  distinta) — decisão fixada desde a Sprint 19.
 
 ## Ativos / Passivos
 
 Valor atual somado de todos os ativos com status "ativo" (Gestão de Ativos)
 e de todos os passivos com status "ativo" (Gestão de Passivos) — sempre
 snapshot de hoje, não depende do período filtrado nem do toggle
-Competência/Caixa.
+Competência/Caixa. **A fórmula não mudou na Sprint 22** — só o drilldown do
+card "Ativos" ficou mais completo: além do accordion de gasto por ativo já
+existente (período filtrado), ganhou duas seções adicionais, lado a lado,
+sem afetar o número do card: "Valor atual por Investimento" (mesma fonte do
+card Patrimônio, ver abaixo) e "Saldo por conta" (mesmo drill-down do card
+"Saldo", sem filtro).
 
 ## Patrimônio
 
 Soma de 4 partes, sempre snapshot de hoje: Saldo líquido acumulado (o mesmo
 conceito do card "Saldo Acumulado", incluindo contas líquidas sem "Saldo
 inicial" pelo saldo ao vivo delas) + saldo em investimentos (ao vivo) +
-Ativos − Passivos. Clique no card para ver o detalhamento das 4 partes.
+Ativos − Passivos. Clique no card para ver o detalhamento das 4 partes; a
+fórmula somada não mudou desde a Sprint 16, mas os destinos de "Ver detalhe"
+foram redesenhados na Sprint 22 para virar itemizados de **valor atual**
+(sem depender do período filtrado), em vez de gasto do período ou lista de
+contas sem filtro:
+
+- **Ativos** → lista de ativos ativos com valor atual (`GET /assets`,
+  filtrado por `status=ativo` no frontend).
+- **Passivos** → lista de passivos ativos com saldo devedor (`GET
+  /liabilities`, mesmo filtro).
+- **Saldo em investimentos** → lista de Investimentos com valor atual
+  agregado (contas + holdings vinculadas, `GET /investimentos`, campo
+  `valor_atual` novo na Sprint 22 — antes só CRUD, sem valor).
+- **Saldo líquido acumulado** → inalterado (mesmo `TrendChart` de antes).
 
 O saldo em investimentos passou, na Sprint 20, a somar as **posições/
 holdings** sincronizadas via Investments da Pluggy (CDBs, ações, títulos do
@@ -114,6 +140,9 @@ próximo de "abrir o app do banco agora".
 
 ## Referências
 
+- [PRD-022](prd/PRD-022-manutencao-investimentos-e-drilldown-patrimonio.md) —
+  origem do redesenho dos drilldowns de Ativos/Patrimônio (valor atual
+  itemizado) e do campo `valor_atual` em `GET /investimentos`.
 - [PRD-018](prd/PRD-018-edicao-data-saldo-acumulado-guia-cards.md) — origem
   deste guia, incluindo a investigação com dado real que confirmou que a
   diferença entre Saldo Acumulado e o extrato bancário é conceitual
