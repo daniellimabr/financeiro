@@ -354,6 +354,35 @@ describe("DashboardsPage", () => {
     expect(screen.getByText("R$ 7.200,00")).toBeInTheDocument();
   });
 
+  it("puts Ativos/Passivos/Patrimonio in their own row, separate from the month flow cards", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    const { container } = renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    const rows = container.querySelectorAll(".dash-summary");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.textContent).toContain("Ativos");
+    expect(rows[0]?.textContent).toContain("Passivos");
+    expect(rows[0]?.textContent).toContain("Patrimônio");
+    expect(rows[0]?.textContent).not.toContain("Receita");
+    expect(rows[1]?.textContent).toContain("Receita");
+  });
+
+  it("no longer shows the short disclaimer tags on Saldo Acumulado or Patrimonio", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    expect(
+      screen.queryByText("projeção por competência — pode diferir do saldo bancário")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("atual, fora do filtro de período — sem histórico ainda")
+    ).not.toBeInTheDocument();
+  });
+
   it("refetches the summary when the month filter changes", async () => {
     const fetchMock = routedFetchMock();
     vi.stubGlobal("fetch", fetchMock);

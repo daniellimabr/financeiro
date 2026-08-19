@@ -281,7 +281,6 @@ export function DashboardsPage() {
             >
               <span className="k">Patrimônio</span>
               <span className="v">{formatCurrency(summaryQuery.data.patrimonio)}</span>
-              <span className="tag">atual, fora do filtro de período — sem histórico ainda</span>
             </button>
           </div>
 
@@ -346,6 +345,9 @@ export function DashboardsPage() {
             <div
               role="button"
               tabIndex={0}
+              aria-label={`Saldo Acumulado ${
+                saldoAcumuladoAtual ? formatCurrency(saldoAcumuladoAtual.total) : "—"
+              }`}
               className="dash-tile clickable"
               onClick={() => abrirFunil("saldoAcumulado")}
               onKeyDown={teclaSaldoAcumulado}

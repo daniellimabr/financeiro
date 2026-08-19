@@ -42,20 +42,23 @@ async function runSteps(page, label) {
   await page.locator(".dash-summary").first().waitFor();
   await page.waitForTimeout(500);
 
+  // .dash-tile .k tem text-transform:uppercase — innerText() reflete o
+  // texto RENDERIZADO (pós-CSS), não o textContent original, então toda
+  // comparação de texto aqui precisa ser case-insensitive.
   const linhas = page.locator(".dash-summary");
-  const linha1Texto = await linhas.nth(0).innerText();
+  const linha1Texto = (await linhas.nth(0).innerText()).toLowerCase();
   if (
-    !/Ativos/.test(linha1Texto) ||
-    !/Passivos/.test(linha1Texto) ||
-    !/Patrimônio/.test(linha1Texto) ||
-    /Receita/.test(linha1Texto)
+    !/ativos/.test(linha1Texto) ||
+    !/passivos/.test(linha1Texto) ||
+    !/patrimônio/.test(linha1Texto) ||
+    /receita/.test(linha1Texto)
   ) {
     failures.push(
       `[${label}] 1a linha do dash-summary não é Ativos/Passivos/Patrimônio isolados: "${linha1Texto}"`
     );
   }
 
-  const pageText = await page.locator(".dash-page").innerText();
+  const pageText = (await page.locator(".dash-page").innerText()).toLowerCase();
   if (pageText.includes("projeção por competência — pode diferir do saldo bancário")) {
     failures.push(`[${label}] disclaimer do card Saldo Acumulado ainda visível`);
   }
@@ -76,13 +79,17 @@ async function runSteps(page, label) {
   }
 
   // ---- Card "Saldo Acumulado": seta pro mês seguinte + drilldown com memória de cálculo ----
-  const setaSeguinte = page.getByRole("button", { name: "Ver mês seguinte" });
+  // Locator por classe, não por role+name: o tile inteiro é `<div role="button"
+  // aria-label="Saldo Acumulado ...">`, e getByRole por nome faz match de
+  // substring por padrão — sem isso, "Ver mês seguinte" também casa (via
+  // substring) com o nome acessível do tile pai, gerando strict-mode violation.
+  const setaSeguinte = page.locator(".dash-tile-arrow");
   const setaVisivel = await setaSeguinte.isVisible().catch(() => false);
   if (!setaVisivel) {
     failures.push(`[${label}] botão "Ver mês seguinte" não encontrado no card Saldo Acumulado`);
   }
 
-  await page.getByText("Saldo Acumulado", { exact: true }).click();
+  await page.getByRole("button", { name: /^Saldo Acumulado/ }).click();
   await page.getByRole("heading", { name: "Saldo Acumulado" }).waitFor({ timeout: 10000 });
   await page.waitForTimeout(500);
   const funilSaldoAcumulado = await page.locator(".dash-funnel").innerText();
@@ -96,7 +103,9 @@ async function runSteps(page, label) {
   await page.locator(".dash-back").click();
 
   // ---- Card "Saldo": memória de cálculo, não lista de contas ----
-  await page.locator(".dash-tile", { hasText: "Saldo" }).first().click();
+  // Texto exato "Saldo" — `hasText` faz substring e casaria também com
+  // "Saldo Anterior"/"Saldo Acumulado" (ambos aparecem antes no DOM).
+  await page.getByText("Saldo", { exact: true }).click();
   await page.waitForTimeout(500);
   const funilSaldo = await page.locator(".dash-funnel").innerText();
   if (!/Receita.*Despesa.*Saldo/s.test(funilSaldo)) {
