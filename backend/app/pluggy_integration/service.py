@@ -473,9 +473,17 @@ def _reconstruct_holding_snapshots(
     # inteiro jan/2026-hoje) — distribuído a seguir pró-rata pelos meses
     # reconstruídos; o que sobrar fica implicitamente para snapshot_current_month
     # calcular no mês corrente (ver docstring de reconstruct_historical_snapshots).
+    # Mesmo cuidado de _net_aportes_desde_cutoff (achado real do Bloco 0 da
+    # Sprint 22): só conta transação **depois** do baseline — uma compra
+    # anterior a 31/12/2025 já está embutida em `saldo_inicial`, contá-la
+    # aqui de novo subtrairia capital que nunca foi "crescimento".
     net_aportes_total = sum(
-        (tx.valor for tx in transactions if tx.tipo == "BUY"), Decimal("0")
-    ) - sum((tx.valor for tx in transactions if tx.tipo == "SELL"), Decimal("0"))
+        (tx.valor for tx in transactions if tx.tipo == "BUY" and tx.data > _BASELINE_DATA),
+        Decimal("0"),
+    ) - sum(
+        (tx.valor for tx in transactions if tx.tipo == "SELL" and tx.data > _BASELINE_DATA),
+        Decimal("0"),
+    )
     residual_total = holding.valor_atual - holding.saldo_inicial - net_aportes_total
 
     buys_no_periodo = [tx.data for tx in transactions if tx.tipo == "BUY"]

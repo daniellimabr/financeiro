@@ -1542,6 +1542,43 @@ def test_reconstruct_historical_snapshots_zero_weight_before_purchase(db_session
         assert snap.rendimento == Decimal("0")
 
 
+def test_reconstruct_historical_snapshots_ignores_buy_transaction_before_baseline(db_session, user):
+    """Achado real do Bloco 0 da Sprint 22 (mesma classe de bug de
+    _net_aportes_desde_cutoff, desta vez no cálculo do resíduo total da
+    própria reconstrução): a compra original de uma holding pré-existente ao
+    baseline (dated antes de 31/12/2025) não pode ser contada como "aporte"
+    no cálculo do crescimento observado — ela já está embutida em
+    saldo_inicial. Sem o fix, um resíduo fantasma de -5000 aparecia
+    concentrado no mês corrente mesmo com baseline == valor atual (nenhum
+    crescimento real a distribuir)."""
+    client = FakePluggyClient(
+        item=_item_raw(),
+        accounts=[],
+        investments=[_investment_raw(balance=5496.86)],
+        investment_transactions_by_investment={
+            "inv-ext-1": [
+                _investment_transaction_raw(
+                    id="tx1", type="BUY", amount=5000.00, date="2025-10-06T00:00:00.000Z"
+                ),
+            ],
+        },
+    )
+    item = service.register_item(db_session, client, user.id, "item-ext-1")
+    service.sync_item(db_session, client, user.id, item.id)
+    investment = service.list_investments(db_session, user.id)[0]
+    service.confirm_baseline_dez_2025(db_session, user.id, [(investment.id, Decimal("5496.86"))])
+    db_session.refresh(investment)
+
+    snapshots = service.reconstruct_historical_snapshots(db_session, user.id)
+    for snap in snapshots:
+        assert snap.rendimento == Decimal("0")
+        assert snap.saldo == Decimal("5496.86")
+
+    db_session.refresh(investment)
+    atual = service.snapshot_current_month(db_session, investment)
+    assert atual.rendimento == Decimal("0")
+
+
 def test_snapshot_current_month_is_idempotent(db_session, user):
     from app.models.pluggy import PluggyInvestmentSnapshot
 
