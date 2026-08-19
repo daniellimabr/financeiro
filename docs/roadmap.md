@@ -991,8 +991,9 @@ console, desktop+mobile, claro+escuro.
 PRD: [PRD-026-interatividade-graficos-dashboard.md](prd/PRD-026-interatividade-graficos-dashboard.md).
 Plano: [SPRINT-026-interatividade-graficos-dashboard-plan.md](sprints/SPRINT-026-interatividade-graficos-dashboard-plan.md).
 Relatório: [SPRINT-026-interatividade-graficos-dashboard-report.md](sprints/SPRINT-026-interatividade-graficos-dashboard-report.md).
+**Sprint aprovada pelo CEO em 2026-08-19.**
 
-### Sprint 27 — Simulação "ocultar gasto" e gráfico comparativo de categorias (cross-epic, sem épico prévio)
+### ~~Sprint 27 — Simulação "ocultar gasto" e gráfico comparativo de categorias~~ (substituída, não executada)
 
 Planejada na mesma sessão (2026-08-19), 3ª das 3 sprints temáticas — a mais nova em decisões de
 produto, resolvidas com o CEO por perguntas diretas: "ocultar gasto" (toggle de binóculo por linha
@@ -1003,6 +1004,11 @@ vários endpoints; estado 100% local/efêmero, mesmo padrão de `applyHipotetica
 (Sprint 14) — sem persistência. Gráfico comparativo de composição de gasto por categoria ao longo
 dos últimos meses aparece dentro do próprio funil Despesa/Receita ao ser aberto, não em seção fixa
 separada.
+
+**Substituída pelo CEO em 2026-08-19 (mesmo dia da aprovação da Sprint 26), antes da execução** —
+o escopo acima nunca chegou a ser implementado. A vaga "Sprint 27" será ocupada por uma nova sprint,
+cujo `/plan` o próprio CEO vai rodar em seguida. PRD-027/SPRINT-027-plan permanecem no repo como
+registro histórico da decisão de produto original, mas não devem ser executados.
 
 PRD: [PRD-027-ocultar-gasto-comparativo-categorias.md](prd/PRD-027-ocultar-gasto-comparativo-categorias.md).
 Plano: [SPRINT-027-ocultar-gasto-comparativo-categorias-plan.md](sprints/SPRINT-027-ocultar-gasto-comparativo-categorias-plan.md).

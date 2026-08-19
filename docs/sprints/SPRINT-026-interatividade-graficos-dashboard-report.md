@@ -2,6 +2,7 @@
 
 - **Plano:** [SPRINT-026-interatividade-graficos-dashboard-plan.md](./SPRINT-026-interatividade-graficos-dashboard-plan.md)
 - **Data do relatório:** 2026-08-19
+- **Status:** aprovado pelo CEO em 2026-08-19
 
 ## Resumo
 
