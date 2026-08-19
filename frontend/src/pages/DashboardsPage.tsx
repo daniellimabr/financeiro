@@ -1067,7 +1067,7 @@ function InvestimentoHoldingsList({ investimentoId }: { investimentoId: number }
 
   return (
     <div className="dash-table-wrap">
-      <table className="dash-table">
+      <table className="dash-table holdings-table">
         <colgroup>
           <col className="col-nome" />
           <col className="col-valor" />
@@ -1208,33 +1208,36 @@ function PatrimonioBreakdownPanel({
 
   const { ativos, passivos, saldo_liquido_acumulado, saldo_investimentos, total } = query.data;
 
+  // Só Passivos guarda uma magnitude sempre não-negativa que precisa do
+  // sinal "−" explícito pra virar subtração na memória de cálculo — os
+  // outros três já vêm com o sinal certo do backend (ex.: saldo líquido
+  // acumulado negativo já é exibido negativo por formatCurrency; prefixar
+  // "+ " na frente de um valor já negativo duplicaria o sinal, "+ -R$ ...").
   const partes: {
     key: PatrimonioParte;
     label: string;
     valor: string;
-    sinal: "+" | "−";
+    subtrai?: boolean;
     painel: ReactNode;
   }[] = [
-    { key: "ativos", label: "Ativos", valor: ativos, sinal: "+", painel: <AssetsValorAtualList /> },
+    { key: "ativos", label: "Ativos", valor: ativos, painel: <AssetsValorAtualList /> },
     {
       key: "passivos",
       label: "Passivos",
       valor: passivos,
-      sinal: "−",
+      subtrai: true,
       painel: <LiabilitiesValorAtualList />,
     },
     {
       key: "saldoInvestimentos",
       label: "Saldo em investimentos",
       valor: saldo_investimentos,
-      sinal: "+",
       painel: <InvestimentosValorAtualList />,
     },
     {
       key: "saldoLiquido",
       label: "Saldo líquido acumulado",
       valor: saldo_liquido_acumulado,
-      sinal: "+",
       painel:
         saldoAcumuladoSparkline && saldoAcumuladoSparkline.length > 0 ? (
           <TrendChart pontos={saldoAcumuladoSparkline} color="var(--accent)" />
@@ -1261,7 +1264,7 @@ function PatrimonioBreakdownPanel({
                 </span>
                 <span className="nm">{parte.label}</span>
                 <span className="amt">
-                  {parte.sinal === "−" ? "− " : "+ "}
+                  {parte.subtrai && "− "}
                   {formatCurrency(parte.valor)}
                 </span>
               </button>

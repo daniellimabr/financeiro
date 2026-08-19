@@ -1389,6 +1389,25 @@ input {
   text-overflow: ellipsis;
 }
 
+/* Holdings de um Investimento (accordion Investimento→Holding, Sprint 24) —
+   sem colgroup, col-nome/col-valor genéricos ficavam sem largura (nenhuma
+   regra os define fora do escopo de cada tabela), e table-layout:fixed sem
+   largura explícita divide pelo conteúdo da 1ª linha — nome de holding
+   longo (ex. razão social de CDB) vazava sobre a coluna de valor, mesmo
+   bug já corrigido em InvestimentoPosicoes/PosicaoHistorico na Sprint 23. */
+.holdings-table .col-nome {
+  width: 70%;
+}
+
+.holdings-table .col-valor {
+  width: 130px;
+}
+
+.holdings-table td:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 @media (max-width: 640px) {
   /* Linha ganhou tendência + percentual na Sprint 6 — em telas estreitas,
      6 elementos (chevron/nome/tendência/barra/valor/%) espremiam o valor e
