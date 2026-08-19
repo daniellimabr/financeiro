@@ -667,8 +667,11 @@ def test_patrimonio_breakdown_returns_parts_matching_summary(client, db_session)
 
     assert response.status_code == 200
     body = response.json()
-    assert Decimal(body["ativos"]) == Decimal("50000.00")
-    assert Decimal(body["saldo_liquido_acumulado"]) == Decimal("1000.00")
+    # Ativos completo = Gestão de Ativos (50000) + saldo de conta corrente
+    # (1000) — sem saldo_inicial, entra pelo saldo ao vivo dentro de Ativos,
+    # não mais via fallback de Patrimônio (removido nesta sprint, PRD-028).
+    assert Decimal(body["ativos_totais"]) == Decimal("51000.00")
+    assert Decimal(body["saldo_acumulado_mes"]) == Decimal("0")
     assert Decimal(body["total"]) == Decimal(summary["patrimonio"])
     del asset
 

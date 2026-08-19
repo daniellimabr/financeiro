@@ -12,6 +12,7 @@ const SUMMARY_FIXTURE = {
   saldo: "3279.70",
   patrimonio: "142800.00",
   ativos: "150000.00",
+  ativos_totais: "151200.00",
   passivos: "7200.00",
 };
 
@@ -350,7 +351,7 @@ describe("DashboardsPage", () => {
     expect(screen.getByText("R$ 5.120,30")).toBeInTheDocument();
     expect(screen.getByText("R$ 3.279,70")).toBeInTheDocument();
     expect(screen.getByText("R$ 142.800,00")).toBeInTheDocument();
-    expect(screen.getByText("R$ 150.000,00")).toBeInTheDocument();
+    expect(screen.getByText("R$ 151.200,00")).toBeInTheDocument();
     expect(screen.getByText("R$ 7.200,00")).toBeInTheDocument();
   });
 
@@ -612,7 +613,7 @@ describe("DashboardsPage", () => {
     });
   });
 
-  it("opens the ativos drilldown with despesa/receita toggle when the Ativos card is clicked", async () => {
+  it("opens the ativos drilldown showing the asset without a despesa/receita toggle (Sprint 28)", async () => {
     vi.stubGlobal("fetch", routedFetchMock());
 
     renderWithQueryClient(<DashboardsPage />);
@@ -620,14 +621,14 @@ describe("DashboardsPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /^Ativos/ }));
 
-    // "Carro" aparece 2x: na lista "Valor atual por Ativo" (accordion,
-    // Sprint 26) e na lista "Despesas por Ativo" (accordion existente desde
-    // a Sprint 8) — ambas usam o mesmo Row/button.
-    expect(await screen.findAllByRole("button", { name: /Carro/ })).toHaveLength(2);
-    expect(screen.getByRole("group", { name: "Tipo de transação" })).toBeInTheDocument();
+    // "Despesas por Ativo" (accordion de gasto do período) saiu do
+    // drilldown de Ativos nesta sprint — "Carro" aparece 1x só, na lista
+    // "Valor atual por Ativo".
+    expect(await screen.findAllByRole("button", { name: /Carro/ })).toHaveLength(1);
+    expect(screen.queryByRole("group", { name: "Tipo de transação" })).not.toBeInTheDocument();
   });
 
-  it("shows Valor atual por Ativo, Valor atual por Investimento and Despesas por Ativo, in that order, without Saldo por conta", async () => {
+  it("shows Valor atual por Ativo, Valor atual por Investimento and Saldo por Conta Corrente, in that order", async () => {
     vi.stubGlobal("fetch", routedFetchMock());
 
     renderWithQueryClient(<DashboardsPage />);
@@ -643,15 +644,19 @@ describe("DashboardsPage", () => {
     expect(headings).toEqual([
       "Valor atual por Ativo",
       "Valor atual por Investimento",
-      "Despesas por Ativo",
+      "Saldo por Conta Corrente",
     ]);
 
     // "Valor atual por Ativo" (AssetsValorAtualList, accordion desde a
     // Sprint 26) mostra o ativo do fixture
     expect(within(funnel).getByText("R$ 50.000,00")).toBeInTheDocument();
     expect(within(funnel).getByText("Reserva de emergência")).toBeInTheDocument();
-    expect(within(funnel).queryByText("Saldo por conta")).not.toBeInTheDocument();
-    expect(within(funnel).queryByText("Conta corrente")).not.toBeInTheDocument();
+    // "Saldo por Conta Corrente" (SaldoContaCorrenteList, Sprint 28) mostra
+    // só a conta tipo=corrente do fixture (SALDO_FIXTURE também tem um
+    // cartão de crédito, que não deve aparecer aqui).
+    expect(within(funnel).getByText("Conta corrente")).toBeInTheDocument();
+    expect(within(funnel).getByText("R$ 1.200,00")).toBeInTheDocument();
+    expect(within(funnel).queryByText("Cartão")).not.toBeInTheDocument();
   });
 
   it("opens the passivos drilldown without a despesa/receita toggle when the Passivos card is clicked", async () => {
@@ -689,11 +694,10 @@ describe("DashboardsPage", () => {
       if (url.startsWith("/dashboards/patrimonio/breakdown")) {
         return Promise.resolve(
           jsonResponse({
-            ativos: "150000.00",
+            ativos_totais: "151200.00",
             passivos: "7200.00",
-            saldo_liquido_acumulado: "1200.00",
-            saldo_investimentos: "300.00",
-            total: "143700.00",
+            saldo_acumulado_mes: "1200.00",
+            total: "145200.00",
           })
         );
       }
@@ -701,7 +705,7 @@ describe("DashboardsPage", () => {
     });
   }
 
-  it("opens the patrimonio breakdown as a 4-part accordion with a total, collapsed by default", async () => {
+  it("opens the patrimonio breakdown as a 3-part accordion with a total, collapsed by default", async () => {
     const fetchMock = routedFetchMock();
     vi.stubGlobal("fetch", fetchMock);
     stubPatrimonioBreakdown(fetchMock);
@@ -711,14 +715,14 @@ describe("DashboardsPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /^Patrimônio/ }));
 
-    expect(await screen.findByText("R$ 143.700,00")).toBeInTheDocument();
+    expect(await screen.findByText("R$ 145.200,00")).toBeInTheDocument();
     const ativosRow = accordionRowButton(/^Ativos/);
     expect(ativosRow).toHaveAttribute("aria-expanded", "false");
     // Sem navegação — nenhum botão "Ver detalhe" nem heading separado.
     expect(screen.queryByRole("button", { name: "Ver detalhe" })).not.toBeInTheDocument();
   });
 
-  it("expands the Ativos part of the patrimonio accordion in place, without navigating away", async () => {
+  it("expands the Ativos part of the patrimonio accordion showing its 3 sub-seções in place", async () => {
     const fetchMock = routedFetchMock();
     vi.stubGlobal("fetch", fetchMock);
     stubPatrimonioBreakdown(fetchMock);
@@ -727,17 +731,22 @@ describe("DashboardsPage", () => {
     await screen.findByText("R$ 8.400,00");
 
     await userEvent.click(screen.getByRole("button", { name: /^Patrimônio/ }));
-    await screen.findByText("R$ 143.700,00");
+    await screen.findByText("R$ 145.200,00");
 
     await userEvent.click(accordionRowButton(/^Ativos/));
 
-    // Ativos: lista itemizada de valor atual (AssetsValorAtualList,
-    // accordion desde a Sprint 26) — "Carro" é o próprio Row expansível,
-    // que ao expandir mostra tipo + data de aquisição (antes só visíveis
-    // como colunas da tabela plana que essa lista substituiu).
+    // Ativos, dentro do accordion de Patrimônio, expande em 3 sub-seções:
+    // Gestão de Ativos (AssetsValorAtualList), Investimentos
+    // (InvestimentosValorAtualList) e Saldo por Conta Corrente
+    // (SaldoContaCorrenteList) — mesmos componentes do drilldown do card
+    // Ativos, sem duplicar busca de dado.
     const carroRow = await screen.findByRole("button", { name: /Carro/ });
     expect(accordionRowButton(/^Ativos/)).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Reserva de emergência")).toBeInTheDocument();
+    expect(screen.getByText("Conta corrente")).toBeInTheDocument();
 
+    // "Carro" é o próprio Row expansível, que ao expandir mostra tipo + data
+    // de aquisição.
     await userEvent.click(carroRow);
     expect(await screen.findByText(/Veículo · Adquirido em 2024-01-01/)).toBeInTheDocument();
   });
@@ -751,7 +760,7 @@ describe("DashboardsPage", () => {
     await screen.findByText("R$ 8.400,00");
 
     await userEvent.click(screen.getByRole("button", { name: /^Patrimônio/ }));
-    await screen.findByText("R$ 143.700,00");
+    await screen.findByText("R$ 145.200,00");
 
     await userEvent.click(accordionRowButton(/^Passivos/));
 
@@ -759,23 +768,7 @@ describe("DashboardsPage", () => {
     expect(screen.getAllByText("R$ 7.200,00").length).toBeGreaterThan(0);
   });
 
-  it("expands the Saldo em investimentos part of the patrimonio accordion showing the Investimento accordion", async () => {
-    const fetchMock = routedFetchMock();
-    vi.stubGlobal("fetch", fetchMock);
-    stubPatrimonioBreakdown(fetchMock);
-
-    renderWithQueryClient(<DashboardsPage />);
-    await screen.findByText("R$ 8.400,00");
-
-    await userEvent.click(screen.getByRole("button", { name: /^Patrimônio/ }));
-    await screen.findByText("R$ 143.700,00");
-
-    await userEvent.click(accordionRowButton(/^Saldo em investimentos/));
-
-    expect(await screen.findByText("Reserva de emergência")).toBeInTheDocument();
-  });
-
-  it("expands the Saldo líquido acumulado part of the patrimonio accordion showing the trend chart", async () => {
+  it("expands the Saldo Acumulado do Mês part of the patrimonio accordion showing the trend chart", async () => {
     const fetchMock = routedFetchMock();
     vi.stubGlobal("fetch", fetchMock);
     stubPatrimonioBreakdown(fetchMock);
@@ -784,9 +777,9 @@ describe("DashboardsPage", () => {
     await screen.findByText("R$ 8.400,00");
 
     await userEvent.click(screen.getByRole("button", { name: /^Patrimônio/ }));
-    await screen.findByText("R$ 143.700,00");
+    await screen.findByText("R$ 145.200,00");
 
-    await userEvent.click(accordionRowButton(/^Saldo líquido acumulado/));
+    await userEvent.click(accordionRowButton(/^Saldo Acumulado do Mês/));
 
     await waitFor(() => {
       expect(container.querySelector(".dash-chart")).not.toBeNull();

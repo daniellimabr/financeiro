@@ -79,11 +79,13 @@ Exclui:
 
 ## Ativos / Passivos
 
-Valor atual somado de todos os ativos com status "ativo" (Gestão de Ativos)
-e de todos os passivos com status "ativo" (Gestão de Passivos) — sempre
-snapshot de hoje, não depende do período filtrado nem do toggle
-Competência/Caixa. **A fórmula não mudou desde a Sprint 22** — só os
-drilldowns ficaram mais completos:
+**Ativos** (desde a Sprint 28) é a soma de tudo que o CEO considera "com o
+que pode contar": Gestão de Ativos (status "ativo") + Investimentos (valor
+atual, mesmo cálculo dedup-safe usado em Patrimônio) + saldo ao vivo de
+todas as contas **tipo "corrente"** — poupança e cartão de crédito ficam de
+fora dessa soma. **Passivos** continua sendo só a soma dos passivos com
+status "ativo" (Gestão de Passivos). Ambos são sempre snapshot de hoje, não
+dependem do período filtrado nem do toggle Competência/Caixa.
 
 - **Ativos**: o drill-down mostra três seções, nesta ordem:
   - "Valor atual por Ativo": accordion/drilldown list com barra+% (mesmo estilo
@@ -96,10 +98,13 @@ drilldowns ficaram mais completos:
     atual e percentagem de cada holding dentro daquele investimento. Desde a
     Sprint 25, cada investimento tem uma cor distinta (antes era var(--accent)
     fixo) — mesma paleta de `buildColorIndexFromIds` já usada por ativos.
-  - "Despesas por Ativo": accordion de gasto por ativo no período filtrado
-    (período filtrado, cada item colorido por ativo desde a Sprint 24 —
-    antes era uma cor fixa por tipo de transação). Inclui toggle Despesa/
-    Receita.
+  - "Saldo por Conta Corrente" (Sprint 28, substitui "Despesas por Ativo" —
+    gasto do período, que não pertencia a um card de composição de
+    patrimônio): lista visual barra+%, mesmo estilo de "Passivos — saldo
+    devedor", com o saldo ao vivo de cada conta tipo "corrente" e a
+    percentagem que representa do total dessa lista. Usa o endpoint `GET
+    /dashboards/saldo-por-conta`, filtrado no frontend a `account_tipo ===
+    "corrente"`.
 
 - **Passivos**: o drill-down mostra duas seções:
   - Accordion de gasto por passivo (período filtrado, mesmo padrão do Ativos).
@@ -111,27 +116,37 @@ drilldowns ficaram mais completos:
 
 ## Patrimônio
 
-Soma de 4 partes, sempre snapshot de hoje: Saldo líquido acumulado (o mesmo
-conceito do card "Saldo Acumulado", incluindo contas líquidas sem "Saldo
-inicial" pelo saldo ao vivo delas) + saldo em investimentos (ao vivo) +
-Ativos − Passivos. Clique no card para ver o detalhamento das 4 partes — a
-fórmula somada não mudou desde a Sprint 16. A Sprint 22 trocou o conteúdo de
-cada parte de gasto do período/lista sem filtro para itemizados de **valor
-atual** (sem depender do período filtrado); a Sprint 24 trocou a forma como
-se chega nesse conteúdo — de uma tabela com botões "Ver detalhe" que
-navegavam pra outra visão do funil, para um **accordion de 4 partes
+Desde a Sprint 28, soma de **3 partes**, sempre snapshot de hoje: **Ativos −
+Passivos + Saldo Acumulado do Mês**, onde "Ativos" já é o total completo do
+card acima (Gestão de Ativos + Investimentos + saldo de contas correntes) e
+"Saldo Acumulado do Mês" é exatamente o valor do card "Saldo Acumulado" (ver
+seção acima) para o mês atual — mesma função de cálculo, sem nenhum termo
+extra. Clique no card para ver o detalhamento das 3 partes, num **accordion
 expansível in-place** (cada parte expande dentro do próprio painel de
-Patrimônio, sem sair dele):
+Patrimônio, sem sair dele; padrão desde a Sprint 24):
 
-- **Ativos** → lista de ativos ativos com valor atual (`GET /assets`,
-  filtrado por `status=ativo` no frontend).
+- **Ativos** → expande em 3 sub-seções, reaproveitando os mesmos componentes
+  do drill-down do card Ativos: Gestão de Ativos (`GET /assets`, filtrado por
+  `status=ativo`), Investimentos (`GET /investimentos`, valor atual
+  dedup-safe) e Saldo por Conta Corrente (`GET /dashboards/saldo-por-conta`,
+  filtrado a `tipo=corrente`).
 - **Passivos** → lista de passivos ativos com saldo devedor (`GET
-  /liabilities`, mesmo filtro).
-- **Saldo em investimentos** → lista de Investimentos com valor atual
-  agregado (contas + holdings vinculadas, `GET /investimentos`, campo
-  `valor_atual` novo na Sprint 22 — antes só CRUD, sem valor).
-- **Saldo líquido acumulado** → inalterado (mesmo gráfico de tendência de antes,
-  `TrendLineChart` variant="card" desde a Sprint 26).
+  /liabilities`, filtrado por `status=ativo`).
+- **Saldo Acumulado do Mês** (renomeado de "Saldo líquido acumulado") →
+  mesmo gráfico de tendência de antes (`TrendLineChart` variant="card" desde
+  a Sprint 26), agora sem o termo extra que causava divergência com o card
+  "Saldo Acumulado" (ver abaixo).
+
+**Bug corrigido nesta sprint:** antes da Sprint 28, a parcela "Saldo líquido
+acumulado" somava, por cima do mesmo cálculo do card "Saldo Acumulado", um
+termo extra (saldo ao vivo de toda conta líquida sem "Saldo inicial"
+configurado) que o card "Saldo Acumulado" nunca mostrava — daí o card e o
+Patrimônio divergirem no mesmo dia. Esse termo foi removido; contas sem
+"Saldo inicial" continuam entrando em Patrimônio, mas agora só via "Ativos"
+(se forem conta corrente) ou não entram (poupança/cartão de crédito sem
+"Saldo inicial" simplesmente não compõem Patrimônio, mesmo tratamento que já
+valia pro card "Saldo Acumulado"). Investimentos deixou de ser uma parcela
+solta de Patrimônio — passou a viver dentro de "Ativos".
 
 O saldo em investimentos passou, na Sprint 20, a somar as **posições/
 holdings** sincronizadas via Investments da Pluggy (CDBs, ações, títulos do
@@ -164,6 +179,12 @@ atual" que venha a ser adicionado no futuro.
 
 ## Referências
 
+- [PRD-028](prd/PRD-028-ativos-saldo-conta-corrente-patrimonio-redesenhado.md) —
+  origem do total completo de "Ativos" (Gestão de Ativos + Investimentos +
+  saldo de contas correntes), da seção "Saldo por Conta Corrente" no
+  drill-down de Ativos, e do redesenho de Patrimônio para 3 partes (Ativos −
+  Passivos + Saldo Acumulado do Mês), que corrigiu a divergência entre
+  "Saldo líquido acumulado" e o card "Saldo Acumulado".
 - [PRD-026](prd/PRD-026-interatividade-graficos-dashboard.md) — origem das variantes
   de gráfico interativo, do clique nos pontos de série histórica navegando por
   mês/ano, da consolidação de CardSparkline/TrendChart em TrendLineChart, e da

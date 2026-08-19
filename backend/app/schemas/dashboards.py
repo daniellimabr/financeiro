@@ -14,6 +14,7 @@ class SummaryOut(BaseModel):
     saldo: Decimal
     patrimonio: Decimal
     ativos: Decimal
+    ativos_totais: Decimal
     passivos: Decimal
 
 
@@ -128,10 +129,9 @@ class TendenciaPassivoOut(BaseModel):
 class PatrimonioBreakdownOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    ativos: Decimal
+    ativos_totais: Decimal
     passivos: Decimal
-    saldo_liquido_acumulado: Decimal
-    saldo_investimentos: Decimal
+    saldo_acumulado_mes: Decimal
     total: Decimal
 
 

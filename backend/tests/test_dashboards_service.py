@@ -160,13 +160,17 @@ def test_get_summary_mixed_debito_credito_computes_saldo(db_session, user):
     assert summary.saldo == Decimal("800.00")
 
 
-def test_get_summary_patrimonio_subtracts_cartao_credito_balance(db_session, user):
+def test_get_summary_patrimonio_reflects_saldo_conta_corrente_via_ativos(db_session, user):
+    # Cartão de crédito nunca entra em "Ativos" (só tipo=corrente, PRD-028
+    # critério 3) e não tem saldo_inicial aqui — sob a fórmula nova
+    # (Ativos − Passivos + Saldo Acumulado do Mês), só a conta corrente conta.
     _account(db_session, user, tipo=PluggyAccountTipo.corrente, saldo=Decimal("1000.00"))
     _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito, saldo=Decimal("300.00"))
 
     summary = service.get_summary(db_session, user.id)
 
-    assert summary.patrimonio == Decimal("700.00")
+    assert summary.ativos_totais == Decimal("1000.00")
+    assert summary.patrimonio == Decimal("1000.00")
 
 
 def test_get_summary_excludes_cartao_credito_credito_from_receita(db_session, user):
@@ -248,13 +252,13 @@ def test_get_patrimonio_breakdown_parts_sum_to_summary_patrimonio(db_session, us
     breakdown = service.get_patrimonio_breakdown(db_session, user.id)
     summary = service.get_summary(db_session, user.id)
 
-    assert breakdown.ativos == Decimal("50000.00")
+    # Ativos completo = Gestão de Ativos (50000) + Investimentos (0) + saldo
+    # de conta corrente (1000) — cartão de crédito não entra (PRD-028
+    # critério 3: só tipo=corrente), com ou sem saldo_inicial.
+    assert breakdown.ativos_totais == Decimal("51000.00")
     assert breakdown.passivos == Decimal("4000.00")
-    # Nenhuma das contas tem saldo_inicial preenchido — ambas entram pelo
-    # fallback de saldo ao vivo (corrente soma, cartão de crédito subtrai,
-    # mesma convenção de sinal de _base_query).
-    assert breakdown.saldo_liquido_acumulado == Decimal("700.00")
-    assert breakdown.saldo_investimentos == Decimal("0")
+    assert breakdown.saldo_acumulado_mes == Decimal("0")
+    assert breakdown.total == Decimal("47000.00")
     assert breakdown.total == summary.patrimonio
 
 
@@ -2489,10 +2493,12 @@ def test_get_saldo_acumulado_regime_caixa_pagamento_de_fatura_avoids_double_coun
     assert pontos[(2026, 3)] == Decimal("-100.00")
 
 
-# --- Patrimônio: saldo_liquido_acumulado / saldo_investimentos / fallback ---
+# --- Patrimônio: ativos_totais / saldo_contas_correntes / saldo_acumulado_mes (PRD-028) ---
 
 
-def test_patrimonio_breakdown_saldo_investimentos_separate_from_acumulado(db_session, user):
+def test_patrimonio_breakdown_saldo_investimentos_independent_of_saldo_acumulado_mes(
+    db_session, user
+):
     corrente = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
     corrente.saldo_inicial = Decimal("1000.00")
     investimento = _account(
@@ -2503,14 +2509,19 @@ def test_patrimonio_breakdown_saldo_investimentos_separate_from_acumulado(db_ses
 
     breakdown = service.get_patrimonio_breakdown(db_session, user.id)
 
-    assert breakdown.saldo_liquido_acumulado == Decimal("1000.00")
-    assert breakdown.saldo_investimentos == Decimal("5000.00")
+    # saldo_inicial de conta tipo=investimento não entra na âncora de
+    # get_saldo_acumulado (tipo excluído, PRD-016) — só o saldo_inicial da
+    # corrente (1000) forma saldo_acumulado_mes; o saldo do investimento
+    # entra por outro caminho, dentro de ativos_totais.
+    assert breakdown.saldo_acumulado_mes == Decimal("1000.00")
+    assert breakdown.ativos_totais == Decimal("5000.00")
     assert breakdown.total == Decimal("6000.00")
 
 
-def test_patrimonio_breakdown_fallback_account_without_saldo_inicial_uses_live_balance(
-    db_session, user
-):
+def test_ativos_totais_includes_conta_corrente_live_balance(db_session, user):
+    # Substitui o antigo fallback de saldo_liquido_acumulado (removido nesta
+    # sprint, PRD-028): conta corrente sem saldo_inicial não soma mais na
+    # acumulação de Patrimônio — entra pelo saldo ao vivo dentro de "Ativos".
     _account(db_session, user, tipo=PluggyAccountTipo.corrente, saldo=Decimal("200.00"))
     ancorada = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
     ancorada.saldo_inicial = Decimal("1000.00")
@@ -2518,31 +2529,66 @@ def test_patrimonio_breakdown_fallback_account_without_saldo_inicial_uses_live_b
 
     breakdown = service.get_patrimonio_breakdown(db_session, user.id)
 
-    # Conta ancorada entra via get_saldo_acumulado (1000, sem transações);
-    # conta sem saldo_inicial entra pelo saldo ao vivo (200) — soma 1200,
-    # sem quebrar o cálculo da conta ancorada.
-    assert breakdown.saldo_liquido_acumulado == Decimal("1200.00")
+    # ativos_totais soma o saldo ao vivo de TODA conta corrente (200 + 0, já
+    # que `ancorada` tem saldo=0 default) — saldo_acumulado_mes soma só o
+    # saldo_inicial (1000), sem duplicar.
+    assert breakdown.ativos_totais == Decimal("200.00")
+    assert breakdown.saldo_acumulado_mes == Decimal("1000.00")
+    assert breakdown.total == Decimal("1200.00")
 
 
-def test_patrimonio_breakdown_fallback_credit_card_without_saldo_inicial_subtracts(
-    db_session, user
-):
+def test_ativos_totais_excludes_cartao_credito_saldo(db_session, user):
+    # Cartão de crédito nunca é "conta corrente" (PRD-028 critério 3) — sem
+    # saldo_inicial, seu saldo ao vivo simplesmente não entra em Patrimônio
+    # (diferente do fallback removido nesta sprint, que o subtraía como
+    # dívida).
     _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito, saldo=Decimal("300.00"))
 
     breakdown = service.get_patrimonio_breakdown(db_session, user.id)
 
-    assert breakdown.saldo_liquido_acumulado == Decimal("-300.00")
+    assert breakdown.ativos_totais == Decimal("0")
+    assert breakdown.saldo_acumulado_mes == Decimal("0")
+    assert breakdown.total == Decimal("0")
 
 
-def test_patrimonio_breakdown_investimento_without_saldo_inicial_never_enters_fallback(
+def test_ativos_totais_includes_investimento_conta_saldo_never_saldo_acumulado_mes(
     db_session, user
 ):
     _account(db_session, user, tipo=PluggyAccountTipo.investimento, saldo=Decimal("777.00"))
 
     breakdown = service.get_patrimonio_breakdown(db_session, user.id)
 
-    assert breakdown.saldo_liquido_acumulado == Decimal("0")
-    assert breakdown.saldo_investimentos == Decimal("777.00")
+    assert breakdown.saldo_acumulado_mes == Decimal("0")
+    assert breakdown.ativos_totais == Decimal("777.00")
+
+
+def test_saldo_contas_correntes_sums_only_tipo_corrente(db_session, user):
+    _account(db_session, user, tipo=PluggyAccountTipo.corrente, saldo=Decimal("500.00"))
+    _account(db_session, user, tipo=PluggyAccountTipo.poupanca, saldo=Decimal("1000.00"))
+    _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito, saldo=Decimal("300.00"))
+    _account(db_session, user, tipo=PluggyAccountTipo.investimento, saldo=Decimal("777.00"))
+    db_session.commit()
+
+    assert service._saldo_contas_correntes(db_session, user.id) == Decimal("500.00")
+
+
+def test_saldo_acumulado_mes_in_patrimonio_matches_saldo_acumulado_card_same_day(db_session, user):
+    # Regressão do bug relatado pelo CEO (PRD-028): antes desta sprint,
+    # saldo_liquido_acumulado somava um termo extra (_saldo_liquido_fallback,
+    # removido) que o card "Saldo Acumulado" (GET /dashboards/saldo-acumulado)
+    # nunca mostrava — agora os dois usam a mesma fonte, sem divergir.
+    conta = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    conta.saldo_inicial = Decimal("1000.00")
+    _account(db_session, user, tipo=PluggyAccountTipo.corrente, saldo=Decimal("999.00"))
+    db_session.commit()
+
+    hoje = date.today()
+    pontos_card = service.get_saldo_acumulado(
+        db_session, user.id, ano=hoje.year, mes=hoje.month, meses=1
+    )
+    breakdown = service.get_patrimonio_breakdown(db_session, user.id)
+
+    assert breakdown.saldo_acumulado_mes == pontos_card[0].total
 
 
 def _item(db_session, user):
@@ -2593,17 +2639,15 @@ def _investment(db_session, user, item, *, valor_atual=Decimal("0")):
     return investment
 
 
-def test_patrimonio_breakdown_sums_holdings_into_saldo_investimentos(db_session, user):
+def test_saldo_investimentos_sums_holdings(db_session, user):
     item = _item(db_session, user)
     _investment(db_session, user, item, valor_atual=Decimal("22762.07"))
     db_session.commit()
 
-    breakdown = service.get_patrimonio_breakdown(db_session, user.id)
-
-    assert breakdown.saldo_investimentos == Decimal("22762.07")
+    assert service._saldo_investimentos(db_session, user.id) == Decimal("22762.07")
 
 
-def test_patrimonio_breakdown_prefers_holdings_over_account_for_same_item(db_session, user):
+def test_saldo_investimentos_prefers_holdings_over_account_for_same_item(db_session, user):
     # Achado do Bloco 1 (Sprint 20): nenhum item conhecido retorna as duas
     # fontes pro mesmo saldo hoje, mas a query já protege contra dobra de
     # contagem caso isso mude no futuro.
@@ -2614,12 +2658,10 @@ def test_patrimonio_breakdown_prefers_holdings_over_account_for_same_item(db_ses
     _investment(db_session, user, item, valor_atual=Decimal("22762.07"))
     db_session.commit()
 
-    breakdown = service.get_patrimonio_breakdown(db_session, user.id)
-
-    assert breakdown.saldo_investimentos == Decimal("22762.07")
+    assert service._saldo_investimentos(db_session, user.id) == Decimal("22762.07")
 
 
-def test_patrimonio_breakdown_item_without_holdings_keeps_using_account_saldo_regression(
+def test_saldo_investimentos_item_without_holdings_keeps_using_account_saldo_regression(
     db_session, user
 ):
     # Regressão explícita (critério de aceite 5 do PRD-020): item com
@@ -2637,9 +2679,48 @@ def test_patrimonio_breakdown_item_without_holdings_keeps_using_account_saldo_re
     )
     db_session.commit()
 
-    breakdown = service.get_patrimonio_breakdown(db_session, user.id)
+    assert service._saldo_investimentos(db_session, user.id) == Decimal("1500.00")
 
-    assert breakdown.saldo_investimentos == Decimal("1500.00")
+
+def test_ativos_totais_sums_gestao_investimentos_and_contas_correntes(db_session, user):
+    db_session.add(
+        Asset(
+            user_id=user.id,
+            nome="Carro",
+            tipo=AssetTipo.veiculo,
+            valor_atual=Decimal("50000.00"),
+            data_aquisicao=date(2020, 1, 1),
+            status=AssetStatus.ativo,
+        )
+    )
+    _account(db_session, user, tipo=PluggyAccountTipo.corrente, saldo=Decimal("1000.00"))
+    item = _item(db_session, user)
+    _investment(db_session, user, item, valor_atual=Decimal("2000.00"))
+    db_session.commit()
+
+    assert service._ativos_totais(db_session, user.id) == Decimal("53000.00")
+
+
+def test_get_summary_ativos_totais_differs_from_ativos_when_investimentos_and_conta_exist(
+    db_session, user
+):
+    db_session.add(
+        Asset(
+            user_id=user.id,
+            nome="Carro",
+            tipo=AssetTipo.veiculo,
+            valor_atual=Decimal("50000.00"),
+            data_aquisicao=date(2020, 1, 1),
+            status=AssetStatus.ativo,
+        )
+    )
+    _account(db_session, user, tipo=PluggyAccountTipo.corrente, saldo=Decimal("1000.00"))
+    db_session.commit()
+
+    summary = service.get_summary(db_session, user.id)
+
+    assert summary.ativos == Decimal("50000.00")
+    assert summary.ativos_totais == Decimal("51000.00")
 
 
 def test_patrimonio_breakdown_regime_caixa_shifts_accumulation(db_session, user, monkeypatch):

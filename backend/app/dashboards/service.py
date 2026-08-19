@@ -30,6 +30,7 @@ class Summary:
     saldo: Decimal
     patrimonio: Decimal
     ativos: Decimal
+    ativos_totais: Decimal
     passivos: Decimal
 
 
@@ -130,10 +131,9 @@ class TendenciaPassivo:
 
 @dataclass
 class PatrimonioBreakdown:
-    ativos: Decimal
+    ativos_totais: Decimal
     passivos: Decimal
-    saldo_liquido_acumulado: Decimal
-    saldo_investimentos: Decimal
+    saldo_acumulado_mes: Decimal
     total: Decimal
 
 
@@ -320,48 +320,13 @@ def _ativos_e_passivos(db: Session, user_id: int) -> tuple[Decimal, Decimal]:
     return _to_decimal(ativos), _to_decimal(passivos)
 
 
-def _saldo_liquido_fallback(db: Session, user_id: int) -> Decimal:
-    """Contas líquidas (não-investimento) sem `saldo_inicial` não entram na
-    âncora/acumulação de get_saldo_acumulado — entram aqui pelo saldo ao vivo,
-    fora da acumulação, sem quebrar o cálculo das demais contas (PRD-016,
-    critério 6). Cartão de crédito sem saldo_inicial mantém a convenção de
-    sinal de _base_query: saldo representa dívida, entra subtraindo.
+def _saldo_investimentos(db: Session, user_id: int) -> Decimal:
+    """Holdings (PluggyInvestment) são a fonte preferencial de saldo por item
+    Pluggy; contas tipo=investimento só entram para itens sem nenhuma holding
+    — evita dobrar contagem caso um item retorne as duas fontes pro mesmo
+    saldo (nenhum item conhecido faz isso hoje, achado do Bloco 1 da Sprint
+    20: XP retorna contas E holdings, sem sobreposição de saldo entre elas).
     """
-    rows = (
-        db.query(PluggyAccount.tipo, func.coalesce(func.sum(PluggyAccount.saldo), 0))
-        .filter(
-            PluggyAccount.user_id == user_id,
-            PluggyAccount.tipo != PluggyAccountTipo.investimento,
-            PluggyAccount.saldo_inicial.is_(None),
-        )
-        .group_by(PluggyAccount.tipo)
-        .all()
-    )
-    total = Decimal("0")
-    for tipo, saldo in rows:
-        saldo = _to_decimal(saldo)
-        total += -saldo if tipo == PluggyAccountTipo.cartao_credito else saldo
-    return total
-
-
-def _patrimonio_breakdown(
-    db: Session, user_id: int, *, regime: Regime = "competencia"
-) -> PatrimonioBreakdown:
-    ativos, passivos = _ativos_e_passivos(db, user_id)
-
-    hoje = date.today()
-    pontos_acumulado = get_saldo_acumulado(
-        db, user_id, ano=hoje.year, mes=hoje.month, meses=1, regime=regime
-    )
-    saldo_liquido_acumulado = pontos_acumulado[0].total if pontos_acumulado else Decimal("0")
-    saldo_liquido_acumulado += _saldo_liquido_fallback(db, user_id)
-
-    # Holdings (PluggyInvestment) são a fonte preferencial de saldo_investimentos
-    # por item Pluggy; contas tipo=investimento só entram para itens sem
-    # nenhuma holding — evita dobrar contagem caso um item retorne as duas
-    # fontes pro mesmo saldo (nenhum item conhecido faz isso hoje, achado do
-    # Bloco 1 da Sprint 20: XP retorna contas E holdings, sem sobreposição de
-    # saldo entre elas).
     saldo_holdings = (
         db.query(func.coalesce(func.sum(PluggyInvestment.valor_atual), 0))
         .filter(PluggyInvestment.user_id == user_id)
@@ -379,14 +344,46 @@ def _patrimonio_breakdown(
         )
         .scalar()
     )
-    saldo_investimentos = _to_decimal(saldo_holdings) + _to_decimal(saldo_contas_sem_holdings)
+    return _to_decimal(saldo_holdings) + _to_decimal(saldo_contas_sem_holdings)
+
+
+def _saldo_contas_correntes(db: Session, user_id: int) -> Decimal:
+    total = (
+        db.query(func.coalesce(func.sum(PluggyAccount.saldo), 0))
+        .filter(
+            PluggyAccount.user_id == user_id,
+            PluggyAccount.tipo == PluggyAccountTipo.corrente,
+        )
+        .scalar()
+    )
+    return _to_decimal(total)
+
+
+def _ativos_totais(db: Session, user_id: int) -> Decimal:
+    """Tudo que o CEO considera "com o que pode contar" (PRD-028): Gestão de
+    Ativos + Investimentos (dedup-safe) + saldo ao vivo de conta corrente —
+    poupança e cartão de crédito ficam de fora (critério de aceite 1/3)."""
+    ativos, _passivos = _ativos_e_passivos(db, user_id)
+    return ativos + _saldo_investimentos(db, user_id) + _saldo_contas_correntes(db, user_id)
+
+
+def _patrimonio_breakdown(
+    db: Session, user_id: int, *, regime: Regime = "competencia"
+) -> PatrimonioBreakdown:
+    _ativos, passivos = _ativos_e_passivos(db, user_id)
+    ativos_totais = _ativos_totais(db, user_id)
+
+    hoje = date.today()
+    pontos_acumulado = get_saldo_acumulado(
+        db, user_id, ano=hoje.year, mes=hoje.month, meses=1, regime=regime
+    )
+    saldo_acumulado_mes = pontos_acumulado[0].total if pontos_acumulado else Decimal("0")
 
     return PatrimonioBreakdown(
-        ativos=ativos,
+        ativos_totais=ativos_totais,
         passivos=passivos,
-        saldo_liquido_acumulado=saldo_liquido_acumulado,
-        saldo_investimentos=saldo_investimentos,
-        total=saldo_liquido_acumulado + saldo_investimentos + ativos - passivos,
+        saldo_acumulado_mes=saldo_acumulado_mes,
+        total=ativos_totais - passivos + saldo_acumulado_mes,
     )
 
 
@@ -412,12 +409,14 @@ def get_summary(
     despesa = _sum_tipo(db, user_id, PluggyTransactionTipo.debito, ano=ano, mes=mes, regime=regime)
     patrimonio = _calcula_patrimonio(db, user_id, regime=regime)
     ativos, passivos = _ativos_e_passivos(db, user_id)
+    ativos_totais = _ativos_totais(db, user_id)
     return Summary(
         receita=receita,
         despesa=despesa,
         saldo=receita - despesa,
         patrimonio=patrimonio,
         ativos=ativos,
+        ativos_totais=ativos_totais,
         passivos=passivos,
     )
 

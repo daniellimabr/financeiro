@@ -45,7 +45,6 @@ import { PeriodFilter } from "../components/PeriodFilter";
 import { RegimeToggle } from "../components/RegimeToggle";
 import { TransactionsTable } from "../components/TransactionsTable";
 import { TrendLineChart } from "../components/TrendLineChart";
-import { useAssetGastos } from "../hooks/useAssetGastos";
 import { useAssets } from "../hooks/useAssets";
 import { useCategoryGroups } from "../hooks/useCategoryGroups";
 import { useDashboardByCategoria } from "../hooks/useDashboardByCategoria";
@@ -59,6 +58,7 @@ import { useLiabilities } from "../hooks/useLiabilities";
 import { useLiabilityGastos } from "../hooks/useLiabilityGastos";
 import { usePatrimonioBreakdown } from "../hooks/usePatrimonioBreakdown";
 import { usePluggyInvestments } from "../hooks/usePluggyInvestments";
+import { useSaldoPorConta } from "../hooks/useSaldoPorConta";
 import { useSubcategories } from "../hooks/useSubcategories";
 import {
   buildColorIndexFromIds,
@@ -122,7 +122,6 @@ export function DashboardsPage() {
   const [periodoHistorico, setPeriodoHistorico] = useState<PeriodoHistorico>(6);
   const [regime, setRegime] = useState<Regime>("competencia");
   const [drill, setDrill] = useState<DrillState | null>(null);
-  const [ativosTipo, setAtivosTipo] = useState<TransacaoTipo>("debito");
 
   const filter: PeriodoFiltro = { ano, mes };
 
@@ -258,7 +257,7 @@ export function DashboardsPage() {
               onClick={() => abrirFunil("ativos")}
             >
               <span className="k">Ativos</span>
-              <span className="v">{formatCurrency(summaryQuery.data.ativos)}</span>
+              <span className="v">{formatCurrency(summaryQuery.data.ativos_totais)}</span>
             </button>
             <button
               type="button"
@@ -406,30 +405,8 @@ export function DashboardsPage() {
               <AssetsValorAtualList />
               <h3>Valor atual por Investimento</h3>
               <InvestimentosValorAtualList />
-              <h3>Despesas por Ativo</h3>
-              <div className="dash-toggle" role="group" aria-label="Tipo de transação">
-                <button
-                  type="button"
-                  aria-pressed={ativosTipo === "debito"}
-                  onClick={() => setAtivosTipo("debito")}
-                >
-                  Despesa
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={ativosTipo === "credito"}
-                  onClick={() => setAtivosTipo("credito")}
-                >
-                  Receita
-                </button>
-              </div>
-              <AtivosAccordion
-                tipo={ativosTipo}
-                filter={filter}
-                regime={regime}
-                expandedRows={drill.expandedRows}
-                onToggleRow={toggleRow}
-              />
+              <h3>Saldo por Conta Corrente</h3>
+              <SaldoContaCorrenteList />
             </>
           )}
 
@@ -851,73 +828,6 @@ function SubcategoriaAccordion({
   );
 }
 
-function AtivosAccordion({
-  tipo,
-  filter,
-  regime,
-  expandedRows,
-  onToggleRow,
-}: {
-  tipo: TransacaoTipo;
-  filter: PeriodoFiltro;
-  regime: Regime;
-  expandedRows: number[];
-  onToggleRow: (id: number) => void;
-}) {
-  const query = useAssetGastos(tipo, { ...filter, regime });
-  // Cor por ativo (não mais fixa por tipo de transação) — índice construído
-  // a partir de TODOS os ativos cadastrados (useAssets), não só os que
-  // aparecem no período filtrado, pra manter a cor da mesma entidade
-  // estável entre filtros (ver categoryColors.ts: "color follows the
-  // entity, never its rank").
-  const assetsQuery = useAssets();
-  const colorIndex = useMemo(
-    () => buildColorIndexFromIds((assetsQuery.data ?? []).map((asset) => asset.id)),
-    [assetsQuery.data]
-  );
-
-  const sorted = useMemo(
-    () => [...(query.data ?? [])].sort((a, b) => Number(b.total) - Number(a.total)),
-    [query.data]
-  );
-
-  if (query.isLoading) return <p>Carregando...</p>;
-  if (query.isError) return <p role="alert">Não foi possível carregar os ativos.</p>;
-  if (sorted.length === 0)
-    return <p className="dash-empty">Nenhuma transação vinculada a um ativo neste período.</p>;
-
-  const max = Number(sorted[0]?.total ?? 1);
-
-  return (
-    <ul className="dash-list dash-accordion">
-      {sorted.map((item) => (
-        <li key={item.asset_id}>
-          <div className="dash-accordion-item">
-            <Row
-              nome={item.asset_nome}
-              total={item.total}
-              max={max}
-              color={groupColorVar(item.asset_id, colorIndex)}
-              expanded={expandedRows.includes(item.asset_id)}
-              onClick={() => onToggleRow(item.asset_id)}
-            />
-            {expandedRows.includes(item.asset_id) && (
-              <div className="dash-accordion-panel">
-                <TransactionsTable
-                  filter={filter}
-                  assetId={item.asset_id}
-                  tipo={tipo}
-                  emptyMessage="Nenhuma transação vinculada a este ativo neste período."
-                />
-              </div>
-            )}
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 function PassivosAccordion({
   filter,
   regime,
@@ -986,7 +896,7 @@ function InvestimentosValorAtualList() {
     [query.data]
   );
   // Cor por investimento (não mais var(--accent) fixo) — mesmo padrão de
-  // buildColorIndexFromIds/groupColorVar já usado por AtivosAccordion.
+  // buildColorIndexFromIds/groupColorVar já usado por AssetsValorAtualList.
   const colorIndex = useMemo(
     () => buildColorIndexFromIds((query.data ?? []).map((investimento) => investimento.id)),
     [query.data]
@@ -1183,14 +1093,62 @@ function LiabilitiesValorAtualList() {
   );
 }
 
-type PatrimonioParte = "ativos" | "passivos" | "saldoInvestimentos" | "saldoLiquido";
+// Saldo por Conta Corrente (Sprint 28) — mesmo estilo bar+% de
+// LiabilitiesValorAtualList (sem accordion, sem cor distinta por item),
+// filtrado a `account_tipo === "corrente"` (PRD-028 critério 3: nem
+// poupança nem cartão de crédito entram aqui). Reaproveitado tanto no card
+// Ativos quanto dentro do accordion do card Patrimônio.
+function SaldoContaCorrenteList() {
+  const query = useSaldoPorConta();
+  const contas = useMemo(
+    () =>
+      (query.data ?? [])
+        .filter((conta) => conta.account_tipo === "corrente")
+        .sort((a, b) => Number(b.saldo) - Number(a.saldo)),
+    [query.data]
+  );
+  const totalGeral = useMemo(
+    () => contas.reduce((sum, conta) => sum + Number(conta.saldo), 0),
+    [contas]
+  );
 
-// Accordion de 4 partes expansível in-place (Sprint 24) — substitui a
-// tabela com botões "Ver detalhe" que navegavam pra outra visão do funil.
-// Cada parte reaproveita o mesmo componente já usado pelo card equivalente
-// (Ativos/Passivos/Investimentos) ou o TrendChart já calculado no
-// componente pai (saldoAcumuladoSparkline, evita buscar de novo). Os
-// rótulos com sinal (+/−) compõem a própria memória de cálculo do Total.
+  if (query.isLoading) return <p>Carregando...</p>;
+  if (query.isError) return <p role="alert">Não foi possível carregar o saldo das contas.</p>;
+  if (contas.length === 0) return <p className="dash-empty">Nenhuma conta corrente cadastrada.</p>;
+
+  const max = Number(contas[0]?.saldo ?? 1);
+  const color = "var(--accent)";
+
+  return (
+    <ul className="dash-list">
+      {contas.map((conta) => {
+        const percentual = totalGeral > 0 ? (Number(conta.saldo) / totalGeral) * 100 : 0;
+        const pct = max > 0 ? Math.max(4, (Number(conta.saldo) / max) * 100) : 0;
+        return (
+          <li key={conta.account_id} className="dash-row">
+            <span className="nm">{conta.account_nome}</span>
+            <span className="track">
+              <span className="fillbar" style={{ width: `${pct}%`, background: color }} />
+            </span>
+            <span className="amt">{formatCurrency(conta.saldo)}</span>
+            <span className="pct">{formatPercent(percentual)}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+type PatrimonioParte = "ativos" | "passivos" | "saldoAcumuladoMes";
+
+// Accordion de 3 partes expansível in-place (Sprint 24, redesenhado na
+// Sprint 28 para a fórmula Ativos − Passivos + Saldo Acumulado do Mês) —
+// substitui a tabela com botões "Ver detalhe" que navegavam pra outra visão
+// do funil. Cada parte reaproveita o mesmo componente já usado pelo card
+// equivalente (Ativos expande em Gestão de Ativos/Investimentos/Saldo por
+// Conta Corrente) ou o TrendChart já calculado no componente pai
+// (saldoAcumuladoSparkline, evita buscar de novo). Os rótulos com sinal
+// (+/−) compõem a própria memória de cálculo do Total.
 function PatrimonioBreakdownPanel({
   regime,
   saldoAcumuladoSparkline,
@@ -1214,13 +1172,13 @@ function PatrimonioBreakdownPanel({
     return <p role="alert">Não foi possível carregar a composição do patrimônio.</p>;
   }
 
-  const { ativos, passivos, saldo_liquido_acumulado, saldo_investimentos, total } = query.data;
+  const { ativos_totais, passivos, saldo_acumulado_mes, total } = query.data;
 
   // Só Passivos guarda uma magnitude sempre não-negativa que precisa do
   // sinal "−" explícito pra virar subtração na memória de cálculo — os
-  // outros três já vêm com o sinal certo do backend (ex.: saldo líquido
-  // acumulado negativo já é exibido negativo por formatCurrency; prefixar
-  // "+ " na frente de um valor já negativo duplicaria o sinal, "+ -R$ ...").
+  // outros dois já vêm com o sinal certo do backend (ex.: saldo acumulado do
+  // mês negativo já é exibido negativo por formatCurrency; prefixar "+ " na
+  // frente de um valor já negativo duplicaria o sinal, "+ -R$ ...").
   const partes: {
     key: PatrimonioParte;
     label: string;
@@ -1228,7 +1186,21 @@ function PatrimonioBreakdownPanel({
     subtrai?: boolean;
     painel: ReactNode;
   }[] = [
-    { key: "ativos", label: "Ativos", valor: ativos, painel: <AssetsValorAtualList /> },
+    {
+      key: "ativos",
+      label: "Ativos",
+      valor: ativos_totais,
+      painel: (
+        <>
+          <h3>Gestão de Ativos</h3>
+          <AssetsValorAtualList />
+          <h3>Investimentos</h3>
+          <InvestimentosValorAtualList />
+          <h3>Saldo por Conta Corrente</h3>
+          <SaldoContaCorrenteList />
+        </>
+      ),
+    },
     {
       key: "passivos",
       label: "Passivos",
@@ -1237,15 +1209,9 @@ function PatrimonioBreakdownPanel({
       painel: <LiabilitiesValorAtualList />,
     },
     {
-      key: "saldoInvestimentos",
-      label: "Saldo em investimentos",
-      valor: saldo_investimentos,
-      painel: <InvestimentosValorAtualList />,
-    },
-    {
-      key: "saldoLiquido",
-      label: "Saldo líquido acumulado",
-      valor: saldo_liquido_acumulado,
+      key: "saldoAcumuladoMes",
+      label: "Saldo Acumulado do Mês",
+      valor: saldo_acumulado_mes,
       painel:
         saldoAcumuladoSparkline && saldoAcumuladoSparkline.length > 0 ? (
           <TrendLineChart

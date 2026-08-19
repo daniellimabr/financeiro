@@ -22,6 +22,7 @@ export interface DashboardSummary {
   saldo: string;
   patrimonio: string;
   ativos: string;
+  ativos_totais: string;
   passivos: string;
 }
 
@@ -108,10 +109,9 @@ export interface TendenciaPassivo {
 }
 
 export interface PatrimonioBreakdown {
-  ativos: string;
+  ativos_totais: string;
   passivos: string;
-  saldo_liquido_acumulado: string;
-  saldo_investimentos: string;
+  saldo_acumulado_mes: string;
   total: string;
 }
 
