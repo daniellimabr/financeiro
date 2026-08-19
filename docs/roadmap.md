@@ -969,8 +969,28 @@ que usa esses componentes (Dashboard, Ativos, Passivos, Investimentos, Natureza,
 Consolidar os 3 componentes de gráfico de linha num só, parametrizado, é decisão de design deixada
 para a sessão de execução (evitar abstração prematura antes de ver os 3 casos lado a lado).
 
+Implementada em sessão própria (2026-08-19): `CardSparkline`/`TrendChart`/`RowTrend` (SVG manual)
+consolidados num único `TrendLineChart.tsx` novo, parametrizado por `variant` ("spark" — cards de
+resumo, "row" — mini gráfico do funil (48px → 144px, 3x mais largo), "card" — painel de tendência de
+drilldown), com tooltip mês/ano+valor no hover (destaque automático do ponto ativo via `activeDot`
+do Recharts) e clique-para-filtrar (`onSelecionarMes`, resolvido pelo helper puro novo
+`utils/resolveClickedPonto.ts`, compartilhado com `ProjectionChart.tsx`) conectado ao estado
+ano/mês de `DashboardsPage`/`AssetsPage`/`LiabilitiesPage`/`InvestimentosPage`/`NaturezaPage`/
+`ProjecaoPage` — nesta última, só pontos de histórico real são clicáveis (ponto projetado é média
+repetida, não "um mês"). `AssetsValorAtualList` (card Ativos) trocou `<table>` por
+`dash-accordion`/`Row`, mesmo padrão de "Valor atual por Investimento" — expande mostrando Tipo +
+Adquirido em, fechando o achado do CEO na validação da Sprint 25. 212 testes frontend (suíte
+completa verde, zero mudança de backend), lint/typecheck/prettier limpos. QA visual real
+(`scripts/browser-check/check-sprint26.mjs`, novo) contra a VM de dev — 2 rodadas encontraram
+achados reais, ambos no próprio script de QA (não no produto): `locator.click()` do Playwright não
+dava tempo do Recharts resolver o ponto ativo antes do clique, corrigido com `mouse.move`+wait+
+`down/up` explícitos; tooltip do card "Saldo" não aparecia no viewport mobile porque o card ficava
+abaixo da dobra, corrigido com `scrollIntoViewIfNeeded()`. Rodada final: 0 falhas, 0 erros de
+console, desktop+mobile, claro+escuro.
+
 PRD: [PRD-026-interatividade-graficos-dashboard.md](prd/PRD-026-interatividade-graficos-dashboard.md).
 Plano: [SPRINT-026-interatividade-graficos-dashboard-plan.md](sprints/SPRINT-026-interatividade-graficos-dashboard-plan.md).
+Relatório: [SPRINT-026-interatividade-graficos-dashboard-report.md](sprints/SPRINT-026-interatividade-graficos-dashboard-report.md).
 
 ### Sprint 27 — Simulação "ocultar gasto" e gráfico comparativo de categorias (cross-epic, sem épico prévio)
 
