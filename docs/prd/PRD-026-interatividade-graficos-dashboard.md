@@ -12,6 +12,12 @@ drilldowns, permitir que o mouse-over num ponto de dado mostre uma legenda (mês
 um clique nesse ponto filtre a tela pelo mês correspondente — com o mesmo comportamento replicado
 em todo gráfico semelhante do sistema, incluindo os cards do Dashboard.
 
+Adicionado na validação pós-Sprint 25 (achado do CEO, 2026-08-19): a seção "Valor atual por Ativo"
+do card "Ativos" (`AssetsValorAtualList`, `DashboardsPage.tsx`) continua sendo uma tabela plana,
+enquanto as outras duas seções do mesmo card ("Valor atual por Investimento", "Despesas por Ativo")
+já são drilldown/accordion — inconsistência visual dentro do próprio card. Vira drilldown nesta
+sprint.
+
 Investigação no código confirmou que o sistema tem 3 componentes de gráfico de linha distintos, em
 estágios diferentes:
 
@@ -30,6 +36,11 @@ Confirmadas na sessão de planejamento (2026-08-19):
 2. Ambiguidade de design resolvida na sessão de execução (não nesta sessão de planejamento): como
    consolidar `CardSparkline`/`TrendChart`/o `RowTrend` reconstruído — provável caminho é um único
    componente parametrizado por tamanho/interatividade, já que os três compartilham Recharts.
+3. (Adicionado 2026-08-19) "Valor atual por Ativo" vira drilldown/accordion, mesmo padrão visual de
+   "Valor atual por Investimento" (`dash-accordion`/`Row`, barra+%) — o que cada linha expande pra
+   mostrar (ex.: nada, como "Passivos — saldo devedor" na Sprint 25; ou as próprias transações do
+   ativo no período, como "Despesas por Ativo") é ambiguidade de design a resolver na execução,
+   olhando os padrões já estabelecidos pelas outras duas seções do mesmo card.
 
 ## Escopo
 
@@ -42,6 +53,9 @@ Confirmadas na sessão de planejamento (2026-08-19):
 - Clique-para-filtrar conectado ao `PeriodFilter`/estado `ano`/`mes` de cada tela que usa esses
   componentes: `DashboardsPage.tsx` (cards de resumo + linhas do funil), `AssetsPage.tsx`,
   `LiabilitiesPage.tsx`, `InvestimentosPage.tsx`, `NaturezaPage.tsx`, `ProjecaoPage.tsx`.
+- `AssetsValorAtualList` ("Valor atual por Ativo", card Ativos do Dashboard) troca `<table>` por
+  `dash-accordion`/`Row` — mesma família visual de "Valor atual por Investimento"/"Passivos — saldo
+  devedor" (Sprint 25), percentual do total preservado.
 
 ### Fora de escopo (explicitamente)
 
@@ -66,6 +80,8 @@ Confirmadas na sessão de planejamento (2026-08-19):
    consulta nova prevista — só interação sobre dado já carregado).
 5. Dado o CI, quando a suíte roda, então os testes novos/alterados passam com cobertura ≥80% nos
    módulos tocados, suíte completa 100% verde.
+6. Dado o card "Ativos" do Dashboard, então "Valor atual por Ativo" usa o mesmo estilo visual de
+   drilldown/accordion das outras duas seções do card, não mais uma tabela.
 
 ## Regras de negócio
 

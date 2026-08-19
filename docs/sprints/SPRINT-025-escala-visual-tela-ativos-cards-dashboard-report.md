@@ -2,6 +2,7 @@
 
 - **Plano:** [SPRINT-025-escala-visual-tela-ativos-cards-dashboard-plan.md](./SPRINT-025-escala-visual-tela-ativos-cards-dashboard-plan.md)
 - **Data do relatório:** 2026-08-19
+- **Status:** aprovado pelo CEO em 2026-08-19
 
 ## Resumo
 
@@ -121,6 +122,11 @@ de prosseguir) e atualização de doc delegada. Comparável em escopo às Sprint
 
 ## Pendências e próximos passos sugeridos
 
+- **"Valor atual por Ativo" ainda é tabela, não drilldown** — achado do CEO na validação pós-sprint:
+  a nova seção (tarefa 6) reaproveitou `AssetsValorAtualList` como veio da Sprint 22 (tabela plana
+  com percentual), mas os outros dois itens do card Ativos ("Valor atual por Investimento" e
+  "Despesas por Ativo") já são accordion/drilldown — inconsistência visual dentro do próprio card.
+  **Movido para a Sprint 26** a pedido do CEO, não corrigido nesta sessão.
 - **Bloco 0 não resolvido:** a transação "Encerramento de dívida" (id 684) segue hoje em
   Receitas/Estornos, sem `asset_id`/`liability_id`. Se o CEO quiser retomar, as opções continuam
   as mesmas: (a) recategorizar pontualmente (precisa de uma subcategoria destino — não existe uma

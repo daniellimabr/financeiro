@@ -7,7 +7,9 @@
 
 Todo gráfico de linha do sistema (mini gráfico de drilldown, sparkline de card, gráfico de
 tendência de Ativos/Passivos/Investimentos/Natureza) passa a se comportar do mesmo jeito: maior,
-com legenda no hover e um clique que filtra a tela pelo mês do ponto de dado.
+com legenda no hover e um clique que filtra a tela pelo mês do ponto de dado. Além disso (achado do
+CEO na validação da Sprint 25), a seção "Valor atual por Ativo" do card Ativos vira drilldown/
+accordion, consistente com as outras duas seções do mesmo card.
 
 ## Tarefas
 
@@ -18,9 +20,10 @@ com legenda no hover e um clique que filtra a tela pelo mês do ponto de dado.
 | 3 | Adicionar clique-em-ponto → filtro de mês em `RowTrend`/`CardSparkline`/`TrendChart` (destaque visual do ponto sob hover antes do clique) | Sonnet: implementação | os 3 componentes + prop `onClickPonto`/equivalente |
 | 4 | Conectar o clique ao estado `ano`/`mes` de cada tela: `DashboardsPage.tsx`, `AssetsPage.tsx`, `LiabilitiesPage.tsx`, `InvestimentosPage.tsx`, `NaturezaPage.tsx`, `ProjecaoPage.tsx` | Sonnet: implementação | `frontend/src/components/PeriodFilter.tsx`, cada página listada |
 | 5 | Testes de componente: clique em ponto dispara callback de filtro correto; tooltip mostra mês/ano+valor; `RowTrend` renderiza 3x mais largo | Sonnet: implementação | testes existentes de `DashboardsPage`/`AssetsPage`/etc. |
-| 6 | QA visual real na VM de dev — `scripts/browser-check/check-sprint26.mjs` (novo): hover mostra tooltip, clique navega o filtro, em pelo menos 3 telas diferentes (Dashboard, Ativos, Investimentos), desktop+mobile | Sonnet: implementação | [docs/infra/ssh-workflow.md](../infra/ssh-workflow.md) |
-| 7 | Atualizar `docs/directory-structure.md` (componente de gráfico consolidado ou não, conforme decisão da tarefa 1) | Haiku: doc-updater | `docs/directory-structure.md` |
-| 8 | Relatório de sprint | Sonnet: implementação | `templates/SPRINT-report-template.md` |
+| 6 | `AssetsValorAtualList` ("Valor atual por Ativo", card Ativos): troca `<table>` por `dash-accordion`/`Row` (mesmo padrão de "Valor atual por Investimento"), decidindo o que cada linha expande (achado do CEO na validação da Sprint 25, 2026-08-19) | Sonnet: implementação | `DashboardsPage.tsx` (`AssetsValorAtualList`, `InvestimentosValorAtualList` como referência) |
+| 7 | QA visual real na VM de dev — `scripts/browser-check/check-sprint26.mjs` (novo): hover mostra tooltip, clique navega o filtro, em pelo menos 3 telas diferentes (Dashboard, Ativos, Investimentos), desktop+mobile; confirma "Valor atual por Ativo" como drilldown | Sonnet: implementação | [docs/infra/ssh-workflow.md](../infra/ssh-workflow.md) |
+| 8 | Atualizar `docs/directory-structure.md` (componente de gráfico consolidado ou não, conforme decisão da tarefa 1) e `docs/dashboards-guia-cards.md` (Valor atual por Ativo vira drilldown) | Haiku: doc-updater | `docs/directory-structure.md`, `docs/dashboards-guia-cards.md` |
+| 9 | Relatório de sprint | Sonnet: implementação | `templates/SPRINT-report-template.md` |
 
 ## Testes previstos
 
@@ -46,3 +49,8 @@ merge na sessão de execução.
 - Se a consolidação da tarefa 1 virar um componente único, `CardSparkline`/`TrendChart` como nomes
   próprios podem sumir — atualizar todos os call sites na mesma sprint (sem shim de
   compatibilidade).
+- Tarefa 6: o que cada linha de "Valor atual por Ativo" expande ao clicar não está decidido — "Valor
+  atual por Investimento" expande pra holdings (dado que já existe por investimento) e "Despesas por
+  Ativo" expande pro extrato (accordion da Sprint 25), mas um Ativo não tem holdings nem precisa
+  reabrir o mesmo extrato de outra seção; decidir na execução (ex.: sem conteúdo ao expandir, mesmo
+  padrão adotado por "Passivos — saldo devedor" na Sprint 25) antes de codar.

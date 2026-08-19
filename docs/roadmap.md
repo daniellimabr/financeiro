@@ -950,10 +950,14 @@ accordion de gasto pra "Despesas por Ativo" (última), removendo "Saldo por cont
 troca a lista "Passivos — saldo devedor" por estilo drilldown (barra+%); percentual do total vira
 padrão obrigatório em todo drilldown de valor atual; validação de que o disclaimer de Patrimônio
 (já corrigido no QA pós-Sprint 24) segue ausente; card "Saldo Acumulado" ganha a fórmula visível
-(Saldo do mês anterior + Receita − Despesa).
+(Saldo do mês anterior + Receita − Despesa). Bloco 0 investigado ao vivo na VM de dev, sem fix
+aplicado (decisão do CEO); achado do QA do CEO pós-sprint — "Valor atual por Ativo" ainda é tabela,
+deveria ser drilldown como os demais itens do card — movido para a Sprint 26.
+**Sprint aprovada pelo CEO em 2026-08-19.**
 
 PRD: [PRD-025-escala-visual-tela-ativos-cards-dashboard.md](prd/PRD-025-escala-visual-tela-ativos-cards-dashboard.md).
 Plano: [SPRINT-025-escala-visual-tela-ativos-cards-dashboard-plan.md](sprints/SPRINT-025-escala-visual-tela-ativos-cards-dashboard-plan.md).
+Relatório: [SPRINT-025-escala-visual-tela-ativos-cards-dashboard-report.md](sprints/SPRINT-025-escala-visual-tela-ativos-cards-dashboard-report.md).
 
 ### Sprint 26 — Interatividade de gráficos (ampliar + hover + clique = filtro), sistema inteiro (cross-epic, sem épico prévio)
 
