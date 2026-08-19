@@ -860,7 +860,7 @@ PRD: [PRD-022-manutencao-investimentos-e-drilldown-patrimonio.md](prd/PRD-022-ma
 Plano: [SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-plan.md](sprints/SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-plan.md).
 Relatório: [SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-report.md](sprints/SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-report.md).
 
-### Sprint 23 — Investimentos: drilldown de posições e extrato unificado (cross-epic, sem épico prévio)
+### ✅ Sprint 23 — Investimentos: drilldown de posições e extrato unificado (cross-epic, sem épico prévio) concluída em 2026-08-19
 
 Planejada em sessão própria (2026-08-19), a partir de 2 pontos que o CEO levantou usando
 `InvestimentosPage` na prática pós-Sprint 22: (1) os cards de Investimento exibem carteiras/posições
@@ -878,8 +878,19 @@ Escopo: Bloco 0 de investigação real na VM de dev (campos/volume/intervalo de
 Investimento sem texto solto de posições, abrindo direto na view "Posições"; `<colgroup>` nas
 tabelas de posições/histórico. Sem migration prevista.
 
+**Bloco 0 confirmou o dado real:** "Quitar o AP" (`investimento_id=5`) tem 14 holdings e 15
+transações, intervalo 2025-10-06 a 2026-04-30, `tipo` é `BUY`/`SELL` (não `Aporte`/`Resgate`) e
+`descricao` é sempre `None` nas 15 linhas — o frontend usa `holding_nome` como fallback quando
+`descricao` é nulo. Volume baixo confirmou que paginação não se justificava. 598 testes backend
+(+13, 98% cobertura, 100% nos módulos tocados) + 192 testes frontend, suíte completa verde. Deploy
+na VM de dev e validação ao vivo via `scripts/browser-check/check-sprint23.mjs` (novo) contra dado
+real — card sem tags soltas, drilldown abrindo em Posições, extrato de abril/2026 mostrando as 2
+transações reais do Bloco 0, sem overlap de coluna, sem erros de console.
+**Sprint aprovada pelo CEO em 2026-08-19.**
+
 PRD: [PRD-023-investimentos-drilldown-extrato-unificado.md](prd/PRD-023-investimentos-drilldown-extrato-unificado.md).
 Plano: [SPRINT-023-investimentos-drilldown-extrato-unificado-plan.md](sprints/SPRINT-023-investimentos-drilldown-extrato-unificado-plan.md).
+Relatório: [SPRINT-023-investimentos-drilldown-extrato-unificado-report.md](sprints/SPRINT-023-investimentos-drilldown-extrato-unificado-report.md).
 
 ### Sprint 24 — Dashboard: layout, cards, navegação e cores (cross-epic, sem épico prévio)
 
