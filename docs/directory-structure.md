@@ -247,7 +247,8 @@ Financeiro v3/
 │           ├── 0016_investments_da_pluggy.py  # tabelas pluggy_investments (holdings) / pluggy_investment_transactions (ledger de transações); indice com nome encurtado `ix_pluggy_investment_tx_ext_id` pra respeitar limite de 63 caracteres do Postgres (Sprint 20)
 │           ├── 0017_sugestao_holding_e_snapshot_mensal.py  # colunas de sugestão em pluggy_investments (investimento_sugerido_id/_confianca/_fonte_tipo/_fonte_id/_score); tabela nova pluggy_investment_snapshots (snapshot mensal por holding, UniqueConstraint investment_id+ano_mes) (Sprint 21)
 │           ├── 0018_categorias_por_usuario.py  # user_id em category_groups/subcategories, unicidade (user_id, nome); clona catálogo global pra cada usuário, repontoa FKs em pluggy_transactions/categorization_rules/subcategoria_sugerida_id, deleta globais (Sprint 30)
-│           └── 0019_create_orcamentos.py  # tabela orcamentos (user_id, subcategory_id, tipo, valor, ano/mes, data_inicio/data_fim) — sem UniqueConstraint, de propósito: múltiplos orçamentos por subcategoria são permitidos e somados quando vigentes ao mesmo tempo (Sprint 30)
+│           ├── 0019_create_orcamentos.py  # tabela orcamentos (user_id, subcategory_id, tipo, valor, ano/mes, data_inicio/data_fim) — sem UniqueConstraint, de propósito: múltiplos orçamentos por subcategoria são permitidos e somados quando vigentes ao mesmo tempo (Sprint 30)
+│           └── 0020_confirmacao_manual_vinculos_transacao.py  # asset_confirmado_manualmente/liability_confirmado_manualmente/investimento_confirmado_manualmente (Boolean, not null, default false) em pluggy_transactions — impedem que _apply_suggestions reponha um vínculo removido manualmente pelo usuário (Sprint 31)
 ├── frontend/                       # React 19 + Vite + TypeScript (Sprint 1)
 │   ├── package.json                # dependências frontend (React, TanStack Query, ESLint, Prettier, Vitest)
 │   ├── tsconfig.json

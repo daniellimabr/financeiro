@@ -30,7 +30,7 @@ explícita do CEO a cada vez, nunca automática/agendada.
 
 | Última auditoria | Sprint de referência | Próxima checagem devida | Status |
 |---|---|---|---|
-| nenhuma ainda | — | Sprint 34 (30 + 4) | 1/5 sprints completadas (Sprint 30); mecanismo criado na Sprint 29 |
+| nenhuma ainda | — | Sprint 34 (30 + 4) | 2/5 sprints completadas (Sprint 30, Sprint 31); mecanismo criado na Sprint 29 |
 
 ## Sequência proposta (dependências)
 
@@ -1120,6 +1120,41 @@ sprint do projeto até agora, comparável à Sprint 13 — 74 arquivos tocados (
 PRD: [PRD-030-categorias-por-usuario-orcamento-gestao-categorias.md](prd/PRD-030-categorias-por-usuario-orcamento-gestao-categorias.md).
 Plano: [SPRINT-030-categorias-por-usuario-orcamento-gestao-categorias-plan.md](sprints/SPRINT-030-categorias-por-usuario-orcamento-gestao-categorias-plan.md).
 Relatório: [SPRINT-030-categorias-por-usuario-orcamento-gestao-categorias-report.md](sprints/SPRINT-030-categorias-por-usuario-orcamento-gestao-categorias-report.md).
+**Sprint aprovada pelo CEO em 2026-08-20.**
+
+### ✅ Sprint 31 — Fix: desassociação de transação presa por sugestão automática (cross-epic, sem épico prévio) concluída em 2026-08-20
+
+Sem sessão de `/plan` prévia — CEO reportou ao vivo, usando a tela de Categorização, que não
+conseguia desassociar um Pix recebido do investimento "Tesouro Direto Nubank". Investigação
+(subagente Explore) confirmou: sem bug de persistência — o backend gravava `investimento_id = NULL`
+corretamente. Causa raiz era o motor de sugestão (`_apply_suggestions`) recalculando
+`investimento_sugerido_id`/`asset_sugerido_id`/`liability_sugerido_id` a cada `list_transactions`
+para toda transação pendente, sem saber que o usuário já tinha decidido manualmente (inclusive
+decidido "nenhum"), somado à UI priorizar o campo de sugestão sobre o valor real ao exibir o
+`<select>`. O mesmo padrão, mais brando, também afetava Categoria (pedido explícito do CEO para
+avaliar) — mitigado mas não eliminado pelo `categorizacao_status` já existente.
+
+CEO escolheu, via pergunta direta, o fix definitivo em vez de um paliativo (que resolveria a tela na
+hora mas o bug voltaria após a próxima recarga da lista): migration `0020` (3 flags booleanas de
+confirmação manual — `asset_confirmado_manualmente`, `liability_confirmado_manualmente`,
+`investimento_confirmado_manualmente` — em `pluggy_transactions`), motor de sugestão passa a
+respeitá-las, e os 3 setters (`set_transaction_asset`/`liability`/`investimento`) marcam a flag e
+limpam a sugestão correspondente ao gravar a escolha manual do usuário. Categoria corrigida sem
+coluna nova (`set_category`/`bulk_confirm` limpam `subcategoria_sugerida_id` ao confirmar,
+aproveitando o `categorizacao_status` já existente). 4 testes de regressão novos, reproduzindo o
+cenário exato do bug relatado para cada campo. 665 testes backend (99% cobertura), lint/format
+limpos.
+
+**Deploy na mesma sessão** (pedido explícito do CEO, dado que o app real estava com o vínculo
+travado): commit `1baee65`, CI confirmado verde (`conclusion: success`) para o commit exato antes
+de tocar a VM, `git pull` + `docker compose pull` + `docker compose up -d` na VM de dev — migration
+`0020` aplicada automaticamente pelo entrypoint do container `api` (nunca executada manualmente,
+evitando a corrida de processos já documentada em `docs/architecture/OVERVIEW.md`), container
+`healthy` confirmado via `docker compose ps`/`logs`.
+
+PRD: [PRD-031-fix-desassociacao-vinculo-transacao.md](prd/PRD-031-fix-desassociacao-vinculo-transacao.md).
+Plano: [SPRINT-031-fix-desassociacao-vinculo-transacao-plan.md](sprints/SPRINT-031-fix-desassociacao-vinculo-transacao-plan.md).
+Relatório: [SPRINT-031-fix-desassociacao-vinculo-transacao-report.md](sprints/SPRINT-031-fix-desassociacao-vinculo-transacao-report.md).
 **Sprint aprovada pelo CEO em 2026-08-20.**
 
 ## Registro de reavaliações futuras
