@@ -2,6 +2,7 @@
 
 - **Plano:** [SPRINT-028-ativos-saldo-conta-corrente-patrimonio-redesenhado-plan.md](./SPRINT-028-ativos-saldo-conta-corrente-patrimonio-redesenhado-plan.md)
 - **Data do relatório:** 2026-08-19
+- **Status:** aprovado pelo CEO em 2026-08-19
 
 ## Resumo
 

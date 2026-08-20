@@ -1030,6 +1030,8 @@ Acumulado" do Dashboard não muda, só sai de dentro da fórmula de Patrimônio.
 
 PRD: [PRD-028-ativos-saldo-conta-corrente-patrimonio-redesenhado.md](prd/PRD-028-ativos-saldo-conta-corrente-patrimonio-redesenhado.md).
 Plano: [SPRINT-028-ativos-saldo-conta-corrente-patrimonio-redesenhado-plan.md](sprints/SPRINT-028-ativos-saldo-conta-corrente-patrimonio-redesenhado-plan.md).
+Relatório: [SPRINT-028-ativos-saldo-conta-corrente-patrimonio-redesenhado-report.md](sprints/SPRINT-028-ativos-saldo-conta-corrente-patrimonio-redesenhado-report.md).
+**Sprint aprovada pelo CEO em 2026-08-19.**
 
 ## Registro de reavaliações futuras
 
