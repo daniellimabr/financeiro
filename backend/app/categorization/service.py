@@ -184,31 +184,36 @@ def _apply_suggestions(
         tx.sugestao_fonte_id = None
         tx.sugestao_score = None
 
-    asset_suggestion = engine.suggest_asset_from_index(normalizado, asset_rules, asset_historico)
-    if asset_suggestion is not None:
-        tx.asset_sugerido_id = asset_suggestion.asset_id
-        tx.asset_sugestao_confianca = asset_suggestion.confianca
-    else:
-        tx.asset_sugerido_id = None
-        tx.asset_sugestao_confianca = None
+    if not tx.asset_confirmado_manualmente:
+        asset_suggestion = engine.suggest_asset_from_index(
+            normalizado, asset_rules, asset_historico
+        )
+        if asset_suggestion is not None:
+            tx.asset_sugerido_id = asset_suggestion.asset_id
+            tx.asset_sugestao_confianca = asset_suggestion.confianca
+        else:
+            tx.asset_sugerido_id = None
+            tx.asset_sugestao_confianca = None
 
-    liability_suggestion = engine.suggest_liability_from_index(normalizado, liabilities)
-    if liability_suggestion is not None:
-        tx.liability_sugerido_id = liability_suggestion.liability_id
-        tx.liability_sugestao_confianca = liability_suggestion.confianca
-    else:
-        tx.liability_sugerido_id = None
-        tx.liability_sugestao_confianca = None
+    if not tx.liability_confirmado_manualmente:
+        liability_suggestion = engine.suggest_liability_from_index(normalizado, liabilities)
+        if liability_suggestion is not None:
+            tx.liability_sugerido_id = liability_suggestion.liability_id
+            tx.liability_sugestao_confianca = liability_suggestion.confianca
+        else:
+            tx.liability_sugerido_id = None
+            tx.liability_sugestao_confianca = None
 
-    investimento_suggestion = engine.suggest_investimento_from_index(
-        normalizado, investimento_rules, investimento_historico
-    )
-    if investimento_suggestion is not None:
-        tx.investimento_sugerido_id = investimento_suggestion.investimento_id
-        tx.investimento_sugestao_confianca = investimento_suggestion.confianca
-    else:
-        tx.investimento_sugerido_id = None
-        tx.investimento_sugestao_confianca = None
+    if not tx.investimento_confirmado_manualmente:
+        investimento_suggestion = engine.suggest_investimento_from_index(
+            normalizado, investimento_rules, investimento_historico
+        )
+        if investimento_suggestion is not None:
+            tx.investimento_sugerido_id = investimento_suggestion.investimento_id
+            tx.investimento_sugestao_confianca = investimento_suggestion.confianca
+        else:
+            tx.investimento_sugerido_id = None
+            tx.investimento_sugestao_confianca = None
 
     db.flush()
 
@@ -242,6 +247,11 @@ def set_category(
 
     tx.subcategory_id = subcategory_id
     tx.categorizacao_status = PluggyTransactionCategorizacaoStatus.confirmada
+    tx.subcategoria_sugerida_id = None
+    tx.sugestao_confianca = None
+    tx.sugestao_fonte_tipo = None
+    tx.sugestao_fonte_id = None
+    tx.sugestao_score = None
     _recompute_data_competencia(tx, subcategory_id, salario_id, user.salario_competencia_cutoff_dia)
     db.commit()
     db.refresh(tx)
@@ -291,6 +301,11 @@ def bulk_confirm(
 
         tx.subcategory_id = subcategory_id
         tx.categorizacao_status = PluggyTransactionCategorizacaoStatus.confirmada
+        tx.subcategoria_sugerida_id = None
+        tx.sugestao_confianca = None
+        tx.sugestao_fonte_tipo = None
+        tx.sugestao_fonte_id = None
+        tx.sugestao_score = None
         _recompute_data_competencia(
             tx, subcategory_id, salario_id, user.salario_competencia_cutoff_dia
         )
@@ -311,6 +326,9 @@ def set_transaction_asset(
             raise NotFoundError(f"Ativo {asset_id} não encontrado")
 
     tx.asset_id = asset_id
+    tx.asset_sugerido_id = None
+    tx.asset_sugestao_confianca = None
+    tx.asset_confirmado_manualmente = True
     db.commit()
     db.refresh(tx)
     return tx
@@ -331,6 +349,9 @@ def set_transaction_liability(
             raise NotFoundError(f"Passivo {liability_id} não encontrado")
 
     tx.liability_id = liability_id
+    tx.liability_sugerido_id = None
+    tx.liability_sugestao_confianca = None
+    tx.liability_confirmado_manualmente = True
     db.commit()
     db.refresh(tx)
     return tx
@@ -351,6 +372,9 @@ def set_transaction_investimento(
             raise NotFoundError(f"Investimento {investimento_id} não encontrado")
 
     tx.investimento_id = investimento_id
+    tx.investimento_sugerido_id = None
+    tx.investimento_sugestao_confianca = None
+    tx.investimento_confirmado_manualmente = True
     db.commit()
     db.refresh(tx)
     return tx

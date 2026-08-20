@@ -178,11 +178,22 @@ class PluggyTransaction(Base):
     asset_id: Mapped[int | None] = mapped_column(ForeignKey("assets.id"), nullable=True)
     asset_sugerido_id: Mapped[int | None] = mapped_column(ForeignKey("assets.id"), nullable=True)
     asset_sugestao_confianca: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # True assim que o usuário escolhe manualmente o vínculo de ativo (mesmo
+    # que a escolha seja "nenhum") — impede que _apply_suggestions reponha
+    # asset_sugerido_id a cada recarga da lista enquanto a transação segue
+    # pendente (achado real: usuário não conseguia desvincular um investimento
+    # porque a sugestão de histórico voltava sempre).
+    asset_confirmado_manualmente: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
     liability_id: Mapped[int | None] = mapped_column(ForeignKey("liabilities.id"), nullable=True)
     liability_sugerido_id: Mapped[int | None] = mapped_column(
         ForeignKey("liabilities.id"), nullable=True
     )
     liability_sugestao_confianca: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    liability_confirmado_manualmente: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
     investimento_id: Mapped[int | None] = mapped_column(
         ForeignKey("investimentos.id"), nullable=True
     )
@@ -190,6 +201,9 @@ class PluggyTransaction(Base):
         ForeignKey("investimentos.id"), nullable=True
     )
     investimento_sugestao_confianca: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    investimento_confirmado_manualmente: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

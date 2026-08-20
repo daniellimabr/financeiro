@@ -495,6 +495,22 @@ def test_set_category_on_already_confirmed_transaction_updates_it(
     assert updated.categorizacao_status == PluggyTransactionCategorizacaoStatus.confirmada
 
 
+def test_set_category_clears_stale_suggestion_on_confirm(
+    db_session, user, subcategory, other_subcategory
+):
+    # Achado real: confirmar uma categoria diferente da última sugestão
+    # calculada deixava subcategoria_sugerida_id "preso" na sugestão antiga,
+    # e a UI prioriza esse campo sobre subcategory_id ao exibir o valor.
+    tx = _transaction(
+        db_session, user, "Mercado Sao Joao", subcategoria_sugerida_id=other_subcategory.id
+    )
+
+    confirmed = service.set_category(db_session, user.id, tx.id, subcategory.id)
+
+    assert confirmed.subcategory_id == subcategory.id
+    assert confirmed.subcategoria_sugerida_id is None
+
+
 def test_set_category_missing_transaction_raises_not_found(db_session, user, subcategory):
     with pytest.raises(NotFoundError):
         service.set_category(db_session, user.id, 999, subcategory.id)
@@ -623,6 +639,44 @@ def test_set_transaction_asset_missing_transaction_raises_not_found(db_session, 
         service.set_transaction_asset(db_session, user.id, 999, None)
 
 
+def test_set_transaction_asset_manual_clear_is_not_reapplied_by_suggestion(db_session, user):
+    # Achado real: o motor de sugestão recalcula asset_sugerido_id a cada
+    # list_transactions enquanto a transação segue pendente, repondo um
+    # vínculo que o usuário acabou de remover manualmente.
+    from app.models.categorization import AssetCategorizationRule
+
+    asset = Asset(
+        user_id=user.id,
+        nome="Apartamento",
+        tipo=AssetTipo.imovel,
+        valor_atual=Decimal("100.00"),
+        data_aquisicao=date(2020, 1, 1),
+    )
+    db_session.add(asset)
+    db_session.commit()
+    db_session.refresh(asset)
+    db_session.add(
+        AssetCategorizationRule(
+            user_id=user.id,
+            asset_id=asset.id,
+            padrao_descricao="Condominio Apto",
+            padrao_normalizado="condominio apto",
+            origem="usuario_confirmou",
+        )
+    )
+    db_session.commit()
+    tx = _pending_transaction(db_session, user, "Condominio Apto")
+
+    service.set_transaction_asset(db_session, user.id, tx.id, asset.id)
+    service.set_transaction_asset(db_session, user.id, tx.id, None)
+
+    items, total = service.list_transactions(db_session, user.id, status="pendente")
+
+    assert total == 1
+    assert items[0].asset_id is None
+    assert items[0].asset_sugerido_id is None
+
+
 # --- set_transaction_liability ----------------------------------------------
 
 
@@ -672,6 +726,29 @@ def test_set_transaction_liability_missing_transaction_raises_not_found(db_sessi
         service.set_transaction_liability(db_session, user.id, 999, None)
 
 
+def test_set_transaction_liability_manual_clear_is_not_reapplied_by_suggestion(db_session, user):
+    liability = Liability(
+        user_id=user.id,
+        nome="Financiamento",
+        tipo=LiabilityTipo.financiamento,
+        valor_total=Decimal("60000.00"),
+        saldo_devedor=Decimal("30000.00"),
+    )
+    db_session.add(liability)
+    db_session.commit()
+    db_session.refresh(liability)
+    tx = _pending_transaction(db_session, user, "Parcela Financiamento")
+
+    service.set_transaction_liability(db_session, user.id, tx.id, liability.id)
+    service.set_transaction_liability(db_session, user.id, tx.id, None)
+
+    items, total = service.list_transactions(db_session, user.id, status="pendente")
+
+    assert total == 1
+    assert items[0].liability_id is None
+    assert items[0].liability_sugerido_id is None
+
+
 # --- set_transaction_investimento -------------------------------------------
 
 
@@ -705,6 +782,41 @@ def test_set_transaction_investimento_other_users_investimento_raises_not_found(
 def test_set_transaction_investimento_missing_transaction_raises_not_found(db_session, user):
     with pytest.raises(NotFoundError):
         service.set_transaction_investimento(db_session, user.id, 999, None)
+
+
+def test_set_transaction_investimento_manual_clear_is_not_reapplied_by_suggestion(db_session, user):
+    # Regressão do achado real do CEO: um Pix vinculado ao Tesouro Direto
+    # Nubank não podia ser desassociado — set_transaction_investimento(None)
+    # gravava investimento_id = NULL corretamente, mas o próximo
+    # list_transactions recalculava investimento_sugerido_id pelo histórico
+    # (regra casando pela descrição) e a UI, que prioriza a sugestão sobre o
+    # valor real, voltava a mostrar o investimento como vinculado.
+    from app.models.categorization import InvestimentoCategorizationRule
+
+    investimento = Investimento(user_id=user.id, nome="Tesouro Direto Nubank")
+    db_session.add(investimento)
+    db_session.commit()
+    db_session.refresh(investimento)
+    db_session.add(
+        InvestimentoCategorizationRule(
+            user_id=user.id,
+            investimento_id=investimento.id,
+            padrao_descricao="Pix recebido Marlon",
+            padrao_normalizado="pix recebido marlon",
+            origem="usuario_confirmou",
+        )
+    )
+    db_session.commit()
+    tx = _pending_transaction(db_session, user, "Pix recebido Marlon")
+
+    service.set_transaction_investimento(db_session, user.id, tx.id, investimento.id)
+    service.set_transaction_investimento(db_session, user.id, tx.id, None)
+
+    items, total = service.list_transactions(db_session, user.id, status="pendente")
+
+    assert total == 1
+    assert items[0].investimento_id is None
+    assert items[0].investimento_sugerido_id is None
 
 
 # --- sugestão de investimento aplicada por list_transactions -----------------
