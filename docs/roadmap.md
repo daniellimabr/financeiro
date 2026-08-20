@@ -21,10 +21,12 @@ Backlog futuro (não desenhar agora): sync Pluggy agendada, otimização para co
 ## Auditoria estrutural (cadência)
 
 O CTO propõe rodar `structural-auditor` ([ADR-003](architecture/adr/ADR-003-agentes-coerencia-design-auditoria-estrutural.md))
-a cada 5 sprints executadas e aprovadas (sprints substituídas antes da execução, como a 27, não
-contam). A checagem é proativa — o CTO verifica esta tabela ao final de cada sprint / início de cada
-novo planejamento — mas a execução em si só acontece com aprovação explícita do CEO a cada vez, nunca
-automática/agendada.
+a cada 5 sprints executadas e aprovadas (sprints substituídas antes da execução, sem nenhum
+código implementado, não contam — não é mais o caso da 27: substituída mais cedo no dia
+2026-08-19, mas o CEO reverteu a decisão no mesmo dia e pediu a execução do escopo original,
+concluída e aprovada). A checagem é proativa — o CTO verifica esta tabela ao final de cada
+sprint / início de cada novo planejamento — mas a execução em si só acontece com aprovação
+explícita do CEO a cada vez, nunca automática/agendada.
 
 | Última auditoria | Sprint de referência | Próxima checagem devida | Status |
 |---|---|---|---|
@@ -1005,25 +1007,30 @@ Plano: [SPRINT-026-interatividade-graficos-dashboard-plan.md](sprints/SPRINT-026
 Relatório: [SPRINT-026-interatividade-graficos-dashboard-report.md](sprints/SPRINT-026-interatividade-graficos-dashboard-report.md).
 **Sprint aprovada pelo CEO em 2026-08-19.**
 
-### ~~Sprint 27 — Simulação "ocultar gasto" e gráfico comparativo de categorias~~ (substituída, não executada)
+### Sprint 27 — "Ocultar gasto" (binóculo) e gráfico comparativo de categorias (cross-epic, sem épico prévio)
 
 Planejada na mesma sessão (2026-08-19), 3ª das 3 sprints temáticas — a mais nova em decisões de
 produto, resolvidas com o CEO por perguntas diretas: "ocultar gasto" (toggle de binóculo por linha
-de transação dentro do funil Despesa/Receita aberto) recalcula só o total/gráfico daquele funil, não
-os cards de resumo do topo (Saldo, Patrimônio, Saldo Acumulado) — escopo "tela inteira" rejeitado
-porque os cards vêm de endpoints agregados separados, exigiria parâmetro de exclusão threaded por
-vários endpoints; estado 100% local/efêmero, mesmo padrão de `applyHipoteticas` da tela Projeção
-(Sprint 14) — sem persistência. Gráfico comparativo de composição de gasto por categoria ao longo
-dos últimos meses aparece dentro do próprio funil Despesa/Receita ao ser aberto, não em seção fixa
-separada.
+de transação dentro do funil Despesa/Receita aberto) recalcula o total/gráfico daquele funil; estado
+100% local/efêmero, mesmo padrão de `applyHipoteticas` da tela Projeção (Sprint 14) — sem
+persistência, reseta ao fechar o funil, trocar de card ou trocar o filtro de ano/mês. Gráfico
+comparativo de composição de gasto por categoria ao longo dos últimos meses aparece dentro do
+próprio funil Despesa/Receita ao ser aberto, não em seção fixa separada — reaproveita o dado de
+tendência por subcategoria já buscado pelo funil, sem endpoint novo.
 
-**Substituída pelo CEO em 2026-08-19 (mesmo dia da aprovação da Sprint 26), antes da execução** —
-o escopo acima nunca chegou a ser implementado. A vaga "Sprint 27" será ocupada por uma nova sprint,
-cujo `/plan` o próprio CEO vai rodar em seguida. PRD-027/SPRINT-027-plan permanecem no repo como
-registro histórico da decisão de produto original, mas não devem ser executados.
+**Substituída pelo CEO mais cedo em 2026-08-19 (mesmo dia da aprovação da Sprint 26), antes da
+execução — revertido pelo próprio CEO no mesmo dia**, pedindo a execução do escopo original acima.
+Durante a execução, o CEO também revisou ao vivo a decisão de escopo do "ocultar gasto": os cards
+**Receita/Despesa/Saldo** do topo do Dashboard também recalculam com o item oculto (não só o total
+do funil) — Patrimônio e Saldo Acumulado continuam intocados, por não terem relação direta com
+"ocultar uma linha de gasto do mês". QA visual ao vivo na VM de dev encontrou e corrigiu, na mesma
+sessão, um bug real de layout na legenda do gráfico comparativo (só aparecia com volume de
+categorias reais suficiente — não coberto pela fixture de teste local).
 
 PRD: [PRD-027-ocultar-gasto-comparativo-categorias.md](prd/PRD-027-ocultar-gasto-comparativo-categorias.md).
 Plano: [SPRINT-027-ocultar-gasto-comparativo-categorias-plan.md](sprints/SPRINT-027-ocultar-gasto-comparativo-categorias-plan.md).
+Relatório: [SPRINT-027-ocultar-gasto-comparativo-categorias-report.md](sprints/SPRINT-027-ocultar-gasto-comparativo-categorias-report.md).
+**Sprint aprovada pelo CEO em 2026-08-19.**
 
 ### Sprint 28 — Card Ativos (saldo de conta corrente + total completo) e Patrimônio redesenhado (cross-epic, sem épico prévio)
 
@@ -1042,6 +1049,8 @@ Acumulado" do Dashboard não muda, só sai de dentro da fórmula de Patrimônio.
 
 PRD: [PRD-028-ativos-saldo-conta-corrente-patrimonio-redesenhado.md](prd/PRD-028-ativos-saldo-conta-corrente-patrimonio-redesenhado.md).
 Plano: [SPRINT-028-ativos-saldo-conta-corrente-patrimonio-redesenhado-plan.md](sprints/SPRINT-028-ativos-saldo-conta-corrente-patrimonio-redesenhado-plan.md).
+Relatório: [SPRINT-028-ativos-saldo-conta-corrente-patrimonio-redesenhado-report.md](sprints/SPRINT-028-ativos-saldo-conta-corrente-patrimonio-redesenhado-report.md).
+**Sprint aprovada pelo CEO em 2026-08-19.**
 
 ### Sprint 29 — Coerência de design no planejamento + auditoria estrutural recorrente (cross-epic, sem épico prévio)
 
