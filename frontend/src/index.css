@@ -795,6 +795,13 @@ input {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
+  /* Sobrescreve o reset genérico de `li` (padding vertical + linha divisória
+     de largura total) — sem isso cada item da legenda vira uma "linha de
+     lista" cheia em vez de um chip compacto lado a lado (achado real do
+     CEO ao vivo: a legenda ocupava quase metade da tela). Mesmo padrão de
+     override já usado por .dash-list li/.simple-list li. */
+  padding: 0;
+  border-bottom: none;
 }
 
 .dash-chart-legend .swatch {
