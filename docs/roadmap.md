@@ -1071,6 +1071,34 @@ aprovação explícita do CEO por execução. Sugestão de feature sob demanda t
 PRD: [PRD-029-agentes-coerencia-design-auditoria-estrutural.md](prd/PRD-029-agentes-coerencia-design-auditoria-estrutural.md).
 Plano: [SPRINT-029-agentes-coerencia-design-auditoria-estrutural-plan.md](sprints/SPRINT-029-agentes-coerencia-design-auditoria-estrutural-plan.md).
 
+### Sprint 30 — Categorias por usuário, Orçamento, Gestão de Categorias/Subcategorias e remoção da Projeção (cross-epic, sem épico prévio)
+
+Planejada em sessão própria (2026-08-20), a partir de uma sugestão de funcionalidade do CTO
+("Orçamento mensal por categoria", pedida sob demanda pelo CEO) que o CEO aprovou e ampliou na
+mesma sessão: (1) tela de gestão de Categorias/Subcategorias (hoje só CRUD via API); (2)
+eliminação completa da Projeção (Sprint 14) — "não serviu ao propósito, e orçamento me parece
+melhor pra isso"; (3) revamp visual da tabela de classificação de Natureza. No meio da sessão o
+CEO corrigiu duas premissas do primeiro rascunho do plano — **Orçamento deve ser por usuário**
+(não global) e **Categoria/Subcategoria também precisam de tabela por usuário** (catálogo hoje
+global vira só o ponto de partida/seed de cada usuário) — e uma terceira: **Orçamento vale para
+Despesa e Receita**, não só Despesa.
+
+A migração de Categoria/Subcategoria de global para por-usuário virou a fase de maior risco da
+sprint (decisão de sequenciamento do CTO, não pedida pelo CEO, mas necessária tecnicamente) —
+toda tabela que referencia `subcategory_id` depende dela, e ela roda contra dado real da VM de
+dev, o único ambiente real hoje. Investigação de código também confirmou um achado de segurança
+pré-existente: `app/categories/service.py` nunca filtrou por usuário (fazia sentido enquanto a
+tabela era global) e `delete_subcategory`/`delete_group` excluíam sem checar uso — mesma classe
+de bug de FK sem `ondelete` já corrigida duas vezes antes no projeto para `asset_id`/
+`liability_id` (Sprints 8 e 9), agora pré-requisito de segurança antes de expor "Excluir" na UI.
+
+Decisão explícita do CEO: tudo entra numa sprint só, mesmo com a alternativa de dividir em
+sprints temáticas recomendada pelo CTO (mesmo padrão de divisão já usado em 7/8/9, 12/13/14/15,
+23/24, 25/26/27) — maior sprint do projeto até agora, comparável à Sprint 13.
+
+PRD: [PRD-030-categorias-por-usuario-orcamento-gestao-categorias.md](prd/PRD-030-categorias-por-usuario-orcamento-gestao-categorias.md).
+Plano: [SPRINT-030-categorias-por-usuario-orcamento-gestao-categorias-plan.md](sprints/SPRINT-030-categorias-por-usuario-orcamento-gestao-categorias-plan.md).
+
 ## Registro de reavaliações futuras
 
 - **Understand Anything:** reavaliar instalação quando o codebase ultrapassar ~100 arquivos (ver ADR-002-plugins).
