@@ -1,6 +1,6 @@
 # Estrutura de diretórios
 
-Atualizado a cada mudança estrutural. Estado atual (fim da Sprint 20 — Integração completa de Investments da Pluggy: holdings (`pluggy_investments`, `pluggy_investment_transactions`), sync/CRUD/rotas novas, Patrimônio soma holdings):
+Atualizado a cada mudança estrutural. Estado atual (fim da Sprint 29 — Agentes (planner estendido com DESIGN.md, novo structural-auditor), ADR-003 com cadência de auditoria estrutural):
 
 ```
 Financeiro v3/
@@ -47,8 +47,15 @@ Financeiro v3/
 │   │   ├── PRD-017-filtro-conta-validacao-extrato.md  # Sprint 17 — filtro de conta em Categorizar + reconciliação contra extrato real (cross-epic, sem épico prévio)
 │   │   ├── PRD-018-edicao-data-saldo-acumulado-guia-cards.md  # Sprint 18 — edição manual de data em Categorizar, investigação de Saldo Acumulado, guia dos cards (cross-epic, sem épico prévio)
 │   │   ├── PRD-019-gestao-de-investimentos.md  # Sprint 19 — modelo Investimento, categorização de Aporte/Resgate, InvestimentosPage; Bloco 3 investigação (cross-epic, sem épico prévio)
-│   │   │   # (lista não atualizada desde a Sprint 19 — PRDs 020-028 existem em docs/prd/ mas não estão
-│   │   │   #  registrados aqui; candidato a achado da primeira auditoria estrutural, ver ADR-003)
+│   │   ├── PRD-020-integracao-completa-investments-pluggy.md  # Sprint 20 — holdings sincronizadas, PluggyInvestment/PluggyInvestmentTransaction, Patrimônio soma holdings
+│   │   ├── PRD-021-vinculo-holdings-serie-historica.md  # Sprint 21 — vínculo automático holdings↔Investimento, série histórica mensal (cross-epic)
+│   │   ├── PRD-022-manutencao-investimentos-e-drilldown-patrimonio.md  # Sprint 22 — categorização investimentos, saldo_inicial holdings, drilldown Ativos/Patrimônio (cross-epic)
+│   │   ├── PRD-023-investimentos-drilldown-extrato-unificado.md  # Sprint 23 — drilldown posições holdings, extrato unificado Investimentos (cross-epic)
+│   │   ├── PRD-024-dashboard-layout-cards-navegacao.md  # Sprint 24 — layout Dashboard, redesign cards, navegação, cores (cross-epic)
+│   │   ├── PRD-025-escala-visual-tela-ativos-cards-dashboard.md  # Sprint 25 — escala visual sistema, tela Ativos, cards Ativos/Passivos/Patrimônio/Saldo Acumulado (cross-epic)
+│   │   ├── PRD-026-interatividade-graficos-dashboard.md  # Sprint 26 — interatividade gráficos (ampliar, hover, clique=filtro), sistema inteiro (cross-epic)
+│   │   ├── PRD-027-ocultar-gasto-comparativo-categorias.md  # Sprint 27 — simulação ocultar gasto, gráfico comparativo categorias (cross-epic)
+│   │   ├── PRD-028-ativos-saldo-conta-corrente-patrimonio-redesenhado.md  # Sprint 28 — card Ativos (saldo conta corrente), Patrimônio redesenhado (cross-epic)
 │   │   └── PRD-029-agentes-coerencia-design-auditoria-estrutural.md  # Sprint 29 — planner.md + DESIGN.md, novo agente structural-auditor, cadência de auditoria (cross-epic, sem épico prévio)
 │   ├── sprints/
 │   │   ├── SPRINT-001-fundacao-tecnica-plan.md       # Plano Sprint 1 (2026-08-04)
@@ -88,9 +95,26 @@ Financeiro v3/
 │   │   ├── SPRINT-018-edicao-data-saldo-acumulado-guia-cards-report.md  # Relatório Sprint 18 (2026-08-17)
 │   │   ├── SPRINT-019-gestao-de-investimentos-plan.md  # Plano Sprint 19 (2026-08-17)
 │   │   ├── SPRINT-019-gestao-de-investimentos-report.md  # Relatório Sprint 19 (2026-08-17)
-│   │   │   # (lista não atualizada desde a Sprint 19 — planos/relatórios 020-028 existem em docs/sprints/
-│   │   │   #  mas não estão registrados aqui; candidato a achado da primeira auditoria estrutural)
-│   │   └── SPRINT-029-agentes-coerencia-design-auditoria-estrutural-plan.md  # Plano Sprint 29 (2026-08-19)
+│   │   ├── SPRINT-020-integracao-completa-investments-pluggy-plan.md  # Plano Sprint 20 (2026-08-18)
+│   │   ├── SPRINT-020-integracao-completa-investments-pluggy-report.md  # Relatório Sprint 20 (2026-08-18)
+│   │   ├── SPRINT-021-vinculo-holdings-serie-historica-plan.md  # Plano Sprint 21 (2026-08-18)
+│   │   ├── SPRINT-021-vinculo-holdings-serie-historica-report.md  # Relatório Sprint 21 (2026-08-18)
+│   │   ├── SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-plan.md  # Plano Sprint 22 (2026-08-18)
+│   │   ├── SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-report.md  # Relatório Sprint 22 (2026-08-18)
+│   │   ├── SPRINT-023-investimentos-drilldown-extrato-unificado-plan.md  # Plano Sprint 23 (2026-08-18)
+│   │   ├── SPRINT-023-investimentos-drilldown-extrato-unificado-report.md  # Relatório Sprint 23 (2026-08-18)
+│   │   ├── SPRINT-024-dashboard-layout-cards-navegacao-plan.md  # Plano Sprint 24 (2026-08-18)
+│   │   ├── SPRINT-024-dashboard-layout-cards-navegacao-report.md  # Relatório Sprint 24 (2026-08-18)
+│   │   ├── SPRINT-025-escala-visual-tela-ativos-cards-dashboard-plan.md  # Plano Sprint 25 (2026-08-18)
+│   │   ├── SPRINT-025-escala-visual-tela-ativos-cards-dashboard-report.md  # Relatório Sprint 25 (2026-08-18)
+│   │   ├── SPRINT-026-interatividade-graficos-dashboard-plan.md  # Plano Sprint 26 (2026-08-19)
+│   │   ├── SPRINT-026-interatividade-graficos-dashboard-report.md  # Relatório Sprint 26 (2026-08-19)
+│   │   ├── SPRINT-027-ocultar-gasto-comparativo-categorias-plan.md  # Plano Sprint 27 (2026-08-19)
+│   │   ├── SPRINT-027-ocultar-gasto-comparativo-categorias-report.md  # Relatório Sprint 27 (2026-08-19)
+│   │   ├── SPRINT-028-ativos-saldo-conta-corrente-patrimonio-redesenhado-plan.md  # Plano Sprint 28 (2026-08-19)
+│   │   ├── SPRINT-028-ativos-saldo-conta-corrente-patrimonio-redesenhado-report.md  # Relatório Sprint 28 (2026-08-19)
+│   │   ├── SPRINT-029-agentes-coerencia-design-auditoria-estrutural-plan.md  # Plano Sprint 29 (2026-08-19)
+│   │   └── SPRINT-029-agentes-coerencia-design-auditoria-estrutural-report.md  # Relatório Sprint 29 (2026-08-19)
 │   ├── roadmap.md                  # épicos + sprints
 │   ├── directory-structure.md      # este arquivo — atualizado em Sprint 9
 │   ├── infra/

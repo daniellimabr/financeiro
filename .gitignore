@@ -55,3 +55,6 @@ scripts/browser-check/shots/
 
 # Extrato bancário real (Sprint 17) — dado financeiro sensível do CEO, nunca versionar
 itau_extrato_*.pdf
+
+# Scripts pessoais do CEO fora do escopo do projeto (achado da validação da Sprint 29)
+.bin/
