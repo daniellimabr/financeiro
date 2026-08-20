@@ -59,7 +59,15 @@ export function CategoriaComparativoChart({ grupos }: { grupos: ComparativoGrupo
             }}
             labelStyle={{ color: "var(--text-h)" }}
           />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
+          {/* wrapperStyle.position "static" (não o padrão "absolute" do
+              Recharts) — a legenda vira parte do fluxo normal do documento em
+              vez de um overlay sobreposto: com muitas categorias reais (a
+              suíte de teste local só usa 2, então isso nunca apareceu antes),
+              a legenda cresce mais alto que o container do gráfico e, como
+              overlay, alcançava e bloqueava cliques no botão "Fechar" do
+              funil acima — achado real em QA ao vivo (check-sprint27.mjs)
+              contra a VM de dev, não um bug do script. */}
+          <Legend wrapperStyle={{ fontSize: 12, position: "static" }} />
           {comparaveis.map((grupo) => (
             <Area
               key={grupo.group_id}

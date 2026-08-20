@@ -178,6 +178,11 @@ async function runSteps(page, label) {
   // ---- Ocultar de novo, fechar o funil e reabrir: reset automático ----
   await toggle.click();
   await page.waitForTimeout(300);
+  // A legenda do gráfico comparativo (Recharts) intercepta o clique no botão
+  // "Fechar" se o scroll ficou na posição da última interação (achado real
+  // do próprio script, não do produto — mesmo padrão de scrollIntoViewIfNeeded
+  // já usado no check-sprint26.mjs pra um problema equivalente).
+  await page.locator(".dash-funnel-head").scrollIntoViewIfNeeded();
   await page.getByRole("button", { name: "Fechar" }).click();
   await despesaTile.click();
   await funil.locator(".dash-accordion > li .dash-row").first().waitFor({ timeout: 10000 });
