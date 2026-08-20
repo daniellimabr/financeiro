@@ -1155,7 +1155,7 @@ evitando a corrida de processos já documentada em `docs/architecture/OVERVIEW.m
 PRD: [PRD-031-fix-desassociacao-vinculo-transacao.md](prd/PRD-031-fix-desassociacao-vinculo-transacao.md).
 Plano: [SPRINT-031-fix-desassociacao-vinculo-transacao-plan.md](sprints/SPRINT-031-fix-desassociacao-vinculo-transacao-plan.md).
 Relatório: [SPRINT-031-fix-desassociacao-vinculo-transacao-report.md](sprints/SPRINT-031-fix-desassociacao-vinculo-transacao-report.md).
-**Sprint aprovada pelo CEO em 2026-08-20.**
+**Sprint aprovada pelo CEO em 2026-08-20**, com validação real no app ("Deu certo a alteração, ja testei!").
 
 ## Registro de reavaliações futuras
 

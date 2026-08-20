@@ -2,7 +2,7 @@
 
 - **Plano:** [SPRINT-031-fix-desassociacao-vinculo-transacao-plan.md](./SPRINT-031-fix-desassociacao-vinculo-transacao-plan.md)
 - **Data do relatório:** 2026-08-20
-- **Aprovado pelo CEO em:** 2026-08-20 ("ok, parece tudo certo", após deploy e validação técnica nesta sessão)
+- **Aprovado pelo CEO em:** 2026-08-20 — validação técnica ("ok, parece tudo certo", após deploy) e, na sequência, validação real no app ("Deu certo a alteração, ja testei!")
 
 ## Resumo
 
@@ -102,8 +102,8 @@ apesar do escopo de código pequeno (1 migration + 4 arquivos tocados).
 
 ## Pendências e próximos passos sugeridos
 
-1. CEO validar na prática, na própria tela de Categorização, que a desassociação do Tesouro Direto
-   Nubank (e de outros vínculos) agora persiste após recarregar a página — validação até agora foi
-   técnica (migration aplicada, container saudável), não um clique real do CEO no app.
+1. ~~CEO validar na prática...~~ — **feito**: CEO confirmou em 2026-08-20 que a desassociação do
+   Tesouro Direto Nubank funciona no app real, fechando o único item pendente da sprint.
 2. Sem QA visual automatizado (`browser-check`) para este fix — sprint 100% backend, sem mudança de
-   UI a validar visualmente.
+   UI a validar visualmente. Não considerado necessário dado o item 1 confirmado diretamente pelo
+   CEO.
