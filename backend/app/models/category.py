@@ -20,9 +20,11 @@ class Natureza(enum.StrEnum):
 
 class CategoryGroup(Base):
     __tablename__ = "category_groups"
+    __table_args__ = (UniqueConstraint("user_id", "nome", name="uq_category_group_user_nome"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    nome: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    nome: Mapped[str] = mapped_column(String(255), index=True)
     excluir_de_totais: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -39,6 +41,7 @@ class Subcategory(Base):
     __table_args__ = (UniqueConstraint("group_id", "nome", name="uq_subcategory_group_nome"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     group_id: Mapped[int] = mapped_column(ForeignKey("category_groups.id"), nullable=False)
     nome: Mapped[str] = mapped_column(String(255), nullable=False)
     natureza: Mapped[Natureza | None] = mapped_column(

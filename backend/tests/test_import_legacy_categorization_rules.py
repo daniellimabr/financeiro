@@ -13,11 +13,19 @@ FIXTURE_PATH = Path(__file__).parent / "fixtures" / "semente_classificacao_sampl
 
 
 @pytest.fixture()
-def taxonomy(db_session):
-    group = CategoryGroup(nome="Alimentação")
+def user(db_session):
+    u = User(google_sub="google-1", email="ceo@example.com", name="CEO")
+    db_session.add(u)
+    db_session.commit()
+    db_session.refresh(u)
+    return u
+
+
+def _taxonomy(db_session, user):
+    group = CategoryGroup(user_id=user.id, nome="Alimentação")
     db_session.add(group)
     db_session.flush()
-    subcategory = Subcategory(group_id=group.id, nome="Comer fora")
+    subcategory = Subcategory(user_id=user.id, group_id=group.id, nome="Comer fora")
     db_session.add(subcategory)
     db_session.commit()
     db_session.refresh(subcategory)
@@ -25,12 +33,8 @@ def taxonomy(db_session):
 
 
 @pytest.fixture()
-def user(db_session):
-    u = User(google_sub="google-1", email="ceo@example.com", name="CEO")
-    db_session.add(u)
-    db_session.commit()
-    db_session.refresh(u)
-    return u
+def taxonomy(db_session, user):
+    return _taxonomy(db_session, user)
 
 
 def test_import_creates_rule_and_logs_unresolved_category(db_session, taxonomy, user, caplog):
@@ -62,6 +66,7 @@ def test_import_is_isolated_per_user(db_session, taxonomy, user):
     db_session.add(other_user)
     db_session.commit()
     db_session.refresh(other_user)
+    _taxonomy(db_session, other_user)
 
     import_legacy_rules(db_session, user.id, FIXTURE_PATH)
     stats_other = import_legacy_rules(db_session, other_user.id, FIXTURE_PATH)

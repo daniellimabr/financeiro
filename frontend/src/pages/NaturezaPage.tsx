@@ -9,7 +9,7 @@ import {
   type TransacaoTipo,
 } from "../api/dashboards";
 import { PeriodFilter } from "../components/PeriodFilter";
-import { SortableHeader } from "../components/SortableHeader";
+import { SubcategoryGroupTable } from "../components/SubcategoryGroupTable";
 import { TransactionsTable } from "../components/TransactionsTable";
 import { TrendLineChart } from "../components/TrendLineChart";
 import { useCategoryGroups } from "../hooks/useCategoryGroups";
@@ -258,59 +258,28 @@ export function NaturezaPage() {
 
       {updateNatureza.isError && <p role="alert">Não foi possível salvar a natureza.</p>}
 
-      <div className="dash-table-wrap">
-        <table className="dash-table nat-table">
-          <colgroup>
-            <col className="col-grupo" />
-            <col className="col-subcategoria" />
-            <col className="col-natureza" />
-          </colgroup>
-          <thead>
-            <tr>
-              <SortableHeader
-                label="Categoria"
-                sortKeyName="grupo"
-                currentKey={classificacaoSortKey}
-                direction={classificacaoDirection}
-                onClick={() => toggleClassificacaoSort("grupo")}
-              />
-              <SortableHeader
-                label="Subcategoria"
-                sortKeyName="subcategoria"
-                currentKey={classificacaoSortKey}
-                direction={classificacaoDirection}
-                onClick={() => toggleClassificacaoSort("subcategoria")}
-              />
-              <th>Natureza</th>
-            </tr>
-          </thead>
-          <tbody>
-            {gruposComSubcategoriasOrdenados.map(({ group, subcategorias }) =>
-              subcategorias.map((sub, index) => (
-                <tr key={sub.id}>
-                  {index === 0 && <td rowSpan={subcategorias.length}>{group.nome}</td>}
-                  <td>{sub.nome}</td>
-                  <td>
-                    <select
-                      aria-label={`Natureza de ${sub.nome}`}
-                      value={sub.natureza ?? "eventual"}
-                      onChange={(event) =>
-                        updateNatureza.mutate({ subcategory: sub, natureza: event.target.value })
-                      }
-                    >
-                      {NATUREZA_ORDER.map((natureza) => (
-                        <option key={natureza} value={natureza}>
-                          {naturezaLabel(natureza)}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <SubcategoryGroupTable
+        grupos={gruposComSubcategoriasOrdenados}
+        sortKey={classificacaoSortKey}
+        sortDirection={classificacaoDirection}
+        onSort={toggleClassificacaoSort}
+        terceiraColunaLabel="Natureza"
+        renderThirdColumn={(sub) => (
+          <select
+            aria-label={`Natureza de ${sub.nome}`}
+            value={sub.natureza ?? "eventual"}
+            onChange={(event) =>
+              updateNatureza.mutate({ subcategory: sub, natureza: event.target.value })
+            }
+          >
+            {NATUREZA_ORDER.map((natureza) => (
+              <option key={natureza} value={natureza}>
+                {naturezaLabel(natureza)}
+              </option>
+            ))}
+          </select>
+        )}
+      />
     </section>
   );
 }

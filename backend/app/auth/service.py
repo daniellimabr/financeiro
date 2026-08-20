@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 
+from app.categories.seed import seed_categories_for_user
 from app.models.user import User
 
 
@@ -9,6 +10,8 @@ def upsert_user_from_google(db: Session, *, google_sub: str, email: str, name: s
     if user is None:
         user = User(google_sub=google_sub, email=email, name=name)
         db.add(user)
+        db.flush()
+        seed_categories_for_user(db, user.id)
     else:
         user.email = email
         user.name = name

@@ -30,11 +30,11 @@ def _authenticate(client, db_session, *, google_sub="google-1", email="a@example
     return user
 
 
-def _subcategory(db_session, nome="Mercado", natureza=None):
-    group = CategoryGroup(nome=f"Grupo {nome}")
+def _subcategory(db_session, user, nome="Mercado", natureza=None):
+    group = CategoryGroup(user_id=user.id, nome=f"Grupo {nome}")
     db_session.add(group)
     db_session.flush()
-    subcategory = Subcategory(group_id=group.id, nome=nome, natureza=natureza)
+    subcategory = Subcategory(user_id=user.id, group_id=group.id, nome=nome, natureza=natureza)
     db_session.add(subcategory)
     db_session.commit()
     db_session.refresh(subcategory)
@@ -186,7 +186,7 @@ def test_por_ativo_tendencia_without_cookie_returns_401(client):
 
 def test_summary_returns_totals_for_period(client, db_session):
     user = _authenticate(client, db_session)
-    sub = _subcategory(db_session)
+    sub = _subcategory(db_session, user)
     _transaction(
         db_session, user, valor="-100.00", tipo=PluggyTransactionTipo.debito, subcategory_id=sub.id
     )
@@ -203,7 +203,7 @@ def test_summary_returns_totals_for_period(client, db_session):
 
 def test_por_categoria_returns_grouped_totals(client, db_session):
     user = _authenticate(client, db_session)
-    sub = _subcategory(db_session)
+    sub = _subcategory(db_session, user)
     _transaction(
         db_session, user, valor="-100.00", tipo=PluggyTransactionTipo.debito, subcategory_id=sub.id
     )
@@ -474,7 +474,7 @@ def test_tendencia_returns_series_combining_meses_and_periodo_filter(client, db_
 
 def test_por_categoria_tendencia_returns_series_per_subcategory(client, db_session):
     user = _authenticate(client, db_session)
-    sub = _subcategory(db_session)
+    sub = _subcategory(db_session, user)
     _transaction(
         db_session,
         user,
@@ -760,7 +760,7 @@ def test_por_natureza_tendencia_without_cookie_returns_401(client):
 
 def test_por_natureza_returns_three_buckets_with_totals(client, db_session):
     user = _authenticate(client, db_session)
-    sub = _subcategory(db_session, nome="Aluguel", natureza=Natureza.fixa)
+    sub = _subcategory(db_session, user, nome="Aluguel", natureza=Natureza.fixa)
     _transaction(
         db_session, user, valor="-1000.00", tipo=PluggyTransactionTipo.debito, subcategory_id=sub.id
     )
@@ -780,7 +780,7 @@ def test_por_natureza_returns_three_buckets_with_totals(client, db_session):
 
 def test_por_natureza_null_natureza_falls_back_to_eventual(client, db_session):
     user = _authenticate(client, db_session)
-    sub = _subcategory(db_session, nome="Diversos", natureza=None)
+    sub = _subcategory(db_session, user, nome="Diversos", natureza=None)
     _transaction(
         db_session, user, valor="-50.00", tipo=PluggyTransactionTipo.debito, subcategory_id=sub.id
     )
@@ -800,7 +800,7 @@ def test_por_natureza_isolated_by_user(client, db_session):
     db_session.add(other)
     db_session.commit()
     db_session.refresh(other)
-    other_sub = _subcategory(db_session, nome="Aluguel de outro", natureza=Natureza.fixa)
+    other_sub = _subcategory(db_session, other, nome="Aluguel de outro", natureza=Natureza.fixa)
     _transaction(
         db_session,
         other,
@@ -821,7 +821,7 @@ def test_por_natureza_isolated_by_user(client, db_session):
 
 def test_por_natureza_tendencia_returns_series_zero_filled(client, db_session):
     user = _authenticate(client, db_session)
-    sub = _subcategory(db_session, nome="Aluguel", natureza=Natureza.fixa)
+    sub = _subcategory(db_session, user, nome="Aluguel", natureza=Natureza.fixa)
     _transaction(
         db_session,
         user,
@@ -850,7 +850,7 @@ def test_por_natureza_tendencia_isolated_by_user(client, db_session):
     db_session.add(other)
     db_session.commit()
     db_session.refresh(other)
-    other_sub = _subcategory(db_session, nome="Aluguel de outro", natureza=Natureza.fixa)
+    other_sub = _subcategory(db_session, other, nome="Aluguel de outro", natureza=Natureza.fixa)
     _transaction(
         db_session,
         other,
@@ -868,79 +868,6 @@ def test_por_natureza_tendencia_isolated_by_user(client, db_session):
 
     assert response.status_code == 200
     assert all(Decimal(p["total"]) == Decimal("0") for n in response.json() for p in n["pontos"])
-
-
-def test_projecao_without_cookie_returns_401(client):
-    response = client.get("/dashboards/projecao", params={"ano": 2026, "mes": 1})
-    assert response.status_code == 401
-
-
-def test_projecao_returns_horizon_with_constant_value(client, db_session):
-    user = _authenticate(client, db_session)
-    sub = _subcategory(db_session, nome="Aluguel", natureza=Natureza.fixa)
-    _transaction(
-        db_session,
-        user,
-        valor="-1200.00",
-        tipo=PluggyTransactionTipo.debito,
-        subcategory_id=sub.id,
-        data=date(2026, 1, 15),
-    )
-
-    response = client.get(
-        "/dashboards/projecao",
-        params={"ano": 2026, "mes": 1, "meses_futuros": 3, "janela_media": 1},
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert [(p["ano"], p["mes"]) for p in body] == [(2026, 2), (2026, 3), (2026, 4)]
-    assert all(Decimal(p["despesa"]) == Decimal("1200.00") for p in body)
-
-
-def test_projecao_respects_ano_mes_meses_futuros_janela_media_params(client, db_session):
-    user = _authenticate(client, db_session)
-    sub = _subcategory(db_session, nome="Aluguel", natureza=Natureza.fixa)
-    _transaction(
-        db_session,
-        user,
-        valor="-1000.00",
-        tipo=PluggyTransactionTipo.debito,
-        subcategory_id=sub.id,
-        data=date(2026, 1, 15),
-    )
-
-    response = client.get(
-        "/dashboards/projecao",
-        params={"ano": 2026, "mes": 1, "meses_futuros": 6, "janela_media": 3},
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert len(body) == 6
-    assert all(Decimal(p["despesa"]) == Decimal("333.33") for p in body)
-
-
-def test_projecao_isolated_by_user(client, db_session):
-    other = User(google_sub="google-projecao", email="projecao@example.com", name="Bob")
-    db_session.add(other)
-    db_session.commit()
-    db_session.refresh(other)
-    other_sub = _subcategory(db_session, nome="Aluguel de outro", natureza=Natureza.fixa)
-    _transaction(
-        db_session,
-        other,
-        valor="-999.00",
-        tipo=PluggyTransactionTipo.debito,
-        subcategory_id=other_sub.id,
-    )
-
-    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
-
-    response = client.get("/dashboards/projecao", params={"ano": 2026, "mes": 1})
-
-    assert response.status_code == 200
-    assert all(Decimal(p["despesa"]) == Decimal("0") for p in response.json())
 
 
 # --- GET /dashboards/evolucao-saldo-por-conta ---------------------------------
@@ -1027,3 +954,65 @@ def test_saldo_acumulado_isolated_by_user(client, db_session):
 
     assert response.status_code == 200
     assert Decimal(response.json()[0]["total"]) == Decimal("0")
+
+
+# --- GET /dashboards/por-orcamento ------------------------------------------
+
+
+def test_por_orcamento_without_cookie_returns_401(client):
+    response = client.get(
+        "/dashboards/por-orcamento", params={"tipo": "debito", "ano": 2026, "mes": 1}
+    )
+    assert response.status_code == 401
+
+
+def test_por_orcamento_returns_orcado_and_realizado(client, db_session):
+    user = _authenticate(client, db_session)
+    sub = _subcategory(db_session, user, nome="Aluguel")
+    _transaction(
+        db_session, user, valor="-800.00", tipo=PluggyTransactionTipo.debito, subcategory_id=sub.id
+    )
+    client.post(
+        "/orcamentos",
+        json={
+            "subcategory_id": sub.id,
+            "tipo": "eventual",
+            "valor": "1000.00",
+            "ano": 2026,
+            "mes": 1,
+        },
+    )
+
+    response = client.get(
+        "/dashboards/por-orcamento", params={"tipo": "debito", "ano": 2026, "mes": 1}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert Decimal(body[0]["orcado"]) == Decimal("1000.00")
+    assert Decimal(body[0]["realizado"]) == Decimal("800.00")
+
+
+def test_por_orcamento_isolated_by_user(client, db_session):
+    other = User(google_sub="google-por-orcamento", email="por-orcamento@example.com", name="Bob")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    other_sub = _subcategory(db_session, other, nome="Aluguel de outro")
+    _transaction(
+        db_session,
+        other,
+        valor="-999.00",
+        tipo=PluggyTransactionTipo.debito,
+        subcategory_id=other_sub.id,
+    )
+
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+
+    response = client.get(
+        "/dashboards/por-orcamento", params={"tipo": "debito", "ano": 2026, "mes": 1}
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []

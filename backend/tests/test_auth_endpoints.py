@@ -1,4 +1,5 @@
 from app.auth.jwt import COOKIE_NAME, create_access_token
+from app.models.category import CategoryGroup, Subcategory
 from app.models.user import User
 
 
@@ -118,3 +119,41 @@ def test_google_callback_creates_session_cookie(client, db_session, monkeypatch)
 
     user = db_session.query(User).filter(User.google_sub == "google-42").one()
     assert user.email == "bob@example.com"
+
+    groups = db_session.query(CategoryGroup).filter(CategoryGroup.user_id == user.id).all()
+    subcategories = db_session.query(Subcategory).filter(Subcategory.user_id == user.id).all()
+    assert len(groups) > 0
+    assert len(subcategories) > 0
+
+
+def test_google_callback_does_not_reseed_categories_for_existing_user(
+    client, db_session, monkeypatch
+):
+    async def fake_authorize_access_token(request):
+        return {
+            "userinfo": {
+                "sub": "google-43",
+                "email": "carol@example.com",
+                "name": "Carol",
+            }
+        }
+
+    monkeypatch.setattr(
+        "app.auth.router.oauth.google.authorize_access_token",
+        fake_authorize_access_token,
+    )
+
+    client.get("/auth/google/callback", follow_redirects=False)
+    user = db_session.query(User).filter(User.google_sub == "google-43").one()
+    count_after_first_login = (
+        db_session.query(CategoryGroup).filter(CategoryGroup.user_id == user.id).count()
+    )
+
+    client.cookies.clear()
+    client.get("/auth/google/callback", follow_redirects=False)
+    count_after_second_login = (
+        db_session.query(CategoryGroup).filter(CategoryGroup.user_id == user.id).count()
+    )
+
+    assert count_after_first_login > 0
+    assert count_after_second_login == count_after_first_login

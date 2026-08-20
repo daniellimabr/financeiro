@@ -8,6 +8,7 @@ from app.models.asset import Asset, AssetStatus, AssetTipo
 from app.models.category import CategoryGroup, Natureza, Subcategory
 from app.models.investimento import Investimento
 from app.models.liability import Liability, LiabilityStatus, LiabilityTipo
+from app.models.orcamento import OrcamentoTipo
 from app.models.pluggy import (
     PluggyAccount,
     PluggyAccountTipo,
@@ -19,6 +20,7 @@ from app.models.pluggy import (
     PluggyTransactionTipo,
 )
 from app.models.user import User
+from app.orcamentos.service import create_orcamento
 
 _SEQ = iter(range(1, 10_000))
 
@@ -33,16 +35,20 @@ def user(db_session):
     return u
 
 
-def _group(db_session, nome=None, excluir_de_totais=False):
-    group = CategoryGroup(nome=nome or f"Grupo {next(_SEQ)}", excluir_de_totais=excluir_de_totais)
+def _group(db_session, user, nome=None, excluir_de_totais=False):
+    group = CategoryGroup(
+        user_id=user.id, nome=nome or f"Grupo {next(_SEQ)}", excluir_de_totais=excluir_de_totais
+    )
     db_session.add(group)
     db_session.flush()
     return group
 
 
-def _subcategory(db_session, group=None, nome=None, natureza=None):
-    group = group or _group(db_session)
-    s = Subcategory(group_id=group.id, nome=nome or f"Sub {next(_SEQ)}", natureza=natureza)
+def _subcategory(db_session, user, group=None, nome=None, natureza=None):
+    group = group or _group(db_session, user)
+    s = Subcategory(
+        user_id=user.id, group_id=group.id, nome=nome or f"Sub {next(_SEQ)}", natureza=natureza
+    )
     db_session.add(s)
     db_session.flush()
     return s
@@ -115,8 +121,8 @@ def test_get_summary_empty_period_returns_zeros(db_session, user):
 
 def test_get_summary_period_with_only_transferencia_interna_is_zeroed(db_session, user):
     account = _account(db_session, user)
-    transferencia = _group(db_session, nome="Transferência interna", excluir_de_totais=True)
-    sub = _subcategory(db_session, group=transferencia, nome="Pagamento de Fatura")
+    transferencia = _group(db_session, user, nome="Transferência interna", excluir_de_totais=True)
+    sub = _subcategory(db_session, user, group=transferencia, nome="Pagamento de Fatura")
     _transaction(
         db_session,
         user,
@@ -444,8 +450,8 @@ def test_get_summary_month_boundary_filters_by_data_competencia(db_session, user
 
 def test_get_por_categoria_sums_match_summary_and_bucket_uncategorized(db_session, user):
     account = _account(db_session, user)
-    group = _group(db_session, nome="Alimentação")
-    sub = _subcategory(db_session, group=group, nome="Mercado")
+    group = _group(db_session, user, nome="Alimentação")
+    sub = _subcategory(db_session, user, group=group, nome="Mercado")
     _transaction(
         db_session,
         user,
@@ -512,9 +518,9 @@ def test_get_por_meio_pagamento_groups_by_account_tipo(db_session, user):
 
 def test_get_por_meio_pagamento_filters_by_categoria_id(db_session, user):
     account = _account(db_session, user)
-    group = _group(db_session, nome="Alimentação")
-    sub = _subcategory(db_session, group=group, nome="Mercado")
-    other_sub = _subcategory(db_session, group=group, nome="Restaurante")
+    group = _group(db_session, user, nome="Alimentação")
+    sub = _subcategory(db_session, user, group=group, nome="Mercado")
+    other_sub = _subcategory(db_session, user, group=group, nome="Restaurante")
     _transaction(
         db_session,
         user,
@@ -549,8 +555,8 @@ def test_get_por_meio_pagamento_filters_by_categoria_id(db_session, user):
 
 def test_get_por_meio_pagamento_filters_by_categoria_id_uncategorized(db_session, user):
     account = _account(db_session, user)
-    group = _group(db_session, nome="Alimentação")
-    sub = _subcategory(db_session, group=group, nome="Mercado")
+    group = _group(db_session, user, nome="Alimentação")
+    sub = _subcategory(db_session, user, group=group, nome="Mercado")
     _transaction(
         db_session,
         user,
@@ -610,9 +616,9 @@ def test_summary_and_por_categoria_isolated_by_user(db_session, user):
 
 def test_get_por_categoria_percentual_sums_to_100(db_session, user):
     account = _account(db_session, user)
-    group = _group(db_session, nome="Alimentação")
-    sub1 = _subcategory(db_session, group=group, nome="Mercado")
-    sub2 = _subcategory(db_session, group=group, nome="Restaurante")
+    group = _group(db_session, user, nome="Alimentação")
+    sub1 = _subcategory(db_session, user, group=group, nome="Mercado")
+    sub2 = _subcategory(db_session, user, group=group, nome="Restaurante")
     _transaction(
         db_session,
         user,
@@ -735,8 +741,8 @@ def test_get_tendencia_por_categoria_groups_across_months_with_uncategorized_buc
     db_session, user
 ):
     account = _account(db_session, user)
-    group = _group(db_session, nome="Alimentação")
-    sub = _subcategory(db_session, group=group, nome="Mercado")
+    group = _group(db_session, user, nome="Alimentação")
+    sub = _subcategory(db_session, user, group=group, nome="Mercado")
     _transaction(
         db_session,
         user,
@@ -1175,7 +1181,7 @@ def test_get_tendencia_por_investimento_isolated_by_user(db_session, user):
 
 def test_aporte_resgate_group_does_not_change_totals_of_unrelated_transactions(db_session, user):
     account = _account(db_session, user)
-    outro_grupo = _subcategory(db_session, nome="Mercado")
+    outro_grupo = _subcategory(db_session, user, nome="Mercado")
     _transaction(
         db_session,
         user,
@@ -1202,11 +1208,13 @@ def test_aporte_resgate_group_does_not_change_totals_of_unrelated_transactions(d
     # Introduz o grupo "Investimentos" (excluir_de_totais=False) com
     # subcategorias Aporte/Resgate, sem nenhuma transação usá-lo — mesmo
     # cenário do dia 1 pós-migration 0015, antes de qualquer aporte real.
-    investimentos_group = CategoryGroup(nome="Investimentos", excluir_de_totais=False)
+    investimentos_group = CategoryGroup(
+        user_id=user.id, nome="Investimentos", excluir_de_totais=False
+    )
     db_session.add(investimentos_group)
     db_session.flush()
-    db_session.add(Subcategory(group_id=investimentos_group.id, nome="Aporte"))
-    db_session.add(Subcategory(group_id=investimentos_group.id, nome="Resgate"))
+    db_session.add(Subcategory(user_id=user.id, group_id=investimentos_group.id, nome="Aporte"))
+    db_session.add(Subcategory(user_id=user.id, group_id=investimentos_group.id, nome="Resgate"))
     db_session.commit()
 
     summary_depois = service.get_summary(db_session, user.id, ano=2026, mes=1)
@@ -1511,9 +1519,9 @@ def test_get_saldo_por_conta_isolated_by_user(db_session, user):
 
 def test_get_por_natureza_groups_by_fixa_variavel_eventual(db_session, user):
     account = _account(db_session, user)
-    sub_fixa = _subcategory(db_session, nome="Aluguel", natureza=Natureza.fixa)
-    sub_variavel = _subcategory(db_session, nome="Mercado", natureza=Natureza.variavel)
-    sub_eventual = _subcategory(db_session, nome="Viagem", natureza=Natureza.eventual)
+    sub_fixa = _subcategory(db_session, user, nome="Aluguel", natureza=Natureza.fixa)
+    sub_variavel = _subcategory(db_session, user, nome="Mercado", natureza=Natureza.variavel)
+    sub_eventual = _subcategory(db_session, user, nome="Viagem", natureza=Natureza.eventual)
     _transaction(
         db_session,
         user,
@@ -1554,7 +1562,7 @@ def test_get_por_natureza_groups_by_fixa_variavel_eventual(db_session, user):
 
 def test_get_por_natureza_null_natureza_falls_back_to_eventual(db_session, user):
     account = _account(db_session, user)
-    sub_sem_natureza = _subcategory(db_session, nome="Diversos", natureza=None)
+    sub_sem_natureza = _subcategory(db_session, user, nome="Diversos", natureza=None)
     _transaction(
         db_session,
         user,
@@ -1597,9 +1605,9 @@ def test_get_por_natureza_transaction_without_subcategory_falls_back_to_eventual
 
 def test_get_por_natureza_excludes_excluir_de_totais_group(db_session, user):
     account = _account(db_session, user)
-    transferencia = _group(db_session, nome="Transferência interna", excluir_de_totais=True)
+    transferencia = _group(db_session, user, nome="Transferência interna", excluir_de_totais=True)
     sub = _subcategory(
-        db_session, group=transferencia, nome="Pagamento de Fatura", natureza=Natureza.fixa
+        db_session, user, group=transferencia, nome="Pagamento de Fatura", natureza=Natureza.fixa
     )
     _transaction(
         db_session,
@@ -1624,7 +1632,7 @@ def test_get_por_natureza_isolated_by_user(db_session, user):
     db_session.commit()
     db_session.refresh(other)
     other_account = _account(db_session, other)
-    sub = _subcategory(db_session, nome="Aluguel", natureza=Natureza.fixa)
+    sub = _subcategory(db_session, other, nome="Aluguel", natureza=Natureza.fixa)
     _transaction(
         db_session,
         other,
@@ -1658,8 +1666,8 @@ def test_get_por_natureza_always_returns_three_buckets_when_no_data(db_session, 
 
 def test_get_por_natureza_percentual_sums_to_100(db_session, user):
     account = _account(db_session, user)
-    sub_fixa = _subcategory(db_session, nome="Aluguel", natureza=Natureza.fixa)
-    sub_variavel = _subcategory(db_session, nome="Mercado", natureza=Natureza.variavel)
+    sub_fixa = _subcategory(db_session, user, nome="Aluguel", natureza=Natureza.fixa)
+    sub_variavel = _subcategory(db_session, user, nome="Mercado", natureza=Natureza.variavel)
     _transaction(
         db_session,
         user,
@@ -1691,7 +1699,7 @@ def test_get_por_natureza_percentual_sums_to_100(db_session, user):
 
 def test_get_tendencia_por_natureza_groups_across_months_zero_filled(db_session, user):
     account = _account(db_session, user)
-    sub_fixa = _subcategory(db_session, nome="Aluguel", natureza=Natureza.fixa)
+    sub_fixa = _subcategory(db_session, user, nome="Aluguel", natureza=Natureza.fixa)
     _transaction(
         db_session,
         user,
@@ -1719,198 +1727,6 @@ def test_get_tendencia_por_natureza_groups_across_months_zero_filled(db_session,
     assert all(p.total == Decimal("0") for p in variavel.pontos)
 
 
-def test_future_month_range_returns_months_after_base():
-    assert service._future_month_range(2026, 10, 3) == [(2026, 11), (2026, 12), (2027, 1)]
-
-
-def test_future_month_range_wraps_year_boundary():
-    assert service._future_month_range(2026, 12, 2) == [(2027, 1), (2027, 2)]
-
-
-def test_get_projecao_averages_last_janela_meses_of_fixa_variavel(db_session, user):
-    account = _account(db_session, user)
-    sub_fixa = _subcategory(db_session, nome="Aluguel", natureza=Natureza.fixa)
-    sub_variavel = _subcategory(db_session, nome="Mercado", natureza=Natureza.variavel)
-    # 3 meses de janela (nov/dez/jan), média deve ser (1000+900+800)/3=900 despesa,
-    # (2000+2000+2000)/3=2000 receita.
-    _transaction(
-        db_session,
-        user,
-        account,
-        valor="-1000.00",
-        tipo=PluggyTransactionTipo.debito,
-        data=date(2025, 11, 5),
-        subcategory_id=sub_fixa.id,
-    )
-    _transaction(
-        db_session,
-        user,
-        account,
-        valor="-900.00",
-        tipo=PluggyTransactionTipo.debito,
-        data=date(2025, 12, 5),
-        subcategory_id=sub_fixa.id,
-    )
-    _transaction(
-        db_session,
-        user,
-        account,
-        valor="-800.00",
-        tipo=PluggyTransactionTipo.debito,
-        data=date(2026, 1, 5),
-        subcategory_id=sub_fixa.id,
-    )
-    _transaction(
-        db_session,
-        user,
-        account,
-        valor="2000.00",
-        tipo=PluggyTransactionTipo.credito,
-        data=date(2025, 11, 6),
-        subcategory_id=sub_variavel.id,
-    )
-    _transaction(
-        db_session,
-        user,
-        account,
-        valor="2000.00",
-        tipo=PluggyTransactionTipo.credito,
-        data=date(2025, 12, 6),
-        subcategory_id=sub_variavel.id,
-    )
-    _transaction(
-        db_session,
-        user,
-        account,
-        valor="2000.00",
-        tipo=PluggyTransactionTipo.credito,
-        data=date(2026, 1, 6),
-        subcategory_id=sub_variavel.id,
-    )
-
-    projecao = service.get_projecao(
-        db_session, user.id, ano=2026, mes=1, meses_futuros=3, janela_media=3
-    )
-
-    assert [(p.ano, p.mes) for p in projecao] == [(2026, 2), (2026, 3), (2026, 4)]
-    assert all(p.despesa == Decimal("900.00") for p in projecao)
-    assert all(p.receita == Decimal("2000.00") for p in projecao)
-    assert all(p.saldo == Decimal("1100.00") for p in projecao)
-
-
-def test_get_projecao_excludes_eventual_and_null_natureza(db_session, user):
-    account = _account(db_session, user)
-    sub_eventual = _subcategory(db_session, nome="Viagem", natureza=Natureza.eventual)
-    sub_sem_natureza = _subcategory(db_session, nome="Diversos", natureza=None)
-    _transaction(
-        db_session,
-        user,
-        account,
-        valor="-500.00",
-        tipo=PluggyTransactionTipo.debito,
-        data=date(2026, 1, 5),
-        subcategory_id=sub_eventual.id,
-    )
-    _transaction(
-        db_session,
-        user,
-        account,
-        valor="-300.00",
-        tipo=PluggyTransactionTipo.debito,
-        data=date(2026, 1, 6),
-        subcategory_id=sub_sem_natureza.id,
-    )
-    _transaction(
-        db_session,
-        user,
-        account,
-        valor="-100.00",
-        tipo=PluggyTransactionTipo.debito,
-        data=date(2026, 1, 7),
-        subcategory_id=None,
-    )
-
-    projecao = service.get_projecao(db_session, user.id, ano=2026, mes=1)
-
-    assert all(p.despesa == Decimal("0") for p in projecao)
-
-
-def test_get_projecao_excludes_excluir_de_totais_and_cartao_credito_credito(db_session, user):
-    transferencia = _group(db_session, nome="Transferência interna", excluir_de_totais=True)
-    sub_transf = _subcategory(
-        db_session, group=transferencia, nome="Pagamento de Fatura", natureza=Natureza.fixa
-    )
-    conta_normal = _account(db_session, user)
-    _transaction(
-        db_session,
-        user,
-        conta_normal,
-        valor="-500.00",
-        tipo=PluggyTransactionTipo.debito,
-        data=date(2026, 1, 5),
-        subcategory_id=sub_transf.id,
-    )
-
-    sub_fixa = _subcategory(db_session, nome="Estorno", natureza=Natureza.fixa)
-    cartao = _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito)
-    _transaction(
-        db_session,
-        user,
-        cartao,
-        valor="-200.00",
-        tipo=PluggyTransactionTipo.credito,
-        data=date(2026, 1, 6),
-        subcategory_id=sub_fixa.id,
-    )
-
-    projecao = service.get_projecao(db_session, user.id, ano=2026, mes=1)
-
-    assert all(p.receita == Decimal("0") and p.despesa == Decimal("0") for p in projecao)
-
-
-def test_get_projecao_meses_futuros_and_janela_media_parametrizable(db_session, user):
-    account = _account(db_session, user)
-    sub_fixa = _subcategory(db_session, nome="Aluguel", natureza=Natureza.fixa)
-    _transaction(
-        db_session,
-        user,
-        account,
-        valor="-1200.00",
-        tipo=PluggyTransactionTipo.debito,
-        data=date(2026, 1, 5),
-        subcategory_id=sub_fixa.id,
-    )
-
-    projecao = service.get_projecao(
-        db_session, user.id, ano=2026, mes=1, meses_futuros=12, janela_media=1
-    )
-
-    assert len(projecao) == 12
-    assert projecao[0].despesa == Decimal("1200.00")
-
-
-def test_get_projecao_isolated_by_user(db_session, user):
-    other = User(google_sub="google-projecao-other", email="other-proj@example.com", name="Bob")
-    db_session.add(other)
-    db_session.commit()
-    db_session.refresh(other)
-    other_account = _account(db_session, other)
-    sub = _subcategory(db_session, nome="Aluguel", natureza=Natureza.fixa)
-    _transaction(
-        db_session,
-        other,
-        other_account,
-        valor="-999.00",
-        tipo=PluggyTransactionTipo.debito,
-        data=date(2026, 1, 5),
-        subcategory_id=sub.id,
-    )
-
-    projecao = service.get_projecao(db_session, user.id, ano=2026, mes=1)
-
-    assert all(p.despesa == Decimal("0") for p in projecao)
-
-
 def test_get_tendencia_por_natureza_isolated_by_user(db_session, user):
     other = User(
         google_sub="google-tendencia-natureza-other",
@@ -1921,7 +1737,7 @@ def test_get_tendencia_por_natureza_isolated_by_user(db_session, user):
     db_session.commit()
     db_session.refresh(other)
     other_account = _account(db_session, other)
-    sub = _subcategory(db_session, nome="Aluguel", natureza=Natureza.fixa)
+    sub = _subcategory(db_session, other, nome="Aluguel", natureza=Natureza.fixa)
     _transaction(
         db_session,
         other,
@@ -2233,8 +2049,8 @@ def test_get_summary_regime_caixa_uses_data_caixa(db_session, user):
 
 def test_get_por_categoria_regime_caixa_uses_data_caixa(db_session, user):
     tx = _transacao_com_caixa_deslocado(db_session, user)
-    group = _group(db_session, nome="Cartão")
-    sub = _subcategory(db_session, group=group, nome="Compras")
+    group = _group(db_session, user, nome="Cartão")
+    sub = _subcategory(db_session, user, group=group, nome="Compras")
     tx.subcategory_id = sub.id
     db_session.commit()
 
@@ -2262,7 +2078,7 @@ def test_get_tendencia_regime_caixa_uses_data_caixa(db_session, user):
 
 def test_get_tendencia_por_categoria_regime_caixa_uses_data_caixa(db_session, user):
     tx = _transacao_com_caixa_deslocado(db_session, user)
-    sub = _subcategory(db_session, nome="Compras")
+    sub = _subcategory(db_session, user, nome="Compras")
     tx.subcategory_id = sub.id
     db_session.commit()
 
@@ -2345,9 +2161,9 @@ def test_get_tendencia_por_passivo_regime_caixa_uses_data_caixa(db_session, user
 # --- cartão de crédito (Sprint 18) --------------------------------------
 
 
-def _pagamento_fatura_subcategory(db_session):
-    grupo = _group(db_session, nome="Transferência interna", excluir_de_totais=True)
-    return _subcategory(db_session, group=grupo, nome="Pagamento de Fatura")
+def _pagamento_fatura_subcategory(db_session, user):
+    grupo = _group(db_session, user, nome="Transferência interna", excluir_de_totais=True)
+    return _subcategory(db_session, user, group=grupo, nome="Pagamento de Fatura")
 
 
 def test_get_summary_regime_caixa_excludes_cartao_credito_entirely(db_session, user):
@@ -2381,7 +2197,7 @@ def test_get_summary_regime_caixa_excludes_cartao_credito_entirely(db_session, u
 
 
 def test_get_summary_regime_caixa_counts_pagamento_de_fatura_on_real_date(db_session, user):
-    sub = _pagamento_fatura_subcategory(db_session)
+    sub = _pagamento_fatura_subcategory(db_session, user)
     conta = _account(db_session, user)
     tx = _transaction(
         db_session,
@@ -2406,8 +2222,8 @@ def test_get_summary_regime_caixa_counts_pagamento_de_fatura_on_real_date(db_ses
 
 
 def test_get_summary_regime_caixa_still_excludes_other_transferencia_interna(db_session, user):
-    grupo = _group(db_session, nome="Transferência interna", excluir_de_totais=True)
-    sub = _subcategory(db_session, group=grupo, nome="Transferência interna")
+    grupo = _group(db_session, user, nome="Transferência interna", excluir_de_totais=True)
+    sub = _subcategory(db_session, user, group=grupo, nome="Transferência interna")
     conta = _account(db_session, user)
     tx = _transaction(
         db_session,
@@ -2427,7 +2243,7 @@ def test_get_summary_regime_caixa_still_excludes_other_transferencia_interna(db_
 
 
 def test_get_por_categoria_regime_caixa_counts_pagamento_de_fatura(db_session, user):
-    sub = _pagamento_fatura_subcategory(db_session)
+    sub = _pagamento_fatura_subcategory(db_session, user)
     conta = _account(db_session, user)
     tx = _transaction(
         db_session,
@@ -2454,7 +2270,7 @@ def test_get_saldo_acumulado_regime_caixa_pagamento_de_fatura_avoids_double_coun
     # fev, caixa modelado mar) paga via Pix da conta corrente em fevereiro,
     # categorizado "Pagamento de Fatura". Sob caixa, só a fatura real conta —
     # a compra modelada em março não deve aparecer.
-    sub = _pagamento_fatura_subcategory(db_session)
+    sub = _pagamento_fatura_subcategory(db_session, user)
     corrente = _account(db_session, user)
     corrente.saldo_inicial = Decimal("0")
     cartao = _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito)
@@ -2740,3 +2556,235 @@ def test_patrimonio_breakdown_regime_caixa_shifts_accumulation(db_session, user,
     caixa = service.get_patrimonio_breakdown(db_session, user.id, regime="caixa")
 
     assert competencia.total == caixa.total - Decimal("100.00")
+
+
+# --- get_orcamento_status (PRD-030) -----------------------------------------
+
+
+def test_get_orcamento_status_returns_orcado_and_realizado(db_session, user):
+    account = _account(db_session, user)
+    sub = _subcategory(db_session, user, nome="Aluguel")
+    create_orcamento(
+        db_session,
+        user.id,
+        subcategory_id=sub.id,
+        tipo=OrcamentoTipo.eventual,
+        valor=Decimal("1000.00"),
+        ano=2026,
+        mes=3,
+        data_inicio=None,
+        data_fim=None,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-800.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 3, 5),
+        subcategory_id=sub.id,
+    )
+
+    status = service.get_orcamento_status(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=3
+    )
+
+    assert len(status) == 1
+    assert status[0].subcategory_id == sub.id
+    assert status[0].orcado == Decimal("1000.00")
+    assert status[0].realizado == Decimal("800.00")
+
+
+def test_get_orcamento_status_sums_multiple_vigentes_for_same_subcategory(db_session, user):
+    sub = _subcategory(db_session, user, nome="Aluguel")
+    create_orcamento(
+        db_session,
+        user.id,
+        subcategory_id=sub.id,
+        tipo=OrcamentoTipo.eventual,
+        valor=Decimal("100.00"),
+        ano=2026,
+        mes=3,
+        data_inicio=None,
+        data_fim=None,
+    )
+    create_orcamento(
+        db_session,
+        user.id,
+        subcategory_id=sub.id,
+        tipo=OrcamentoTipo.recorrente,
+        valor=Decimal("50.00"),
+        ano=None,
+        mes=None,
+        data_inicio=date(2026, 1, 1),
+        data_fim=None,
+    )
+
+    status = service.get_orcamento_status(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=3
+    )
+
+    assert len(status) == 1
+    assert status[0].orcado == Decimal("150.00")
+
+
+def test_get_orcamento_status_zero_realizado_when_no_transactions(db_session, user):
+    sub = _subcategory(db_session, user, nome="Aluguel")
+    create_orcamento(
+        db_session,
+        user.id,
+        subcategory_id=sub.id,
+        tipo=OrcamentoTipo.eventual,
+        valor=Decimal("1000.00"),
+        ano=2026,
+        mes=3,
+        data_inicio=None,
+        data_fim=None,
+    )
+
+    status = service.get_orcamento_status(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=3
+    )
+
+    assert status[0].realizado == Decimal("0")
+
+
+def test_get_orcamento_status_only_includes_subcategories_with_vigente_orcamento(db_session, user):
+    account = _account(db_session, user)
+    sub_com_orcamento = _subcategory(db_session, user, nome="Aluguel")
+    sub_sem_orcamento = _subcategory(db_session, user, nome="Mercado")
+    create_orcamento(
+        db_session,
+        user.id,
+        subcategory_id=sub_com_orcamento.id,
+        tipo=OrcamentoTipo.eventual,
+        valor=Decimal("1000.00"),
+        ano=2026,
+        mes=3,
+        data_inicio=None,
+        data_fim=None,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-50.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 3, 5),
+        subcategory_id=sub_sem_orcamento.id,
+    )
+
+    status = service.get_orcamento_status(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=3
+    )
+
+    assert len(status) == 1
+    assert status[0].subcategory_id == sub_com_orcamento.id
+
+
+def test_get_orcamento_status_respects_tipo_receita(db_session, user):
+    account = _account(db_session, user)
+    sub = _subcategory(db_session, user, nome="Salário")
+    create_orcamento(
+        db_session,
+        user.id,
+        subcategory_id=sub.id,
+        tipo=OrcamentoTipo.eventual,
+        valor=Decimal("5000.00"),
+        ano=2026,
+        mes=3,
+        data_inicio=None,
+        data_fim=None,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="5000.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 3, 5),
+        subcategory_id=sub.id,
+    )
+    # débito na mesma subcategoria não deveria contar como realizado de receita.
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 3, 6),
+        subcategory_id=sub.id,
+    )
+
+    status = service.get_orcamento_status(
+        db_session, user.id, tipo=PluggyTransactionTipo.credito, ano=2026, mes=3
+    )
+
+    assert status[0].realizado == Decimal("5000.00")
+
+
+def test_get_orcamento_status_respects_excluir_de_totais(db_session, user):
+    account = _account(db_session, user)
+    transferencia = _group(db_session, user, nome="Transferência interna", excluir_de_totais=True)
+    sub = _subcategory(db_session, user, group=transferencia, nome="Pagamento de Fatura")
+    create_orcamento(
+        db_session,
+        user.id,
+        subcategory_id=sub.id,
+        tipo=OrcamentoTipo.eventual,
+        valor=Decimal("500.00"),
+        ano=2026,
+        mes=3,
+        data_inicio=None,
+        data_fim=None,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="-500.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 3, 5),
+        subcategory_id=sub.id,
+    )
+
+    status = service.get_orcamento_status(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=3
+    )
+
+    assert status[0].realizado == Decimal("0")
+
+
+def test_get_orcamento_status_isolated_by_user(db_session, user):
+    other = User(google_sub="google-orcamento-other", email="other-orc@example.com", name="Bob")
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    other_account = _account(db_session, other)
+    other_sub = _subcategory(db_session, other, nome="Aluguel")
+    create_orcamento(
+        db_session,
+        other.id,
+        subcategory_id=other_sub.id,
+        tipo=OrcamentoTipo.eventual,
+        valor=Decimal("999.00"),
+        ano=2026,
+        mes=3,
+        data_inicio=None,
+        data_fim=None,
+    )
+    _transaction(
+        db_session,
+        other,
+        other_account,
+        valor="-999.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 3, 5),
+        subcategory_id=other_sub.id,
+    )
+
+    status = service.get_orcamento_status(
+        db_session, user.id, tipo=PluggyTransactionTipo.debito, ano=2026, mes=3
+    )
+
+    assert status == []

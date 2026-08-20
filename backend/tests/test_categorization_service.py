@@ -37,13 +37,13 @@ def other_user(db_session):
 
 
 @pytest.fixture()
-def subcategory(db_session):
-    return _subcategory(db_session, nome="Comer fora")
+def subcategory(db_session, user):
+    return _subcategory(db_session, user, nome="Comer fora")
 
 
 @pytest.fixture()
-def other_subcategory(db_session):
-    return _subcategory(db_session, nome="Supermercado")
+def other_subcategory(db_session, user):
+    return _subcategory(db_session, user, nome="Supermercado")
 
 
 def _user(db_session, **overrides):
@@ -57,24 +57,28 @@ def _user(db_session, **overrides):
     return u
 
 
-def _subcategory(db_session, nome="Comer fora"):
-    group = CategoryGroup(nome=f"Grupo {next(_SEQ)}")
+def _subcategory(db_session, user, nome="Comer fora"):
+    group = CategoryGroup(user_id=user.id, nome=f"Grupo {next(_SEQ)}")
     db_session.add(group)
     db_session.flush()
-    s = Subcategory(group_id=group.id, nome=nome)
+    s = Subcategory(user_id=user.id, group_id=group.id, nome=nome)
     db_session.add(s)
     db_session.commit()
     db_session.refresh(s)
     return s
 
 
-def _salario_subcategory(db_session):
-    group = db_session.query(CategoryGroup).filter(CategoryGroup.nome == "Receitas").one_or_none()
+def _salario_subcategory(db_session, user):
+    group = (
+        db_session.query(CategoryGroup)
+        .filter(CategoryGroup.user_id == user.id, CategoryGroup.nome == "Receitas")
+        .one_or_none()
+    )
     if group is None:
-        group = CategoryGroup(nome="Receitas")
+        group = CategoryGroup(user_id=user.id, nome="Receitas")
         db_session.add(group)
         db_session.flush()
-    s = Subcategory(group_id=group.id, nome="Salário")
+    s = Subcategory(user_id=user.id, group_id=group.id, nome="Salário")
     db_session.add(s)
     db_session.commit()
     db_session.refresh(s)
@@ -776,8 +780,8 @@ def test_update_description_does_not_propagate_to_different_description(
 
 
 def test_update_description_does_not_propagate_to_different_category(db_session, user, other_user):
-    grupo_a = _subcategory(db_session, nome="Alimentação")
-    grupo_b = _subcategory(db_session, nome="Outra categoria")
+    grupo_a = _subcategory(db_session, user, nome="Alimentação")
+    grupo_b = _subcategory(db_session, user, nome="Outra categoria")
     origem = _confirmed_transaction(db_session, user, grupo_a, "PADARIA DO ZE 1234")
     candidato_categoria_diferente = _confirmed_transaction(
         db_session, user, grupo_b, "Padaria do Ze 5678"
@@ -917,7 +921,7 @@ def test_dismiss_description_suggestion_without_pending_raises_invalid_state(db_
 
 
 def test_set_category_salario_at_or_above_cutoff_shifts_data_competencia(db_session, user):
-    salario = _salario_subcategory(db_session)
+    salario = _salario_subcategory(db_session, user)
     tx = _pending_transaction(db_session, user)
     tx.data = date(2026, 1, 25)
     db_session.commit()
@@ -928,7 +932,7 @@ def test_set_category_salario_at_or_above_cutoff_shifts_data_competencia(db_sess
 
 
 def test_set_category_salario_below_cutoff_keeps_same_month(db_session, user):
-    salario = _salario_subcategory(db_session)
+    salario = _salario_subcategory(db_session, user)
     tx = _pending_transaction(db_session, user)
     tx.data = date(2026, 1, 10)
     db_session.commit()
@@ -951,7 +955,7 @@ def test_set_category_non_salario_sets_competencia_equal_to_data(db_session, use
 def test_set_category_recategorizing_out_of_salario_resets_competencia(
     db_session, user, subcategory
 ):
-    salario = _salario_subcategory(db_session)
+    salario = _salario_subcategory(db_session, user)
     tx = _pending_transaction(db_session, user)
     tx.data = date(2026, 1, 30)
     db_session.commit()
@@ -964,7 +968,8 @@ def test_set_category_recategorizing_out_of_salario_resets_competencia(
 
 
 def test_set_category_salario_uses_user_specific_cutoff(db_session, user, other_user):
-    salario = _salario_subcategory(db_session)
+    salario_user = _salario_subcategory(db_session, user)
+    salario_other = _salario_subcategory(db_session, other_user)
     user.salario_competencia_cutoff_dia = 5
     db_session.commit()
     tx_user = _pending_transaction(db_session, user)
@@ -973,8 +978,8 @@ def test_set_category_salario_uses_user_specific_cutoff(db_session, user, other_
     tx_other.data = date(2026, 1, 10)
     db_session.commit()
 
-    confirmed_user = service.set_category(db_session, user.id, tx_user.id, salario.id)
-    confirmed_other = service.set_category(db_session, other_user.id, tx_other.id, salario.id)
+    confirmed_user = service.set_category(db_session, user.id, tx_user.id, salario_user.id)
+    confirmed_other = service.set_category(db_session, other_user.id, tx_other.id, salario_other.id)
 
     # user tem cutoff=5 (10 >= 5 desloca); other_user usa o default 25 (10 < 25 não desloca).
     assert confirmed_user.data_competencia == date(2026, 2, 10)
@@ -982,7 +987,7 @@ def test_set_category_salario_uses_user_specific_cutoff(db_session, user, other_
 
 
 def test_bulk_confirm_shifts_competencia_for_salario_rows_only(db_session, user, subcategory):
-    salario = _salario_subcategory(db_session)
+    salario = _salario_subcategory(db_session, user)
     tx_salario = _pending_transaction(db_session, user, "Salário mensal")
     tx_salario.data = date(2026, 1, 28)
     tx_outra = _pending_transaction(db_session, user, "Mercado")
@@ -1024,7 +1029,7 @@ def test_set_category_credit_card_shifts_competencia_unconditionally(db_session,
 
 
 def test_set_category_credit_card_ignores_salario_cutoff(db_session, user):
-    salario = _salario_subcategory(db_session)
+    salario = _salario_subcategory(db_session, user)
     tx = _transaction(db_session, user, account_tipo=PluggyAccountTipo.cartao_credito)
     tx.data = date(2026, 1, 5)
     db_session.commit()
@@ -1092,7 +1097,7 @@ def test_update_data_recomputes_competencia_for_credit_card(db_session, user):
 
 
 def test_update_data_recomputes_competencia_salario_when_confirmed(db_session, user):
-    salario = _salario_subcategory(db_session)
+    salario = _salario_subcategory(db_session, user)
     tx = _confirmed_transaction(db_session, user, salario, "Salário mensal")
     tx.data = date(2026, 1, 20)
     db_session.commit()

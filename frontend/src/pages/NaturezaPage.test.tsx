@@ -354,7 +354,7 @@ describe("NaturezaPage", () => {
     // sempre têm uma coluna ordenada por padrão) — ordem alfabética. Só a
     // primeira linha de cada grupo tem a célula de Categoria (rowSpan).
     const gruposEmOrdem = () =>
-      Array.from(document.querySelectorAll(".nat-table tbody td[rowspan]")).map(
+      Array.from(document.querySelectorAll(".subcategory-group-table tbody td[rowspan]")).map(
         (td) => td.textContent
       );
     expect(gruposEmOrdem()).toEqual(["Alimentação", "Moradia"]);
@@ -372,7 +372,7 @@ describe("NaturezaPage", () => {
     expect(gruposEmOrdem()).toEqual(["Moradia", "Alimentação"]);
 
     const primeirasDuasLinhas = () =>
-      Array.from(document.querySelectorAll(".nat-table tbody tr"))
+      Array.from(document.querySelectorAll(".subcategory-group-table tbody tr"))
         .slice(0, 2)
         .map((row) => row.textContent);
     expect(primeirasDuasLinhas()[0]).toContain("Aluguel");

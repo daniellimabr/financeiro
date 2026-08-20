@@ -29,11 +29,11 @@ def _authenticate(client, db_session, *, google_sub="google-1", email="a@example
     return user
 
 
-def _subcategory(db_session, nome="Comer fora"):
-    group = CategoryGroup(nome=f"Grupo {nome}")
+def _subcategory(db_session, user, nome="Comer fora"):
+    group = CategoryGroup(user_id=user.id, nome=f"Grupo {nome}")
     db_session.add(group)
     db_session.flush()
-    subcategory = Subcategory(group_id=group.id, nome=nome)
+    subcategory = Subcategory(user_id=user.id, group_id=group.id, nome=nome)
     db_session.add(subcategory)
     db_session.commit()
     db_session.refresh(subcategory)
@@ -151,7 +151,7 @@ def test_update_data_without_cookie_returns_401(client):
 
 def test_list_transactions_default_status_returns_pending_and_confirmed(client, db_session):
     user = _authenticate(client, db_session)
-    subcategory = _subcategory(db_session)
+    subcategory = _subcategory(db_session, user)
     _pending_transaction(db_session, user, "Pendente")
     _confirmed_transaction(db_session, user, subcategory, "Confirmada")
 
@@ -163,7 +163,7 @@ def test_list_transactions_default_status_returns_pending_and_confirmed(client, 
 
 def test_list_transactions_status_pendente(client, db_session):
     user = _authenticate(client, db_session)
-    subcategory = _subcategory(db_session)
+    subcategory = _subcategory(db_session, user)
     tx = _pending_transaction(db_session, user, "Pendente")
     _confirmed_transaction(db_session, user, subcategory, "Confirmada")
 
@@ -176,7 +176,7 @@ def test_list_transactions_status_pendente(client, db_session):
 
 def test_list_transactions_status_confirmada(client, db_session):
     user = _authenticate(client, db_session)
-    subcategory = _subcategory(db_session)
+    subcategory = _subcategory(db_session, user)
     _pending_transaction(db_session, user, "Pendente")
     tx_confirmada = _confirmed_transaction(db_session, user, subcategory, "Confirmada")
 
@@ -189,7 +189,7 @@ def test_list_transactions_status_confirmada(client, db_session):
 
 def test_list_transactions_status_todas(client, db_session):
     user = _authenticate(client, db_session)
-    subcategory = _subcategory(db_session)
+    subcategory = _subcategory(db_session, user)
     _pending_transaction(db_session, user, "Pendente")
     _confirmed_transaction(db_session, user, subcategory, "Confirmada")
 
@@ -270,8 +270,8 @@ def test_list_transactions_filters_by_has_asset(client, db_session):
 
 def test_list_transactions_filters_by_group_id(client, db_session):
     user = _authenticate(client, db_session)
-    subcategory = _subcategory(db_session, nome="Comer fora")
-    other_subcategory = _subcategory(db_session, nome="Supermercado")
+    subcategory = _subcategory(db_session, user, nome="Comer fora")
+    other_subcategory = _subcategory(db_session, user, nome="Supermercado")
     tx_grupo = _confirmed_transaction(db_session, user, subcategory, "Grupo alvo")
     _confirmed_transaction(db_session, user, other_subcategory, "Outro grupo")
 
@@ -324,7 +324,7 @@ def test_user_a_does_not_see_or_act_on_user_bs_transactions(client, db_session):
     db_session.commit()
     db_session.refresh(tx_b_owner)
     tx_b = _pending_transaction(db_session, tx_b_owner)
-    subcategory = _subcategory(db_session)
+    subcategory = _subcategory(db_session, user_a)
     del user_a
 
     list_response = client.get("/categorization/transactions")
@@ -364,8 +364,8 @@ def test_user_a_does_not_see_or_act_on_user_bs_transactions(client, db_session):
 
 def test_set_category_confirms_and_reedit_works(client, db_session):
     user = _authenticate(client, db_session)
-    subcategory = _subcategory(db_session, nome="Comer fora")
-    other_subcategory = _subcategory(db_session, nome="Supermercado")
+    subcategory = _subcategory(db_session, user, nome="Comer fora")
+    other_subcategory = _subcategory(db_session, user, nome="Supermercado")
     tx = _pending_transaction(db_session, user)
 
     confirm_response = client.put(
@@ -399,7 +399,7 @@ def test_set_category_with_invalid_subcategory_returns_404(client, db_session):
 
 def test_bulk_confirm_confirms_valid_rows_and_reports_failures(client, db_session):
     user = _authenticate(client, db_session)
-    subcategory = _subcategory(db_session)
+    subcategory = _subcategory(db_session, user)
     tx_valid = _pending_transaction(db_session, user, "Valida")
 
     response = client.post(
@@ -580,7 +580,7 @@ def test_update_description_propagates_pending_suggestion_to_matching_transactio
     client, db_session
 ):
     user = _authenticate(client, db_session)
-    subcategory = _subcategory(db_session)
+    subcategory = _subcategory(db_session, user)
     origem = _confirmed_transaction(db_session, user, subcategory, "PADARIA DO ZE 1234")
     candidato = _confirmed_transaction(db_session, user, subcategory, "Padaria do Ze 5678")
 
@@ -602,7 +602,7 @@ def test_update_description_propagates_pending_suggestion_to_matching_transactio
 
 def test_confirm_description_suggestion_applies_it(client, db_session):
     user = _authenticate(client, db_session)
-    subcategory = _subcategory(db_session)
+    subcategory = _subcategory(db_session, user)
     origem = _confirmed_transaction(db_session, user, subcategory, "PADARIA DO ZE 1234")
     candidato = _confirmed_transaction(db_session, user, subcategory, "Padaria do Ze 5678")
     client.put(
@@ -619,7 +619,7 @@ def test_confirm_description_suggestion_applies_it(client, db_session):
 
 def test_dismiss_description_suggestion_clears_it(client, db_session):
     user = _authenticate(client, db_session)
-    subcategory = _subcategory(db_session)
+    subcategory = _subcategory(db_session, user)
     origem = _confirmed_transaction(db_session, user, subcategory, "PADARIA DO ZE 1234")
     candidato = _confirmed_transaction(db_session, user, subcategory, "Padaria do Ze 5678")
     client.put(

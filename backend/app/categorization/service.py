@@ -30,11 +30,12 @@ _SALARIO_SUBCATEGORY_NOME = "Salário"
 _SALARIO_GROUP_NOME = "Receitas"
 
 
-def salario_subcategory_id(db: Session) -> int | None:
+def salario_subcategory_id(db: Session, user_id: int) -> int | None:
     row = (
         db.query(Subcategory.id)
         .join(CategoryGroup, Subcategory.group_id == CategoryGroup.id)
         .filter(
+            Subcategory.user_id == user_id,
             Subcategory.nome == _SALARIO_SUBCATEGORY_NOME,
             CategoryGroup.nome == _SALARIO_GROUP_NOME,
         )
@@ -228,12 +229,16 @@ def set_category(
 ) -> PluggyTransaction:
     tx = _get_transaction(db, user_id, transaction_id)
 
-    subcategory = db.get(Subcategory, subcategory_id)
+    subcategory = (
+        db.query(Subcategory)
+        .filter(Subcategory.id == subcategory_id, Subcategory.user_id == user_id)
+        .one_or_none()
+    )
     if subcategory is None:
         raise NotFoundError(f"Subcategoria {subcategory_id} não encontrada")
 
     user = db.get(User, user_id)
-    salario_id = salario_subcategory_id(db)
+    salario_id = salario_subcategory_id(db, user_id)
 
     tx.subcategory_id = subcategory_id
     tx.categorizacao_status = PluggyTransactionCategorizacaoStatus.confirmada
@@ -254,7 +259,7 @@ def bulk_confirm(
     db: Session, user_id: int, items: list[tuple[int, int]]
 ) -> list[BulkConfirmResult]:
     user = db.get(User, user_id)
-    salario_id = salario_subcategory_id(db)
+    salario_id = salario_subcategory_id(db, user_id)
 
     results: list[BulkConfirmResult] = []
     for transaction_id, subcategory_id in items:
@@ -271,7 +276,11 @@ def bulk_confirm(
             )
             continue
 
-        subcategory = db.get(Subcategory, subcategory_id)
+        subcategory = (
+            db.query(Subcategory)
+            .filter(Subcategory.id == subcategory_id, Subcategory.user_id == user_id)
+            .one_or_none()
+        )
         if subcategory is None:
             results.append(
                 BulkConfirmResult(
@@ -400,7 +409,7 @@ def update_data(
         raise InvalidStateError("Data não pode ser no futuro")
 
     user = db.get(User, user_id)
-    salario_id = salario_subcategory_id(db)
+    salario_id = salario_subcategory_id(db, user_id)
 
     tx.data = nova_data
     tx.data_editada_manualmente = True

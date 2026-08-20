@@ -22,22 +22,26 @@ _APORTE_SUBCATEGORY_NOME = "Aporte"
 _RESGATE_SUBCATEGORY_NOME = "Resgate"
 
 
-def _subcategory_id(db: Session, nome: str) -> int | None:
+def _subcategory_id(db: Session, user_id: int, nome: str) -> int | None:
     row = (
         db.query(Subcategory.id)
         .join(CategoryGroup, Subcategory.group_id == CategoryGroup.id)
-        .filter(Subcategory.nome == nome, CategoryGroup.nome == _INVESTIMENTOS_GROUP_NOME)
+        .filter(
+            Subcategory.user_id == user_id,
+            Subcategory.nome == nome,
+            CategoryGroup.nome == _INVESTIMENTOS_GROUP_NOME,
+        )
         .one_or_none()
     )
     return row[0] if row else None
 
 
-def aporte_subcategory_id(db: Session) -> int | None:
-    return _subcategory_id(db, _APORTE_SUBCATEGORY_NOME)
+def aporte_subcategory_id(db: Session, user_id: int) -> int | None:
+    return _subcategory_id(db, user_id, _APORTE_SUBCATEGORY_NOME)
 
 
-def resgate_subcategory_id(db: Session) -> int | None:
-    return _subcategory_id(db, _RESGATE_SUBCATEGORY_NOME)
+def resgate_subcategory_id(db: Session, user_id: int) -> int | None:
+    return _subcategory_id(db, user_id, _RESGATE_SUBCATEGORY_NOME)
 
 
 @dataclass
@@ -215,8 +219,12 @@ def get_evolucao(db: Session, user_id: int, investimento_id: int) -> Evolucao:
     )
     saldo_atual = Decimal(str(saldo_atual_carteiras)) + Decimal(str(saldo_atual_holdings))
 
-    total_aportes = _confirmed_total(db, user_id, investimento_id, aporte_subcategory_id(db))
-    total_resgates = _confirmed_total(db, user_id, investimento_id, resgate_subcategory_id(db))
+    total_aportes = _confirmed_total(
+        db, user_id, investimento_id, aporte_subcategory_id(db, user_id)
+    )
+    total_resgates = _confirmed_total(
+        db, user_id, investimento_id, resgate_subcategory_id(db, user_id)
+    )
 
     rendimento_estimado = saldo_atual - saldo_base - total_aportes + total_resgates
 

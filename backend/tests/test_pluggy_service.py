@@ -241,7 +241,7 @@ def test_resync_does_not_discard_salario_competencia_shift_of_confirmed_transact
     # cada re-sincronização.
     from app.categorization import service as categorization_service
 
-    salario = _salario_subcategory(db_session)
+    salario = _salario_subcategory(db_session, user)
     client = FakePluggyClient(
         item=_item_raw(),
         accounts=[_account_raw()],
@@ -681,11 +681,11 @@ def _synced_account(db_session, user):
     return service.list_accounts(db_session, user.id)[0]
 
 
-def _salario_subcategory(db_session):
-    group = CategoryGroup(nome="Receitas")
+def _salario_subcategory(db_session, user):
+    group = CategoryGroup(user_id=user.id, nome="Receitas")
     db_session.add(group)
     db_session.flush()
-    subcategory = Subcategory(group_id=group.id, nome="Salário")
+    subcategory = Subcategory(user_id=user.id, group_id=group.id, nome="Salário")
     db_session.add(subcategory)
     db_session.commit()
     db_session.refresh(subcategory)
@@ -727,7 +727,7 @@ def test_update_saldo_inicial_other_users_account_raises_not_found(db_session, u
 
 
 def test_upsert_salario_ajuste_creates_confirmed_transaction_with_competencia(db_session, user):
-    _salario_subcategory(db_session)
+    _salario_subcategory(db_session, user)
     account = _synced_account(db_session, user)
 
     tx = service.upsert_salario_ajuste_dez_2025(
@@ -744,13 +744,13 @@ def test_upsert_salario_ajuste_creates_confirmed_transaction_with_competencia(db
     assert tx.data == date(2025, 12, 30)
     assert tx.data_competencia == date(2026, 1, 30)
     assert tx.categorizacao_status.value == "confirmada"
-    assert tx.subcategory_id == salario_subcategory_id(db_session)
+    assert tx.subcategory_id == salario_subcategory_id(db_session, user.id)
     assert tx.tipo.value == "credito"
     assert tx.data_caixa == tx.data_competencia
 
 
 def test_upsert_salario_ajuste_called_twice_updates_instead_of_duplicating(db_session, user):
-    _salario_subcategory(db_session)
+    _salario_subcategory(db_session, user)
     account = _synced_account(db_session, user)
     service.upsert_salario_ajuste_dez_2025(
         db_session,
@@ -776,7 +776,7 @@ def test_upsert_salario_ajuste_called_twice_updates_instead_of_duplicating(db_se
 
 
 def test_upsert_salario_ajuste_valor_none_deletes_existing_row(db_session, user):
-    _salario_subcategory(db_session)
+    _salario_subcategory(db_session, user)
     account = _synced_account(db_session, user)
     service.upsert_salario_ajuste_dez_2025(
         db_session,
@@ -817,7 +817,7 @@ def test_upsert_salario_ajuste_valor_none_without_existing_row_is_noop(db_sessio
 
 
 def test_upsert_salario_ajuste_isolated_by_user(db_session, user, other_user):
-    _salario_subcategory(db_session)
+    _salario_subcategory(db_session, user)
     account_user = _synced_account(db_session, user)
 
     with pytest.raises(NotFoundError):
@@ -980,7 +980,7 @@ def test_salario_ajuste_flows_through_dashboards_aggregations_without_special_ca
 ):
     from app.models.pluggy import PluggyTransactionTipo
 
-    salario = _salario_subcategory(db_session)
+    salario = _salario_subcategory(db_session, user)
     account = _synced_account(db_session, user)
 
     tx = service.upsert_salario_ajuste_dez_2025(

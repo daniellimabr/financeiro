@@ -14,9 +14,9 @@ from app.schemas.dashboards import (
     InvestimentoTotalOut,
     MeioPagamentoTotalOut,
     NaturezaTotalOut,
+    OrcamentoStatusOut,
     PassivoTotalOut,
     PatrimonioBreakdownOut,
-    PontoProjecaoOut,
     PontoTendenciaOut,
     SaldoContaOut,
     SummaryOut,
@@ -212,22 +212,17 @@ def get_por_passivo_tendencia(
     )
 
 
-@router.get("/projecao", response_model=list[PontoProjecaoOut])
-def get_projecao(
+@router.get("/por-orcamento", response_model=list[OrcamentoStatusOut])
+def get_por_orcamento(
+    tipo: PluggyTransactionTipo,
     ano: int,
     mes: int,
-    meses_futuros: int = Query(6, ge=1, le=24),
-    janela_media: int = Query(3, ge=1, le=24),
+    regime: Regime = "competencia",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.get_projecao(
-        db,
-        current_user.id,
-        ano=ano,
-        mes=mes,
-        meses_futuros=meses_futuros,
-        janela_media=janela_media,
+    return service.get_orcamento_status(
+        db, current_user.id, tipo=tipo, ano=ano, mes=mes, regime=regime
     )
 
 

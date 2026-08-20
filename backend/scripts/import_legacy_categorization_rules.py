@@ -32,20 +32,28 @@ logger = logging.getLogger("import_legacy_categorization_rules")
 DEFAULT_JSON_PATH = Path(__file__).resolve().parent / "data" / "semente-classificacao.json"
 
 
-def _resolve_subcategory(db: Session, categoria: str) -> Subcategory | None:
+def _resolve_subcategory(db: Session, user_id: int, categoria: str) -> Subcategory | None:
     if "/" not in categoria:
         return None
     grupo_nome, subcategoria_nome = categoria.split("/", 1)
     grupo_nome = grupo_nome.strip()
     subcategoria_nome = subcategoria_nome.strip()
 
-    group = db.query(CategoryGroup).filter(CategoryGroup.nome.ilike(grupo_nome)).one_or_none()
+    group = (
+        db.query(CategoryGroup)
+        .filter(CategoryGroup.user_id == user_id, CategoryGroup.nome.ilike(grupo_nome))
+        .one_or_none()
+    )
     if group is None:
         return None
 
     return (
         db.query(Subcategory)
-        .filter(Subcategory.group_id == group.id, Subcategory.nome.ilike(subcategoria_nome))
+        .filter(
+            Subcategory.user_id == user_id,
+            Subcategory.group_id == group.id,
+            Subcategory.nome.ilike(subcategoria_nome),
+        )
         .one_or_none()
     )
 
@@ -60,7 +68,7 @@ def import_legacy_rules(db: Session, user_id: int, json_path: Path) -> dict[str,
         padrao_descricao = regra["padrao_descricao"].strip()
         categoria = regra["categoria"].strip()
 
-        subcategory = _resolve_subcategory(db, categoria)
+        subcategory = _resolve_subcategory(db, user_id, categoria)
         if subcategory is None:
             logger.warning(
                 "Categoria não resolvida: '%s' (regra '%s') — pulada", categoria, padrao_descricao

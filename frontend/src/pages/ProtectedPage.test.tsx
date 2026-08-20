@@ -43,6 +43,7 @@ function catchAllFetchMock() {
     if (url.startsWith("/subcategories")) return Promise.resolve(jsonResponse([]));
     if (url.startsWith("/assets")) return Promise.resolve(jsonResponse([]));
     if (url.startsWith("/liabilities")) return Promise.resolve(jsonResponse([]));
+    if (url.startsWith("/orcamentos")) return Promise.resolve(jsonResponse([]));
     if (url.startsWith("/categorization/transactions")) {
       return Promise.resolve(jsonResponse({ items: [], total: 0, page: 1, page_size: 20 }));
     }
@@ -76,7 +77,7 @@ describe("ProtectedPage navigation", () => {
     expect(screen.getByRole("button", { name: "Passivos" })).toBeInTheDocument();
   });
 
-  it("orders the nav as Dashboards, Categorizar, Ativos, Investimentos, Passivos, Natureza, Projeção, Configurações", () => {
+  it("orders the nav as Dashboards, Categorizar, Ativos, Investimentos, Passivos, Natureza, Orçamento, Categorias, Configurações", () => {
     vi.stubGlobal("fetch", catchAllFetchMock());
 
     renderProtectedPage();
@@ -93,7 +94,8 @@ describe("ProtectedPage navigation", () => {
       "Investimentos",
       "Passivos",
       "Natureza",
-      "Projeção",
+      "Orçamento",
+      "Categorias",
       "Configurações",
     ]);
   });
@@ -140,15 +142,29 @@ describe("ProtectedPage navigation", () => {
     );
   });
 
-  it("switches to the Projeção tab and renders ProjecaoPage", async () => {
+  it("switches to the Orçamento tab and renders OrcamentoPage", async () => {
     vi.stubGlobal("fetch", catchAllFetchMock());
 
     renderProtectedPage();
 
-    await userEvent.click(screen.getByRole("button", { name: "Projeção" }));
+    await userEvent.click(screen.getByRole("button", { name: "Orçamento" }));
 
-    expect(await screen.findByRole("heading", { name: "Projeção" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Projeção" })).toHaveAttribute(
+    expect(await screen.findByRole("heading", { name: "Orçamento" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Orçamento" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+  });
+
+  it("switches to the Categorias tab and renders CategoriasPage", async () => {
+    vi.stubGlobal("fetch", catchAllFetchMock());
+
+    renderProtectedPage();
+
+    await userEvent.click(screen.getByRole("button", { name: "Categorias" }));
+
+    expect(await screen.findByRole("heading", { name: "Categorias" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Categorias" })).toHaveAttribute(
       "aria-current",
       "page"
     );

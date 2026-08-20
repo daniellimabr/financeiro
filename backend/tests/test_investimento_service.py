@@ -43,41 +43,43 @@ def other_user(db_session):
     return u
 
 
-def _investimentos_group(db_session):
+def _investimentos_group(db_session, user):
     group = (
-        db_session.query(CategoryGroup).filter(CategoryGroup.nome == "Investimentos").one_or_none()
+        db_session.query(CategoryGroup)
+        .filter(CategoryGroup.user_id == user.id, CategoryGroup.nome == "Investimentos")
+        .one_or_none()
     )
     if group is None:
-        group = CategoryGroup(nome="Investimentos", excluir_de_totais=False)
+        group = CategoryGroup(user_id=user.id, nome="Investimentos", excluir_de_totais=False)
         db_session.add(group)
         db_session.flush()
     return group
 
 
-def _aporte_subcategory(db_session):
-    group = _investimentos_group(db_session)
+def _aporte_subcategory(db_session, user):
+    group = _investimentos_group(db_session, user)
     sub = (
         db_session.query(Subcategory)
         .filter(Subcategory.group_id == group.id, Subcategory.nome == "Aporte")
         .one_or_none()
     )
     if sub is None:
-        sub = Subcategory(group_id=group.id, nome="Aporte")
+        sub = Subcategory(user_id=user.id, group_id=group.id, nome="Aporte")
         db_session.add(sub)
         db_session.commit()
         db_session.refresh(sub)
     return sub
 
 
-def _resgate_subcategory(db_session):
-    group = _investimentos_group(db_session)
+def _resgate_subcategory(db_session, user):
+    group = _investimentos_group(db_session, user)
     sub = (
         db_session.query(Subcategory)
         .filter(Subcategory.group_id == group.id, Subcategory.nome == "Resgate")
         .one_or_none()
     )
     if sub is None:
-        sub = Subcategory(group_id=group.id, nome="Resgate")
+        sub = Subcategory(user_id=user.id, group_id=group.id, nome="Resgate")
         db_session.add(sub)
         db_session.commit()
         db_session.refresh(sub)
@@ -281,7 +283,7 @@ def test_update_missing_investimento_raises_not_found(db_session, user):
 def test_delete_investimento_disassociates_accounts_and_transactions(db_session, user):
     investimento = service.create_investimento(db_session, user.id, nome="Renda fixa")
     account = _account(db_session, user, investimento_id=investimento.id)
-    aporte = _aporte_subcategory(db_session)
+    aporte = _aporte_subcategory(db_session, user)
     tx = _transaction(
         db_session,
         user,
@@ -362,8 +364,8 @@ def test_get_evolucao_only_counts_confirmed_aporte_resgate(db_session, user):
         saldo_inicial=Decimal("1000.00"),
         investimento_id=investimento.id,
     )
-    aporte = _aporte_subcategory(db_session)
-    resgate = _resgate_subcategory(db_session)
+    aporte = _aporte_subcategory(db_session, user)
+    resgate = _resgate_subcategory(db_session, user)
 
     _transaction(
         db_session,
@@ -626,7 +628,7 @@ def test_get_transacoes_only_holdings_returns_holding_side(db_session, user):
 def test_get_transacoes_unites_conta_and_holding_sources(db_session, user):
     investimento = service.create_investimento(db_session, user.id, nome="Misto")
     account = _account(db_session, user, investimento_id=investimento.id)
-    aporte = _aporte_subcategory(db_session)
+    aporte = _aporte_subcategory(db_session, user)
     _transaction(
         db_session,
         user,

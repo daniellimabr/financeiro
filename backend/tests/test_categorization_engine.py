@@ -38,11 +38,11 @@ def _user(db_session, **overrides):
     return user
 
 
-def _subcategory(db_session, nome="Comer fora", grupo=None):
-    group = CategoryGroup(nome=grupo or f"Grupo {next(_SEQ)}")
+def _subcategory(db_session, user, nome="Comer fora", grupo=None):
+    group = CategoryGroup(user_id=user.id, nome=grupo or f"Grupo {next(_SEQ)}")
     db_session.add(group)
     db_session.flush()
-    subcategory = Subcategory(group_id=group.id, nome=nome)
+    subcategory = Subcategory(user_id=user.id, group_id=group.id, nome=nome)
     db_session.add(subcategory)
     db_session.commit()
     db_session.refresh(subcategory)
@@ -222,8 +222,8 @@ def test_suggest_category_returns_none_when_nothing_matches(db_session):
 
 def test_suggest_category_regra_wins_over_historico_exato_and_similar(db_session):
     user = _user(db_session)
-    subcategory_regra = _subcategory(db_session, nome="Comer fora")
-    subcategory_historico = _subcategory(db_session, nome="Supermercado")
+    subcategory_regra = _subcategory(db_session, user, nome="Comer fora")
+    subcategory_historico = _subcategory(db_session, user, nome="Supermercado")
 
     db_session.add(
         CategorizationRule(
@@ -248,8 +248,8 @@ def test_suggest_category_regra_wins_over_historico_exato_and_similar(db_session
 
 def test_suggest_category_historico_exato_wins_over_similar(db_session):
     user = _user(db_session)
-    subcategory_exato = _subcategory(db_session, nome="Comer fora")
-    subcategory_similar = _subcategory(db_session, nome="Supermercado")
+    subcategory_exato = _subcategory(db_session, user, nome="Comer fora")
+    subcategory_similar = _subcategory(db_session, user, nome="Supermercado")
 
     _confirmed_transaction(db_session, user, subcategory_exato, "Padaria Bom Pao")
     # Highly similar (but not identical) description, would score high on layer 2.
@@ -263,7 +263,7 @@ def test_suggest_category_historico_exato_wins_over_similar(db_session):
 
 def test_suggest_category_similarity_at_or_above_threshold_matches(db_session):
     user = _user(db_session)
-    subcategory = _subcategory(db_session)
+    subcategory = _subcategory(db_session, user)
     base = "mercado sao joao ltda"
     _confirmed_transaction(db_session, user, subcategory, base)
 
@@ -278,7 +278,7 @@ def test_suggest_category_similarity_at_or_above_threshold_matches(db_session):
 
 def test_suggest_category_below_similarity_threshold_returns_none(db_session):
     user = _user(db_session)
-    subcategory = _subcategory(db_session)
+    subcategory = _subcategory(db_session, user)
     base = "mercado sao joao ltda"
     _confirmed_transaction(db_session, user, subcategory, base)
 
@@ -291,7 +291,7 @@ def test_suggest_category_below_similarity_threshold_returns_none(db_session):
 def test_suggest_category_isolated_by_user(db_session):
     user = _user(db_session)
     other_user = _user(db_session)
-    subcategory = _subcategory(db_session)
+    subcategory = _subcategory(db_session, other_user)
     _confirmed_transaction(db_session, other_user, subcategory, "Mercado Sao Joao")
 
     assert engine.suggest_category(db_session, user.id, "Mercado Sao Joao") is None

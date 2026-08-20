@@ -2,13 +2,14 @@ import { useState } from "react";
 
 import type { CurrentUser } from "../api/auth";
 import { AssetsPage } from "./AssetsPage";
+import { CategoriasPage } from "./CategoriasPage";
 import { CategorizationReviewPage } from "./CategorizationReviewPage";
 import { ConfiguracoesPage } from "./ConfiguracoesPage";
 import { DashboardsPage } from "./DashboardsPage";
 import { InvestimentosPage } from "./InvestimentosPage";
 import { LiabilitiesPage } from "./LiabilitiesPage";
 import { NaturezaPage } from "./NaturezaPage";
-import { ProjecaoPage } from "./ProjecaoPage";
+import { OrcamentoPage } from "./OrcamentoPage";
 
 interface ProtectedPageProps {
   user: CurrentUser;
@@ -21,7 +22,8 @@ type Tab =
   | "investimentos"
   | "passivos"
   | "natureza"
-  | "projecao"
+  | "orcamento"
+  | "categorias"
   | "configuracoes";
 
 const NAV_ITEMS: { tab: Tab; label: string }[] = [
@@ -31,7 +33,8 @@ const NAV_ITEMS: { tab: Tab; label: string }[] = [
   { tab: "investimentos", label: "Investimentos" },
   { tab: "passivos", label: "Passivos" },
   { tab: "natureza", label: "Natureza" },
-  { tab: "projecao", label: "Projeção" },
+  { tab: "orcamento", label: "Orçamento" },
+  { tab: "categorias", label: "Categorias" },
   { tab: "configuracoes", label: "Configurações" },
 ];
 
@@ -70,7 +73,8 @@ export function ProtectedPage({ user }: ProtectedPageProps) {
         {tab === "investimentos" && <InvestimentosPage />}
         {tab === "passivos" && <LiabilitiesPage />}
         {tab === "natureza" && <NaturezaPage />}
-        {tab === "projecao" && <ProjecaoPage />}
+        {tab === "orcamento" && <OrcamentoPage />}
+        {tab === "categorias" && <CategoriasPage />}
         {tab === "configuracoes" && <ConfiguracoesPage user={user} />}
       </main>
     </div>

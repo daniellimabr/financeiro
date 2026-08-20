@@ -35,6 +35,12 @@ export interface CategoriaTotal {
   percentual: string;
 }
 
+export interface OrcamentoStatus {
+  subcategory_id: number;
+  orcado: string;
+  realizado: string;
+}
+
 export interface MeioPagamentoTotal {
   account_tipo: string;
   total: string;
@@ -115,14 +121,6 @@ export interface PatrimonioBreakdown {
   total: string;
 }
 
-export interface PontoProjecao {
-  ano: number;
-  mes: number;
-  receita: string;
-  despesa: string;
-  saldo: string;
-}
-
 export interface SaldoConta {
   account_id: number;
   account_nome: string;
@@ -167,6 +165,13 @@ export function fetchDashboardPorCategoria(
   filter: PeriodoFilter & RegimeFilter = {}
 ): Promise<CategoriaTotal[]> {
   return apiFetch<CategoriaTotal[]>(`/dashboards/por-categoria${buildQuery({ tipo, ...filter })}`);
+}
+
+export function fetchDashboardPorOrcamento(
+  tipo: TransacaoTipo,
+  filter: Required<PeriodoFilter> & RegimeFilter
+): Promise<OrcamentoStatus[]> {
+  return apiFetch<OrcamentoStatus[]>(`/dashboards/por-orcamento${buildQuery({ tipo, ...filter })}`);
 }
 
 export function fetchDashboardPorMeioPagamento(
@@ -255,19 +260,6 @@ export function fetchDashboardPorPassivoTendencia(
 ): Promise<TendenciaPassivo[]> {
   return apiFetch<TendenciaPassivo[]>(
     `/dashboards/por-passivo/tendencia${buildQuery({ ...filter })}`
-  );
-}
-
-export function fetchDashboardProjecao(
-  filter: Required<PeriodoFilter> & { mesesFuturos: PeriodoHistorico; janelaMedia?: number }
-): Promise<PontoProjecao[]> {
-  const { mesesFuturos, janelaMedia, ...periodo } = filter;
-  return apiFetch<PontoProjecao[]>(
-    `/dashboards/projecao${buildQuery({
-      ...periodo,
-      meses_futuros: mesesFuturos,
-      janela_media: janelaMedia,
-    })}`
   );
 }
 

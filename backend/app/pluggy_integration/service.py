@@ -696,7 +696,7 @@ def upsert_salario_ajuste_dez_2025(
             db.commit()
         return None
 
-    subcategory_id = salario_subcategory_id(db)
+    subcategory_id = salario_subcategory_id(db, user_id)
     if subcategory_id is None:
         raise NotFoundError("Subcategoria 'Salário' não encontrada no catálogo")
 

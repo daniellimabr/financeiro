@@ -11,6 +11,7 @@ from app.models.asset import Asset, AssetStatus
 from app.models.category import SEM_CATEGORIA_ID, CategoryGroup, Natureza, Subcategory
 from app.models.investimento import Investimento
 from app.models.liability import Liability, LiabilityStatus
+from app.models.orcamento import Orcamento
 from app.models.pluggy import (
     INVESTIMENTO_PROVENTOS_CATEGORIAS_PLUGGY,
     PluggyAccount,
@@ -19,6 +20,7 @@ from app.models.pluggy import (
     PluggyTransaction,
     PluggyTransactionTipo,
 )
+from app.orcamentos.service import orcamentos_vigentes_query
 
 Regime = Literal["competencia", "caixa"]
 
@@ -138,15 +140,6 @@ class PatrimonioBreakdown:
 
 
 @dataclass
-class PontoProjecao:
-    ano: int
-    mes: int
-    receita: Decimal
-    despesa: Decimal
-    saldo: Decimal
-
-
-@dataclass
 class SaldoConta:
     account_id: int
     account_nome: str
@@ -204,11 +197,12 @@ _PAGAMENTO_FATURA_SUBCATEGORY_NOME = "Pagamento de Fatura"
 _TRANSFERENCIA_INTERNA_GROUP_NOME = "Transferência interna"
 
 
-def _pagamento_fatura_subcategory_id(db: Session) -> int | None:
+def _pagamento_fatura_subcategory_id(db: Session, user_id: int) -> int | None:
     row = (
         db.query(Subcategory.id)
         .join(CategoryGroup, Subcategory.group_id == CategoryGroup.id)
         .filter(
+            Subcategory.user_id == user_id,
             Subcategory.nome == _PAGAMENTO_FATURA_SUBCATEGORY_NOME,
             CategoryGroup.nome == _TRANSFERENCIA_INTERNA_GROUP_NOME,
         )
@@ -223,7 +217,10 @@ def _base_query(
     query = (
         db.query(PluggyTransaction)
         .join(PluggyAccount, PluggyTransaction.account_id == PluggyAccount.id)
-        .outerjoin(Subcategory, PluggyTransaction.subcategory_id == Subcategory.id)
+        .outerjoin(
+            Subcategory,
+            (PluggyTransaction.subcategory_id == Subcategory.id) & (Subcategory.user_id == user_id),
+        )
         .outerjoin(CategoryGroup, Subcategory.group_id == CategoryGroup.id)
         .filter(PluggyTransaction.user_id == user_id)
         .filter(
@@ -243,7 +240,7 @@ def _base_query(
         # regime, e toda transação de conta de cartão de crédito é excluída
         # (evita contar a mesma compra 2 vezes: uma pela fatura real, outra
         # pelo modelo de competência+1/caixa+2).
-        pagamento_fatura_id = _pagamento_fatura_subcategory_id(db)
+        pagamento_fatura_id = _pagamento_fatura_subcategory_id(db, user_id)
         if pagamento_fatura_id is not None:
             query = query.filter(
                 or_(
@@ -975,61 +972,63 @@ def get_tendencia_por_passivo(
     ]
 
 
-def _future_month_range(ano: int, mes: int, meses_futuros: int) -> list[tuple[int, int]]:
-    """Próximos `meses_futuros` meses após (ano, mes), em ordem cronológica."""
-    periodo = []
-    y, m = ano, mes
-    for _ in range(meses_futuros):
-        m += 1
-        if m == 13:
-            m = 1
-            y += 1
-        periodo.append((y, m))
-    return periodo
+@dataclass
+class OrcamentoStatus:
+    subcategory_id: int
+    orcado: Decimal
+    realizado: Decimal
 
 
-def get_projecao(
+def get_orcamento_status(
     db: Session,
     user_id: int,
     *,
+    tipo: PluggyTransactionTipo,
     ano: int,
     mes: int,
-    meses_futuros: int = 6,
-    janela_media: int = 3,
-) -> list[PontoProjecao]:
-    # Base da média: só subcategorias `fixa`/`variavel` (exclusão direta, sem
-    # COALESCE — diferente de get_por_natureza, que precisa de um bucket
-    # "eventual" pros 3 cards zero-filled; aqui `eventual`/sem natureza
-    # simplesmente não entram na projeção, mesma premissa de não recorrência).
-    janela = _month_range(ano, mes, janela_media)
-    inicio, fim = _date_bounds(janela)
-
-    query = (
-        _base_query(db, user_id)
-        .filter(Subcategory.natureza.in_([Natureza.fixa, Natureza.variavel]))
-        .filter(
-            PluggyTransaction.data_competencia >= inicio,
-            PluggyTransaction.data_competencia < fim,
-        )
-    )
-    rows = (
-        query.with_entities(PluggyTransaction.tipo, func.sum(func.abs(PluggyTransaction.valor)))
-        .group_by(PluggyTransaction.tipo)
+    regime: Regime = "competencia",
+) -> list[OrcamentoStatus]:
+    # Orçado: soma de todos os orçamentos vigentes no mês, por subcategoria
+    # (múltiplos orçamentos na mesma subcategoria somam — decisão do CEO).
+    orcados_rows = (
+        orcamentos_vigentes_query(db, user_id, ano=ano, mes=mes)
+        .with_entities(Orcamento.subcategory_id, func.sum(Orcamento.valor))
+        .group_by(Orcamento.subcategory_id)
         .all()
     )
-    totais = {tipo: _to_decimal(total) for tipo, total in rows}
-    divisor = Decimal(janela_media)
-    receita_media = (totais.get(PluggyTransactionTipo.credito, Decimal("0")) / divisor).quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
+    orcado_by_subcategoria = {
+        subcategory_id: _to_decimal(total) for subcategory_id, total in orcados_rows
+    }
+    if not orcado_by_subcategoria:
+        return []
+
+    # Realizado: só para as subcategorias com orçamento vigente — reaproveita
+    # o mesmo filtro base (excluir_de_totais/regime/investimento) de todo
+    # outro agregador desta função.
+    query = _apply_periodo(
+        _base_query(db, user_id, regime=regime), ano=ano, mes=mes, regime=regime
+    ).filter(
+        PluggyTransaction.tipo == tipo,
+        PluggyTransaction.subcategory_id.in_(orcado_by_subcategoria.keys()),
     )
-    despesa_media = (totais.get(PluggyTransactionTipo.debito, Decimal("0")) / divisor).quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
+    realizado_rows = (
+        query.with_entities(
+            PluggyTransaction.subcategory_id, func.sum(func.abs(PluggyTransaction.valor))
+        )
+        .group_by(PluggyTransaction.subcategory_id)
+        .all()
     )
-    saldo_media = receita_media - despesa_media
+    realizado_by_subcategoria = {
+        subcategory_id: _to_decimal(total) for subcategory_id, total in realizado_rows
+    }
 
     return [
-        PontoProjecao(ano=y, mes=m, receita=receita_media, despesa=despesa_media, saldo=saldo_media)
-        for y, m in _future_month_range(ano, mes, meses_futuros)
+        OrcamentoStatus(
+            subcategory_id=subcategory_id,
+            orcado=orcado,
+            realizado=realizado_by_subcategoria.get(subcategory_id, Decimal("0")),
+        )
+        for subcategory_id, orcado in orcado_by_subcategoria.items()
     ]
 
 

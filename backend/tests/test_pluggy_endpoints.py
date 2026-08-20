@@ -231,11 +231,11 @@ def test_user_does_not_see_other_users_items_accounts_transactions(client, db_se
     assert client.get("/pluggy/transactions").json() == []
 
 
-def _subcategory(db_session, nome="Mercado"):
-    group = CategoryGroup(nome=f"Grupo {nome}")
+def _subcategory(db_session, user, nome="Mercado"):
+    group = CategoryGroup(user_id=user.id, nome=f"Grupo {nome}")
     db_session.add(group)
     db_session.flush()
-    subcategory = Subcategory(group_id=group.id, nome=nome)
+    subcategory = Subcategory(user_id=user.id, group_id=group.id, nome=nome)
     db_session.add(subcategory)
     db_session.commit()
     db_session.refresh(subcategory)
@@ -359,7 +359,7 @@ def test_list_transactions_filters_by_ano_and_mes(client, db_session):
 
 def test_list_transactions_filters_by_subcategory_id(client, db_session):
     user = _authenticate(client, db_session)
-    sub = _subcategory(db_session)
+    sub = _subcategory(db_session, user)
     _transaction(db_session, user, valor="-10.00", subcategory_id=sub.id)
     _transaction(db_session, user, valor="-20.00", subcategory_id=None)
 
@@ -373,7 +373,7 @@ def test_list_transactions_filters_by_subcategory_id(client, db_session):
 
 def test_list_transactions_filters_by_subcategory_id_zero_returns_uncategorized(client, db_session):
     user = _authenticate(client, db_session)
-    sub = _subcategory(db_session)
+    sub = _subcategory(db_session, user)
     _transaction(db_session, user, valor="-10.00", subcategory_id=sub.id)
     _transaction(db_session, user, valor="-20.00", subcategory_id=None)
 
@@ -423,7 +423,7 @@ def test_list_transactions_filters_by_competencia_flag(client, db_session):
 
 def test_list_transactions_combined_filters_isolated_by_user(client, db_session):
     user = _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
-    sub = _subcategory(db_session)
+    sub = _subcategory(db_session, user)
     _transaction(
         db_session,
         user,
@@ -512,7 +512,7 @@ def test_list_transactions_filters_by_asset_id_combined_with_ano_mes_subcategori
 ):
     user = _authenticate(client, db_session)
     asset = _asset(db_session, user)
-    sub = _subcategory(db_session)
+    sub = _subcategory(db_session, user)
     _transaction(
         db_session,
         user,
@@ -866,11 +866,11 @@ def test_update_saldo_inicial_other_users_account_returns_404(client, db_session
 # --- GET/PUT /pluggy/ajuste-salario-dezembro ----------------------------------
 
 
-def _salario_subcategory(db_session):
-    group = CategoryGroup(nome="Receitas")
+def _salario_subcategory(db_session, user):
+    group = CategoryGroup(user_id=user.id, nome="Receitas")
     db_session.add(group)
     db_session.flush()
-    subcategory = Subcategory(group_id=group.id, nome="Salário")
+    subcategory = Subcategory(user_id=user.id, group_id=group.id, nome="Salário")
     db_session.add(subcategory)
     db_session.commit()
     db_session.refresh(subcategory)
@@ -898,8 +898,8 @@ def test_get_ajuste_salario_dezembro_returns_null_when_absent(client, db_session
 
 
 def test_put_ajuste_salario_dezembro_creates_and_reflects_in_summary(client, db_session):
-    _authenticate(client, db_session)
-    _salario_subcategory(db_session)
+    user = _authenticate(client, db_session)
+    _salario_subcategory(db_session, user)
     _item, account, _fake_client = _connect_account(client, db_session)
 
     response = client.put(
@@ -920,8 +920,8 @@ def test_put_ajuste_salario_dezembro_creates_and_reflects_in_summary(client, db_
 
 
 def test_put_ajuste_salario_dezembro_valor_none_deletes(client, db_session):
-    _authenticate(client, db_session)
-    _salario_subcategory(db_session)
+    user = _authenticate(client, db_session)
+    _salario_subcategory(db_session, user)
     _item, account, _fake_client = _connect_account(client, db_session)
     client.put(
         "/pluggy/ajuste-salario-dezembro",

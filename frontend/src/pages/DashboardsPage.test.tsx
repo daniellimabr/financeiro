@@ -346,6 +346,21 @@ function routedFetchMock() {
   });
 }
 
+// Mesmo roteamento de routedFetchMock, mas intercepta /dashboards/por-orcamento
+// com um fixture próprio — evita adicionar orçamento a todos os testes do
+// funil (mudaria o texto de .amt e quebraria asserções existentes de
+// getByText em valores exatos).
+function routedFetchMockWithOrcamento(orcamentoFixture: unknown) {
+  const base = routedFetchMock();
+  return vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.startsWith("/dashboards/por-orcamento")) {
+      return Promise.resolve(jsonResponse(orcamentoFixture));
+    }
+    return base(input, init);
+  });
+}
+
 describe("DashboardsPage", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -464,6 +479,66 @@ describe("DashboardsPage", () => {
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: /Alimentação/ })).not.toBeInTheDocument();
     });
+  });
+
+  it("shows an overshoot alert (▲) on a Despesa subcategoria row when realizado exceeds orçado", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routedFetchMockWithOrcamento([{ subcategory_id: 10, orcado: "500.00", realizado: "800.00" }])
+    );
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /Despesa/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Alimentação/ }));
+    await screen.findByRole("button", { name: /Mercado/ });
+    const mercadoRow = accordionRowButton(/Mercado/);
+
+    expect(normalizedText(mercadoRow)).toContain("estourou o orçado");
+    expect(mercadoRow.querySelector(".track.orcamento-alerta")).not.toBeNull();
+
+    // Restaurante não tem orçamento vigente — nenhum sinal, comportamento
+    // idêntico ao de antes desta sprint.
+    const restauranteRow = accordionRowButton(/Restaurante/);
+    expect(normalizedText(restauranteRow)).not.toContain("orçado");
+    expect(restauranteRow.querySelector(".track.orcamento-alerta")).toBeNull();
+  });
+
+  it("shows a shortfall alert (▼) on a Receita subcategoria row when realizado is below orçado", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routedFetchMockWithOrcamento([{ subcategory_id: 10, orcado: "1000.00", realizado: "800.00" }])
+    );
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /Receita/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Alimentação/ }));
+    await screen.findByRole("button", { name: /Mercado/ });
+    const mercadoRow = accordionRowButton(/Mercado/);
+
+    expect(normalizedText(mercadoRow)).toContain("abaixo do orçado");
+    expect(mercadoRow.querySelector(".track.orcamento-alerta")).not.toBeNull();
+  });
+
+  it("shows a muted 'de R$X orçado' subtext, no alert marker, when realizado is within budget", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routedFetchMockWithOrcamento([{ subcategory_id: 10, orcado: "1000.00", realizado: "800.00" }])
+    );
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /Despesa/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Alimentação/ }));
+    await screen.findByRole("button", { name: /Mercado/ });
+    const mercadoRow = accordionRowButton(/Mercado/);
+
+    expect(normalizedText(mercadoRow)).toContain("de R$ 1.000,00 orçado");
+    expect(mercadoRow.querySelector(".track.orcamento-alerta")).toBeNull();
   });
 
   it("keeps a first expanded grupo visible when a second grupo is expanded (sanfona)", async () => {

@@ -135,14 +135,12 @@ class PatrimonioBreakdownOut(BaseModel):
     total: Decimal
 
 
-class PontoProjecaoOut(BaseModel):
+class OrcamentoStatusOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    ano: int
-    mes: int
-    receita: Decimal
-    despesa: Decimal
-    saldo: Decimal
+    subcategory_id: int
+    orcado: Decimal
+    realizado: Decimal
 
 
 class SaldoContaOut(BaseModel):

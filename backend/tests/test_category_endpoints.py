@@ -134,6 +134,48 @@ def test_get_update_delete_subcategory(client, db_session):
     assert missing_response.status_code == 404
 
 
+def test_create_subcategory_with_missing_group_returns_404(client, db_session):
+    _authenticate(client, db_session)
+
+    response = client.post(
+        "/subcategories", json={"group_id": 999, "nome": "Aluguel", "natureza": None}
+    )
+
+    assert response.status_code == 404
+
+
+def test_create_subcategory_duplicate_name_returns_400(client, db_session):
+    _authenticate(client, db_session)
+    group = client.post("/category-groups", json={"nome": "Moradia"}).json()
+    client.post(
+        "/subcategories", json={"group_id": group["id"], "nome": "Aluguel", "natureza": None}
+    )
+
+    response = client.post(
+        "/subcategories", json={"group_id": group["id"], "nome": "aluguel", "natureza": None}
+    )
+
+    assert response.status_code == 400
+
+
+def test_update_subcategory_to_duplicate_name_returns_400(client, db_session):
+    _authenticate(client, db_session)
+    group = client.post("/category-groups", json={"nome": "Moradia"}).json()
+    client.post(
+        "/subcategories", json={"group_id": group["id"], "nome": "Aluguel", "natureza": None}
+    )
+    subcategory_b = client.post(
+        "/subcategories", json={"group_id": group["id"], "nome": "Condomínio", "natureza": None}
+    ).json()
+
+    response = client.put(
+        f"/subcategories/{subcategory_b['id']}",
+        json={"group_id": group["id"], "nome": "aluguel", "natureza": None},
+    )
+
+    assert response.status_code == 400
+
+
 def test_update_missing_subcategory_returns_404(client, db_session):
     _authenticate(client, db_session)
     group = client.post("/category-groups", json={"nome": "Moradia"}).json()
@@ -143,3 +185,120 @@ def test_update_missing_subcategory_returns_404(client, db_session):
     )
 
     assert response.status_code == 404
+
+
+def test_user_does_not_see_other_users_category_groups(client, db_session):
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    client.post("/category-groups", json={"nome": "Moradia"})
+    client.cookies.clear()
+
+    _authenticate(client, db_session, google_sub="google-2", email="b@example.com")
+    response = client.get("/category-groups")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_get_other_users_category_group_returns_404(client, db_session):
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    group = client.post("/category-groups", json={"nome": "Moradia"}).json()
+    client.cookies.clear()
+
+    _authenticate(client, db_session, google_sub="google-2", email="b@example.com")
+    response = client.get(f"/category-groups/{group['id']}")
+
+    assert response.status_code == 404
+
+
+def test_update_other_users_category_group_returns_404(client, db_session):
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    group = client.post("/category-groups", json={"nome": "Moradia"}).json()
+    client.cookies.clear()
+
+    _authenticate(client, db_session, google_sub="google-2", email="b@example.com")
+    response = client.put(f"/category-groups/{group['id']}", json={"nome": "Outro nome"})
+
+    assert response.status_code == 404
+
+
+def test_delete_other_users_category_group_returns_404(client, db_session):
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    group = client.post("/category-groups", json={"nome": "Moradia"}).json()
+    client.cookies.clear()
+
+    _authenticate(client, db_session, google_sub="google-2", email="b@example.com")
+    response = client.delete(f"/category-groups/{group['id']}")
+
+    assert response.status_code == 404
+
+
+def test_get_other_users_subcategory_returns_404(client, db_session):
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    group = client.post("/category-groups", json={"nome": "Moradia"}).json()
+    subcategory = client.post(
+        "/subcategories", json={"group_id": group["id"], "nome": "Aluguel", "natureza": None}
+    ).json()
+    client.cookies.clear()
+
+    _authenticate(client, db_session, google_sub="google-2", email="b@example.com")
+    response = client.get(f"/subcategories/{subcategory['id']}")
+
+    assert response.status_code == 404
+
+
+def test_delete_other_users_subcategory_returns_404(client, db_session):
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    group = client.post("/category-groups", json={"nome": "Moradia"}).json()
+    subcategory = client.post(
+        "/subcategories", json={"group_id": group["id"], "nome": "Aluguel", "natureza": None}
+    ).json()
+    client.cookies.clear()
+
+    _authenticate(client, db_session, google_sub="google-2", email="b@example.com")
+    response = client.delete(f"/subcategories/{subcategory['id']}")
+
+    assert response.status_code == 404
+
+
+def test_delete_subcategory_in_use_by_orcamento_returns_400(client, db_session):
+    _authenticate(client, db_session)
+    group = client.post("/category-groups", json={"nome": "Moradia"}).json()
+    subcategory = client.post(
+        "/subcategories", json={"group_id": group["id"], "nome": "Aluguel", "natureza": None}
+    ).json()
+    client.post(
+        "/orcamentos",
+        json={
+            "subcategory_id": subcategory["id"],
+            "tipo": "eventual",
+            "valor": "1000.00",
+            "ano": 2026,
+            "mes": 3,
+        },
+    )
+
+    response = client.delete(f"/subcategories/{subcategory['id']}")
+
+    assert response.status_code == 400
+
+
+def test_delete_group_with_subcategory_in_use_returns_400(client, db_session):
+    _authenticate(client, db_session)
+    group = client.post("/category-groups", json={"nome": "Moradia"}).json()
+    subcategory = client.post(
+        "/subcategories", json={"group_id": group["id"], "nome": "Aluguel", "natureza": None}
+    ).json()
+    client.post(
+        "/orcamentos",
+        json={
+            "subcategory_id": subcategory["id"],
+            "tipo": "eventual",
+            "valor": "1000.00",
+            "ano": 2026,
+            "mes": 3,
+        },
+    )
+
+    response = client.delete(f"/category-groups/{group['id']}")
+
+    assert response.status_code == 400
