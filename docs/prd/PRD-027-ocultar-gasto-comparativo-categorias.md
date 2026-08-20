@@ -1,8 +1,9 @@
 # PRD-027: Simulação "ocultar gasto" e gráfico comparativo de categorias
 
-- **Status:** substituído — não executado (CEO, 2026-08-19). A vaga "Sprint 27" foi ocupada por uma
-  nova sprint, planejada em sessão própria. Documento mantido como registro histórico da decisão de
-  produto original.
+- **Status:** executado (CEO, 2026-08-19). Substituído mais cedo no mesmo dia da aprovação da
+  Sprint 26, antes de qualquer execução — o CEO reverteu essa decisão no mesmo dia e pediu a
+  execução do escopo original abaixo, sem alteração. Ver
+  [SPRINT-027-ocultar-gasto-comparativo-categorias-report.md](../sprints/SPRINT-027-ocultar-gasto-comparativo-categorias-report.md).
 - **Épico relacionado:** nenhum (cross-epic, 3ª de 3 sprints desta sessão de planejamento — ver
   PRD-025/PRD-026)
 - **Sprint(s):** [SPRINT-027-ocultar-gasto-comparativo-categorias-plan.md](../sprints/SPRINT-027-ocultar-gasto-comparativo-categorias-plan.md)

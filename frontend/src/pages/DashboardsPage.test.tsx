@@ -300,6 +300,15 @@ function accordionRowButton(name: string | RegExp): HTMLElement {
   return button;
 }
 
+// formatCurrency usa Intl.NumberFormat, que separa "R$" do valor com um
+// espaco NBSP (codepoint U+00A0) do valor - invisivel na tela mas diferente
+// do espaco normal usado nos literais de teste abaixo. getByText normaliza
+// isso sozinho, mas comparar .textContent bruto com toContain precisa da
+// mesma normalizacao.
+function normalizedText(el: HTMLElement): string {
+  return (el.textContent ?? "").replace(/\u00A0/g, " ");
+}
+
 function routedFetchMock() {
   return vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     void init;
@@ -522,6 +531,96 @@ describe("DashboardsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /Mercado/ }));
     // 45.00 / 800.00 (total do tipo "Mercado")
     expect(await screen.findByText("5.6%")).toBeInTheDocument();
+  });
+
+  it("'ocultar gasto' toggles a transaction out of the grupo/subcategoria totals, without a new network request, and top summary cards stay unchanged", async () => {
+    const fetchMock = routedFetchMock();
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /Despesa/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Alimentação/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Mercado/ }));
+    await screen.findByText("Mercado São João");
+
+    expect(normalizedText(accordionRowButton(/Mercado/))).toContain("R$ 800,00");
+    expect(normalizedText(accordionRowButton(/Alimentação/))).toContain("R$ 1.000,00");
+
+    const callsBefore = fetchMock.mock.calls.length;
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Ocultar transação Mercado São João (simulação)" })
+    );
+
+    await waitFor(() => {
+      expect(normalizedText(accordionRowButton(/Mercado/))).toContain("R$ 755,00");
+    });
+    expect(normalizedText(accordionRowButton(/Alimentação/))).toContain("R$ 955,00");
+    expect(fetchMock.mock.calls.length).toBe(callsBefore);
+
+    // Cards de resumo do topo (Despesa) não mudam com o item oculto.
+    expect(screen.getByText("R$ 5.120,30")).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Reexibir transação Mercado São João" })
+    );
+    await waitFor(() => {
+      expect(normalizedText(accordionRowButton(/Mercado/))).toContain("R$ 800,00");
+    });
+    expect(normalizedText(accordionRowButton(/Alimentação/))).toContain("R$ 1.000,00");
+  });
+
+  it("resets 'ocultar gasto' state when the funil closes or the month filter changes", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /Despesa/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Alimentação/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Mercado/ }));
+    await screen.findByText("Mercado São João");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Ocultar transação Mercado São João (simulação)" })
+    );
+    await waitFor(() => {
+      expect(normalizedText(accordionRowButton(/Mercado/))).toContain("R$ 755,00");
+    });
+
+    // Fechar o funil e reabrir: item oculto some, volta ao valor original.
+    await userEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    await userEvent.click(screen.getByRole("button", { name: /Despesa/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Alimentação/ }));
+    await waitFor(() => {
+      expect(normalizedText(accordionRowButton(/Mercado/))).toContain("R$ 800,00");
+    });
+
+    // Ocultar de novo e trocar o mês: reseta sem fechar o funil.
+    await userEvent.click(screen.getByRole("button", { name: /Mercado/ }));
+    await screen.findByText("Mercado São João");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Ocultar transação Mercado São João (simulação)" })
+    );
+    await waitFor(() => {
+      expect(normalizedText(accordionRowButton(/Mercado/))).toContain("R$ 755,00");
+    });
+
+    await userEvent.selectOptions(screen.getByLabelText("Mês"), "Janeiro");
+    await waitFor(() => {
+      expect(normalizedText(accordionRowButton(/Mercado/))).toContain("R$ 800,00");
+    });
+  });
+
+  it("shows a 'comparativo por categoria' chart inside the Despesa/Receita funil", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /Despesa/ }));
+    expect(await screen.findByText("Comparativo por categoria")).toBeInTheDocument();
   });
 
   it("shows an empty state when there are no transactions in the period", async () => {

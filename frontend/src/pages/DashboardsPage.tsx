@@ -41,6 +41,7 @@ import {
   type TransacaoTipo,
 } from "../api/dashboards";
 import type { PluggyInvestment } from "../api/pluggy";
+import { CategoriaComparativoChart } from "../components/CategoriaComparativoChart";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { RegimeToggle } from "../components/RegimeToggle";
 import { TransactionsTable } from "../components/TransactionsTable";
@@ -615,6 +616,25 @@ function SaldoAcumuladoMemoriaCalculo({
   );
 }
 
+// "Ocultar gasto" (Sprint 27) — desconta a soma dos itens marcados como
+// ocultos só do ponto do mês/ano atualmente filtrado; os demais meses do
+// histórico não mudam (simulação escopada ao mês aberto no funil, não
+// retroativa). Sem efeito se hiddenSum é 0 (early return preserva a
+// referência do array, evita recomputar tudo abaixo à toa).
+function applyHiddenToTrend(
+  trend: PontoTendencia[] | undefined,
+  ano: number,
+  mes: number,
+  hiddenSum: number
+): PontoTendencia[] | undefined {
+  if (!trend || hiddenSum === 0) return trend;
+  return trend.map((ponto) =>
+    ponto.ano === ano && ponto.mes === mes
+      ? { ...ponto, total: String(Number(ponto.total) - hiddenSum) }
+      : ponto
+  );
+}
+
 function sumTrends(lists: PontoTendencia[][]): PontoTendencia[] | undefined {
   if (lists.length === 0) return undefined;
   const [first] = lists;
@@ -666,6 +686,45 @@ function GrupoAccordion({
   const groupsQuery = useCategoryGroups();
   const subcategoriesQuery = useSubcategories();
 
+  // "Ocultar gasto" (Sprint 27, PRD-027) — estado 100% local/efêmero, mesmo
+  // padrão de applyHipoteticas (Sprint 14): Map<transactionId, {subcategoryId,
+  // valor}> em vez de só um Set de ids porque a soma exibida no Row de
+  // grupo/subcategoria precisa do valor sem esperar a TransactionsTable
+  // recarregar. Reseta sozinho ao fechar o funil (GrupoAccordion desmonta,
+  // ver DashboardsPage) e explicitamente ao trocar ano/mês abaixo (critério
+  // de aceite 3 do PRD).
+  const [hiddenTxns, setHiddenTxns] = useState<
+    Map<number, { subcategoryId: number; valor: number }>
+  >(new Map());
+  // Reset ao trocar ano/mês (critério de aceite 3 do PRD) via ajuste de
+  // estado durante a renderização (padrão recomendado pelo React pra
+  // "resetar estado quando uma prop muda") em vez de useEffect — evita o
+  // re-render em cascata de um setState síncrono dentro de efeito.
+  const [ultimoFiltro, setUltimoFiltro] = useState({ ano: filter.ano, mes: filter.mes });
+  if (ultimoFiltro.ano !== filter.ano || ultimoFiltro.mes !== filter.mes) {
+    setUltimoFiltro({ ano: filter.ano, mes: filter.mes });
+    setHiddenTxns(new Map());
+  }
+
+  function toggleHidden(subcategoryId: number, transactionId: number, valor: number) {
+    setHiddenTxns((prev) => {
+      const next = new Map(prev);
+      if (next.has(transactionId)) next.delete(transactionId);
+      else next.set(transactionId, { subcategoryId, valor: Math.abs(valor) });
+      return next;
+    });
+  }
+
+  const hiddenIds = useMemo(() => new Set(hiddenTxns.keys()), [hiddenTxns]);
+
+  const hiddenSumBySubcategoria = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const { subcategoryId, valor } of hiddenTxns.values()) {
+      map.set(subcategoryId, (map.get(subcategoryId) ?? 0) + valor);
+    }
+    return map;
+  }, [hiddenTxns]);
+
   const groupColorIndex = useMemo(
     () => buildColorIndexFromIds((groupsQuery.data ?? []).map((g) => g.id)),
     [groupsQuery.data]
@@ -712,49 +771,104 @@ function GrupoAccordion({
       .sort((a, b) => b.total - a.total);
   }, [query.data, trendBySubcategoria]);
 
+  // Grupos com o total/trend recalculados descontando os itens marcados
+  // como "ocultar gasto" (ver hiddenSumBySubcategoria acima) — grupos (sem
+  // ajuste) segue existindo à parte porque o gráfico comparativo de
+  // categorias usa a série histórica original, não a simulação do mês
+  // aberto (ver CategoriaComparativoChart).
+  const gruposAjustados = useMemo<GrupoTotal[]>(() => {
+    if (hiddenSumBySubcategoria.size === 0) return grupos;
+    const ajustados = grupos.map((grupo) => {
+      const subcategoriasAjustadas = grupo.subcategorias.map((sub) => {
+        const hidden = hiddenSumBySubcategoria.get(sub.subcategory_id) ?? 0;
+        if (hidden === 0) return sub;
+        return { ...sub, total: String(Math.max(0, Number(sub.total) - hidden)) };
+      });
+      const totalAjustado = subcategoriasAjustadas.reduce((sum, s) => sum + Number(s.total), 0);
+      const hiddenGrupo = grupo.subcategorias.reduce(
+        (sum, s) => sum + (hiddenSumBySubcategoria.get(s.subcategory_id) ?? 0),
+        0
+      );
+      return {
+        ...grupo,
+        total: totalAjustado,
+        subcategorias: subcategoriasAjustadas,
+        trend: applyHiddenToTrend(grupo.trend, filter.ano, filter.mes, hiddenGrupo),
+      };
+    });
+    const totalGeralAjustado = ajustados.reduce((sum, g) => sum + g.total, 0);
+    return ajustados
+      .map((g) => ({
+        ...g,
+        percentual: totalGeralAjustado > 0 ? (g.total / totalGeralAjustado) * 100 : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [grupos, hiddenSumBySubcategoria, filter.ano, filter.mes]);
+
   if (query.isLoading) return <p>Carregando...</p>;
   if (query.isError) return <p role="alert">Não foi possível carregar as categorias.</p>;
   if (grupos.length === 0) return <p className="dash-empty">Nenhuma transação neste período.</p>;
 
-  const max = grupos[0]?.total ?? 1;
+  const max = gruposAjustados[0]?.total ?? 1;
 
   return (
-    <ul className="dash-list dash-accordion">
-      {grupos.map((grupo) => (
-        <li key={grupo.group_id}>
-          <div className="dash-accordion-item">
-            <Row
-              nome={grupo.group_nome}
-              total={String(grupo.total)}
-              percentual={grupo.percentual.toFixed(2)}
-              max={max}
-              color={groupColorVar(grupo.group_id, groupColorIndex)}
-              expanded={expandedGrupos.includes(grupo.group_id)}
-              onClick={() => onToggleGrupo(grupo.group_id)}
-              trend={grupo.trend}
-              onSelecionarMes={onSelecionarMes}
-            />
-            {expandedGrupos.includes(grupo.group_id) && (
-              <div className="dash-accordion-panel">
-                <SubcategoriaAccordion
-                  tipo={tipo}
-                  groupId={grupo.group_id}
-                  groupTotal={grupo.total}
-                  subcategorias={grupo.subcategorias}
-                  groupColorIndex={groupColorIndex}
-                  subcategoryTintIndex={subcategoryTintIndex}
-                  trendBySubcategoria={trendBySubcategoria}
-                  filter={filter}
-                  expandedSubcategorias={expandedSubcategorias}
-                  onToggleSubcategoria={onToggleSubcategoria}
-                  onSelecionarMes={onSelecionarMes}
-                />
-              </div>
-            )}
-          </div>
-        </li>
-      ))}
-    </ul>
+    <>
+      <CategoriaComparativoChart
+        grupos={grupos.map((grupo) => ({
+          group_id: grupo.group_id,
+          group_nome: grupo.group_nome,
+          trend: grupo.trend,
+          color: groupColorVar(grupo.group_id, groupColorIndex),
+        }))}
+      />
+      {hiddenTxns.size > 0 && (
+        <p className="dash-hidden-summary">
+          Simulando sem {hiddenTxns.size} {hiddenTxns.size === 1 ? "transação" : "transações"}.
+          <button type="button" onClick={() => setHiddenTxns(new Map())}>
+            Restaurar
+          </button>
+        </p>
+      )}
+      <ul className="dash-list dash-accordion">
+        {gruposAjustados.map((grupo) => (
+          <li key={grupo.group_id}>
+            <div className="dash-accordion-item">
+              <Row
+                nome={grupo.group_nome}
+                total={String(grupo.total)}
+                percentual={grupo.percentual.toFixed(2)}
+                max={max}
+                color={groupColorVar(grupo.group_id, groupColorIndex)}
+                expanded={expandedGrupos.includes(grupo.group_id)}
+                onClick={() => onToggleGrupo(grupo.group_id)}
+                trend={grupo.trend}
+                onSelecionarMes={onSelecionarMes}
+              />
+              {expandedGrupos.includes(grupo.group_id) && (
+                <div className="dash-accordion-panel">
+                  <SubcategoriaAccordion
+                    tipo={tipo}
+                    groupId={grupo.group_id}
+                    groupTotal={grupo.total}
+                    subcategorias={grupo.subcategorias}
+                    groupColorIndex={groupColorIndex}
+                    subcategoryTintIndex={subcategoryTintIndex}
+                    trendBySubcategoria={trendBySubcategoria}
+                    filter={filter}
+                    expandedSubcategorias={expandedSubcategorias}
+                    onToggleSubcategoria={onToggleSubcategoria}
+                    onSelecionarMes={onSelecionarMes}
+                    hiddenSumBySubcategoria={hiddenSumBySubcategoria}
+                    hiddenIds={hiddenIds}
+                    onToggleHidden={toggleHidden}
+                  />
+                </div>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 
@@ -770,6 +884,9 @@ function SubcategoriaAccordion({
   expandedSubcategorias,
   onToggleSubcategoria,
   onSelecionarMes,
+  hiddenSumBySubcategoria,
+  hiddenIds,
+  onToggleHidden,
 }: {
   tipo: TransacaoTipo;
   groupId: number;
@@ -782,6 +899,12 @@ function SubcategoriaAccordion({
   expandedSubcategorias: number[];
   onToggleSubcategoria: (id: number) => void;
   onSelecionarMes: (ponto: { ano: number; mes: number }) => void;
+  // "Ocultar gasto" (Sprint 27) — subcategorias já chega com item.total
+  // ajustado (ver gruposAjustados em GrupoAccordion); só o trend (mapa
+  // bruto compartilhado entre grupos) precisa de ajuste aqui.
+  hiddenSumBySubcategoria: Map<number, number>;
+  hiddenIds: Set<number>;
+  onToggleHidden: (subcategoryId: number, transactionId: number, valor: number) => void;
 }) {
   const max = Number(subcategorias[0]?.total ?? 1);
 
@@ -790,6 +913,12 @@ function SubcategoriaAccordion({
       {subcategorias.map((item) => {
         const percentual =
           groupTotal > 0 ? ((Number(item.total) / groupTotal) * 100).toFixed(2) : "0.00";
+        const trend = applyHiddenToTrend(
+          trendBySubcategoria.get(item.subcategory_id),
+          filter.ano,
+          filter.mes,
+          hiddenSumBySubcategoria.get(item.subcategory_id) ?? 0
+        );
         return (
           <li key={item.subcategory_id}>
             <div className="dash-accordion-item">
@@ -806,7 +935,7 @@ function SubcategoriaAccordion({
                 )}
                 expanded={expandedSubcategorias.includes(item.subcategory_id)}
                 onClick={() => onToggleSubcategoria(item.subcategory_id)}
-                trend={trendBySubcategoria.get(item.subcategory_id)}
+                trend={trend}
                 onSelecionarMes={onSelecionarMes}
               />
               {expandedSubcategorias.includes(item.subcategory_id) && (
@@ -817,6 +946,10 @@ function SubcategoriaAccordion({
                     tipo={tipo}
                     totalParaPercentual={item.total}
                     emptyMessage="Nenhuma transação nesta categoria."
+                    hiddenIds={hiddenIds}
+                    onToggleHidden={(transactionId, valor) =>
+                      onToggleHidden(item.subcategory_id, transactionId, valor)
+                    }
                   />
                 </div>
               )}

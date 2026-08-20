@@ -770,6 +770,26 @@ input {
   width: 100%;
 }
 
+/* Aviso de simulação ativa (Sprint 27) — some itens marcados como "ocultar
+   gasto" no funil. Fica acima da lista de grupos, mesma cor de destaque do
+   toggle ativo (.hide-toggle.active). */
+.dash-hidden-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--accent-text);
+}
+
+.dash-hidden-summary button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent-text);
+  font: inherit;
+  text-decoration: underline;
+}
+
 .dash-list {
   list-style: none;
   margin: 0;
@@ -1242,6 +1262,56 @@ input {
 
 .txn-table .col-percentual {
   width: 70px;
+}
+
+.txn-table .col-ocultar {
+  width: 40px;
+}
+
+/* "Ocultar gasto" (Sprint 27) — toggle de binóculo por linha, simulação
+   client-side efêmera (ver GrupoAccordion em DashboardsPage.tsx). Linha
+   marcada como oculta fica esmaecida e com o valor riscado — sinaliza que
+   ela saiu da soma exibida sem removê-la da lista (o usuário ainda precisa
+   poder desmarcar). */
+.hide-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+}
+
+.hide-toggle:hover {
+  border-color: var(--border);
+}
+
+.hide-toggle.active {
+  color: var(--accent-text);
+  background: var(--accent-bg);
+}
+
+tr.hidden-row {
+  opacity: 0.5;
+}
+
+tr.hidden-row .valor-cell {
+  text-decoration: line-through;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Breakdown de Patrimônio (DashboardsPage, Sprint 24) — accordion de 4

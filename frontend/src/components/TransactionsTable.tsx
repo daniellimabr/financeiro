@@ -9,6 +9,7 @@ import { useTableSort } from "../hooks/useTableSort";
 import { formatCurrency } from "../utils/format";
 import { assetLabel, investimentoLabel, subcategoryLabel } from "../utils/transactionEdit";
 import { AccountTipoIcon } from "./AccountTipoIcon";
+import { BinocularIcon } from "./BinocularIcon";
 import { SortableHeader } from "./SortableHeader";
 import {
   AssetSelectCell,
@@ -44,6 +45,8 @@ export function TransactionsTable({
   showCategoria = true,
   showAtivo = true,
   showInvestimento = false,
+  hiddenIds,
+  onToggleHidden,
 }: {
   filter: PeriodoFilter;
   categoriaId?: number;
@@ -56,6 +59,13 @@ export function TransactionsTable({
   showCategoria?: boolean;
   showAtivo?: boolean;
   showInvestimento?: boolean;
+  // "Ocultar gasto" (Sprint 27) — simulação client-side efêmera do funil
+  // Despesa/Receita do Dashboard (ver GrupoAccordion). Só aparece a coluna
+  // de binóculo quando onToggleHidden é passado; os demais consumidores de
+  // TransactionsTable (Ativos/Passivos/Investimentos) não passam a prop e
+  // ficam iguais a antes.
+  hiddenIds?: Set<number>;
+  onToggleHidden?: (transactionId: number, valor: number) => void;
 }) {
   const query = usePluggyTransactions({
     ano: filter.ano,
@@ -121,6 +131,7 @@ export function TransactionsTable({
           {showInvestimento && <col className="col-investimento" />}
           <col className="col-valor" />
           {total !== undefined && <col className="col-percentual" />}
+          {onToggleHidden && <col className="col-ocultar" />}
         </colgroup>
         <thead>
           <tr>
@@ -181,6 +192,11 @@ export function TransactionsTable({
                 onClick={() => toggleSort("percentual")}
               />
             )}
+            {onToggleHidden && (
+              <th>
+                <span className="sr-only">Ocultar (simulação)</span>
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -189,8 +205,9 @@ export function TransactionsTable({
               total !== undefined && total > 0
                 ? (Math.abs(Number(transaction.valor)) / total) * 100
                 : 0;
+            const oculta = hiddenIds?.has(transaction.id) ?? false;
             return (
-              <tr key={transaction.id}>
+              <tr key={transaction.id} className={oculta ? "hidden-row" : undefined}>
                 <td>{transaction.data}</td>
                 <td>
                   <DescriptionCell transaction={transaction} />
@@ -224,6 +241,23 @@ export function TransactionsTable({
                   </span>
                 </td>
                 {total !== undefined && <td className="pct-col">{formatPercent(percentual)}</td>}
+                {onToggleHidden && (
+                  <td>
+                    <button
+                      type="button"
+                      className={`hide-toggle${oculta ? " active" : ""}`}
+                      aria-pressed={oculta}
+                      aria-label={
+                        oculta
+                          ? `Reexibir transação ${transaction.descricao}`
+                          : `Ocultar transação ${transaction.descricao} (simulação)`
+                      }
+                      onClick={() => onToggleHidden(transaction.id, Number(transaction.valor))}
+                    >
+                      <BinocularIcon active={oculta} />
+                    </button>
+                  </td>
+                )}
               </tr>
             );
           })}
