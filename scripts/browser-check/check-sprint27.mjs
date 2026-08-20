@@ -220,9 +220,10 @@ async function runSteps(page, label) {
     failures.push(`[${label}] aviso de simulação não apareceu na 2ª rodada de ocultar`);
   }
 
-  const mesAtual = await page.getByLabel("Mês").inputValue();
+  const mesSelect = page.getByLabel("Mês", { exact: true });
+  const mesAtual = await mesSelect.inputValue();
   const outroMes = mesAtual === "1" ? "2" : "1";
-  await page.getByLabel("Mês").selectOption(outroMes);
+  await mesSelect.selectOption(outroMes);
   await page.waitForTimeout(500);
   const bannerAposTrocarMes = await page
     .locator(".dash-hidden-summary")
