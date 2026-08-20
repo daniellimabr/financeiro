@@ -30,7 +30,7 @@ explícita do CEO a cada vez, nunca automática/agendada.
 
 | Última auditoria | Sprint de referência | Próxima checagem devida | Status |
 |---|---|---|---|
-| nenhuma ainda | — | Sprint 34 (29 + 5) | mecanismo criado na Sprint 29 |
+| nenhuma ainda | — | Sprint 34 (30 + 4) | 1/5 sprints completadas (Sprint 30); mecanismo criado na Sprint 29 |
 
 ## Sequência proposta (dependências)
 
@@ -1070,8 +1070,10 @@ aprovação explícita do CEO por execução. Sugestão de feature sob demanda t
 
 PRD: [PRD-029-agentes-coerencia-design-auditoria-estrutural.md](prd/PRD-029-agentes-coerencia-design-auditoria-estrutural.md).
 Plano: [SPRINT-029-agentes-coerencia-design-auditoria-estrutural-plan.md](sprints/SPRINT-029-agentes-coerencia-design-auditoria-estrutural-plan.md).
+Relatório: [SPRINT-029-agentes-coerencia-design-auditoria-estrutural-report.md](sprints/SPRINT-029-agentes-coerencia-design-auditoria-estrutural-report.md).
+**Sprint aprovada pelo CEO em 2026-08-19.**
 
-### Sprint 30 — Categorias por usuário, Orçamento, Gestão de Categorias/Subcategorias e remoção da Projeção (cross-epic, sem épico prévio)
+### ✅ Sprint 30 — Categorias por usuário, Orçamento, Gestão de Categorias/Subcategorias e remoção da Projeção (cross-epic, sem épico prévio) concluída em 2026-08-20
 
 Planejada em sessão própria (2026-08-20), a partir de uma sugestão de funcionalidade do CTO
 ("Orçamento mensal por categoria", pedida sob demanda pelo CEO) que o CEO aprovou e ampliou na
@@ -1084,20 +1086,41 @@ global vira só o ponto de partida/seed de cada usuário) — e uma terceira: **
 Despesa e Receita**, não só Despesa.
 
 A migração de Categoria/Subcategoria de global para por-usuário virou a fase de maior risco da
-sprint (decisão de sequenciamento do CTO, não pedida pelo CEO, mas necessária tecnicamente) —
-toda tabela que referencia `subcategory_id` depende dela, e ela roda contra dado real da VM de
-dev, o único ambiente real hoje. Investigação de código também confirmou um achado de segurança
-pré-existente: `app/categories/service.py` nunca filtrou por usuário (fazia sentido enquanto a
-tabela era global) e `delete_subcategory`/`delete_group` excluíam sem checar uso — mesma classe
-de bug de FK sem `ondelete` já corrigida duas vezes antes no projeto para `asset_id`/
+sprint — toda tabela que referencia `subcategory_id` depende dela, e ela rodou contra dado real da
+VM de dev, o único ambiente real hoje. Investigação de código também confirmou um achado de
+segurança pré-existente: `app/categories/service.py` nunca filtrou por usuário (fazia sentido
+enquanto a tabela era global) e `delete_subcategory`/`delete_group` excluíam sem checar uso —
+mesma classe de bug de FK sem `ondelete` já corrigida duas vezes antes no projeto para `asset_id`/
 `liability_id` (Sprints 8 e 9), agora pré-requisito de segurança antes de expor "Excluir" na UI.
 
-Decisão explícita do CEO: tudo entra numa sprint só, mesmo com a alternativa de dividir em
-sprints temáticas recomendada pelo CTO (mesmo padrão de divisão já usado em 7/8/9, 12/13/14/15,
-23/24, 25/26/27) — maior sprint do projeto até agora, comparável à Sprint 13.
+**Deploy na VM de dev realizado dentro desta sessão de execução** (pedido do CEO), antes da aprovação
+formal do relatório. A migration `0018` falhou 2 vezes contra o banco real antes de ser corrigida —
+ambas as falhas foram isoladas por transação de DDL automática do Postgres e nenhum dado foi
+perdido. Após a 2ª falha, adotado o procedimento de testar contra uma cópia descartável do banco em
+vez de direto em produção (precedente já existia na Sprint 2, não seguido até aqui). Achado real
+pós-migration: Caddyfile nunca roteava `/orcamentos*` pra API — gotcha já documentado no projeto
+(`docs/architecture/OVERVIEW.md`), corrigido com uma linha no matcher `@api`. Todas as 4 falhas +
+fix foram commitadas com causa raiz documentada (commits `581db5c`, `abda5d1`, `589a853`, `2a97c18`).
+
+Implementadas as Fases 0–7 do plano: remoção completa da Projeção (código/testes/rotas/nav/scripts);
+migração de Categoria/Subcategoria de catálogo global para nível de usuário (migration `0018`,
+`seed.py`, threading de `user_id` em `app/categories/`); mecanismo completo de Orçamento (modelo,
+migration `0019`, CRUD, vigência em tempo constante, agregação orçado-vs-realizado); fix de
+segurança bloqueando exclusão de categoria/subcategoria em uso; telas `OrcamentoPage` e
+`CategoriasPage`; componente `SubcategoryGroupTable` extraído de `NaturezaPage` (revisão de design
+via Artifact — CEO escolheu Candidata B em ambas as decisões: barra orçado-vs-realizado sem cor
+semântica nova em vez de âmbar, grupo demarcado com borda superior mais forte); barra
+orçado-vs-realizado integrada aos funis de Despesa e Receita do Dashboard.
+
+661 testes backend (99% cobertura, 100% em módulos novos `app/orcamentos/`, `app/categories/seed.py`,
+`app/schemas/orcamento.py`) + 222 testes frontend, suíte 100% verde. Lint/formatter limpos. Maior
+sprint do projeto até agora, comparável à Sprint 13 — 74 arquivos tocados (31 novos, 12 excluídos,
+31 modificados), uma única sessão de execução.
 
 PRD: [PRD-030-categorias-por-usuario-orcamento-gestao-categorias.md](prd/PRD-030-categorias-por-usuario-orcamento-gestao-categorias.md).
 Plano: [SPRINT-030-categorias-por-usuario-orcamento-gestao-categorias-plan.md](sprints/SPRINT-030-categorias-por-usuario-orcamento-gestao-categorias-plan.md).
+Relatório: [SPRINT-030-categorias-por-usuario-orcamento-gestao-categorias-report.md](sprints/SPRINT-030-categorias-por-usuario-orcamento-gestao-categorias-report.md).
+**Sprint aprovada pelo CEO em 2026-08-20.**
 
 ## Registro de reavaliações futuras
 

@@ -2,6 +2,7 @@
 
 - **Plano:** [SPRINT-030-categorias-por-usuario-orcamento-gestao-categorias-plan.md](./SPRINT-030-categorias-por-usuario-orcamento-gestao-categorias-plan.md)
 - **Data do relatório:** 2026-08-20
+- **Aprovado pelo CEO em:** 2026-08-20, após revisão ao vivo na VM de dev
 
 ## Resumo
 

@@ -435,6 +435,46 @@ reading as unstyled HTML next to `.dash-row`/`.dash-table`. This is
 presentation only: `.simple-list` adds no button semantics, no chevron, no
 expand state — a row that isn't interactive stays exactly that.
 
+### Grouped table (`.dash-table` variant, `SubcategoryGroupTable` component — Sprint 30)
+When a table groups rows by a parent entity (e.g., Subcategory rows grouped
+by CategoryGroup), visual demarcation of group boundaries prevents users from
+losing their place when a list grows large. `SubcategoryGroupTable` signals
+group transitions via a **stronger top border** (`border-top: 2px` instead of
+`1px`) on the first row of each new group — a pattern validated via
+rendered-comparison Impeccable round (Artifact, two candidates: "Strong border"
+vs. "Continuous rowSpan treatment"). The CEO chose the strong-border approach
+for its clarity at a glance compared to the rowSpan-only candidate. Applied
+to `CategoriasPage` (new Gestão de Categorias tela, Sprint 30) and
+`NaturezaPage` (refactored to reuse `SubcategoryGroupTable`, same visual
+direction). No new color token introduced; the border inherits
+`var(--border)` and gains visual emphasis through thickness alone, staying
+true to the Flat Ledger Rule and restrained-palette principle.
+
+### Orçado-vs-Realizado status indicator (Sprint 30)
+When a Subcategory row in the Despesa or Receita funnel of the Dashboard has
+a vigente (current/active) Orçamento for the filtered month, the amount
+always gains a muted caption naming the orçado total ("de R$X orçado"). The
+proportion bar (`.track`) and a directional symbol appear only when the
+realizado is **outside** the orçado — the bar gains a subtle `outline` (not
+fill; no new background color) and the caption switches to naming the
+direction of the miss:
+
+- **▲** (Despesa only): gasto ultrapassou o orçado (overshoot) — outline +
+  caption "estourou o orçado".
+- **▼** (Receita only): receita não atingiu o orçado (shortfall) — outline +
+  caption "abaixo do orçado".
+- Within budget (either tipo): no outline, no symbol — just the muted "de
+  R$X orçado" caption.
+
+This design rejects the alternative of introducing a new semantic color
+(amber/"alerta" token for warnings). The CEO's explicit choice preserves two
+principles already documented in the system: the **One Meaning Rule** (one
+color = one meaning; terracotta means despesa/expense and nothing else) and
+the **restrained palette** (only green/terracotta/neutral/danger exist). Status
+is signaled via outline thickness (a structural cue) and symbol/direction
+(a semantic cue without color), not a fourth color token. See the Orçamento
+section of `dashboards-guia-cards.md` for user-facing explanation.
+
 ## Do's and Don'ts
 
 ### Do:

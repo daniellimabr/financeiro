@@ -4,7 +4,9 @@ Reaproveitamento **estrito**: apenas os dois artefatos abaixo (categorias/subcat
 
 ## 1. Categorias e subcategorias — lista confirmada (2026-08-03)
 
-Lista definitiva fornecida pelo CEO. Formato `grupo,subcategoria`:
+**Nota Sprint 30 (2026-08-20):** Categorias e Subcategorias deixaram de ser um catálogo global e passaram a ser **por usuário**. Cada usuário tem sua própria cópia editável. Para os usuários já existentes no momento da migração, a migration `0018` clonou o catálogo global vivo do banco (uma cópia por usuário, repontando toda transação/regra de categorização). Para usuários novos a partir de então, o cadastro semeia a mesma composição a partir de um snapshot congelado em código (`backend/app/categories/seed.py`, capturado do catálogo real em 2026-08-20 — mesmo conteúdo, agora fixo, não mais lido do CSV). O antigo script de import do catálogo global (`backend/scripts/import_legacy_categories.py`) foi deletado — é estruturalmente incompatível com o novo schema (coluna `user_id` em `CategoryGroup`/`Subcategory` é `NOT NULL`). O mapeamento de classificação do v1 (`import_legacy_categorization_rules.py`) continua funcional, mas agora resolve subcategorias escopadas ao usuário de destino, não a um catálogo global.
+
+**Lista confirmada (2026-08-03, base para snapshot de 2026-08-20):** Formato `grupo,subcategoria`:
 
 ```csv
 grupo,subcategoria

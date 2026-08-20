@@ -103,6 +103,26 @@ Desde a Sprint 27, dentro do funil Despesa/Receita aberto no Dashboard:
   grupo) — sem endpoint novo. Independente do "ocultar gasto": mostra a série
   histórica real, não a simulação do mês aberto.
 
+### Indicador de Orçado-vs-Realizado (Sprint 30)
+
+Desde a Sprint 30, cada linha de **Subcategoria** (nível mais detalhado) nos
+funis Despesa e Receita do Dashboard mostra um indicador de orçamento, se houver
+um orçamento vigente para aquela subcategoria no mês filtrado. O valor sempre
+ganha uma legenda muda com o total orçado ("de R$X orçado", abaixo do valor
+realizado); a barra de proporção (`.track`) e o símbolo direcional só aparecem
+quando o realizado está **fora** do orçado:
+
+- **▲ em Despesa**: gasto ultrapassou o orçado (estourou) — barra ganha contorno
+  (`outline`) e a legenda muda vira "estourou o orçado".
+- **▼ em Receita**: receita não atingiu o orçado (ficou aquém) — mesmo contorno,
+  legenda "abaixo do orçado".
+- Dentro do orçado (ambos os tipos): sem contorno, sem símbolo — só a legenda
+  muda com o valor orçado.
+
+O CEO escolheu este design (via uma rodada Impeccable/Artifact) em vez de
+introduzir uma nova cor semântica (âmbar/"alerta"), mantendo a paleta restrita
+e preservando a regra de "um significado por cor" já documentada em `DESIGN.md`.
+
 ## Ativos / Passivos
 
 **Ativos** (desde a Sprint 28) é a soma de tudo que o CEO considera "com o
