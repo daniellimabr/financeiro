@@ -56,7 +56,21 @@ Backend: nenhuma mudança de código — suíte completa rodada como baseline, i
 TOTAL: 2594 stmts, 46 miss, 98% cover
 ```
 
-QA visual ao vivo na VM de dev: pendente (ver item 7 da tabela acima).
+QA visual ao vivo (`check-sprint27.mjs`, contra dado real do CEO na VM de dev):
+
+```
+[desktop-claro] done
+[desktop-escuro] done
+done, sem erros de console, sem falhas de asserção
+```
+
+Rodada final passou de primeira; 3 rodadas anteriores encontraram achados reais (ver "Decisões
+tomadas") antes de chegar limpa. Conferido nos screenshots `s27-01`/`s27-02`: card Despesa foi
+de R$ 8.221,30 pra R$ 8.075,75 ao ocultar 1 transação Amazon BR de R$ 145,55 (10 linhas
+idênticas na categoria "Compras / Eletrônicos" — dado real do CEO, recorrência de assinatura;
+8221,30 − 145,55 = 8075,75, confere), banner "Simulando sem 1 transação · Restaurar" visível,
+linha ocultada com valor riscado, e o gráfico "Comparativo por categoria" com 9 categorias
+reais renderizando sem sobrepor nenhum outro elemento da tela.
 
 ## Lint/formatter
 
@@ -110,6 +124,18 @@ $ ruff format --check     → 80 files already formatted (baseline)
 - **Coluna do binóculo em `TransactionsTable` é opt-in** (`hiddenIds`/`onToggleHidden`
   opcionais) — os outros consumidores do componente (Ativos, Passivos, Investimentos) não
   passam essas props e continuam exatamente como antes, sem coluna nova.
+- **Legenda do `CategoriaComparativoChart` virou HTML puro, fora do Recharts — achado real de
+  QA ao vivo, não coberto pelos testes locais.** A fixture de teste usa só 2 categorias; o dado
+  real do CEO tem 9. O `<Legend>` embutido do Recharts usa `position:absolute` por padrão (não
+  reserva espaço de layout) dentro de um `ResponsiveContainer` de altura fixa (220px) — com
+  categorias suficientes pra a legenda ficar mais alta que o container, ela ultrapassava o
+  rodapé sem empurrar o conteúdo abaixo, sobrepondo e bloqueando cliques em elementos do funil
+  (o botão "Fechar", inicialmente). Duas correções intermediárias não resolveram
+  (`position:relative` no container, depois `wrapperStyle.position:"static"` no próprio
+  Recharts) porque a altura fixa do `ResponsiveContainer` continuava sendo o limite real —
+  a correção definitiva foi tirar a legenda de dentro do Recharts inteiramente e renderizá-la
+  como `<ul>/<li>` HTML normal logo abaixo do `ResponsiveContainer`, participando do fluxo do
+  documento de verdade.
 
 ## Critérios de aceite do PRD — verificação item a item
 
@@ -134,12 +160,13 @@ $ ruff format --check     → 80 files already formatted (baseline)
 
 ## Consumo estimado de tokens/sessões
 
-Sprint de porte médio: 1 componente de ícone novo, 1 componente de gráfico novo, mudanças em
-2 componentes existentes (`TransactionsTable`, `DashboardsPage`) com um pouco de superfície de
-estado (Map + ajuste durante render), 3 testes de integração novos. Sem mudança de backend.
-Coube confortavelmente numa única sessão de execução; o ciclo de deploy completo (push → CI →
-VM → mint de token → QA visual) ficou pendente só no último passo, que depende de decisão do
-CEO sobre o mint do token de sessão.
+Sprint de porte médio-alto: 1 componente de ícone novo, 1 componente de gráfico novo, mudanças
+em 2 componentes existentes (`TransactionsTable`, `DashboardsPage`) com superfície de estado
+(Map + ajuste durante render), 3 testes de integração novos, mais uma revisão de escopo pedida
+ao vivo pelo CEO no meio da execução (cards do topo) e 4 ciclos completos de deploy (push → CI
+→ VM → QA) — 3 por achados reais em QA visual (2 no layout da legenda do gráfico novo, 1 num
+seletor ambíguo do próprio script). Nenhum achado exigiu nova rodada de planejamento, todos
+corrigidos dentro da mesma sessão de execução.
 
 ## Pendências e próximos passos sugeridos
 
