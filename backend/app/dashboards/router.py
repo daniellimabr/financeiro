@@ -12,6 +12,7 @@ from app.schemas.dashboards import (
     CategoriaTotalOut,
     EvolucaoSaldoContaOut,
     InvestimentoTotalOut,
+    LinhaConferenciaSaldoOut,
     MeioPagamentoTotalOut,
     NaturezaTotalOut,
     OrcamentoStatusOut,
@@ -250,10 +251,17 @@ def get_saldo_acumulado(
     ano: int,
     mes: int,
     meses: int = Query(6, ge=1, le=24),
-    regime: Regime = "competencia",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.get_saldo_acumulado(
-        db, current_user.id, ano=ano, mes=mes, meses=meses, regime=regime
-    )
+    return service.get_saldo_acumulado(db, current_user.id, ano=ano, mes=mes, meses=meses)
+
+
+@router.get("/saldo-acumulado/conferencia", response_model=list[LinhaConferenciaSaldoOut])
+def get_saldo_acumulado_conferencia(
+    ano: int,
+    mes: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.get_saldo_acumulado_conferencia(db, current_user.id, ano=ano, mes=mes)

@@ -280,12 +280,13 @@ def test_get_patrimonio_breakdown_isolated_by_user(db_session, user):
     assert breakdown.total == Decimal("0")
 
 
-def test_get_summary_excludes_investimento_proventos_categoria_pluggy(db_session, user):
-    # Achado real do Bloco 0 da Sprint 22: dividendo/JCP/taxa de investimentos
-    # administrados (XP) chega numa conta tipo=corrente vinculada à
-    # corretora, marcado pela Pluggy com essas duas categorias — o CEO não
-    # quer administrar/categorizar isso, mesmo tratamento hoje dado a
-    # "Transferência interna".
+def test_get_summary_investimento_proventos_categoria_pluggy_counts_normally(db_session, user):
+    # PRD-032: rendimento automático/proveniente de investimento administrado
+    # (dividendo/JCP/taxa, achado real do Bloco 0 da Sprint 22, chega numa
+    # conta tipo=corrente vinculada à corretora, ex.: XP) é dinheiro real —
+    # o CEO decidiu que conta normalmente em Receita/Despesa, sem exclusão
+    # por `categoria_pluggy` (mudança de contrato: antes desta sprint era
+    # excluído, igual "Transferência interna").
     account = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
     _transaction(
         db_session,
@@ -308,8 +309,8 @@ def test_get_summary_excludes_investimento_proventos_categoria_pluggy(db_session
 
     summary = service.get_summary(db_session, user.id, ano=2026, mes=1)
 
-    assert summary.receita == Decimal("0")
-    assert summary.despesa == Decimal("0")
+    assert summary.receita == Decimal("74.02")
+    assert summary.despesa == Decimal("0.12")
 
 
 def test_get_summary_investment_aporte_still_counts(db_session, user):
@@ -1855,10 +1856,15 @@ def test_get_evolucao_saldo_por_conta_isolated_by_user(db_session, user):
     assert evolucao == []
 
 
-# --- get_saldo_acumulado -----------------------------------------------------
+# --- get_saldo_acumulado (PRD-032: saldo real por conta corrente) ----------
 
 
-def test_get_saldo_acumulado_anchor_without_salario_sentinela(db_session, user):
+def _salario_subcategory(db_session, user):
+    grupo = _group(db_session, user, nome="Receitas")
+    return _subcategory(db_session, user, group=grupo, nome="Salário")
+
+
+def test_get_saldo_acumulado_sums_saldo_inicial_without_movement(db_session, user):
     account = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
     account.saldo_inicial = Decimal("1000.00")
     db_session.commit()
@@ -1870,37 +1876,7 @@ def test_get_saldo_acumulado_anchor_without_salario_sentinela(db_session, user):
     assert por_mes[(2026, 1)] == Decimal("1000.00")
 
 
-def test_get_saldo_acumulado_subtracts_salario_sentinela_from_anchor(db_session, user):
-    account = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
-    account.saldo_inicial = Decimal("1000.00")
-    db_session.flush()
-    # transação sentinela de salário de dez/2025 (competência jan/2026) —
-    # o valor já entra de volta na receita de jan/2026 abaixo.
-    _transaction(
-        db_session,
-        user,
-        account,
-        valor="500.00",
-        tipo=PluggyTransactionTipo.credito,
-        data=date(2025, 12, 30),
-        data_competencia=date(2026, 1, 30),
-        subcategory_id=None,
-    )
-    db_session.commit()
-    tx = db_session.query(PluggyTransaction).one()
-    tx.pluggy_transaction_id = f"manual-salario-dez2025-user{user.id}"
-    db_session.commit()
-
-    pontos = service.get_saldo_acumulado(db_session, user.id, ano=2026, mes=1, meses=2)
-
-    por_mes = {(p.ano, p.mes): p.total for p in pontos}
-    # Âncora de dez/2025 = 1000 (saldo_inicial) - 500 (sentinela) = 500.
-    assert por_mes[(2025, 12)] == Decimal("500.00")
-    # jan/2026 = âncora (500) + receita de jan/2026 (a própria sentinela, 500).
-    assert por_mes[(2026, 1)] == Decimal("1000.00")
-
-
-def test_get_saldo_acumulado_accumulates_receita_menos_despesa_month_over_month(db_session, user):
+def test_get_saldo_acumulado_accumulates_real_movement_month_over_month(db_session, user):
     account = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
     account.saldo_inicial = Decimal("0")
     db_session.flush()
@@ -1944,8 +1920,15 @@ def test_get_saldo_acumulado_isolated_by_user(db_session, user):
     assert pontos[0].total == Decimal("0")
 
 
-def test_get_saldo_acumulado_excludes_investimento_from_anchor(db_session, user):
+def test_get_saldo_acumulado_excludes_non_corrente_accounts(db_session, user):
+    # Só conta corrente entra (PRD-032, decisão do CEO) — poupança, cartão
+    # de crédito e investimento ficam fora mesmo com saldo_inicial
+    # configurado.
     _account(db_session, user, tipo=PluggyAccountTipo.corrente).saldo_inicial = Decimal("1000.00")
+    poupanca = _account(db_session, user, tipo=PluggyAccountTipo.poupanca)
+    poupanca.saldo_inicial = Decimal("300.00")
+    cartao = _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito)
+    cartao.saldo_inicial = Decimal("200.00")
     investimento = _account(db_session, user, tipo=PluggyAccountTipo.investimento)
     investimento.saldo_inicial = Decimal("50000.00")
     db_session.commit()
@@ -1955,61 +1938,255 @@ def test_get_saldo_acumulado_excludes_investimento_from_anchor(db_session, user)
     assert pontos[0].total == Decimal("1000.00")
 
 
-def test_get_saldo_acumulado_excludes_investimento_transactions_from_accumulation(db_session, user):
+def test_get_saldo_acumulado_investment_transactions_no_longer_excluded(db_session, user):
+    # PRD-032: Aporte/Resgate e proventos de investimento contam
+    # normalmente na acumulação — não há mais exclusão por categoria (muda o
+    # contrato fixado na Sprint 22).
     corrente = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
     corrente.saldo_inicial = Decimal("0")
-    investimento = _account(db_session, user, tipo=PluggyAccountTipo.investimento)
-    investimento.saldo_inicial = Decimal("0")
     db_session.flush()
     _transaction(
         db_session,
         user,
         corrente,
-        valor="100.00",
-        tipo=PluggyTransactionTipo.credito,
-        data=date(2026, 1, 10),
-    )
-    _transaction(
-        db_session,
-        user,
-        investimento,
         valor="9999.00",
         tipo=PluggyTransactionTipo.credito,
         data=date(2026, 1, 10),
+        categoria_pluggy="Proceeds interests and dividends",
     )
     db_session.commit()
 
     pontos = service.get_saldo_acumulado(db_session, user.id, ano=2026, mes=1, meses=1)
 
-    assert pontos[0].total == Decimal("100.00")
+    assert pontos[0].total == Decimal("9999.00")
 
 
-def test_get_saldo_acumulado_regime_caixa_uses_data_caixa(db_session, user):
-    conta = _account(db_session, user)
+def test_get_saldo_acumulado_conta_sem_saldo_inicial_fica_fora(db_session, user):
+    _account(db_session, user, tipo=PluggyAccountTipo.corrente, saldo=Decimal("500.00"))
+
+    pontos = service.get_saldo_acumulado(db_session, user.id, ano=2026, mes=1, meses=1)
+
+    assert pontos[0].total == Decimal("0")
+
+
+def test_get_saldo_acumulado_conta_sem_transacoes_aparece_com_saldo_inicial(db_session, user):
+    account = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    account.saldo_inicial = Decimal("421.54")
+    db_session.commit()
+
+    pontos = service.get_saldo_acumulado(db_session, user.id, ano=2026, mes=3, meses=1)
+
+    assert pontos[0].total == Decimal("421.54")
+
+
+def test_get_saldo_acumulado_subtracts_salario_antecipado(db_session, user):
+    account = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    account.saldo_inicial = Decimal("0")
+    salario = _salario_subcategory(db_session, user)
+    db_session.flush()
     _transaction(
         db_session,
         user,
-        conta,
-        valor="-100.00",
-        tipo=PluggyTransactionTipo.debito,
-        data=date(2026, 1, 10),
-        data_competencia=date(2026, 2, 10),
+        account,
+        valor="9925.60",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 1, 30),
+        data_competencia=date(2026, 2, 1),
+        subcategory_id=salario.id,
     )
-    tx = db_session.query(PluggyTransaction).one()
-    tx.data_caixa = date(2026, 3, 10)
     db_session.commit()
 
-    competencia = service.get_saldo_acumulado(db_session, user.id, ano=2026, mes=2, meses=1)
-    caixa = service.get_saldo_acumulado(
-        db_session, user.id, ano=2026, mes=2, meses=1, regime="caixa"
-    )
-    caixa_no_mes_certo = service.get_saldo_acumulado(
-        db_session, user.id, ano=2026, mes=3, meses=1, regime="caixa"
-    )
+    pontos = service.get_saldo_acumulado(db_session, user.id, ano=2026, mes=1, meses=1)
 
-    assert competencia[0].total == Decimal("-100.00")
-    assert caixa[0].total == Decimal("0")
-    assert caixa_no_mes_certo[0].total == Decimal("-100.00")
+    assert pontos[0].total == Decimal("0")
+
+
+def test_get_saldo_acumulado_multiplas_transacoes_salario_mesmo_mes_subtrai_as_duas(
+    db_session, user
+):
+    # Cenário real de abril/2026 confirmado pelo CEO: bônus + salário, ambos
+    # competência do mês seguinte, no mesmo mês.
+    account = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    account.saldo_inicial = Decimal("0")
+    salario = _salario_subcategory(db_session, user)
+    db_session.flush()
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="11118.85",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 4, 18),
+        data_competencia=date(2026, 5, 1),
+        subcategory_id=salario.id,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="9925.60",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 4, 20),
+        data_competencia=date(2026, 5, 1),
+        subcategory_id=salario.id,
+    )
+    db_session.commit()
+
+    pontos = service.get_saldo_acumulado(db_session, user.id, ano=2026, mes=4, meses=1)
+
+    assert pontos[0].total == Decimal("0")
+
+
+def test_get_saldo_acumulado_salario_nao_antecipado_nao_e_subtraido(db_session, user):
+    # Salário com competência no PRÓPRIO mês (não deslocada) não é
+    # descontado — só o caso "recebido perto do fim do mês, competência do
+    # mês seguinte" é.
+    account = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    account.saldo_inicial = Decimal("0")
+    salario = _salario_subcategory(db_session, user)
+    db_session.flush()
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="9925.60",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 1, 5),
+        data_competencia=date(2026, 1, 5),
+        subcategory_id=salario.id,
+    )
+    db_session.commit()
+
+    pontos = service.get_saldo_acumulado(db_session, user.id, ano=2026, mes=1, meses=1)
+
+    assert pontos[0].total == Decimal("9925.60")
+
+
+def test_get_saldo_acumulado_reconciliacao_multi_conta_multi_mes(db_session, user):
+    # Regressão estrutural da auditoria de 2026-08-20 (PRD-032): 2 contas
+    # corrente (formato Itaú/NuBank), com movimento em 2 meses e salário
+    # antecipado num deles — confere que soma por conta e subtração de
+    # salário se combinam corretamente mês a mês, não só numa conta isolada.
+    itau = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    itau.saldo_inicial = Decimal("2000.00")
+    nubank = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    nubank.saldo_inicial = Decimal("100.00")
+    salario = _salario_subcategory(db_session, user)
+    db_session.flush()
+    _transaction(
+        db_session,
+        user,
+        itau,
+        valor="3000.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 1, 30),
+        data_competencia=date(2026, 2, 1),
+        subcategory_id=salario.id,
+    )
+    _transaction(
+        db_session,
+        user,
+        itau,
+        valor="-500.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 1, 15),
+    )
+    _transaction(
+        db_session,
+        user,
+        nubank,
+        valor="200.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 2, 10),
+    )
+    db_session.commit()
+
+    pontos = service.get_saldo_acumulado(db_session, user.id, ano=2026, mes=2, meses=2)
+    por_mes = {(p.ano, p.mes): p.total for p in pontos}
+
+    # Jan: itaú 2000 - 500 + 3000 (salário) = 4500; nubank 100. Bruto 4600,
+    # menos o salário antecipado de jan (3000) = 1600.
+    assert por_mes[(2026, 1)] == Decimal("1600.00")
+    # Fev: itaú segue 4500 (sem novo movimento); nubank 100 + 200 = 300.
+    # Bruto 4800, sem salário antecipado em fev.
+    assert por_mes[(2026, 2)] == Decimal("4800.00")
+
+
+# --- get_saldo_acumulado_conferencia ----------------------------------------
+
+
+def test_get_saldo_acumulado_conferencia_total_e_linha_por_conta(db_session, user):
+    itau = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    itau.saldo_inicial = Decimal("1000.00")
+    nubank = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    nubank.saldo_inicial = Decimal("100.00")
+    salario = _salario_subcategory(db_session, user)
+    db_session.flush()
+    _transaction(
+        db_session,
+        user,
+        itau,
+        valor="500.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 2, 10),
+    )
+    _transaction(
+        db_session,
+        user,
+        itau,
+        valor="-200.00",
+        tipo=PluggyTransactionTipo.debito,
+        data=date(2026, 2, 15),
+    )
+    _transaction(
+        db_session,
+        user,
+        itau,
+        valor="3000.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 2, 27),
+        data_competencia=date(2026, 3, 1),
+        subcategory_id=salario.id,
+    )
+    db_session.commit()
+
+    linhas = service.get_saldo_acumulado_conferencia(db_session, user.id, ano=2026, mes=2)
+
+    assert len(linhas) == 3
+    total, linha_itau, linha_nubank = linhas
+    assert total.account_id is None
+    assert total.account_nome == "Total em Conta Corrente (100%)"
+    assert linha_itau.account_id == itau.id
+    assert linha_itau.saldo_inicio == Decimal("1000.00")
+    assert linha_itau.receitas == Decimal("3500.00")
+    assert linha_itau.despesas == Decimal("200.00")
+    assert linha_itau.saldo_fim == Decimal("4300.00")
+    assert linha_itau.salario_recebido == Decimal("3000.00")
+    assert linha_itau.saldo_efetivo == Decimal("1300.00")
+    assert linha_nubank.account_id == nubank.id
+    assert linha_nubank.saldo_inicio == Decimal("100.00")
+    assert linha_nubank.saldo_fim == Decimal("100.00")
+    assert linha_nubank.saldo_efetivo == Decimal("100.00")
+    assert total.saldo_inicio == Decimal("1100.00")
+    assert total.saldo_fim == Decimal("4400.00")
+    assert total.saldo_efetivo == Decimal("1400.00")
+
+
+def test_get_saldo_acumulado_conferencia_saldo_efetivo_matches_get_saldo_acumulado(
+    db_session, user
+):
+    account = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    account.saldo_inicial = Decimal("1000.00")
+    db_session.commit()
+
+    linhas = service.get_saldo_acumulado_conferencia(db_session, user.id, ano=2026, mes=3)
+    pontos = service.get_saldo_acumulado(db_session, user.id, ano=2026, mes=3, meses=1)
+
+    assert linhas[0].saldo_efetivo == pontos[0].total
+
+
+def test_get_saldo_acumulado_conferencia_empty_without_contas(db_session, user):
+    assert service.get_saldo_acumulado_conferencia(db_session, user.id, ano=2026, mes=1) == []
 
 
 # --- get_summary / get_por_categoria / etc. respeitando regime (Sprint 16) --
@@ -2265,18 +2442,18 @@ def test_get_por_categoria_regime_caixa_counts_pagamento_de_fatura(db_session, u
     assert por_categoria[0].total == Decimal("1767.05")
 
 
-def test_get_saldo_acumulado_regime_caixa_pagamento_de_fatura_avoids_double_count(db_session, user):
-    # Cenário real da Sprint 18: compra de cartão em janeiro (competência
-    # fev, caixa modelado mar) paga via Pix da conta corrente em fevereiro,
-    # categorizado "Pagamento de Fatura". Sob caixa, só a fatura real conta —
-    # a compra modelada em março não deve aparecer.
+def test_get_saldo_acumulado_pagamento_de_fatura_counts_as_real_movement(db_session, user):
+    # PRD-032: get_saldo_acumulado não depende mais de regime nem de
+    # `excluir_de_totais` — "Pagamento de Fatura" é dinheiro real saindo da
+    # conta corrente (compra de cartão em si nunca entra, já que a conta de
+    # cartão de crédito não é tipo=corrente).
     sub = _pagamento_fatura_subcategory(db_session, user)
-    corrente = _account(db_session, user)
+    corrente = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
     corrente.saldo_inicial = Decimal("0")
     cartao = _account(db_session, user, tipo=PluggyAccountTipo.cartao_credito)
     db_session.flush()
 
-    compra = _transaction(
+    _transaction(
         db_session,
         user,
         cartao,
@@ -2285,8 +2462,7 @@ def test_get_saldo_acumulado_regime_caixa_pagamento_de_fatura_avoids_double_coun
         data=date(2026, 1, 15),
         data_competencia=date(2026, 2, 15),
     )
-    compra.data_caixa = date(2026, 3, 15)
-    fatura = _transaction(
+    _transaction(
         db_session,
         user,
         corrente,
@@ -2295,18 +2471,11 @@ def test_get_saldo_acumulado_regime_caixa_pagamento_de_fatura_avoids_double_coun
         data=date(2026, 2, 2),
         subcategory_id=sub.id,
     )
-    fatura.data_caixa = date(2026, 2, 2)
     db_session.commit()
 
-    caixa = service.get_saldo_acumulado(
-        db_session, user.id, ano=2026, mes=3, meses=3, regime="caixa"
-    )
+    pontos = service.get_saldo_acumulado(db_session, user.id, ano=2026, mes=2, meses=1)
 
-    pontos = {(p.ano, p.mes): p.total for p in caixa}
-    # A fatura já pesou em fevereiro (-100) e permanece assim em março — não
-    # cai de novo (o que daria -200).
-    assert pontos[(2026, 2)] == Decimal("-100.00")
-    assert pontos[(2026, 3)] == Decimal("-100.00")
+    assert pontos[0].total == Decimal("-100.00")
 
 
 # --- Patrimônio: ativos_totais / saldo_contas_correntes / saldo_acumulado_mes (PRD-028) ---
@@ -2539,23 +2708,20 @@ def test_get_summary_ativos_totais_differs_from_ativos_when_investimentos_and_co
     assert summary.ativos_totais == Decimal("51000.00")
 
 
-def test_patrimonio_breakdown_regime_caixa_shifts_accumulation(db_session, user, monkeypatch):
+def test_patrimonio_breakdown_regime_no_longer_shifts_saldo_acumulado_mes(db_session, user):
+    # PRD-032: get_saldo_acumulado não depende mais de regime (fórmula nova
+    # usa saldo real por conta, não receita/despesa por competência/caixa) —
+    # `regime` segue aceito por get_patrimonio_breakdown (usado por
+    # ativos_totais/passivos em chamadas futuras), mas não muda mais
+    # saldo_acumulado_mes nem o total. Mudança de contrato explícita: antes
+    # desta sprint os dois regimes divergiam nesse cenário.
     _transacao_com_caixa_deslocado(db_session, user)
 
-    class _HojeFevereiro(date):
-        @classmethod
-        def today(cls):
-            return date(2026, 2, 25)
-
-    monkeypatch.setattr(service, "date", _HojeFevereiro)
-
-    # "Hoje" congelado em 25/fev: a despesa (competência fev, caixa mar) já
-    # entrou na acumulação por competência, mas ainda não por caixa (mar é
-    # futuro em relação a "hoje").
     competencia = service.get_patrimonio_breakdown(db_session, user.id, regime="competencia")
     caixa = service.get_patrimonio_breakdown(db_session, user.id, regime="caixa")
 
-    assert competencia.total == caixa.total - Decimal("100.00")
+    assert competencia.total == caixa.total
+    assert competencia.saldo_acumulado_mes == caixa.saldo_acumulado_mes
 
 
 # --- get_orcamento_status (PRD-030) -----------------------------------------

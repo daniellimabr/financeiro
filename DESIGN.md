@@ -448,7 +448,11 @@ to `CategoriasPage` (new Gestão de Categorias tela, Sprint 30) and
 `NaturezaPage` (refactored to reuse `SubcategoryGroupTable`, same visual
 direction). No new color token introduced; the border inherits
 `var(--border)` and gains visual emphasis through thickness alone, staying
-true to the Flat Ledger Rule and restrained-palette principle.
+true to the Flat Ledger Rule and restrained-palette principle. The Saldo
+Acumulado conferência table (`SaldoAcumuladoConferenciaTable`, Sprint 32)
+reuses the same border rule directly in CSS (not the shared component, since
+its grouping shape — one Total row + a flat account list, no rowSpan) to mark
+where the per-account rows begin after the Total row.
 
 ### Orçado-vs-Realizado status indicator (Sprint 30)
 When a Subcategory row in the Despesa or Receita funnel of the Dashboard has

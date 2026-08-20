@@ -181,11 +181,12 @@ def test_list_transactions_applies_suggestion_but_never_confirms(db_session, use
         assert result.categorizacao_status == PluggyTransactionCategorizacaoStatus.pendente
 
 
-def test_list_transactions_excludes_investimento_proventos_categoria_pluggy(db_session, user):
-    # Achado real do Bloco 0 da Sprint 22: dividendo/JCP/taxa de investimentos
-    # administrados (XP) chega numa conta corrente vinculada à corretora,
-    # marcada pela Pluggy com essas categorias — sai da fila de Categorização
-    # (o CEO não quer administrar/categorizar isso manualmente).
+def test_list_transactions_includes_investimento_proventos_categoria_pluggy(db_session, user):
+    # PRD-032: dividendo/JCP/taxa de investimentos administrados (XP), que
+    # chegam numa conta corrente vinculada à corretora marcadas pela Pluggy
+    # com essas categorias, voltam a aparecer na fila de Categorização — o
+    # CEO decidiu que são receita/despesa real e devem ser categorizadas
+    # normalmente (mudança de contrato: a Sprint 22 as excluía).
     _transaction(
         db_session, user, "Dividendo TAEE11", categoria_pluggy="Proceeds interests and dividends"
     )
@@ -193,8 +194,7 @@ def test_list_transactions_excludes_investimento_proventos_categoria_pluggy(db_s
 
     items, total = service.list_transactions(db_session, user.id)
 
-    assert items == []
-    assert total == 0
+    assert total == 2
 
 
 def test_list_transactions_investment_aporte_still_appears(db_session, user):

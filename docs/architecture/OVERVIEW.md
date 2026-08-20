@@ -1484,6 +1484,61 @@ Plano: [SPRINT-022-manutencao-investimentos-e-drilldown-patrimonio-plan.md](../s
 - **Pre-commit:** ruff, eslint, detect-secrets (baseline) — executado local antes de push
 - **CI:** GitHub Actions — jobs `backend` (ruff check/format, pytest) e `frontend` (eslint, prettier, tsc, vitest) — roda em push/PR para `main`
 
+## Saldo Acumulado redefinido como saldo real por conta corrente (Sprint 32) — sem épico prévio
+
+Nasceu de uma auditoria manual do CEO (mês a mês, jan-mar/2026, contra os extratos reais do
+Itaú e do NuBank) que achou 3 causas reais de divergência entre o card "Saldo Acumulado" e o
+saldo bancário real — ver [PRD-032](../prd/PRD-032-saldo-acumulado-saldo-real-e-conferencia-por-conta.md)
+para a investigação completa. Decisão do CEO: o card passa a medir "quanto dinheiro eu tenho
+no fim do mês, menos o salário recebido naquele mês" — não mais um resultado de
+competência/caixa.
+
+- **`get_saldo_acumulado` reescrito** (`app/dashboards/service.py`): para cada conta
+  `tipo=corrente` com `saldo_inicial` configurado, soma o saldo real de fim de mês
+  (`_saldo_real_por_conta_e_mes`, extraído de `get_evolucao_saldo_por_conta` para reuso — sem
+  nenhum filtro de categoria) e subtrai qualquer transação "Salário" cuja `data` caia no mês
+  mas `data_competencia` caia no mês seguinte (`_salario_antecipado_por_conta_e_mes`, soma
+  todas as ocorrências — cobre múltiplas transações de salário no mesmo mês, cenário real de
+  abril/2026 com bônus + salário). Perde o parâmetro `regime` — a fórmula nova sempre usa a
+  `data` real, nunca `data_competencia`/`data_caixa`.
+- **Mecanismo de âncora/sentinela aposentado**: `_salario_ajuste_dez_2025_pluggy_transaction_id`
+  e a fórmula `soma_saldo_inicial − valor_sentinela` (Sprint 15) saem de `dashboards/service.py`
+  — ficam obsoletos com a fórmula nova. A feature de UI que grava a transação sentinela
+  (`upsert_salario_ajuste_dez_2025`, `app/pluggy_integration/service.py`) continua existindo
+  (fora do escopo desta sprint), só deixou de ser lida pelo Saldo Acumulado.
+- **Exclusão de proventos de investimento por `categoria_pluggy` revertida**: a constante
+  `INVESTIMENTO_PROVENTOS_CATEGORIAS_PLUGGY` (Sprint 22) foi removida de `models/pluggy.py`,
+  junto com o filtro em `_base_query` (`dashboards/service.py`) e em `list_transactions`
+  (`categorization/service.py`). Dividendo/JCP/taxa de investimento administrado (Itaú ou XP)
+  volta a contar normalmente em Receita/Despesa e a aparecer na fila de Categorização — decisão
+  do CEO: é dinheiro real, não deve ser escondido. Aporte/Resgate (categoria "Investments",
+  Sprint 19) não muda — já contava normalmente.
+- **`_base_query` perde `excluir_investimento`**: existia só para a fórmula antiga do Saldo
+  Acumulado; removido junto com o parâmetro equivalente em `_receita_despesa_por_periodo`.
+- **`get_saldo_acumulado_conferencia` novo**: Total (100%) + uma linha por conta corrente, com
+  saldo início/receitas/despesas/saldo fim/salário recebido/saldo efetivo do mês — alimenta a
+  tabela de conferência do drill-down (`GET /dashboards/saldo-acumulado/conferencia`), pensada
+  para o CEO auditar contra o extrato bancário sem precisar de SSH.
+- **Toggle Competência/Caixa removido do card Saldo Acumulado**: `GET /dashboards/saldo-acumulado`
+  perde o parâmetro `regime`; o toggle continua existindo e valendo normalmente para os demais
+  cards (Receita/Despesa/funis). `_patrimonio_breakdown` (que usa `get_saldo_acumulado` para
+  `saldo_acumulado_mes`) chama a função sem `regime` — na prática, o card Patrimônio também
+  deixou de variar com o toggle (nenhuma outra parcela dele — `ativos_totais`/`passivos` —
+  jamais dependeu de regime).
+- **Frontend**: `SaldoAcumuladoMemoriaCalculo` (âncora + tabela mês-a-mês via
+  `useEvolucaoSaldoPorConta`) removida de `DashboardsPage.tsx`, substituída por
+  `SaldoAcumuladoConferenciaTable` (`.dash-table` sempre visível, sem acordeão — pedido
+  explícito do CEO — via `useSaldoAcumuladoConferencia`, hook novo). `useDashboardSaldoAcumulado`
+  perde o parâmetro `regime`.
+- **Testes:** suíte backend com 20 testes novos/reescritos em `get_saldo_acumulado`/
+  `get_saldo_acumulado_conferencia` (reconciliação multi-conta/multi-mês, contas não-corrente
+  excluídas, conta sem transação, conta sem `saldo_inicial`, múltiplas transações de salário no
+  mesmo mês, Aporte/Resgate e proventos contando normalmente); `test_patrimonio_breakdown_*`
+  atualizado para o novo contrato (regime deixa de deslocar `saldo_acumulado_mes`). 672 testes
+  backend, 99% cobertura. Frontend: `DashboardsPage.test.tsx` com o teste da tabela de
+  conferência (Total + linha por conta, sem controle de expandir) no lugar do teste da memória
+  de cálculo antiga; 223 testes frontend, sem regressão.
+
 ## Acesso externo à VM de dev — DNS e checklist de portas
 
 A VM de dev é acessada por `http://financeirov2.duckdns.org:8080` (domínio gratuito DuckDNS apontando para `163.176.0.135`), **não pelo IP puro**: o Google rejeita IP como redirect URI OAuth ("é preciso usar um domínio... com TLD válido"). `OAUTH_REDIRECT_BASE_URL` no `.env` da VM usa esse domínio.

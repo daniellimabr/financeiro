@@ -38,7 +38,6 @@ import {
   type PeriodoHistorico,
   type PontoTendencia,
   type Regime,
-  type TendenciaMes,
   type TransacaoTipo,
 } from "../api/dashboards";
 import type { PluggyInvestment } from "../api/pluggy";
@@ -55,12 +54,12 @@ import { useDashboardPorOrcamento } from "../hooks/useDashboardPorOrcamento";
 import { useDashboardSaldoAcumulado } from "../hooks/useDashboardSaldoAcumulado";
 import { useDashboardSummary } from "../hooks/useDashboardSummary";
 import { useDashboardTendencia } from "../hooks/useDashboardTendencia";
-import { useEvolucaoSaldoPorConta } from "../hooks/useEvolucaoSaldoPorConta";
 import { useInvestimentos } from "../hooks/useInvestimentos";
 import { useLiabilities } from "../hooks/useLiabilities";
 import { useLiabilityGastos } from "../hooks/useLiabilityGastos";
 import { usePatrimonioBreakdown } from "../hooks/usePatrimonioBreakdown";
 import { usePluggyInvestments } from "../hooks/usePluggyInvestments";
+import { useSaldoAcumuladoConferencia } from "../hooks/useSaldoAcumuladoConferencia";
 import { useSaldoPorConta } from "../hooks/useSaldoPorConta";
 import { useSubcategories } from "../hooks/useSubcategories";
 import {
@@ -130,7 +129,7 @@ export function DashboardsPage() {
 
   const summaryQuery = useDashboardSummary({ ...filter, regime });
   const tendenciaQuery = useDashboardTendencia(ano, mes, periodoHistorico, regime);
-  const saldoAcumuladoQuery = useDashboardSaldoAcumulado(ano, mes, periodoHistorico, regime);
+  const saldoAcumuladoQuery = useDashboardSaldoAcumulado(ano, mes, periodoHistorico);
 
   // "Ocultar gasto" (Sprint 27, PRD-027) — estado 100% local/efêmero, mesmo
   // padrão de applyHipoteticas (Sprint 14). Vive aqui (não dentro de
@@ -528,24 +527,12 @@ export function DashboardsPage() {
           {drill.kind === "saldoAcumulado" && (
             <>
               <p className="dash-empty">
-                Este valor soma o saldo inicial das contas com "Saldo inicial" configurado (ver
-                Configurações) mais receitas/despesas por competência (ou caixa, no toggle acima) —
-                não é o saldo bancário do dia. Salário recebido perto do fim do mês, por exemplo, só
-                entra na competência do mês seguinte, mesmo já estando na conta; e uma compra no
-                cartão de crédito entra na competência antes da fatura ser paga. Pra ver o saldo
-                bancário atual por conta, use o card "Saldo".
+                Saldo real das contas corrente com "Saldo inicial" configurado (ver Configurações),
+                menos o salário recebido no mês (competência do mês seguinte, mesmo já estando na
+                conta) — não depende do toggle Competência/Caixa acima. Pra ver o saldo bancário
+                bruto por conta, use o card "Saldo".
               </p>
-              {summaryQuery.data && (
-                <SaldoAcumuladoMemoriaCalculo
-                  ano={ano}
-                  mes={mes}
-                  periodoHistorico={periodoHistorico}
-                  tendencia={tendenciaQuery.data}
-                  acumulado={saldoAcumuladoSparkline}
-                  receitaMes={summaryQuery.data.receita}
-                  despesaMes={summaryQuery.data.despesa}
-                />
-              )}
+              <SaldoAcumuladoConferenciaTable ano={ano} mes={mes} />
               {saldoAcumuladoSparkline && saldoAcumuladoSparkline.length > 0 ? (
                 <TrendLineChart
                   variant="card"
@@ -611,92 +598,64 @@ function SaldoMemoriaCalculo({
   );
 }
 
-// Card "Saldo Acumulado": memória de cálculo (âncora + acumulação mês a mês
-// até o mês filtrado) + resumo de receita/despesa do mês, acima do
-// TrendLineChart (variant="card") já existente. Âncora vem de useEvolucaoSaldoPorConta (soma de
-// saldo_inicial por conta) — endpoint já existente, sem mudança de backend.
-function SaldoAcumuladoMemoriaCalculo({
-  ano,
-  mes,
-  periodoHistorico,
-  tendencia,
-  acumulado,
-  receitaMes,
-  despesaMes,
-}: {
-  ano: number;
-  mes: number;
-  periodoHistorico: PeriodoHistorico;
-  tendencia: TendenciaMes[] | undefined;
-  acumulado: PontoTendencia[] | undefined;
-  receitaMes: string;
-  despesaMes: string;
-}) {
-  const evolucaoQuery = useEvolucaoSaldoPorConta(ano, mes, periodoHistorico);
-  const ancora = useMemo(
-    () => (evolucaoQuery.data ?? []).reduce((sum, conta) => sum + Number(conta.saldo_inicial), 0),
-    [evolucaoQuery.data]
-  );
+// Tabela de conferência do drill-down do Saldo Acumulado (PRD-032, Sprint
+// 32) — Total (100%) + uma linha por conta corrente, sempre visível (sem
+// acordeão, pedido explícito do CEO). Reaproveita o idioma unificado
+// .dash-table e o padrão "grouped table" (SubcategoryGroupTable, Sprint 30):
+// borda separando a linha Total da lista de contas.
+function SaldoAcumuladoConferenciaTable({ ano, mes }: { ano: number; mes: number }) {
+  const query = useSaldoAcumuladoConferencia(ano, mes);
 
-  const linhas = useMemo(() => {
-    if (!tendencia || !acumulado) return [];
-    return acumulado.map((ponto, i) => ({
-      ano: ponto.ano,
-      mes: ponto.mes,
-      receita: tendencia[i]?.receita ?? "0",
-      despesa: tendencia[i]?.despesa ?? "0",
-      total: ponto.total,
-    }));
-  }, [tendencia, acumulado]);
-
-  if (evolucaoQuery.isLoading) return <p>Carregando memória de cálculo...</p>;
-  if (evolucaoQuery.isError) {
+  if (query.isLoading) return <p>Carregando memória de cálculo...</p>;
+  if (query.isError) {
     return <p role="alert">Não foi possível carregar a memória de cálculo.</p>;
   }
 
+  const linhas = query.data ?? [];
+  if (linhas.length === 0) {
+    return <p className="dash-empty">Nenhuma conta corrente com saldo inicial informado.</p>;
+  }
+
   return (
-    <div className="dash-memoria-calculo">
-      <p>Fórmula: Saldo do mês anterior + Receita do mês − Despesa do mês = Saldo Acumulado</p>
-      <p>
-        Saldo inicial das contas (âncora): <strong>{formatCurrency(String(ancora))}</strong>
-      </p>
-      <p>
-        <span style={{ color: "var(--receita)" }}>Receita do mês {formatCurrency(receitaMes)}</span>
-        {" · "}
-        <span style={{ color: "var(--despesa)" }}>Despesa do mês {formatCurrency(despesaMes)}</span>
-      </p>
-      {linhas.length > 0 && (
-        <div className="dash-table-wrap">
-          <table className="dash-table saldo-acumulado-memoria-table">
-            <colgroup>
-              <col className="col-mes" />
-              <col className="col-valor" />
-              <col className="col-valor" />
-              <col className="col-valor" />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>Mês</th>
-                <th>Receita</th>
-                <th>Despesa</th>
-                <th>Acumulado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {linhas.map((linha) => (
-                <tr key={`${linha.ano}-${linha.mes}`}>
-                  <td>
-                    {String(linha.mes).padStart(2, "0")}/{linha.ano}
-                  </td>
-                  <td>{formatCurrency(linha.receita)}</td>
-                  <td>{formatCurrency(linha.despesa)}</td>
-                  <td>{formatCurrency(linha.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+    <div className="dash-table-wrap">
+      <table className="dash-table saldo-acumulado-conferencia-table">
+        <colgroup>
+          <col className="col-conta" />
+          <col className="col-valor" />
+          <col className="col-valor" />
+          <col className="col-valor" />
+          <col className="col-valor" />
+          <col className="col-valor" />
+          <col className="col-valor" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Conta</th>
+            <th>Saldo início</th>
+            <th>Receitas</th>
+            <th>Despesas</th>
+            <th>Saldo fim do mês</th>
+            <th>Salário recebido</th>
+            <th>Saldo efetivo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {linhas.map((linha, index) => (
+            <tr
+              key={linha.account_id ?? "total"}
+              className={index === 1 ? "group-start" : undefined}
+            >
+              <td>{linha.account_nome}</td>
+              <td>{formatCurrency(linha.saldo_inicio)}</td>
+              <td>{formatCurrency(linha.receitas)}</td>
+              <td>{formatCurrency(linha.despesas)}</td>
+              <td>{formatCurrency(linha.saldo_fim)}</td>
+              <td>{formatCurrency(linha.salario_recebido)}</td>
+              <td>{formatCurrency(linha.saldo_efetivo)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

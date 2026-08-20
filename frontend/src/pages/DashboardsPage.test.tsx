@@ -193,6 +193,40 @@ const SALDO_ACUMULADO_FIXTURE = [
   { ano: 2026, mes: 1, total: "12000.00" },
 ];
 
+// Tabela de conferência (PRD-032, Sprint 32) — Total + 2 contas corrente.
+const SALDO_ACUMULADO_CONFERENCIA_FIXTURE = [
+  {
+    account_id: null,
+    account_nome: "Total em Conta Corrente (100%)",
+    saldo_inicio: "6000.00",
+    receitas: "8400.00",
+    despesas: "5120.30",
+    saldo_fim: "9279.70",
+    salario_recebido: "1000.00",
+    saldo_efetivo: "8279.70",
+  },
+  {
+    account_id: 1,
+    account_nome: "Conta corrente",
+    saldo_inicio: "5000.00",
+    receitas: "8400.00",
+    despesas: "5120.30",
+    saldo_fim: "8279.70",
+    salario_recebido: "1000.00",
+    saldo_efetivo: "7279.70",
+  },
+  {
+    account_id: 2,
+    account_nome: "Conta XP",
+    saldo_inicio: "1000.00",
+    receitas: "0.00",
+    despesas: "0.00",
+    saldo_fim: "1000.00",
+    salario_recebido: "0.00",
+    saldo_efetivo: "1000.00",
+  },
+];
+
 const SALDO_FIXTURE = [
   {
     account_id: 1,
@@ -327,6 +361,8 @@ function routedFetchMock() {
       return Promise.resolve(jsonResponse(PASSIVO_FIXTURE));
     if (url.startsWith("/dashboards/saldo-por-conta"))
       return Promise.resolve(jsonResponse(SALDO_FIXTURE));
+    if (url.startsWith("/dashboards/saldo-acumulado/conferencia"))
+      return Promise.resolve(jsonResponse(SALDO_ACUMULADO_CONFERENCIA_FIXTURE));
     if (url.startsWith("/dashboards/saldo-acumulado"))
       return Promise.resolve(jsonResponse(SALDO_ACUMULADO_FIXTURE));
     if (url.startsWith("/category-groups")) return Promise.resolve(jsonResponse(GROUPS_FIXTURE));
@@ -1049,7 +1085,7 @@ describe("DashboardsPage", () => {
     expect(fillbarColor(reserva)).not.toBe(fillbarColor(aposentadoria));
   });
 
-  it("adds regime=caixa to summary/tendencia/saldo-acumulado requests when the Caixa toggle is selected", async () => {
+  it("adds regime=caixa to summary/tendencia requests when the Caixa toggle is selected, but not to saldo-acumulado", async () => {
     const fetchMock = routedFetchMock();
     vi.stubGlobal("fetch", fetchMock);
 
@@ -1066,12 +1102,14 @@ describe("DashboardsPage", () => {
       expect(
         calls.some((url) => url.startsWith("/dashboards/tendencia") && url.includes("regime=caixa"))
       ).toBe(true);
-      expect(
-        calls.some(
-          (url) => url.startsWith("/dashboards/saldo-acumulado") && url.includes("regime=caixa")
-        )
-      ).toBe(true);
     });
+
+    // PRD-032: o card Saldo Acumulado não depende mais de regime — o
+    // endpoint deixou de aceitar o parâmetro.
+    const calls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(
+      calls.some((url) => url.startsWith("/dashboards/saldo-acumulado") && url.includes("regime="))
+    ).toBe(false);
   });
 
   it("editing a transaction's category from the drilldown invalidates the dashboard summary", async () => {
@@ -1256,7 +1294,7 @@ describe("DashboardsPage", () => {
     expect(await screen.findByText("CDB Nubank 120%")).toBeInTheDocument();
   });
 
-  it("shows the Saldo Acumulado memoria de calculo (ancora + monthly rows) above the trend chart", async () => {
+  it("shows the Saldo Acumulado conferencia table (Total + one row per conta) above the trend chart", async () => {
     vi.stubGlobal("fetch", routedFetchMock());
 
     renderWithQueryClient(<DashboardsPage />);
@@ -1265,18 +1303,34 @@ describe("DashboardsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Saldo Acumulado/ }));
     await screen.findByRole("heading", { name: "Saldo Acumulado" });
 
-    // Fórmula do card (Sprint 25) — visível no início do drilldown
-    expect(
-      await screen.findByText(
-        /Saldo do mês anterior \+ Receita do mês − Despesa do mês = Saldo Acumulado/
-      )
-    ).toBeInTheDocument();
-    // Âncora = soma de saldo_inicial (EVOLUCAO_SALDO_FIXTURE: 5000 + 1000)
-    expect(await screen.findByText(/R\$ 6\.000,00/)).toBeInTheDocument();
-    expect(screen.getByText(/Receita do mês R\$ 8\.400,00/)).toBeInTheDocument();
-    expect(screen.getByText(/Despesa do mês R\$ 5\.120,30/)).toBeInTheDocument();
-    // Última linha da tabela é o mês filtrado (01/2026), acumulado = último
-    // ponto da série (12000.00).
-    expect(screen.getAllByText("R$ 12.000,00").length).toBeGreaterThan(0);
+    const table = await screen.findByRole("table");
+    expect(within(table).getByText("Total em Conta Corrente (100%)")).toBeInTheDocument();
+    expect(within(table).getByText("Conta corrente")).toBeInTheDocument();
+    expect(within(table).getByText("Conta XP")).toBeInTheDocument();
+
+    const rows = within(table).getAllByRole("row");
+    // header + Total + 2 contas
+    expect(rows).toHaveLength(4);
+    function saldoEfetivoCell(row: HTMLElement) {
+      const cells = within(row).getAllByRole("cell");
+      return cells[cells.length - 1]?.textContent;
+    }
+    // Saldo efetivo (última coluna) de cada linha — Total = 6.000+8.400-
+    // 5.120,30-1.000 = 8.279,70; conta corrente = 7.279,70; conta XP = 1.000.
+    expect(saldoEfetivoCell(rows[1]!)).toContain("8.279,70");
+    expect(saldoEfetivoCell(rows[2]!)).toContain("7.279,70");
+    expect(saldoEfetivoCell(rows[3]!)).toContain("1.000,00");
+  });
+
+  it("does not render an accordion/expand control on the Saldo Acumulado conferencia table", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /^Saldo Acumulado/ }));
+    const table = await screen.findByRole("table");
+
+    expect(within(table).queryAllByRole("button")).toHaveLength(0);
   });
 });

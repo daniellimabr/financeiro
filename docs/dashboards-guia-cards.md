@@ -20,8 +20,9 @@ não muda os valores em si:
   gasto só "pesa" quando a fatura é paga). Para as demais contas, caixa e
   competência são o mesmo mês.
 
-O toggle afeta Receita, Despesa, Saldo, Ativos, Passivos, Patrimônio e Saldo
-Acumulado.
+O toggle afeta Receita, Despesa, Saldo, Ativos, Passivos e Patrimônio. Desde
+a Sprint 32, **não afeta mais o Saldo Acumulado** — a fórmula nova sempre usa
+a data real de cada transação, não a competência/caixa.
 
 ## Saldo
 
@@ -33,23 +34,29 @@ crédito (nunca entra aqui). Clicar no card abre a memória de cálculo
 
 ## Saldo Acumulado
 
-Projeção acumulada desde janeiro/2026: começa do saldo inicial das contas
-que têm "Saldo inicial" configurado (tela Configurações) e vai somando o
-resultado (receita − despesa) de cada mês, por competência ou caixa. A fórmula
-é: **Saldo do mês anterior + Receita do mês − Despesa do mês = Saldo
-Acumulado**. **Não é o saldo bancário do dia** — é o que o saldo *deveria*
-ser se todo mundo pagasse e recebesse exatamente na competência/caixa esperada.
-Duas diferenças comuns entre este número e o extrato real do banco:
+Redefinido na Sprint 32: **quanto dinheiro o CEO tem, de fato, nas contas
+corrente no fim do mês** — soma o saldo real (saldo inicial + todo movimento
+real, sem exclusão de categoria nenhuma) de cada conta **tipo "corrente"**
+com "Saldo inicial" configurado (tela Configurações), e subtrai qualquer
+transação da subcategoria "Salário" cuja data caia no mês mas cuja
+competência caia no mês seguinte (o dinheiro já está na conta, mas "pertence"
+ao próximo mês). Só conta corrente entra — poupança, cartão de crédito e
+conta de investimento nunca entram aqui, mesmo com "Saldo inicial"
+configurado. **Não depende mais do toggle Competência/Caixa** — a fórmula
+sempre usa a data real de cada transação.
 
-- Um salário recebido perto do fim do mês só entra na competência do mês
-  seguinte, mesmo já estando fisicamente na conta.
-- Uma compra no cartão de crédito já entra na competência antes de a fatura
-  ser paga.
+Diferente da versão anterior (Sprint 15–28), este número bate com o extrato
+bancário real: Aporte/Resgate de investimento e proventos automáticos (ex.:
+rendimento de CDB embutido em conta corrente, dividendo/JCP de corretora) já
+contam normalmente, sem exclusão por `categoria_pluggy` — são dinheiro real
+que entrou ou saiu da conta.
 
-Cartão de crédito nunca tem "Saldo inicial" (serve só para capturar as
-compras feitas nele, não para representar dinheiro guardado) — por isso ele
-não entra na âncora deste card, mas suas compras entram na despesa
-normalmente, na competência/caixa que lhes cabe.
+O drill-down mostra uma tabela de conferência sempre visível (sem acordeão):
+uma linha "Total em Conta Corrente (100%)" + uma linha por conta corrente,
+com as colunas Saldo início do mês, Receitas, Despesas, Saldo fim do mês,
+Salário recebido e Saldo efetivo (= Saldo fim − Salário recebido) — pensada
+para conferência manual contra o extrato do banco, mês a mês, sem precisar
+de SSH/consulta direta ao banco.
 
 ## Saldo Anterior
 
@@ -68,14 +75,15 @@ Exclui:
 - `credito` em conta de cartão de crédito (pagamento de fatura ou
   estorno/reversão — nunca é receita real).
 - Categorias marcadas para excluir de totais (configuração por grupo).
-- Desde a Sprint 22, dividendo/JCP/taxa de investimentos administrados por
-  corretora (identificado pela própria `categoria_pluggy` da Pluggy:
-  "Proceeds interests and dividends" / "Taxes on investments") — chega numa
-  conta corrente vinculada à corretora (não numa conta tipo "Investimento",
-  achado real do Bloco 0), e o CEO decidiu não precisar administrar/
-  categorizar esse fluxo. Mesma exclusão vale na fila de Categorização.
-  Aporte/resgate continuam contando normalmente (categoria "Investments",
-  distinta) — decisão fixada desde a Sprint 19.
+
+Desde a Sprint 32, dividendo/JCP/taxa de investimentos administrados por
+corretora (`categoria_pluggy` da Pluggy: "Proceeds interests and dividends" /
+"Taxes on investments") **voltou a contar normalmente** em Receita/Despesa e
+na fila de Categorização — o CEO decidiu que é dinheiro real (rendimento
+efetivo, seja do Itaú ou da XP) e deve ser categorizado como qualquer outra
+transação, revertendo a exclusão fixada na Sprint 22. Aporte/resgate de
+investimento também contam normalmente (categoria "Investments", distinta) —
+decisão fixada desde a Sprint 19, sem mudança nesta sprint.
 
 ### "Ocultar gasto" (simulação) e gráfico comparativo por categoria
 
@@ -225,6 +233,10 @@ atual" que venha a ser adicionado no futuro.
 
 ## Referências
 
+- [PRD-032](prd/PRD-032-saldo-acumulado-saldo-real-e-conferencia-por-conta.md) —
+  redefinição do Saldo Acumulado como saldo real por conta corrente, fim da
+  exclusão de proventos de investimento por `categoria_pluggy`, e a tabela
+  de conferência no drill-down.
 - [PRD-028](prd/PRD-028-ativos-saldo-conta-corrente-patrimonio-redesenhado.md) —
   origem do total completo de "Ativos" (Gestão de Ativos + Investimentos +
   saldo de contas correntes), da seção "Saldo por Conta Corrente" no

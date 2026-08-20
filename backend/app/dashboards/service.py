@@ -7,13 +7,13 @@ from typing import Literal
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Query, Session
 
+from app.categorization.service import salario_subcategory_id
 from app.models.asset import Asset, AssetStatus
 from app.models.category import SEM_CATEGORIA_ID, CategoryGroup, Natureza, Subcategory
 from app.models.investimento import Investimento
 from app.models.liability import Liability, LiabilityStatus
 from app.models.orcamento import Orcamento
 from app.models.pluggy import (
-    INVESTIMENTO_PROVENTOS_CATEGORIAS_PLUGGY,
     PluggyAccount,
     PluggyAccountTipo,
     PluggyInvestment,
@@ -211,9 +211,7 @@ def _pagamento_fatura_subcategory_id(db: Session, user_id: int) -> int | None:
     return row[0] if row else None
 
 
-def _base_query(
-    db: Session, user_id: int, *, excluir_investimento: bool = True, regime: Regime = "competencia"
-) -> Query:
+def _base_query(db: Session, user_id: int, *, regime: Regime = "competencia") -> Query:
     query = (
         db.query(PluggyTransaction)
         .join(PluggyAccount, PluggyTransaction.account_id == PluggyAccount.id)
@@ -223,11 +221,6 @@ def _base_query(
         )
         .outerjoin(CategoryGroup, Subcategory.group_id == CategoryGroup.id)
         .filter(PluggyTransaction.user_id == user_id)
-        .filter(
-            func.coalesce(PluggyTransaction.categoria_pluggy, "").notin_(
-                INVESTIMENTO_PROVENTOS_CATEGORIAS_PLUGGY
-            )
-        )
     )
 
     if regime == "caixa":
@@ -267,11 +260,6 @@ def _base_query(
             )
         )
 
-    if excluir_investimento:
-        # Variação de valor de mercado de investimento não é uma transação —
-        # usado só pelo Saldo Acumulado (get_saldo_acumulado), não pelas
-        # agregações normais de Receita/Despesa.
-        query = query.filter(PluggyAccount.tipo != PluggyAccountTipo.investimento)
     return query
 
 
@@ -371,9 +359,7 @@ def _patrimonio_breakdown(
     ativos_totais = _ativos_totais(db, user_id)
 
     hoje = date.today()
-    pontos_acumulado = get_saldo_acumulado(
-        db, user_id, ano=hoje.year, mes=hoje.month, meses=1, regime=regime
-    )
+    pontos_acumulado = get_saldo_acumulado(db, user_id, ano=hoje.year, mes=hoje.month, meses=1)
     saldo_acumulado_mes = pontos_acumulado[0].total if pontos_acumulado else Decimal("0")
 
     return PatrimonioBreakdown(
@@ -497,18 +483,14 @@ def _receita_despesa_por_periodo(
     periodo: list[tuple[int, int]],
     *,
     regime: Regime = "competencia",
-    excluir_investimento: bool = False,
 ) -> dict[tuple[int, int], dict[str, Decimal]]:
     """Soma receita/despesa por mês (por competência ou caixa) num range
     arbitrário de meses — reaproveitado por get_tendencia (últimos N meses
-    terminando no filtro) e get_saldo_acumulado (range fixo desde jan/2026,
-    excluindo investimento)."""
+    terminando no filtro)."""
     inicio, fim = _date_bounds(periodo)
     coluna = _competencia_column(regime)
 
-    query = _base_query(
-        db, user_id, excluir_investimento=excluir_investimento, regime=regime
-    ).filter(
+    query = _base_query(db, user_id, regime=regime).filter(
         coluna >= inicio,
         coluna < fim,
     )
@@ -1098,14 +1080,6 @@ def get_saldo_por_conta(db: Session, user_id: int) -> list[SaldoConta]:
 _INICIO_EVOLUCAO_SALDO = date(2026, 1, 1)
 
 
-# Mesmo id determinístico usado em
-# pluggy_integration.service._salario_ajuste_dez_2025_pluggy_transaction_id —
-# duplicado aqui (string de 1 linha) para não acoplar dashboards a
-# pluggy_integration por causa de um único lookup.
-def _salario_ajuste_dez_2025_pluggy_transaction_id(user_id: int) -> str:
-    return f"manual-salario-dez2025-user{user_id}"
-
-
 def _months_between(inicio: tuple[int, int], fim: tuple[int, int]) -> list[tuple[int, int]]:
     """Todos os meses de `inicio` até `fim` (inclusive), em ordem cronológica."""
     y, m = inicio
@@ -1117,6 +1091,52 @@ def _months_between(inicio: tuple[int, int], fim: tuple[int, int]) -> list[tuple
             m = 1
             y += 1
     return periodo
+
+
+def _next_month(ano: int, mes: int) -> tuple[int, int]:
+    return (ano + 1, 1) if mes == 12 else (ano, mes + 1)
+
+
+def _previous_month(ano: int, mes: int) -> tuple[int, int]:
+    return (ano - 1, 12) if mes == 1 else (ano, mes - 1)
+
+
+def _saldo_real_por_conta_e_mes(
+    db: Session, account: PluggyAccount, range_completo: list[tuple[int, int]]
+) -> dict[tuple[int, int], Decimal]:
+    """Saldo real (saldo_inicial + movimento bruto, sem filtro de categoria
+    nem exclusão nenhuma) no fim de cada mês de `range_completo`, para uma
+    conta — usa `data` real, nunca `data_competencia`/`data_caixa` (ferramenta
+    de auditoria bancária, PRD-018/PRD-032). Meses anteriores a jan/2026
+    (fora da janela de movimento rastreado) ficam com o próprio
+    `saldo_inicial`, sem ajuste."""
+    fim_exclusivo = _date_bounds([range_completo[-1]])[1]
+    rows = (
+        db.query(
+            func.extract("year", PluggyTransaction.data),
+            func.extract("month", PluggyTransaction.data),
+            func.sum(PluggyTransaction.valor),
+        )
+        .filter(
+            PluggyTransaction.account_id == account.id,
+            PluggyTransaction.data >= _INICIO_EVOLUCAO_SALDO,
+            PluggyTransaction.data < fim_exclusivo,
+        )
+        .group_by(
+            func.extract("year", PluggyTransaction.data),
+            func.extract("month", PluggyTransaction.data),
+        )
+        .all()
+    )
+    movimento_por_mes = {(int(y), int(m)): _to_decimal(v) for y, m, v in rows}
+
+    saldo = account.saldo_inicial
+    saldo_por_mes: dict[tuple[int, int], Decimal] = {}
+    for y, m in range_completo:
+        if (y, m) >= (2026, 1):
+            saldo += movimento_por_mes.get((y, m), Decimal("0"))
+        saldo_por_mes[(y, m)] = saldo
+    return saldo_por_mes
 
 
 def get_evolucao_saldo_por_conta(
@@ -1131,7 +1151,6 @@ def get_evolucao_saldo_por_conta(
     if not janela:
         return []
 
-    fim_exclusivo = _date_bounds([janela[-1]])[1]
     range_completo = _months_between((2026, 1), janela[-1])
 
     accounts = (
@@ -1143,31 +1162,7 @@ def get_evolucao_saldo_por_conta(
 
     resultado = []
     for account in accounts:
-        rows = (
-            db.query(
-                func.extract("year", PluggyTransaction.data),
-                func.extract("month", PluggyTransaction.data),
-                func.sum(PluggyTransaction.valor),
-            )
-            .filter(
-                PluggyTransaction.account_id == account.id,
-                PluggyTransaction.data >= _INICIO_EVOLUCAO_SALDO,
-                PluggyTransaction.data < fim_exclusivo,
-            )
-            .group_by(
-                func.extract("year", PluggyTransaction.data),
-                func.extract("month", PluggyTransaction.data),
-            )
-            .all()
-        )
-        movimento_por_mes = {(int(y), int(m)): _to_decimal(v) for y, m, v in rows}
-
-        saldo = account.saldo_inicial
-        saldo_por_mes: dict[tuple[int, int], Decimal] = {}
-        for y, m in range_completo:
-            saldo += movimento_por_mes.get((y, m), Decimal("0"))
-            saldo_por_mes[(y, m)] = saldo
-
+        saldo_por_mes = _saldo_real_por_conta_e_mes(db, account, range_completo)
         resultado.append(
             EvolucaoSaldoConta(
                 account_id=account.id,
@@ -1182,49 +1177,184 @@ def get_evolucao_saldo_por_conta(
     return resultado
 
 
-def get_saldo_acumulado(
-    db: Session, user_id: int, *, ano: int, mes: int, meses: int = 6, regime: Regime = "competencia"
-) -> list[PontoTendencia]:
-    # Âncora ("saldo acumulado de dez/2025") = soma de saldo_inicial das
-    # contas (excluindo investimento — variação de valor de mercado não é uma
-    # transação, PRD-016) menos o valor da transação sentinela de salário de
-    # dez/2025 (se existir) — ver regra de negócio no PRD-015: saldo_inicial
-    # já inclui fisicamente esse dinheiro, mas por competência ele "pertence"
-    # a jan/2026 e já entra de volta sozinho na receita desse mês.
-    soma_saldo_inicial = (
-        db.query(func.coalesce(func.sum(PluggyAccount.saldo_inicial), 0))
+def _accounts_corrente_com_saldo_inicial(db: Session, user_id: int) -> list[PluggyAccount]:
+    return (
+        db.query(PluggyAccount)
         .filter(
             PluggyAccount.user_id == user_id,
+            PluggyAccount.tipo == PluggyAccountTipo.corrente,
             PluggyAccount.saldo_inicial.isnot(None),
-            PluggyAccount.tipo != PluggyAccountTipo.investimento,
         )
-        .scalar()
+        .order_by(PluggyAccount.nome)
+        .all()
     )
-    valor_sentinela = (
-        db.query(PluggyTransaction.valor)
+
+
+def _salario_antecipado_por_conta_e_mes(
+    db: Session,
+    account_ids: list[int],
+    salario_id: int,
+    range_completo: list[tuple[int, int]],
+) -> dict[int, dict[tuple[int, int], Decimal]]:
+    """Soma, por conta e por mês de `data`, das transações de subcategoria
+    "Salário" cuja `data_competencia` cai no mês seguinte — dinheiro que já
+    está fisicamente na conta, mas que por competência "pertence" ao mês
+    seguinte (regra de negócio do PRD-032; soma todas as ocorrências no mês,
+    cobrindo o cenário real de mais de uma transação de salário no mesmo
+    mês)."""
+    inicio, fim = _date_bounds(range_completo)
+    rows = (
+        db.query(
+            PluggyTransaction.account_id,
+            PluggyTransaction.data,
+            PluggyTransaction.data_competencia,
+            PluggyTransaction.valor,
+        )
         .filter(
-            PluggyTransaction.user_id == user_id,
-            PluggyTransaction.pluggy_transaction_id
-            == _salario_ajuste_dez_2025_pluggy_transaction_id(user_id),
+            PluggyTransaction.account_id.in_(account_ids),
+            PluggyTransaction.subcategory_id == salario_id,
+            PluggyTransaction.data >= inicio,
+            PluggyTransaction.data < fim,
         )
-        .scalar()
+        .all()
     )
-    ancora = _to_decimal(soma_saldo_inicial) - (
-        _to_decimal(valor_sentinela) if valor_sentinela is not None else Decimal("0")
-    )
+    resultado: dict[int, dict[tuple[int, int], Decimal]] = {}
+    for account_id, data, data_competencia, valor in rows:
+        if data_competencia is None:
+            continue
+        mes_dado = (data.year, data.month)
+        if (data_competencia.year, data_competencia.month) != _next_month(*mes_dado):
+            continue
+        mapa = resultado.setdefault(account_id, {})
+        mapa[mes_dado] = mapa.get(mes_dado, Decimal("0")) + abs(_to_decimal(valor))
+    return resultado
 
-    range_completo = _months_between((2026, 1), (ano, mes))
-    totais = _receita_despesa_por_periodo(
-        db, user_id, range_completo, regime=regime, excluir_investimento=True
-    )
 
-    saldo = ancora
-    saldo_por_mes: dict[tuple[int, int], Decimal] = {}
-    for y, m in range_completo:
-        saldo += totais[(y, m)]["receita"] - totais[(y, m)]["despesa"]
-        saldo_por_mes[(y, m)] = saldo
-
+def get_saldo_acumulado(
+    db: Session, user_id: int, *, ano: int, mes: int, meses: int = 6
+) -> list[PontoTendencia]:
+    # Saldo real por conta corrente (decisão do CEO, PRD-032): soma do saldo
+    # bancário de fim de mês de cada conta corrente com saldo_inicial
+    # configurado (mesma lógica de get_evolucao_saldo_por_conta — sem nenhum
+    # filtro de categoria) menos qualquer transação "Salário" cuja `data`
+    # caia no mês mas `data_competencia` caia no mês seguinte (já está
+    # fisicamente na conta, mas "pertence" ao mês seguinte). Não depende de
+    # regime competência/caixa — a fórmula sempre usa `data` real.
     janela = _month_range(ano, mes, meses)
-    return [
-        PontoTendencia(ano=y, mes=m, total=saldo_por_mes.get((y, m), ancora)) for y, m in janela
-    ]
+    contas = _accounts_corrente_com_saldo_inicial(db, user_id)
+    if not contas:
+        return [PontoTendencia(ano=y, mes=m, total=Decimal("0")) for y, m in janela]
+
+    range_completo = _months_between(min(janela[0], (2025, 12)), janela[-1])
+    salario_id = salario_subcategory_id(db, user_id)
+    salario_por_conta_mes = (
+        _salario_antecipado_por_conta_e_mes(db, [c.id for c in contas], salario_id, range_completo)
+        if salario_id is not None
+        else {}
+    )
+
+    saldo_total_por_mes = {chave: Decimal("0") for chave in range_completo}
+    for conta in contas:
+        saldo_por_mes = _saldo_real_por_conta_e_mes(db, conta, range_completo)
+        salario_conta = salario_por_conta_mes.get(conta.id, {})
+        for chave in range_completo:
+            saldo_total_por_mes[chave] += saldo_por_mes[chave] - salario_conta.get(
+                chave, Decimal("0")
+            )
+
+    return [PontoTendencia(ano=y, mes=m, total=saldo_total_por_mes[(y, m)]) for y, m in janela]
+
+
+@dataclass
+class LinhaConferenciaSaldo:
+    account_id: int | None
+    account_nome: str
+    saldo_inicio: Decimal
+    receitas: Decimal
+    despesas: Decimal
+    saldo_fim: Decimal
+    salario_recebido: Decimal
+    saldo_efetivo: Decimal
+
+
+def _receita_despesa_bruta_mes(
+    db: Session, account_id: int, ano: int, mes: int
+) -> tuple[Decimal, Decimal]:
+    rows = (
+        db.query(PluggyTransaction.tipo, func.sum(func.abs(PluggyTransaction.valor)))
+        .filter(
+            PluggyTransaction.account_id == account_id,
+            func.extract("year", PluggyTransaction.data) == ano,
+            func.extract("month", PluggyTransaction.data) == mes,
+        )
+        .group_by(PluggyTransaction.tipo)
+        .all()
+    )
+    totais = {tipo: _to_decimal(total) for tipo, total in rows}
+    return (
+        totais.get(PluggyTransactionTipo.credito, Decimal("0")),
+        totais.get(PluggyTransactionTipo.debito, Decimal("0")),
+    )
+
+
+def get_saldo_acumulado_conferencia(
+    db: Session, user_id: int, *, ano: int, mes: int
+) -> list[LinhaConferenciaSaldo]:
+    """Tabela de conferência do drill-down do Saldo Acumulado (PRD-032):
+    Total (100%) + uma linha por conta corrente, com a memória de cálculo
+    completa do mês — pensada para auditoria manual contra extrato bancário,
+    sem precisar de SSH/consulta direta ao banco."""
+    contas = _accounts_corrente_com_saldo_inicial(db, user_id)
+    if not contas:
+        return []
+
+    mes_atual = (ano, mes)
+    mes_ant = _previous_month(ano, mes)
+    range_completo = _months_between(min(mes_ant, (2025, 12)), mes_atual)
+
+    salario_id = salario_subcategory_id(db, user_id)
+    salario_por_conta_mes = (
+        _salario_antecipado_por_conta_e_mes(db, [c.id for c in contas], salario_id, range_completo)
+        if salario_id is not None
+        else {}
+    )
+
+    total = LinhaConferenciaSaldo(
+        account_id=None,
+        account_nome="Total em Conta Corrente (100%)",
+        saldo_inicio=Decimal("0"),
+        receitas=Decimal("0"),
+        despesas=Decimal("0"),
+        saldo_fim=Decimal("0"),
+        salario_recebido=Decimal("0"),
+        saldo_efetivo=Decimal("0"),
+    )
+    linhas: list[LinhaConferenciaSaldo] = []
+    for conta in contas:
+        saldo_por_mes = _saldo_real_por_conta_e_mes(db, conta, range_completo)
+        receitas, despesas = _receita_despesa_bruta_mes(db, conta.id, ano, mes)
+        salario_recebido = salario_por_conta_mes.get(conta.id, {}).get(mes_atual, Decimal("0"))
+        saldo_inicio = saldo_por_mes[mes_ant]
+        saldo_fim = saldo_por_mes[mes_atual]
+        saldo_efetivo = saldo_fim - salario_recebido
+
+        linhas.append(
+            LinhaConferenciaSaldo(
+                account_id=conta.id,
+                account_nome=conta.apelido or conta.nome,
+                saldo_inicio=saldo_inicio,
+                receitas=receitas,
+                despesas=despesas,
+                saldo_fim=saldo_fim,
+                salario_recebido=salario_recebido,
+                saldo_efetivo=saldo_efetivo,
+            )
+        )
+        total.saldo_inicio += saldo_inicio
+        total.receitas += receitas
+        total.despesas += despesas
+        total.saldo_fim += saldo_fim
+        total.salario_recebido += salario_recebido
+        total.saldo_efetivo += saldo_efetivo
+
+    return [total, *linhas]

@@ -1433,6 +1433,22 @@ tr.hidden-row .valor-cell {
   width: 90px;
 }
 
+/* Tabela de conferência do Saldo Acumulado (Sprint 32) — Total + uma linha
+   por conta corrente, 7 colunas (conta + 6 valores). Reaproveita a borda de
+   separação de grupo já usada em .subcategory-group-table (Sprint 30) para
+   marcar onde a lista de contas começa, depois da linha Total. */
+.saldo-acumulado-conferencia-table .col-conta {
+  width: 22%;
+}
+
+.saldo-acumulado-conferencia-table tbody tr.group-start td {
+  border-top: 2px solid var(--border);
+}
+
+.saldo-acumulado-conferencia-table tbody tr:first-child td:first-child {
+  font-weight: 600;
+}
+
 /* Revisão de baseline dez/2025 (AccountManagementPage, Sprint 21) — Holding e
    Motivo são texto longo (nome de CDB da Nubank chega a ~80 caracteres),
    sem colgroup o table-layout:fixed dividia a largura igualmente entre as 6

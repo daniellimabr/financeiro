@@ -137,6 +137,20 @@ export interface EvolucaoSaldoConta {
   pontos: PontoTendencia[];
 }
 
+// Tabela de conferência do drill-down do Saldo Acumulado (PRD-032): Total
+// (100%) + uma linha por conta corrente com saldo_inicial configurado —
+// account_id null identifica a linha Total.
+export interface LinhaConferenciaSaldo {
+  account_id: number | null;
+  account_nome: string;
+  saldo_inicio: string;
+  receitas: string;
+  despesas: string;
+  saldo_fim: string;
+  salario_recebido: string;
+  saldo_efetivo: string;
+}
+
 // Período histórico oferecido pelo seletor de tendência (3/6/12 meses).
 export type PeriodoHistorico = 3 | 6 | 12;
 
@@ -281,8 +295,18 @@ export function fetchEvolucaoSaldoPorConta(
   );
 }
 
+// PRD-032: a fórmula nova (saldo real por conta corrente) não depende de
+// regime competência/caixa — o endpoint deixou de aceitar esse parâmetro.
 export function fetchSaldoAcumulado(
-  filter: Required<PeriodoFilter> & RegimeFilter & { meses?: number }
+  filter: Required<PeriodoFilter> & { meses?: number }
 ): Promise<PontoTendencia[]> {
   return apiFetch<PontoTendencia[]>(`/dashboards/saldo-acumulado${buildQuery({ ...filter })}`);
+}
+
+export function fetchSaldoAcumuladoConferencia(
+  filter: Required<PeriodoFilter>
+): Promise<LinhaConferenciaSaldo[]> {
+  return apiFetch<LinhaConferenciaSaldo[]>(
+    `/dashboards/saldo-acumulado/conferencia${buildQuery({ ...filter })}`
+  );
 }

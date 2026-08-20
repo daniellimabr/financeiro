@@ -17,7 +17,6 @@ from app.models.category import CategoryGroup, Subcategory
 from app.models.investimento import Investimento
 from app.models.liability import Liability
 from app.models.pluggy import (
-    INVESTIMENTO_PROVENTOS_CATEGORIAS_PLUGGY,
     PluggyAccount,
     PluggyAccountTipo,
     PluggyTransaction,
@@ -76,11 +75,6 @@ def list_transactions(
         .join(PluggyAccount, PluggyTransaction.account_id == PluggyAccount.id)
         .filter(PluggyTransaction.user_id == user_id)
         .filter(PluggyAccount.tipo != PluggyAccountTipo.investimento)
-        .filter(
-            func.coalesce(PluggyTransaction.categoria_pluggy, "").notin_(
-                INVESTIMENTO_PROVENTOS_CATEGORIAS_PLUGGY
-            )
-        )
     )
 
     if status == "pendente":

@@ -161,3 +161,16 @@ class EvolucaoSaldoContaOut(BaseModel):
     account_tipo: PluggyAccountTipo
     saldo_inicial: Decimal
     pontos: list[PontoTendenciaOut]
+
+
+class LinhaConferenciaSaldoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    account_id: int | None
+    account_nome: str
+    saldo_inicio: Decimal
+    receitas: Decimal
+    despesas: Decimal
+    saldo_fim: Decimal
+    salario_recebido: Decimal
+    saldo_efetivo: Decimal

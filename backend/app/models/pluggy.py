@@ -50,21 +50,6 @@ class PluggyTransactionCategorizacaoStatus(enum.StrEnum):
     confirmada = "confirmada"
 
 
-# Proventos/taxas de investimentos administrados (dividendo, JCP, IRRF sobre
-# rendimento, taxa de intermediação) chegam via conta corrente vinculada à
-# corretora (ex.: XP), nunca por uma conta tipo=investimento (achado real do
-# Bloco 0 da Sprint 22: XP não retorna nenhuma conta desse tipo, só holdings
-# via /investments). `categoria_pluggy` é o sinal que a própria Pluggy usa pra
-# marcar esse fluxo — distinto de "Investments" (aporte/resgate manual, que o
-# CEO decidiu continuar controlando pela transação de conta corrente, Sprint
-# 19) — por isso a exclusão é por categoria, não por tipo de conta. Compartilhada
-# entre dashboards (totais) e categorization (fila) para não divergir.
-INVESTIMENTO_PROVENTOS_CATEGORIAS_PLUGGY = {
-    "Proceeds interests and dividends",
-    "Taxes on investments",
-}
-
-
 class PluggyItem(Base):
     __tablename__ = "pluggy_items"
 
