@@ -1,6 +1,6 @@
 # PRD-032: Saldo Acumulado redefinido como saldo real por conta + conferência de categorização de investimentos
 
-- **Status:** aprovado, aguardando execução
+- **Status:** implementado e aprovado pelo CEO em 2026-08-20 (deploy na VM de dev)
 - **Épico relacionado:** nenhum (nasceu de uma auditoria manual do CEO, mês a mês contra extratos
   bancários reais — sem sessão de `/plan` prévia)
 - **Sprint(s):** [SPRINT-032-saldo-acumulado-saldo-real-e-conferencia-por-conta-plan.md](../sprints/SPRINT-032-saldo-acumulado-saldo-real-e-conferencia-por-conta-plan.md)

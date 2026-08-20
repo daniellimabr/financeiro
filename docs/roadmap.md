@@ -1157,7 +1157,7 @@ Plano: [SPRINT-031-fix-desassociacao-vinculo-transacao-plan.md](sprints/SPRINT-0
 Relatório: [SPRINT-031-fix-desassociacao-vinculo-transacao-report.md](sprints/SPRINT-031-fix-desassociacao-vinculo-transacao-report.md).
 **Sprint aprovada pelo CEO em 2026-08-20**, com validação real no app ("Deu certo a alteração, ja testei!").
 
-### Sprint 32 — Saldo Acumulado redefinido como saldo real por conta + conferência de categorização de investimentos (cross-epic, sem épico prévio)
+### ✅ Sprint 32 — Saldo Acumulado redefinido como saldo real por conta + conferência de categorização de investimentos (cross-epic, sem épico prévio) concluída em 2026-08-20
 
 Sem sessão de `/plan` prévia — nasceu de uma auditoria manual do CEO (mês a mês, jan-mar/2026,
 contra os extratos reais do Itaú e do NuBank), mesmo padrão retroativo das Sprints 30/31. Achou 3
@@ -1192,8 +1192,10 @@ PRD: [PRD-032-saldo-acumulado-saldo-real-e-conferencia-por-conta.md](prd/PRD-032
 Plano: [SPRINT-032-saldo-acumulado-saldo-real-e-conferencia-por-conta-plan.md](sprints/SPRINT-032-saldo-acumulado-saldo-real-e-conferencia-por-conta-plan.md).
 Relatório: [SPRINT-032-saldo-acumulado-saldo-real-e-conferencia-por-conta-report.md](sprints/SPRINT-032-saldo-acumulado-saldo-real-e-conferencia-por-conta-report.md).
 Commit `9bae0f4`, CI verde confirmado, deployado na VM de dev (`docker compose ps` reporta `api`
-`healthy`). **Aguardando aprovação do CEO** (validação real no app + confirmação do valor de
-`saldo_inicial` da XP).
+`healthy`). **Sprint aprovada pelo CEO em 2026-08-20.** Pendências que seguem abertas como próximo
+passo (não bloquearam a aprovação): confirmar se `saldo_inicial` da XP (R$535,55, já configurado ao
+vivo) está correto, validação visual da tabela nova no app real, e recategorizar as 8 transações de
+Aporte/Resgate ainda em "Transferência interna".
 
 ## Registro de reavaliações futuras
 

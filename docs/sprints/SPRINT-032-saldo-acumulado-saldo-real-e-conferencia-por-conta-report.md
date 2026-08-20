@@ -2,9 +2,11 @@
 
 - **Plano:** [SPRINT-032-saldo-acumulado-saldo-real-e-conferencia-por-conta-plan.md](./SPRINT-032-saldo-acumulado-saldo-real-e-conferencia-por-conta-plan.md)
 - **Data do relatório:** 2026-08-20
-- **Aprovado pelo CEO em:** _pendente_ — deploy feito na mesma sessão de execução (mesmo padrão da
-  Sprint 31, plano já continha o deploy como tarefa da própria sprint); aguardando validação do CEO
-  no app real e confirmação da mudança de valor do "Saldo Acumulado" total (ver achado abaixo).
+- **Aprovado pelo CEO em:** 2026-08-20 ("aprovado") — deploy feito na mesma sessão de execução
+  (mesmo padrão da Sprint 31, plano já continha o deploy como tarefa da própria sprint). Os itens
+  de pendência abaixo (confirmação do `saldo_inicial` da XP, validação visual no app, recategorizar
+  as 8 transações de Aporte/Resgate) seguem abertos como próximos passos, não bloqueiam a aprovação
+  da sprint em si.
 
 ## Resumo
 
