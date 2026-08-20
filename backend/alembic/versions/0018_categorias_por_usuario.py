@@ -138,6 +138,14 @@ def upgrade() -> None:
     op.create_index("ix_category_groups_user_id", "category_groups", ["user_id"])
     op.create_index("ix_subcategories_user_id", "subcategories", ["user_id"])
 
+    # Precisa cair antes do loop de clonagem: enquanto as linhas globais
+    # ainda existem (só são removidas depois de clonadas para todos os
+    # usuários), o índice único antigo em `nome` sozinho rejeitaria a cópia
+    # de cada usuário com IntegrityError (mesmo nome, dono diferente) — achado
+    # real ao aplicar contra a VM de dev, rollback automático do Postgres
+    # (transação da migration) confirmou que nenhum dado real foi tocado.
+    op.drop_index("ix_category_groups_nome", table_name="category_groups")
+
     grupos_globais = [
         (row.id, row.nome, row.excluir_de_totais)
         for row in bind.execute(
@@ -162,7 +170,6 @@ def upgrade() -> None:
     op.alter_column("category_groups", "user_id", nullable=False)
     op.alter_column("subcategories", "user_id", nullable=False)
 
-    op.drop_index("ix_category_groups_nome", table_name="category_groups")
     op.create_index("ix_category_groups_nome", "category_groups", ["nome"])
     op.create_unique_constraint(
         "uq_category_group_user_nome", "category_groups", ["user_id", "nome"]
