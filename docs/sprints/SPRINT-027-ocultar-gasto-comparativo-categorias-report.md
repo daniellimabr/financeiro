@@ -64,13 +64,16 @@ QA visual ao vivo (`check-sprint27.mjs`, contra dado real do CEO na VM de dev):
 done, sem erros de console, sem falhas de asserção
 ```
 
-Rodada final passou de primeira; 3 rodadas anteriores encontraram achados reais (ver "Decisões
-tomadas") antes de chegar limpa. Conferido nos screenshots `s27-01`/`s27-02`: card Despesa foi
-de R$ 8.221,30 pra R$ 8.075,75 ao ocultar 1 transação Amazon BR de R$ 145,55 (10 linhas
-idênticas na categoria "Compras / Eletrônicos" — dado real do CEO, recorrência de assinatura;
-8221,30 − 145,55 = 8075,75, confere), banner "Simulando sem 1 transação · Restaurar" visível,
-linha ocultada com valor riscado, e o gráfico "Comparativo por categoria" com 9 categorias
-reais renderizando sem sobrepor nenhum outro elemento da tela.
+Passou limpa nas asserções automatizadas desde a 2ª rodada (a 1ª e a 4ª/5ª rodadas encontraram
+achados reais de layout — ver "Decisões tomadas" — incluindo um que o QA automatizado não
+testava e só o próprio CEO notou ao vivo, corrigido e reconfirmado por nova rodada visual).
+Conferido nos screenshots `s27-01`/`s27-02`: card Despesa foi de R$ 8.221,30 pra R$ 8.075,75 ao
+ocultar 1 transação Amazon BR de R$ 145,55 (10 linhas idênticas na categoria "Compras /
+Eletrônicos" — dado real do CEO, recorrência de assinatura; 8221,30 − 145,55 = 8075,75,
+confere), banner "Simulando sem 1 transação · Restaurar" visível, linha ocultada com valor
+riscado, e o gráfico "Comparativo por categoria" com 9 categorias reais renderizando em legenda
+compacta (uma linha, chips lado a lado) sem sobrepor nem empurrar nenhum outro elemento da
+tela.
 
 ## Lint/formatter
 
@@ -136,6 +139,19 @@ $ ruff format --check     → 80 files already formatted (baseline)
   a correção definitiva foi tirar a legenda de dentro do Recharts inteiramente e renderizá-la
   como `<ul>/<li>` HTML normal logo abaixo do `ResponsiveContainer`, participando do fluxo do
   documento de verdade.
+- **A legenda HTML nova, por sua vez, ocupava quase metade da tela — achado ao vivo do próprio
+  CEO, não do QA automatizado** (o script testava bloqueio de clique, não espaço ocupado). Causa
+  raiz de duas camadas: (1) o reset genérico `li { padding; border-bottom }` do projeto não
+  estava sobrescrito em `.dash-chart-legend li`, corrigido; (2) a raiz real — um reset genérico
+  `ul { display:flex; flex-direction:column }` já existente no projeto declara `display` e
+  `flex-direction` juntos, mas `.dash-chart-legend` só redeclarava `display` (com
+  especificidade maior); o cascade resolve por propriedade, então `flex-direction:column` do
+  reset genérico continuava sendo a única declaração pra essa propriedade específica e vencia —
+  cada item da legenda empilhava um por linha, esticado a 100% da largura via
+  `align-items:stretch` no eixo cruzado (agora horizontal, por causa da direção errada).
+  Confirmado via `getComputedStyle` direto na VM de dev antes de identificar a causa.
+  `flex-direction: row` explícito em `.dash-chart-legend` resolveu — confirmado com nova rodada
+  de QA visual e screenshot comparado lado a lado com o CEO.
 
 ## Critérios de aceite do PRD — verificação item a item
 
@@ -163,10 +179,11 @@ $ ruff format --check     → 80 files already formatted (baseline)
 Sprint de porte médio-alto: 1 componente de ícone novo, 1 componente de gráfico novo, mudanças
 em 2 componentes existentes (`TransactionsTable`, `DashboardsPage`) com superfície de estado
 (Map + ajuste durante render), 3 testes de integração novos, mais uma revisão de escopo pedida
-ao vivo pelo CEO no meio da execução (cards do topo) e 4 ciclos completos de deploy (push → CI
-→ VM → QA) — 3 por achados reais em QA visual (2 no layout da legenda do gráfico novo, 1 num
-seletor ambíguo do próprio script). Nenhum achado exigiu nova rodada de planejamento, todos
-corrigidos dentro da mesma sessão de execução.
+ao vivo pelo CEO no meio da execução (cards do topo) e 6 ciclos completos de deploy (push → CI
+→ VM → QA) — 5 por achados reais de layout/QA (4 sucessivos no CSS da legenda do gráfico novo,
+até a causa raiz — um reset genérico `ul` do projeto — ser identificada; 1 num seletor ambíguo
+do próprio script), o último achado pelo próprio CEO ao vivo, não pelo script. Nenhum achado
+exigiu nova rodada de planejamento, todos corrigidos dentro da mesma sessão de execução.
 
 ## Pendências e próximos passos sugeridos
 
