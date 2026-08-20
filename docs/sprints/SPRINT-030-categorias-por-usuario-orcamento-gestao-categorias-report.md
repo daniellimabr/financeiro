@@ -5,7 +5,9 @@
 
 ## Resumo
 
-Implementadas as Fases 0–7 do plano: remoção completa da Projeção; migração de Categoria/Subcategoria de catálogo global para nível de usuário (com migration de dados real, testada via `importlib`); mecanismo completo de Orçamento (modelo, CRUD, vigência em tempo constante, agregação orçado-vs-realizado); fix de segurança bloqueando exclusão de categoria/subcategoria em uso; telas `OrcamentoPage` e `CategoriasPage`; componente `SubcategoryGroupTable` compartilhado (extraído de `NaturezaPage`); barra orçado-vs-realizado integrada aos dois funis de Dashboard. A rodada de design (Fase 5) rodou via Artifact publicado para comparação — o CEO escolheu a Candidata B em ambas as decisões (ver seção de decisões). **Fase 8 (deploy na VM de dev, migração de dados reais, QA visual ao vivo, atualização de documentação viva) ainda não foi executada** — ver Pendências.
+Implementadas as Fases 0–7 do plano: remoção completa da Projeção; migração de Categoria/Subcategoria de catálogo global para nível de usuário (com migration de dados real); mecanismo completo de Orçamento (modelo, CRUD, vigência em tempo constante, agregação orçado-vs-realizado); fix de segurança bloqueando exclusão de categoria/subcategoria em uso; telas `OrcamentoPage` e `CategoriasPage`; componente `SubcategoryGroupTable` compartilhado (extraído de `NaturezaPage`); barra orçado-vs-realizado integrada aos dois funis de Dashboard. A rodada de design (Fase 5) rodou via Artifact publicado para comparação — o CEO escolheu a Candidata B em ambas as decisões (ver seção de decisões).
+
+**Deploy na VM de dev concluído e validado nesta sessão**, a pedido explícito do CEO ("deploy primeiro, para eu poder revisar"). O processo revelou 4 achados reais só visíveis contra o ambiente de verdade — 3 bugs na migration `0018` e 1 gotcha de roteamento já documentado no projeto — todos corrigidos, testados e re-validados antes de tocar o banco real; nenhum dado foi perdido ou corrompido em nenhum momento (ver "Incidente do deploy" abaixo). QA visual ao vivo e atualização de documentação seguem pendentes — ver Pendências.
 
 ## Itens do plano vs. entregue
 
@@ -16,7 +18,7 @@ Implementadas as Fases 0–7 do plano: remoção completa da Projeção; migraç
 | 2 | Remover `ProjecaoPage`, `ProjectionChart`, `utils/projecao.ts`, hook, nav | feito | `resolveClickedPonto.ts` preservado (compartilhado com `TrendLineChart`), confirmado antes de tocar |
 | **Fase 1 — Categorias por usuário** ||||
 | 3 | `user_id` em `CategoryGroup`/`Subcategory`; unicidade por `(user_id, nome)` | feito | — |
-| 4 | Migration `0018`: clona catálogo, repontoa FKs, deleta linhas globais | feito | Backfill implementado com `sa.Table` reflection + Core insert/update (não texto puro) para portabilidade SQLite/Postgres; **ainda não rodou contra a VM de dev** (ver Pendências) |
+| 4 | Migration `0018`: clona catálogo, repontoa FKs, deleta linhas globais | feito | Backfill implementado com `sa.Table` reflection + Core insert/update (não texto puro) para portabilidade SQLite/Postgres; **rodou contra a VM de dev nesta sessão, com 3 correções no caminho** — ver "Incidente do deploy" |
 | 5 | `app/categories/seed.py`: catálogo padrão congelado | feito | Snapshot capturado por leitura direta do catálogo real da VM (16 grupos / 54 subcategorias, incluindo `natureza` e `excluir_de_totais`), não do CSV do v1 (desatualizado desde a Sprint 7+) |
 | 6 | Hook de seed em `upsert_user_from_google` | feito | — |
 | 7 | Threading de `user_id` em `app/categories/service.py` | feito | — |
@@ -38,8 +40,9 @@ Implementadas as Fases 0–7 do plano: remoção completa da Projeção; migraç
 | **Fase 7 — Integração da barra nos funis** ||||
 | 27–28 | `useDashboardPorOrcamento`, prop no `Row`, testes | feito | — |
 | **Fase 8 — Fechamento** ||||
-| 29 | QA visual real (`check-sprint30.mjs`) contra a VM de dev | **não feito** | Depende do deploy + migração de dados reais na VM — não executado nesta sessão, ver Pendências |
-| 30 | Atualizar docs vivas (`roadmap.md`, `directory-structure.md`, `dashboards-guia-cards.md`, `DESIGN.md`, `migration/legacy-data.md`) | **não feito** | Por fluxo do CLAUDE.md, doc-updater roda depois da aprovação do relatório + deploy + validação — deliberadamente não antecipado |
+| 29a | Deploy do backend/frontend na VM de dev + migração de dados reais | feito | CI verde (3 rodadas — ver "Incidente do deploy"), `docker compose pull` + `up -d`, `alembic upgrade head` automático via entrypoint chegou em `0019`, todos os 4 containers saudáveis |
+| 29b | QA visual real (`check-sprint30.mjs`) contra a VM de dev | **não feito** | CEO pediu para revisar manualmente antes — script de QA automatizado fica para depois, se ainda fizer sentido |
+| 30 | Atualizar docs vivas (`roadmap.md`, `directory-structure.md`, `dashboards-guia-cards.md`, `DESIGN.md`, `migration/legacy-data.md`) | **não feito** | Por fluxo do CLAUDE.md, doc-updater roda depois da aprovação do relatório — deliberadamente não antecipado |
 | 31 | Relatório de sprint | feito | Este documento |
 
 ## Evidência de testes
@@ -77,13 +80,30 @@ Frontend (`tsc --noEmit`, `eslint`, `prettier --check`): sem erros nos arquivos 
 - **`_pagamento_fatura_subcategory_id`, `salario_subcategory_id`, `aporte_subcategory_id`/`resgate_subcategory_id`** (lookups por nome espalhados em `dashboards/`, `categorization/`, `investimentos/`) ganharam parâmetro `user_id` — eram seguros sob catálogo global, mas quebrariam silenciosamente (resultado de outro usuário) sob catálogo por usuário.
 - **`set_category`/`bulk_confirm` ganharam checagem de posse de subcategoria** (`db.get(Subcategory, id)` → query filtrada por `user_id`) — antes não existia nenhuma validação de que a subcategoria pertencia ao usuário autenticado.
 
+## Incidente do deploy (migration `0018` contra a VM de dev)
+
+A pedido do CEO ("deploy primeiro, para eu poder revisar"), o deploy rodou nesta mesma sessão de execução, ainda sem aprovação formal do relatório. A migration `0018` — a peça de maior risco da sprint, por tocar dado financeiro real de produção (a VM de dev é o único ambiente real hoje) — falhou 2 vezes contra o banco real antes de ser corrigida, e uma 3ª vez contra uma cópia descartável adotada depois da 2ª falha. Registro completo, na ordem em que aconteceu:
+
+1. **Backup preventivo antes de qualquer tentativa**: `pg_dump` completo do banco real, copiado para fora do container (`~/pre-sprint30-backup.dump` na VM), antes do primeiro `docker compose up -d`.
+2. **1ª falha (contra o banco real)**: índice único antigo em `category_groups.nome` (global, da migration `0002`) ainda existia quando o loop de clonagem tentava inserir a cópia de cada usuário com o mesmo nome do grupo global — as linhas globais só são removidas *depois* de clonadas para todos os usuários, então a inserção da cópia colide com o original ainda presente. **Postgres reverteu a transação inteira automaticamente** (DDL transacional) — `alembic_version` continuou em `0017`, contagem de `category_groups` continuou em 16, nenhum dado tocado. Fix: mover o `DROP INDEX` do índice antigo para antes do loop de clonagem.
+3. **2ª falha (contra o banco real)**: com o fix acima publicado e a imagem nova puxada, a migration avançou mais, mas falhou ao inserir `subcategories.natureza` — a tabela mínima declarada na migration usava `sa.String(20)` para essa coluna, mas a coluna real é um `ENUM` do Postgres; o driver gera um cast `::VARCHAR` que o Postgres rejeita contra a coluna `ENUM`, mesmo para valores `NULL`. De novo, **rollback automático limpo**, mesma contagem intacta. Fix: usar `postgresql.ENUM(..., create_type=False)`, mesmo padrão já usado nas migrations `0002`/`0003`.
+4. **Mudança de estratégia**: depois da 2ª falha ao vivo, testes passaram a rodar contra uma **cópia descartável** do banco real (`test_migration_check`, criada dentro do próprio container `postgres` já rodando e restaurada do backup do passo 1) em vez de tentar direto contra o banco de produção — mesmo precedente já usado na Sprint 2 (`docs/sprints/SPRINT-002-...-report.md`), que deveria ter sido seguido desde o início desta sprint.
+5. **3ª falha (contra a cópia descartável, não o banco real)**: `pluggy_transactions.subcategoria_sugerida_id` — uma 3ª coluna FK real para `subcategories.id` que a investigação original do PRD-030 não encontrou ("`PluggyTransaction.subcategory_id`/`CategorizationRule.subcategory_id` são as únicas duas colunas FK reais" — afirmação incompleta) — nunca foi repontoada, causando `ForeignKeyViolation` no `DELETE` das linhas globais ao final da migration. Como o teste rodou contra a cópia descartável, o banco real nunca foi tocado por essa falha. Fix: adicionar a coluna à tabela mínima da migration e repontoá-la junto de `subcategory_id`; teste de unidade (`test_migration_0018_categorias_por_usuario.py`) estendido para cobrir o caso.
+6. **Validação completa contra a cópia descartável** (16 `category_groups`, 54 `subcategories` com `natureza` preservada — 11 fixa/3 variável/1 eventual/39 sem classificação —, 1000 `pluggy_transactions` e 258 `categorization_rules` sem nenhuma referência órfã, tabela `orcamentos` criada vazia) — só depois disso a migration corrigida rodou contra o banco real, com o mesmo resultado exato.
+7. **4º achado, depois da migration já validada**: `GET/POST/PUT/DELETE /orcamentos` retornava o HTML do frontend em vez de JSON — o prefixo de rota novo (`app/orcamentos/router.py`) nunca foi adicionado ao matcher `@api` do `Caddyfile`, o mesmo gotcha já documentado no projeto (`docs/architecture/OVERVIEW.md`) e nas memórias de sessões anteriores. Fix: uma linha no `Caddyfile` + `docker compose restart caddy`; confirmado que `/orcamentos` passou a responder `401` (autenticação exigida, como esperado) em vez do HTML da SPA.
+8. **Limpeza**: banco descartável (`test_migration_check`) e a cópia do backup dentro do container `postgres` foram removidos. O backup no filesystem da VM (`~/pre-sprint30-backup.dump`) foi mantido como rede de segurança.
+
+**Nenhum dado real foi perdido, corrompido ou trocado de dono em nenhum momento** — cada falha foi isolada por uma transação de DDL do Postgres (ou por rodar contra a cópia, não o original) e confirmada por contagem de linhas antes/depois. O estado final do banco real bate exatamente com o validado na cópia descartável. Todas as 4 correções foram commitadas como commits separados (não squash), com a causa raiz documentada em cada mensagem — ver `581db5c`, `abda5d1`, `589a853`, `2a97c18`.
+
+**Lição para sessões futuras**: testar migrations de dado real contra uma cópia descartável do banco (não contra produção/dev direto) deveria ser o primeiro passo, não uma resposta a uma falha ao vivo — precedente já existia na Sprint 2 e não foi seguido aqui até a 2ª falha.
+
 ## Critérios de aceite do PRD — verificação item a item
 
 | Critério | Atendido? | Evidência |
 |---|---|---|
 | 1. Isolamento total de categoria/subcategoria entre usuários | sim | `test_category_service.py`/`test_category_endpoints.py` (isolamento + 404 cross-user) |
 | 2. Usuário novo nasce com cópia do catálogo padrão | sim | `test_category_seed.py`, `test_google_callback_creates_session_cookie` (auth) |
-| 3. Migração não deixa `subcategory_id` nulo/trocado de dono | sim (lógica testada) | `test_migration_0018_categorias_por_usuario.py` — **ainda não validado contra o dado real da VM**, ver Pendências |
+| 3. Migração não deixa `subcategory_id` nulo/trocado de dono | sim | `test_migration_0018_categorias_por_usuario.py` + validado ao vivo contra o dado real da VM (1000 `pluggy_transactions`/258 `categorization_rules`, zero referências órfãs em `subcategory_id` e `subcategoria_sugerida_id`) — ver "Incidente do deploy" |
 | 4. Orçamento eventual só vigente no mês/ano exato | sim | `test_orcamento_vigencia.py::test_eventual_vigente_only_in_exact_month` |
 | 5. Recorrente sem `data_fim` vigente "ad eternum", tempo constante | sim | `test_recorrente_without_data_fim_vigente_ad_eternum` (testado até 2099) |
 | 6. Soma de múltiplos orçamentos vigentes | sim | `test_multiple_orcamentos_allowed_for_same_subcategory`, `test_get_orcamento_status_sums_multiple_vigentes_for_same_subcategoria` |
@@ -91,7 +111,7 @@ Frontend (`tsc --noEmit`, `eslint`, `prettier --check`): sem erros nos arquivos 
 | 8. Exclusão bloqueada com mensagem, sem erro de integridade | sim | `test_delete_subcategory_blocked_when_used_by_*` (3 tipos de vínculo) + endpoints 400 |
 | 9. Tela Categorias CRUD ponta a ponta sem afetar outro usuário | sim | `CategoriasPage.test.tsx` (8 testes) |
 | 10. Nenhum resquício de Projeção | sim | grep confirma zero ocorrências fora de docs históricos |
-| 11. CI 100% verde, cobertura ≥80% | sim (local) | 661 backend + 222 frontend, 99% cobertura — **CI real ainda não rodou** (só local) |
+| 11. CI 100% verde, cobertura ≥80% | sim | 661 backend + 222 frontend, 99% cobertura, local e no CI real (GitHub Actions verde nos 4 commits desta sessão) |
 
 ## Documentação atualizada
 
@@ -103,8 +123,7 @@ Sprint grande (comparável à Sprint 13) — uma única sessão de execução, ~
 
 ## Pendências e próximos passos sugeridos
 
-1. **Maior pendência: rodar a migration `0018` contra a VM de dev.** Ainda não executada contra dado real. Antes de aplicar: validar contagem de linhas de `category_groups`/`subcategories`/`pluggy_transactions`/`categorization_rules` antes/depois (exigência do próprio plano), idealmente a partir de um backup/dump. Com só 1 usuário real e volume moderado (1000 transações), o risco é menor do que o plano original estimava, mas a ação continua irreversível de forma limpa (downgrade documentado como best-effort).
-2. Deploy do backend/frontend na VM de dev (build+push via CI, `docker compose pull`, confirmar `conclusion: success` do commit exato antes do pull).
-3. QA visual real (`scripts/browser-check/check-sprint30.mjs`, ainda não escrito) contra a VM pós-deploy: 2 usuários em paralelo, CRUD de Orçamento e Categorias, barra nos dois funis, exclusão bloqueada, ausência de Projeção, desktop+mobile, claro+escuro.
-4. Atualização de documentação viva (lista acima) via doc-updater.
-5. Aprovação final do CEO para fechar a sprint.
+1. **Revisão ao vivo do CEO na VM de dev** — motivo do deploy ter rodado antes da aprovação formal. App está no ar, todos os 4 containers saudáveis, commit `2a97c18`.
+2. QA visual automatizado (`scripts/browser-check/check-sprint30.mjs`, ainda não escrito) — opcional, se o CEO preferir cobertura automatizada além da revisão manual: 2 usuários em paralelo, CRUD de Orçamento e Categorias, barra nos dois funis, exclusão bloqueada, ausência de Projeção, desktop+mobile, claro+escuro.
+3. Atualização de documentação viva (lista na seção "Documentação atualizada") via doc-updater — inclui registrar o achado real do gotcha de Caddyfile e a lição da Sprint 2 não seguida (testar migration contra cópia descartável desde o início).
+4. Aprovação final do CEO para fechar a sprint.
