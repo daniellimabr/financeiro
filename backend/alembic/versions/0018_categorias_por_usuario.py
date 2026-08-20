@@ -55,6 +55,7 @@ _pluggy_transactions = sa.Table(
     sa.Column("id", sa.Integer, primary_key=True),
     sa.Column("user_id", sa.Integer),
     sa.Column("subcategory_id", sa.Integer),
+    sa.Column("subcategoria_sugerida_id", sa.Integer),
 )
 
 _categorization_rules = sa.Table(
@@ -108,8 +109,9 @@ def _clone_catalog_for_user(
 
 
 def _repoint_references(conn, *, user_id: int, subcategoria_id_map: dict[int, int]) -> None:
-    """Repontoa subcategory_id de pluggy_transactions/categorization_rules
-    do usuário, da subcategoria global antiga para a cópia nova dele."""
+    """Repontoa subcategory_id/subcategoria_sugerida_id de
+    pluggy_transactions e subcategory_id de categorization_rules do
+    usuário, da subcategoria global antiga para a cópia nova dele."""
     for old_id, new_id in subcategoria_id_map.items():
         conn.execute(
             _pluggy_transactions.update()
@@ -118,6 +120,14 @@ def _repoint_references(conn, *, user_id: int, subcategoria_id_map: dict[int, in
                 _pluggy_transactions.c.subcategory_id == old_id,
             )
             .values(subcategory_id=new_id)
+        )
+        conn.execute(
+            _pluggy_transactions.update()
+            .where(
+                _pluggy_transactions.c.user_id == user_id,
+                _pluggy_transactions.c.subcategoria_sugerida_id == old_id,
+            )
+            .values(subcategoria_sugerida_id=new_id)
         )
         conn.execute(
             _categorization_rules.update()

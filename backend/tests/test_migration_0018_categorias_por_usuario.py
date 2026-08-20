@@ -143,6 +143,7 @@ def test_repoint_references_updates_transactions_and_rules_for_the_right_user_on
         data=date(2026, 1, 10),
         data_competencia=date(2026, 1, 10),
         subcategory_id=old_subcategory_id,
+        subcategoria_sugerida_id=old_subcategory_id,
         status=PluggyTransactionStatus.efetivada,
     )
     tx_other = PluggyTransaction(
@@ -155,6 +156,7 @@ def test_repoint_references_updates_transactions_and_rules_for_the_right_user_on
         data=date(2026, 1, 10),
         data_competencia=date(2026, 1, 10),
         subcategory_id=old_subcategory_id,
+        subcategoria_sugerida_id=old_subcategory_id,
         status=PluggyTransactionStatus.efetivada,
     )
     rule_user = CategorizationRule(
@@ -179,6 +181,8 @@ def test_repoint_references_updates_transactions_and_rules_for_the_right_user_on
     db_session.refresh(rule_user)
 
     assert tx_user.subcategory_id == new_subcategory_id_user
+    assert tx_user.subcategoria_sugerida_id == new_subcategory_id_user
     assert rule_user.subcategory_id == new_subcategory_id_user
     # transação de outro usuário nunca é tocada, mesmo referenciando o mesmo id antigo.
     assert tx_other.subcategory_id == old_subcategory_id
+    assert tx_other.subcategoria_sugerida_id == old_subcategory_id
