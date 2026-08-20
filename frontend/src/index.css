@@ -780,6 +780,30 @@ input {
   position: relative;
 }
 
+.dash-chart-legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  font-size: var(--text-xs);
+  color: var(--text);
+}
+
+.dash-chart-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.dash-chart-legend .swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: 0 0 auto;
+}
+
 /* Aviso de simulação ativa (Sprint 27) — some itens marcados como "ocultar
    gasto" no funil. Fica acima da lista de grupos, mesma cor de destaque do
    toggle ativo (.hide-toggle.active). */

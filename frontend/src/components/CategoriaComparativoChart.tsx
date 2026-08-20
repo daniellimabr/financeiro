@@ -1,4 +1,4 @@
-import { Area, AreaChart, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import type { PontoTendencia } from "../api/dashboards";
 import { formatCurrency } from "../utils/format";
@@ -59,15 +59,6 @@ export function CategoriaComparativoChart({ grupos }: { grupos: ComparativoGrupo
             }}
             labelStyle={{ color: "var(--text-h)" }}
           />
-          {/* wrapperStyle.position "static" (não o padrão "absolute" do
-              Recharts) — a legenda vira parte do fluxo normal do documento em
-              vez de um overlay sobreposto: com muitas categorias reais (a
-              suíte de teste local só usa 2, então isso nunca apareceu antes),
-              a legenda cresce mais alto que o container do gráfico e, como
-              overlay, alcançava e bloqueava cliques no botão "Fechar" do
-              funil acima — achado real em QA ao vivo (check-sprint27.mjs)
-              contra a VM de dev, não um bug do script. */}
-          <Legend wrapperStyle={{ fontSize: 12, position: "static" }} />
           {comparaveis.map((grupo) => (
             <Area
               key={grupo.group_id}
@@ -82,6 +73,22 @@ export function CategoriaComparativoChart({ grupos }: { grupos: ComparativoGrupo
           ))}
         </AreaChart>
       </ResponsiveContainer>
+      {/* Legenda em HTML puro, fora do Recharts — o <Legend> embutido do
+          Recharts usa position:absolute por padrão (não reserva espaço de
+          layout) e o ResponsiveContainer tem altura fixa (220px), então uma
+          legenda com muitas categorias reais (a fixture de teste local só
+          usa 2, por isso isso nunca apareceu antes) simplesmente ultrapassa
+          o rodapé do container sem empurrar o conteúdo abaixo — na prática
+          sobrepunha e bloqueava cliques em elementos do funil acima dela.
+          Achado real em QA ao vivo (check-sprint27.mjs) contra a VM de dev. */}
+      <ul className="dash-chart-legend">
+        {comparaveis.map((grupo) => (
+          <li key={grupo.group_id}>
+            <span className="swatch" style={{ background: grupo.color }} aria-hidden="true" />
+            {grupo.group_nome}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
