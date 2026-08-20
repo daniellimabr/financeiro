@@ -783,6 +783,17 @@ input {
 .dash-chart-legend {
   list-style: none;
   display: flex;
+  /* O reset genérico `ul { display:flex; flex-direction:column }` (só
+     define display, nunca flex-direction) faz o cascade herdar
+     flex-direction:column daquela regra pra qualquer <ul> que não a
+     sobrescreva — mesmo com display:flex redeclarado aqui com
+     especificidade maior, a propriedade flex-direction em si só tem uma
+     única declaração no CSS inteiro até esta linha, então "row" precisa
+     ser explícito. Sem isso os itens empilhavam um por linha, esticados
+     pra 100% da largura via align-items:stretch no eixo cruzado (agora
+     horizontal) — achado real do CEO ao vivo, legenda ocupando quase
+     metade da tela. */
+  flex-direction: row;
   flex-wrap: wrap;
   gap: var(--space-1) var(--space-3);
   margin: var(--space-2) 0 0;
