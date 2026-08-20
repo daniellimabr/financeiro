@@ -30,7 +30,7 @@ explícita do CEO a cada vez, nunca automática/agendada.
 
 | Última auditoria | Sprint de referência | Próxima checagem devida | Status |
 |---|---|---|---|
-| nenhuma ainda | — | Sprint 34 (30 + 4) | 2/5 sprints completadas (Sprint 30, Sprint 31); mecanismo criado na Sprint 29 |
+| nenhuma ainda | — | Sprint 34 (30 + 4) | 3/5 sprints completadas (Sprint 30, Sprint 31, Sprint 32); mecanismo criado na Sprint 29 |
 
 ## Sequência proposta (dependências)
 
@@ -1156,6 +1156,44 @@ PRD: [PRD-031-fix-desassociacao-vinculo-transacao.md](prd/PRD-031-fix-desassocia
 Plano: [SPRINT-031-fix-desassociacao-vinculo-transacao-plan.md](sprints/SPRINT-031-fix-desassociacao-vinculo-transacao-plan.md).
 Relatório: [SPRINT-031-fix-desassociacao-vinculo-transacao-report.md](sprints/SPRINT-031-fix-desassociacao-vinculo-transacao-report.md).
 **Sprint aprovada pelo CEO em 2026-08-20**, com validação real no app ("Deu certo a alteração, ja testei!").
+
+### Sprint 32 — Saldo Acumulado redefinido como saldo real por conta + conferência de categorização de investimentos (cross-epic, sem épico prévio)
+
+Sem sessão de `/plan` prévia — nasceu de uma auditoria manual do CEO (mês a mês, jan-mar/2026,
+contra os extratos reais do Itaú e do NuBank), mesmo padrão retroativo das Sprints 30/31. Achou 3
+causas reais de divergência: rendimentos automáticos do Itaú excluídos por engano (mesmo
+`categoria_pluggy` que a Pluggy usa pros proventos da XP), 8 transações de Aporte/Resgate
+categorizadas como "Transferência interna" (excluídas dos dashboards por engano), e a própria
+definição do card divergindo do que o CEO queria conferir ("quanto dinheiro eu tenho"). Decisão do
+CEO: Saldo Acumulado = saldo real por conta corrente, menos salário recebido no mês (competência do
+mês seguinte).
+
+`get_saldo_acumulado` (`app/dashboards/service.py`) reescrito — soma o saldo real de fim de mês
+(reaproveitando a lógica de `get_evolucao_saldo_por_conta`) de cada conta `tipo=corrente` com
+`saldo_inicial`, menos qualquer transação "Salário" com `data` no mês e `data_competencia` no mês
+seguinte (cobre múltiplas transações no mesmo mês, cenário real de abril: bônus + salário). Perde o
+parâmetro `regime` — não depende mais de competência/caixa, e o toggle correspondente some do card
+(confirmado via `AskUserQuestion`, já sinalizado como risco no PRD). Mecanismo de âncora/sentinela
+(Sprint 15) aposentado. Exclusão de proventos de investimento por `categoria_pluggy`
+(`INVESTIMENTO_PROVENTOS_CATEGORIAS_PLUGGY`, Sprint 22) revertida — em `_base_query` e na fila de
+Categorização — dividendo/JCP/rendimento (Itaú ou XP) volta a contar normalmente, decisão do CEO.
+Tabela de conferência nova no drill-down (`get_saldo_acumulado_conferencia`, `GET
+/dashboards/saldo-acumulado/conferencia`): Total (100%) + uma linha por conta corrente, 6 colunas,
+sempre visível (sem acordeão, pedido explícito). 672 testes backend (99% cobertura), 223 testes
+frontend, sem regressão.
+
+**Achado da validação ao vivo:** a soma Itaú+NuBank bate exata, ao centavo, com os valores já
+reconciliados no PRD (fev R$1.543,37, mar R$7.653,54) — confirma a fórmula. O total de 3 contas
+diverge (R$2.094,70/R$8.556,12) porque a conta XP já tem `saldo_inicial` configurado ao vivo
+(R$535,55, diferente do R$421,54 calculado na investigação) — dado que já estava no banco, não uma
+ação desta sessão. Pendente: CEO confirmar se esse valor está correto.
+
+PRD: [PRD-032-saldo-acumulado-saldo-real-e-conferencia-por-conta.md](prd/PRD-032-saldo-acumulado-saldo-real-e-conferencia-por-conta.md).
+Plano: [SPRINT-032-saldo-acumulado-saldo-real-e-conferencia-por-conta-plan.md](sprints/SPRINT-032-saldo-acumulado-saldo-real-e-conferencia-por-conta-plan.md).
+Relatório: [SPRINT-032-saldo-acumulado-saldo-real-e-conferencia-por-conta-report.md](sprints/SPRINT-032-saldo-acumulado-saldo-real-e-conferencia-por-conta-report.md).
+Commit `9bae0f4`, CI verde confirmado, deployado na VM de dev (`docker compose ps` reporta `api`
+`healthy`). **Aguardando aprovação do CEO** (validação real no app + confirmação do valor de
+`saldo_inicial` da XP).
 
 ## Registro de reavaliações futuras
 
