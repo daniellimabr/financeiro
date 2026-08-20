@@ -533,7 +533,7 @@ describe("DashboardsPage", () => {
     expect(await screen.findByText("5.6%")).toBeInTheDocument();
   });
 
-  it("'ocultar gasto' toggles a transaction out of the grupo/subcategoria totals, without a new network request, and top summary cards stay unchanged", async () => {
+  it("'ocultar gasto' toggles a transaction out of the grupo/subcategoria totals and the top Despesa/Saldo cards, without a new network request, while Ativos/Passivos/Patrimonio stay unchanged", async () => {
     const fetchMock = routedFetchMock();
     vi.stubGlobal("fetch", fetchMock);
 
@@ -547,6 +547,7 @@ describe("DashboardsPage", () => {
 
     expect(normalizedText(accordionRowButton(/Mercado/))).toContain("R$ 800,00");
     expect(normalizedText(accordionRowButton(/Alimentação/))).toContain("R$ 1.000,00");
+    expect(screen.getByText("R$ 5.120,30")).toBeInTheDocument();
 
     const callsBefore = fetchMock.mock.calls.length;
 
@@ -554,14 +555,20 @@ describe("DashboardsPage", () => {
       screen.getByRole("button", { name: "Ocultar transação Mercado São João (simulação)" })
     );
 
+    // 45.00 sai do total do grupo/subcategoria e do card "Despesa" do topo
+    // (5120.30 - 45 = 5075.30); "Saldo" sobe na mesma medida (receita fixa
+    // menos despesa menor); Ativos/Passivos/Patrimônio, que não vêm do
+    // mesmo período filtrado, ficam intocados. Tudo sem chamada de rede nova.
     await waitFor(() => {
       expect(normalizedText(accordionRowButton(/Mercado/))).toContain("R$ 755,00");
     });
     expect(normalizedText(accordionRowButton(/Alimentação/))).toContain("R$ 955,00");
+    expect(screen.getByText("R$ 5.075,30")).toBeInTheDocument();
+    expect(screen.getByText("R$ 3.324,70")).toBeInTheDocument();
+    expect(screen.getByText("R$ 151.200,00")).toBeInTheDocument();
+    expect(screen.getByText("R$ 7.200,00")).toBeInTheDocument();
+    expect(screen.getByText("R$ 142.800,00")).toBeInTheDocument();
     expect(fetchMock.mock.calls.length).toBe(callsBefore);
-
-    // Cards de resumo do topo (Despesa) não mudam com o item oculto.
-    expect(screen.getByText("R$ 5.120,30")).toBeInTheDocument();
 
     await userEvent.click(
       screen.getByRole("button", { name: "Reexibir transação Mercado São João" })
@@ -570,6 +577,7 @@ describe("DashboardsPage", () => {
       expect(normalizedText(accordionRowButton(/Mercado/))).toContain("R$ 800,00");
     });
     expect(normalizedText(accordionRowButton(/Alimentação/))).toContain("R$ 1.000,00");
+    expect(screen.getByText("R$ 5.120,30")).toBeInTheDocument();
   });
 
   it("resets 'ocultar gasto' state when the funil closes or the month filter changes", async () => {

@@ -85,12 +85,16 @@ Desde a Sprint 27, dentro do funil Despesa/Receita aberto no Dashboard:
   profundo do funil) tem um ícone de binóculo — clicar marca a transação como
   "oculta" e ela sai do total exibido no Row de grupo e de subcategoria (e do
   mini gráfico de tendência daquele Row, só no ponto do mês/ano atualmente
-  filtrado), sem chamada de rede nova. Escopo deliberadamente restrito ao
-  funil aberto: **os cards de resumo do topo (Saldo, Patrimônio, Saldo
-  Acumulado) nunca mudam** — vêm de agregações de backend separadas, não do
-  mesmo dado do funil. Estado 100% local/efêmero (mesmo padrão de
-  `applyHipoteticas` da tela Projeção, Sprint 14) — reseta sozinho ao fechar
-  o funil ou trocar o filtro de ano/mês, nunca persiste entre sessões.
+  filtrado), sem chamada de rede nova. Os cards **Receita/Despesa/Saldo** do
+  topo também recalculam ao vivo (mesmo dado do período filtrado, ajustado no
+  cliente) — pedido explícito do CEO ao ver o resultado em uso: sem isso não
+  dava pra visualizar o impacto real de uma linha oculta no total do mês.
+  **Patrimônio e Saldo Acumulado nunca mudam** — vêm de fórmulas sem relação
+  direta com "ocultar uma linha de gasto do mês" (patrimônio líquido, saldo
+  bancário acumulado), escopo mantido de fora deliberadamente. Estado 100%
+  local/efêmero (mesmo padrão de `applyHipoteticas` da tela Projeção, Sprint
+  14) — reseta sozinho ao fechar o funil ou trocar o filtro de ano/mês, nunca
+  persiste entre sessões.
 - **Gráfico comparativo por categoria:** ao abrir o funil Despesa ou Receita,
   aparece um gráfico de área empilhada com a composição de gasto por grupo
   de categoria ao longo dos últimos meses (mesma janela do seletor de

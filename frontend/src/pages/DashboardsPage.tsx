@@ -130,6 +130,75 @@ export function DashboardsPage() {
   const tendenciaQuery = useDashboardTendencia(ano, mes, periodoHistorico, regime);
   const saldoAcumuladoQuery = useDashboardSaldoAcumulado(ano, mes, periodoHistorico, regime);
 
+  // "Ocultar gasto" (Sprint 27, PRD-027) — estado 100% local/efêmero, mesmo
+  // padrão de applyHipoteticas (Sprint 14). Vive aqui (não dentro de
+  // GrupoAccordion) porque o CEO pediu, ao ver o resultado ao vivo, que os
+  // cards Receita/Despesa/Saldo do topo também reflitam a simulação — só
+  // esses 3 são derivados diretamente do período filtrado (soma/subtração
+  // simples); Patrimônio e Saldo Acumulado vêm de fórmulas sem relação
+  // direta com "ocultar uma linha de gasto do mês" e continuam intocados
+  // (decisão confirmada explicitamente ao reabrir o escopo original do
+  // PRD-027 durante a execução).
+  const [hiddenTxns, setHiddenTxns] = useState<
+    Map<number, { subcategoryId: number; valor: number }>
+  >(new Map());
+  // Reset ao trocar ano/mês via ajuste de estado durante a renderização
+  // (padrão recomendado pelo React pra "resetar estado quando uma prop
+  // muda") em vez de useEffect — evita o re-render em cascata de um
+  // setState síncrono dentro de efeito (react-hooks/set-state-in-effect).
+  const [ultimoFiltro, setUltimoFiltro] = useState({ ano, mes });
+  if (ultimoFiltro.ano !== ano || ultimoFiltro.mes !== mes) {
+    setUltimoFiltro({ ano, mes });
+    setHiddenTxns(new Map());
+  }
+
+  function toggleHidden(subcategoryId: number, transactionId: number, valor: number) {
+    setHiddenTxns((prev) => {
+      const next = new Map(prev);
+      if (next.has(transactionId)) next.delete(transactionId);
+      else next.set(transactionId, { subcategoryId, valor: Math.abs(valor) });
+      return next;
+    });
+  }
+
+  const hiddenIds = useMemo(() => new Set(hiddenTxns.keys()), [hiddenTxns]);
+
+  const hiddenSumBySubcategoria = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const { subcategoryId, valor } of hiddenTxns.values()) {
+      map.set(subcategoryId, (map.get(subcategoryId) ?? 0) + valor);
+    }
+    return map;
+  }, [hiddenTxns]);
+
+  const hiddenSumTotal = useMemo(
+    () => [...hiddenTxns.values()].reduce((sum, h) => sum + h.valor, 0),
+    [hiddenTxns]
+  );
+
+  // Só aplica a simulação ao card cujo funil está aberto — hiddenTxns só tem
+  // itens de despesa OU receita por vez (reseta ao trocar de funil, ver
+  // abrirFunil/fecharFunil abaixo), nunca os dois ao mesmo tempo.
+  const hiddenAplicaA = drill?.kind === "despesa" || drill?.kind === "receita" ? drill.kind : null;
+  const despesaAjustada =
+    summaryQuery.data &&
+    String(Number(summaryQuery.data.despesa) - (hiddenAplicaA === "despesa" ? hiddenSumTotal : 0));
+  const receitaAjustada =
+    summaryQuery.data &&
+    String(Number(summaryQuery.data.receita) - (hiddenAplicaA === "receita" ? hiddenSumTotal : 0));
+  // Saldo = Receita − Despesa: ocultar uma despesa aumenta o saldo, ocultar
+  // uma receita diminui — sinal oposto ao aplicado nos 2 cards acima.
+  const saldoAjustado =
+    summaryQuery.data &&
+    String(
+      Number(summaryQuery.data.saldo) +
+        (hiddenAplicaA === "despesa"
+          ? hiddenSumTotal
+          : hiddenAplicaA === "receita"
+            ? -hiddenSumTotal
+            : 0)
+    );
+
   // A série vem com um ponto a mais no início (ver useDashboardSaldoAcumulado)
   // — esse ponto extra é só o valor do "mês anterior", usado pelo card
   // "Saldo Anterior"; o restante (mesmo tamanho de periodoHistorico) alimenta
@@ -146,10 +215,12 @@ export function DashboardsPage() {
         ? null
         : { kind, expandedRows: [], expandedGrupos: [], expandedSubcategorias: [] }
     );
+    setHiddenTxns(new Map());
   }
 
   function fecharFunil() {
     setDrill(null);
+    setHiddenTxns(new Map());
   }
 
   function toggleRow(id: number) {
@@ -294,14 +365,15 @@ export function DashboardsPage() {
               onClick={() => abrirFunil("receita")}
             >
               <span className="k">Receita</span>
-              <span className="v receita">{formatCurrency(summaryQuery.data.receita)}</span>
+              <span className="v receita">{formatCurrency(receitaAjustada)}</span>
               <TrendLineChart
                 variant="spark"
-                pontos={tendenciaQuery.data?.map((p) => ({
-                  ano: p.ano,
-                  mes: p.mes,
-                  total: p.receita,
-                }))}
+                pontos={applyHiddenToTrend(
+                  tendenciaQuery.data?.map((p) => ({ ano: p.ano, mes: p.mes, total: p.receita })),
+                  ano,
+                  mes,
+                  hiddenAplicaA === "receita" ? hiddenSumTotal : 0
+                )}
                 color="var(--receita)"
                 onSelecionarMes={selecionarMes}
               />
@@ -312,14 +384,15 @@ export function DashboardsPage() {
               onClick={() => abrirFunil("despesa")}
             >
               <span className="k">Despesa</span>
-              <span className="v despesa">{formatCurrency(summaryQuery.data.despesa)}</span>
+              <span className="v despesa">{formatCurrency(despesaAjustada)}</span>
               <TrendLineChart
                 variant="spark"
-                pontos={tendenciaQuery.data?.map((p) => ({
-                  ano: p.ano,
-                  mes: p.mes,
-                  total: p.despesa,
-                }))}
+                pontos={applyHiddenToTrend(
+                  tendenciaQuery.data?.map((p) => ({ ano: p.ano, mes: p.mes, total: p.despesa })),
+                  ano,
+                  mes,
+                  hiddenAplicaA === "despesa" ? hiddenSumTotal : 0
+                )}
                 color="var(--despesa)"
                 onSelecionarMes={selecionarMes}
               />
@@ -330,14 +403,19 @@ export function DashboardsPage() {
               onClick={() => abrirFunil("saldo")}
             >
               <span className="k">Saldo</span>
-              <span className="v">{formatCurrency(summaryQuery.data.saldo)}</span>
+              <span className="v">{formatCurrency(saldoAjustado)}</span>
               <TrendLineChart
                 variant="spark"
-                pontos={tendenciaQuery.data?.map((p) => ({
-                  ano: p.ano,
-                  mes: p.mes,
-                  total: p.saldo,
-                }))}
+                pontos={applyHiddenToTrend(
+                  tendenciaQuery.data?.map((p) => ({ ano: p.ano, mes: p.mes, total: p.saldo })),
+                  ano,
+                  mes,
+                  hiddenAplicaA === "despesa"
+                    ? -hiddenSumTotal
+                    : hiddenAplicaA === "receita"
+                      ? hiddenSumTotal
+                      : 0
+                )}
                 color="var(--accent)"
                 onSelecionarMes={selecionarMes}
               />
@@ -397,6 +475,11 @@ export function DashboardsPage() {
               onToggleGrupo={toggleGrupo}
               onToggleSubcategoria={toggleSubcategoria}
               onSelecionarMes={selecionarMes}
+              hiddenCount={hiddenTxns.size}
+              hiddenIds={hiddenIds}
+              hiddenSumBySubcategoria={hiddenSumBySubcategoria}
+              onToggleHidden={toggleHidden}
+              onRestaurarTudo={() => setHiddenTxns(new Map())}
             />
           )}
 
@@ -664,6 +747,11 @@ function GrupoAccordion({
   onToggleGrupo,
   onToggleSubcategoria,
   onSelecionarMes,
+  hiddenCount,
+  hiddenIds,
+  hiddenSumBySubcategoria,
+  onToggleHidden,
+  onRestaurarTudo,
 }: {
   tipo: TransacaoTipo;
   filter: PeriodoFiltro;
@@ -674,6 +762,14 @@ function GrupoAccordion({
   onToggleGrupo: (id: number) => void;
   onToggleSubcategoria: (id: number) => void;
   onSelecionarMes: (ponto: { ano: number; mes: number }) => void;
+  // "Ocultar gasto" (Sprint 27) — estado vive em DashboardsPage (não aqui)
+  // porque os cards Receita/Despesa/Saldo do topo também precisam refletir
+  // a simulação, não só este funil.
+  hiddenCount: number;
+  hiddenIds: Set<number>;
+  hiddenSumBySubcategoria: Map<number, number>;
+  onToggleHidden: (subcategoryId: number, transactionId: number, valor: number) => void;
+  onRestaurarTudo: () => void;
 }) {
   const query = useDashboardByCategoria(tipo, { ...filter, regime });
   const tendenciaQuery = useDashboardCategoriaTendencia(
@@ -685,45 +781,6 @@ function GrupoAccordion({
   );
   const groupsQuery = useCategoryGroups();
   const subcategoriesQuery = useSubcategories();
-
-  // "Ocultar gasto" (Sprint 27, PRD-027) — estado 100% local/efêmero, mesmo
-  // padrão de applyHipoteticas (Sprint 14): Map<transactionId, {subcategoryId,
-  // valor}> em vez de só um Set de ids porque a soma exibida no Row de
-  // grupo/subcategoria precisa do valor sem esperar a TransactionsTable
-  // recarregar. Reseta sozinho ao fechar o funil (GrupoAccordion desmonta,
-  // ver DashboardsPage) e explicitamente ao trocar ano/mês abaixo (critério
-  // de aceite 3 do PRD).
-  const [hiddenTxns, setHiddenTxns] = useState<
-    Map<number, { subcategoryId: number; valor: number }>
-  >(new Map());
-  // Reset ao trocar ano/mês (critério de aceite 3 do PRD) via ajuste de
-  // estado durante a renderização (padrão recomendado pelo React pra
-  // "resetar estado quando uma prop muda") em vez de useEffect — evita o
-  // re-render em cascata de um setState síncrono dentro de efeito.
-  const [ultimoFiltro, setUltimoFiltro] = useState({ ano: filter.ano, mes: filter.mes });
-  if (ultimoFiltro.ano !== filter.ano || ultimoFiltro.mes !== filter.mes) {
-    setUltimoFiltro({ ano: filter.ano, mes: filter.mes });
-    setHiddenTxns(new Map());
-  }
-
-  function toggleHidden(subcategoryId: number, transactionId: number, valor: number) {
-    setHiddenTxns((prev) => {
-      const next = new Map(prev);
-      if (next.has(transactionId)) next.delete(transactionId);
-      else next.set(transactionId, { subcategoryId, valor: Math.abs(valor) });
-      return next;
-    });
-  }
-
-  const hiddenIds = useMemo(() => new Set(hiddenTxns.keys()), [hiddenTxns]);
-
-  const hiddenSumBySubcategoria = useMemo(() => {
-    const map = new Map<number, number>();
-    for (const { subcategoryId, valor } of hiddenTxns.values()) {
-      map.set(subcategoryId, (map.get(subcategoryId) ?? 0) + valor);
-    }
-    return map;
-  }, [hiddenTxns]);
 
   const groupColorIndex = useMemo(
     () => buildColorIndexFromIds((groupsQuery.data ?? []).map((g) => g.id)),
@@ -821,10 +878,10 @@ function GrupoAccordion({
           color: groupColorVar(grupo.group_id, groupColorIndex),
         }))}
       />
-      {hiddenTxns.size > 0 && (
+      {hiddenCount > 0 && (
         <p className="dash-hidden-summary">
-          Simulando sem {hiddenTxns.size} {hiddenTxns.size === 1 ? "transação" : "transações"}.
-          <button type="button" onClick={() => setHiddenTxns(new Map())}>
+          Simulando sem {hiddenCount} {hiddenCount === 1 ? "transação" : "transações"}.
+          <button type="button" onClick={onRestaurarTudo}>
             Restaurar
           </button>
         </p>
@@ -860,7 +917,7 @@ function GrupoAccordion({
                     onSelecionarMes={onSelecionarMes}
                     hiddenSumBySubcategoria={hiddenSumBySubcategoria}
                     hiddenIds={hiddenIds}
-                    onToggleHidden={toggleHidden}
+                    onToggleHidden={onToggleHidden}
                   />
                 </div>
               )}

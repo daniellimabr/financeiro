@@ -2,7 +2,8 @@
 
 - **Status:** executado (CEO, 2026-08-19). Substituído mais cedo no mesmo dia da aprovação da
   Sprint 26, antes de qualquer execução — o CEO reverteu essa decisão no mesmo dia e pediu a
-  execução do escopo original abaixo, sem alteração. Ver
+  execução do escopo abaixo, com uma revisão à decisão 1 feita ao vivo durante a execução (ver
+  nota na decisão 1). Ver
   [SPRINT-027-ocultar-gasto-comparativo-categorias-report.md](../sprints/SPRINT-027-ocultar-gasto-comparativo-categorias-report.md).
 - **Épico relacionado:** nenhum (cross-epic, 3ª de 3 sprints desta sessão de planejamento — ver
   PRD-025/PRD-026)
@@ -25,6 +26,16 @@ sprint são as mais novas do pedido, com mais decisões de produto em aberto:
    recalcular a tela inteira porque os cards de resumo vêm de endpoints agregados separados no
    backend, não do mesmo dado já carregado no funil — recalcular a tela inteira exigiria um
    parâmetro de exclusão threaded por vários endpoints, escopo bem maior.
+   >
+   > **Revisado ao vivo durante a execução (2026-08-19):** o CEO pediu que os cards **Receita**,
+   > **Despesa** e **Saldo** do topo também reflitam a simulação — sem isso não dava pra
+   > visualizar o impacto de uma linha oculta no total do mês. Esses 3 cards são derivados
+   > diretamente do mesmo período filtrado (soma/subtração simples, sem chamada de rede nova, só
+   > ajuste no cliente); **Patrimônio e Saldo Acumulado continuam intocados** — vêm de fórmulas
+   > (patrimônio líquido, saldo bancário acumulado) sem relação direta com "ocultar uma linha de
+   > gasto do mês", então incluí-los seria estranho conceitualmente, não só mais trabalho. Ver
+   > detalhe em
+   > [SPRINT-027-ocultar-gasto-comparativo-categorias-report.md](../sprints/SPRINT-027-ocultar-gasto-comparativo-categorias-report.md).
 2. **Persistência:** estado 100% local/efêmero, mesmo padrão de `applyHipoteticas` da tela
    Projeção (Sprint 14) — sem tabela nova, sem CRUD, reseta ao fechar o funil ou trocar filtro.
 3. **Gráfico comparativo de categorias:** aparece dentro do funil Despesa/Receita, ao ser aberto —
