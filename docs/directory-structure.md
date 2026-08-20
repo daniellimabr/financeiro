@@ -15,7 +15,7 @@ Financeiro v3/
 ├── Caddyfile                       # configuração Caddy reverse-proxy (Sprint 1)
 ├── .claude/
 │   ├── settings.json               # plugins habilitados no projeto (Ponytail)
-│   ├── agents/                     # 5 agentes do ECC copiados seletivamente (ver ADR-002)
+│   ├── agents/                     # 5 agentes do ECC copiados seletivamente (ver ADR-002); +structural-auditor.md, planner.md estendido com checagem de DESIGN.md e sugestão de feature sob demanda (Sprint 29, ver ADR-003)
 │   └── skills/
 │       ├── tdd-workflow/           # skill do ECC copiada seletivamente
 │       └── impeccable/             # skill completa do plugin Impeccable
@@ -24,7 +24,9 @@ Financeiro v3/
 │   │   ├── OVERVIEW.md             # arquitetura/infra/lógica — atualizado com VM de dev e Docker Compose (Sprint 1)
 │   │   └── adr/
 │   │       ├── ADR-001-stack.md    # stack aprovada em 2026-08-03
-│   │       └── ADR-002-plugins.md  # plugins ativados/desativados e por quê
+│   │       ├── ADR-002-plugins.md  # plugins ativados/desativados e por quê
+│   │       └── ADR-003-agentes-coerencia-design-auditoria-estrutural.md  # Sprint 29 — planner.md estendido com DESIGN.md, novo agente structural-auditor
+│   ├── audits/                     # relatórios de auditoria estrutural (docs/audits/AUDIT-NNN-AAAA-MM.md); vazio até a primeira execução real (Sprint 34 ou quando priorizado, ver roadmap.md § Auditoria estrutural) — mecanismo criado na Sprint 29
 │   ├── prd/
 │   │   ├── PRD-001-fundacao-tecnica.md  # Sprint 1 — VM de dev, auth Google, testes e CI
 │   │   ├── PRD-002-dados-mestres-migracao-legado.md  # Sprint 2 — categorias/ativos/passivos + import
@@ -44,7 +46,10 @@ Financeiro v3/
 │   │   ├── PRD-016-regime-competencia-caixa-patrimonio.md  # Sprint 16 — toggle Competência/Caixa, data_caixa, Patrimônio via Saldo Acumulado (cross-epic, sem épico prévio)
 │   │   ├── PRD-017-filtro-conta-validacao-extrato.md  # Sprint 17 — filtro de conta em Categorizar + reconciliação contra extrato real (cross-epic, sem épico prévio)
 │   │   ├── PRD-018-edicao-data-saldo-acumulado-guia-cards.md  # Sprint 18 — edição manual de data em Categorizar, investigação de Saldo Acumulado, guia dos cards (cross-epic, sem épico prévio)
-│   │   └── PRD-019-gestao-de-investimentos.md  # Sprint 19 — modelo Investimento, categorização de Aporte/Resgate, InvestimentosPage; Bloco 3 investigação (cross-epic, sem épico prévio)
+│   │   ├── PRD-019-gestao-de-investimentos.md  # Sprint 19 — modelo Investimento, categorização de Aporte/Resgate, InvestimentosPage; Bloco 3 investigação (cross-epic, sem épico prévio)
+│   │   │   # (lista não atualizada desde a Sprint 19 — PRDs 020-028 existem em docs/prd/ mas não estão
+│   │   │   #  registrados aqui; candidato a achado da primeira auditoria estrutural, ver ADR-003)
+│   │   └── PRD-029-agentes-coerencia-design-auditoria-estrutural.md  # Sprint 29 — planner.md + DESIGN.md, novo agente structural-auditor, cadência de auditoria (cross-epic, sem épico prévio)
 │   ├── sprints/
 │   │   ├── SPRINT-001-fundacao-tecnica-plan.md       # Plano Sprint 1 (2026-08-04)
 │   │   ├── SPRINT-001-fundacao-tecnica-report.md     # Relatório Sprint 1 (2026-08-04)
@@ -82,7 +87,10 @@ Financeiro v3/
 │   │   ├── SPRINT-018-edicao-data-saldo-acumulado-guia-cards-plan.md  # Plano Sprint 18 (2026-08-17)
 │   │   ├── SPRINT-018-edicao-data-saldo-acumulado-guia-cards-report.md  # Relatório Sprint 18 (2026-08-17)
 │   │   ├── SPRINT-019-gestao-de-investimentos-plan.md  # Plano Sprint 19 (2026-08-17)
-│   │   └── SPRINT-019-gestao-de-investimentos-report.md  # Relatório Sprint 19 (2026-08-17)
+│   │   ├── SPRINT-019-gestao-de-investimentos-report.md  # Relatório Sprint 19 (2026-08-17)
+│   │   │   # (lista não atualizada desde a Sprint 19 — planos/relatórios 020-028 existem em docs/sprints/
+│   │   │   #  mas não estão registrados aqui; candidato a achado da primeira auditoria estrutural)
+│   │   └── SPRINT-029-agentes-coerencia-design-auditoria-estrutural-plan.md  # Plano Sprint 29 (2026-08-19)
 │   ├── roadmap.md                  # épicos + sprints
 │   ├── directory-structure.md      # este arquivo — atualizado em Sprint 9
 │   ├── infra/
@@ -93,8 +101,9 @@ Financeiro v3/
 ├── templates/
 │   ├── PRD-template.md
 │   ├── ADR-template.md
-│   ├── SPRINT-plan-template.md
-│   └── SPRINT-report-template.md
+│   ├── SPRINT-plan-template.md     # +seção condicional "Coerência de Design (DESIGN.md)" (Sprint 29)
+│   ├── SPRINT-report-template.md
+│   └── AUDIT-template.md           # relatório de auditoria estrutural (Sprint 29, ver ADR-003)
 ├── backend/                        # FastAPI + SQLAlchemy 2.0 + Alembic (Sprint 1)
 │   ├── pyproject.toml              # dependências backend (FastAPI, SQLAlchemy, pytest, etc)
 │   ├── app/

@@ -18,6 +18,18 @@ Fases em épicos, derivados do escopo funcional do bootstrap. PRDs individuais s
 
 Backlog futuro (não desenhar agora): sync Pluggy agendada, otimização para comercialização/escala >10 usuários, reavaliação do plugin Understand Anything quando o codebase passar de ~100 arquivos.
 
+## Auditoria estrutural (cadência)
+
+O CTO propõe rodar `structural-auditor` ([ADR-003](architecture/adr/ADR-003-agentes-coerencia-design-auditoria-estrutural.md))
+a cada 5 sprints executadas e aprovadas (sprints substituídas antes da execução, como a 27, não
+contam). A checagem é proativa — o CTO verifica esta tabela ao final de cada sprint / início de cada
+novo planejamento — mas a execução em si só acontece com aprovação explícita do CEO a cada vez, nunca
+automática/agendada.
+
+| Última auditoria | Sprint de referência | Próxima checagem devida | Status |
+|---|---|---|---|
+| nenhuma ainda | — | Sprint 34 (29 + 5) | mecanismo criado na Sprint 29 |
+
 ## Sequência proposta (dependências)
 
 E1 → E8 (import pode rodar assim que houver schema) → E4 (categorias/ativos precisam existir antes de transações reais) → E2 (Pluggy) → E3 (categorização depende de transações existirem) → E5 → E6 → E7 (pode ser paralelo a qualquer ponto após E1).
@@ -1030,8 +1042,25 @@ Acumulado" do Dashboard não muda, só sai de dentro da fórmula de Patrimônio.
 
 PRD: [PRD-028-ativos-saldo-conta-corrente-patrimonio-redesenhado.md](prd/PRD-028-ativos-saldo-conta-corrente-patrimonio-redesenhado.md).
 Plano: [SPRINT-028-ativos-saldo-conta-corrente-patrimonio-redesenhado-plan.md](sprints/SPRINT-028-ativos-saldo-conta-corrente-patrimonio-redesenhado-plan.md).
-Relatório: [SPRINT-028-ativos-saldo-conta-corrente-patrimonio-redesenhado-report.md](sprints/SPRINT-028-ativos-saldo-conta-corrente-patrimonio-redesenhado-report.md).
-**Sprint aprovada pelo CEO em 2026-08-19.**
+
+### Sprint 29 — Coerência de design no planejamento + auditoria estrutural recorrente (cross-epic, sem épico prévio)
+
+Planejada em sessão própria (2026-08-19), a partir do pedido do CEO para automatizar dois pontos que
+vinham sendo repetitivos: (1) checar planos de UI contra `DESIGN.md` antes da implementação, para que
+a primeira versão de cada funcionalidade já nasça alinhada aos padrões vigentes — reduzindo o ciclo de
+feedback de ajuste visual que gerou retrabalho real nas Sprints 13 (3 dialetos de tabela) e 26 (3
+componentes de gráfico de linha); e (2) uma auditoria estrutural periódica (dívida técnica, docs,
+segurança, cobertura de testes) que gere sprint de débito técnico quando aprovada. `DESIGN.md`,
+já maduro e ativamente mantido, foi reutilizado como fonte única de padrões em vez de um novo
+documento. A checagem de coerência de design foi embutida em `planner.md` (não um agente dedicado,
+já que `planner`/`architect` não têm a tool `Task` para delegar). A auditoria estrutural ganhou um
+agente novo, só-leitura (`structural-auditor`), com cadência proposta pelo CTO a cada 5 sprints
+aprovadas (ver seção "Auditoria estrutural (cadência)" acima) — nunca automática, sempre com
+aprovação explícita do CEO por execução. Sugestão de feature sob demanda também ficou embutida em
+`planner.md`, disparada só quando pedida explicitamente.
+
+PRD: [PRD-029-agentes-coerencia-design-auditoria-estrutural.md](prd/PRD-029-agentes-coerencia-design-auditoria-estrutural.md).
+Plano: [SPRINT-029-agentes-coerencia-design-auditoria-estrutural-plan.md](sprints/SPRINT-029-agentes-coerencia-design-auditoria-estrutural-plan.md).
 
 ## Registro de reavaliações futuras
 

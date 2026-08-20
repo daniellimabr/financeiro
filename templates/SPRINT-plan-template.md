@@ -14,6 +14,14 @@ Uma frase: o que muda para o usuário ao final.
 | 1 | ... | Sonnet: implementação | {doc relevante} |
 | 2 | ... | Haiku: doc-updater | {doc relevante} |
 
+## Coerência de Design (DESIGN.md)
+
+*Omitir esta seção inteira se a sprint não tocar UI/frontend.*
+
+- Componentes/tokens/regras nomeadas reaproveitados: ...
+- Padrões novos propostos (se houver) + justificativa de por que nada existente serve: ...
+- Regras nomeadas aplicáveis (ex.: The One Meaning Rule, The Flat Ledger Rule): ...
+
 ## Testes previstos
 
 Unitários: quais regras de negócio. Integração: quais endpoints.

@@ -770,6 +770,16 @@ input {
   width: 100%;
 }
 
+/* CategoriaComparativoChart (Sprint 27) — primeiro gráfico do projeto a usar
+   <Legend> do Recharts, que posiciona o wrapper com position:absolute por
+   padrão. Sem um container posicionado, esse absolute escapava pro ancestral
+   posicionado mais próximo (achado real em QA ao vivo: a legenda sobrepunha
+   o botão "Fechar" do funil, interceptando o clique) — position:relative
+   aqui contém a legenda dentro do próprio card do gráfico. */
+.dash-chart-comparativo {
+  position: relative;
+}
+
 /* Aviso de simulação ativa (Sprint 27) — some itens marcados como "ocultar
    gasto" no funil. Fica acima da lista de grupos, mesma cor de destaque do
    toggle ativo (.hide-toggle.active). */

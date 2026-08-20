@@ -18,6 +18,7 @@ CEO: idealiza, aprova planos, valida entregas. CTO (Claude Code): planeja, arqui
 | O que cada card do Dashboard soma/exclui | [docs/dashboards-guia-cards.md](docs/dashboards-guia-cards.md) |
 | Procedimento de SSH para a VM | [docs/infra/ssh-workflow.md](docs/infra/ssh-workflow.md) |
 | Formato de import do v1 (categorias + memória) | [docs/migration/legacy-data.md](docs/migration/legacy-data.md) |
+| Relatórios de auditoria estrutural (código/docs/segurança) | [docs/audits/](docs/audits/) |
 
 ## Decisões fixas (não reabrir sem pedido explícito do CEO)
 
@@ -33,6 +34,7 @@ CEO: idealiza, aprova planos, valida entregas. CTO (Claude Code): planeja, arqui
 | Memória compartilhada | Opt-in por usuário; só mapeamento descrição→categoria, nunca valores/descrições brutas de transação |
 | Modelos | Sonnet: planejamento/arquitetura/implementação/revisão. Haiku: docs, commits, Graphify, formatação |
 | Reaproveitamento do v1 | Só categorias/subcategorias + memória de classificação (dados, não código) |
+| Auditoria estrutural | CTO propõe rodar `structural-auditor` a cada 5 sprints executadas/aprovadas (rastreado em [docs/roadmap.md](docs/roadmap.md)); execução só com aprovação explícita do CEO a cada vez — nunca automática/agendada (ADR-003) |
 
 Stack de backend/frontend/DB/ORM/deploy: ver [ADR-001](docs/architecture/adr/ADR-001-stack.md) — aprovado em 2026-08-03.
 
@@ -44,7 +46,7 @@ Stack de backend/frontend/DB/ORM/deploy: ver [ADR-001](docs/architecture/adr/ADR
 
 ## Fluxo por sprint
 
-Input do CEO → `/plan` (PRD + plano de sprint) → aprovação → execução em sessão nova (`/clear`) → relatório pós-execução → aprovação → deploy na VM → validação → doc-updater atualiza documentação viva.
+Input do CEO → checagem da cadência de auditoria estrutural ([docs/roadmap.md](docs/roadmap.md) § Auditoria estrutural) → `/plan` (PRD + plano de sprint; checagem de coerência com [DESIGN.md](DESIGN.md) quando a sprint tocar UI) → aprovação → execução em sessão nova (`/clear`) → relatório pós-execução → aprovação → deploy na VM → validação → doc-updater atualiza documentação viva (incl. contador de sprints desde a última auditoria estrutural).
 
 ## Definition of Done
 
