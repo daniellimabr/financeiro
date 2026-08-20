@@ -12,6 +12,7 @@ Create Date: 2026-08-20
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
@@ -34,6 +35,10 @@ _category_groups = sa.Table(
     sa.Column("excluir_de_totais", sa.Boolean),
 )
 
+_natureza_enum_no_create = postgresql.ENUM(
+    "fixa", "variavel", "eventual", name="natureza", create_type=False
+)
+
 _subcategories = sa.Table(
     "subcategories",
     _metadata,
@@ -41,7 +46,7 @@ _subcategories = sa.Table(
     sa.Column("user_id", sa.Integer),
     sa.Column("group_id", sa.Integer),
     sa.Column("nome", sa.String(255)),
-    sa.Column("natureza", sa.String(20)),
+    sa.Column("natureza", _natureza_enum_no_create),
 )
 
 _pluggy_transactions = sa.Table(
