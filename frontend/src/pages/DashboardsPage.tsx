@@ -44,7 +44,7 @@ import {
 } from "../api/dashboards";
 import type { PluggyInvestment } from "../api/pluggy";
 import { CategoriaComparativoChart } from "../components/CategoriaComparativoChart";
-import { chartCursorProps, ChartTooltip } from "../components/ChartTooltip";
+import { chartCursorProps } from "../components/ChartTooltip";
 import { KpiTile } from "../components/KpiTile";
 import type { KpiDelta } from "../components/KpiTile";
 import { RegimeToggle } from "../components/RegimeToggle";
@@ -509,8 +509,9 @@ export function DashboardsPage() {
       </div>
 
       {tendenciaQuery.data && tendenciaQuery.data.length > 1 && (
-        <ReceitaDespesaComparativo
+        <ReceitaDespesaSaldoChart
           pontos={tendenciaQuery.data}
+          saldoAcumulado={saldoAcumuladoSparkline}
           periodoHistorico={periodoHistorico}
         />
       )}
@@ -690,84 +691,132 @@ function MonthNav({
   );
 }
 
-// Comparativo Receita vs. Despesa em pequenos múltiplos (Sprint 34) — duas
-// séries com o MESMO domínio Y (computeSharedDomain sobre as duas juntas,
-// nunca cada uma normalizada no seu próprio mínimo/máximo — comparação
-// visual real, não só formato). Tooltip/crosshair via ChartTooltip.tsx.
-function ReceitaDespesaComparativo({
+interface ComparativoTooltipEntry {
+  name?: string;
+  value?: number;
+  color?: string;
+  dataKey?: string;
+}
+
+// Tooltip do gráfico combinado abaixo — mostra os 3 valores do mês
+// simultaneamente (mês + Receita + Despesa + Saldo Acumulado), diferente de
+// ChartTooltip.tsx (que mostra um valor só, reservado pra gráficos de série
+// única — segue disponível pras próximas telas do épico E10).
+function ComparativoTooltipContent({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: ComparativoTooltipEntry[];
+  label?: string;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  return (
+    <div className="ac-chart-tooltip ac-chart-tooltip-multi">
+      <div className="ac-chart-tooltip-month">{label}</div>
+      {payload.map((entry) => (
+        <div key={entry.dataKey} className="ac-chart-tooltip-row">
+          <span
+            className="ac-chart-tooltip-dot"
+            style={{ background: entry.color }}
+            aria-hidden="true"
+          />
+          {entry.name}
+          <strong>{formatCurrency(entry.value ?? 0)}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Receita, Despesa e Saldo Acumulado sobrepostos num único gráfico (Sprint
+// 34, decisão do CEO durante a execução — reabre a rejeição original do
+// PRD-034 a um "gráfico de eixo duplo": as 3 séries são valores monetários
+// na MESMA unidade/escala, não grandezas diferentes, então sobrepor não cria
+// o problema de eixo duplo que o PRD queria evitar). Domínio Y compartilhado
+// entre as 3 séries via computeSharedDomain, igual ao critério de escala
+// compartilhada que já valia pros pequenos múltiplos que este gráfico
+// substituiu.
+function ReceitaDespesaSaldoChart({
   pontos,
+  saldoAcumulado,
   periodoHistorico,
 }: {
   pontos: TendenciaMes[];
+  saldoAcumulado: PontoTendencia[] | undefined;
   periodoHistorico: PeriodoHistorico;
 }) {
-  const receitaData = pontos.map((p) => ({
+  // saldoAcumuladoSparkline (ver DashboardsPage) tem a mesma janela de meses
+  // que tendenciaQuery.data — mesmo periodoHistorico — então os dois arrays
+  // alinham por índice; length diferente (dado ainda carregando, ou período
+  // sem nenhuma conta com saldo inicial) só omite a 3ª linha.
+  const temSaldoAcumulado = saldoAcumulado !== undefined && saldoAcumulado.length === pontos.length;
+
+  const data = pontos.map((p, i) => ({
     label: `${String(p.mes).padStart(2, "0")}/${p.ano}`,
-    ano: p.ano,
-    mes: p.mes,
-    total: Number(p.receita),
+    Receita: Number(p.receita),
+    Despesa: Number(p.despesa),
+    ...(temSaldoAcumulado ? { "Saldo Acumulado": Number(saldoAcumulado[i].total) } : {}),
   }));
-  const despesaData = pontos.map((p) => ({
-    label: `${String(p.mes).padStart(2, "0")}/${p.ano}`,
-    ano: p.ano,
-    mes: p.mes,
-    total: Number(p.despesa),
-  }));
-  const domain = computeSharedDomain([
-    receitaData.map((d) => d.total),
-    despesaData.map((d) => d.total),
-  ]);
+
+  const series = [data.map((d) => d.Receita), data.map((d) => d.Despesa)];
+  if (temSaldoAcumulado) series.push(data.map((d) => d["Saldo Acumulado"] as number));
+  const domain = computeSharedDomain(series);
+
+  const linhas: { key: string; color: string }[] = [
+    { key: "Receita", color: "var(--ac-good)" },
+    { key: "Despesa", color: "var(--ac-bad)" },
+    ...(temSaldoAcumulado ? [{ key: "Saldo Acumulado", color: "var(--ac-blue)" }] : []),
+  ];
 
   return (
     <div className="ac-panel">
       <div className="ac-panel-head">
         <div>
-          <h2>Receita vs. despesa — {periodoHistorico} meses</h2>
+          <h2>Receita, despesa e saldo acumulado — {periodoHistorico} meses</h2>
           <div className="ac-panel-meta">
-            Duas séries na mesma escala, sem eixo duplo. Passe o mouse pra ver cada mês.
+            Mesma escala, um só gráfico. Passe o mouse pra ver os valores de cada mês.
           </div>
         </div>
       </div>
-      <div className="ac-sm-grid">
-        <div>
-          <div className="ac-sm-chart-label">Receita</div>
-          <ResponsiveContainer width="100%" height={100}>
-            <LineChart data={receitaData} margin={{ top: 8, right: 8, bottom: 4, left: 4 }}>
-              <XAxis dataKey="label" hide />
-              <YAxis domain={domain} hide />
-              <Tooltip content={<ChartTooltip />} cursor={chartCursorProps} />
-              <Line
-                type="monotone"
-                dataKey="total"
-                stroke="var(--ac-good)"
-                strokeWidth={2.2}
-                dot={false}
-                activeDot={{ r: 4.5 }}
-                isAnimationActive={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-        <div>
-          <div className="ac-sm-chart-label">Despesa</div>
-          <ResponsiveContainer width="100%" height={100}>
-            <LineChart data={despesaData} margin={{ top: 8, right: 8, bottom: 4, left: 4 }}>
-              <XAxis dataKey="label" hide />
-              <YAxis domain={domain} hide />
-              <Tooltip content={<ChartTooltip />} cursor={chartCursorProps} />
-              <Line
-                type="monotone"
-                dataKey="total"
-                stroke="var(--ac-bad)"
-                strokeWidth={2.2}
-                dot={false}
-                activeDot={{ r: 4.5 }}
-                isAnimationActive={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+      <ResponsiveContainer width="100%" height={240}>
+        <LineChart data={data} margin={{ top: 8, right: 16, bottom: 4, left: 4 }}>
+          <XAxis
+            dataKey="label"
+            tick={{ fontSize: 11, fill: "var(--ac-text-dim)" }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis domain={domain} hide />
+          <Tooltip content={<ComparativoTooltipContent />} cursor={chartCursorProps} />
+          {linhas.map((linha) => (
+            <Line
+              key={linha.key}
+              type="monotone"
+              dataKey={linha.key}
+              name={linha.key}
+              stroke={linha.color}
+              strokeWidth={2.2}
+              dot={false}
+              activeDot={{ r: 4.5 }}
+              isAnimationActive={false}
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+      <ul className="ac-chart-legend">
+        {linhas.map((linha) => (
+          <li key={linha.key}>
+            <span
+              className="ac-chart-legend-swatch"
+              style={{ background: linha.color }}
+              aria-hidden="true"
+            />
+            {linha.key}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

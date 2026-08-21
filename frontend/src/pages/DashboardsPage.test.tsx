@@ -770,6 +770,25 @@ describe("DashboardsPage", () => {
     });
   });
 
+  it("shows Receita, Despesa and Saldo Acumulado overlaid in one chart with a 3-item legend", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Receita, despesa e saldo acumulado — 6 meses",
+      })
+    ).toBeInTheDocument();
+    // Um só <ul> de legenda pro gráfico combinado — não 2 painéis separados
+    // como na versão anterior (pequenos múltiplos).
+    const legend = document.querySelector(".ac-chart-legend") as HTMLElement;
+    expect(within(legend).getByText("Receita")).toBeInTheDocument();
+    expect(within(legend).getByText("Despesa")).toBeInTheDocument();
+    expect(within(legend).getByText("Saldo Acumulado")).toBeInTheDocument();
+  });
+
   it("shows a 'comparativo por categoria' chart inside the Despesa/Receita funil", async () => {
     vi.stubGlobal("fetch", routedFetchMock());
 
@@ -1333,7 +1352,10 @@ describe("DashboardsPage", () => {
     renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
 
-    await userEvent.click(screen.getByText("Saldo Acumulado"));
+    // "Saldo Acumulado" também aparece na legenda do gráfico combinado
+    // (Sprint 34) — escopa a busca ao label do KPI, dentro de .ac-kpi-row.
+    const kpiRow = document.querySelector(".ac-kpi-row") as HTMLElement;
+    await userEvent.click(within(kpiRow).getByText("Saldo Acumulado"));
 
     expect(await screen.findByRole("heading", { name: "Saldo Acumulado" })).toBeInTheDocument();
   });
