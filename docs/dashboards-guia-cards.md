@@ -51,12 +51,15 @@ rendimento de CDB embutido em conta corrente, dividendo/JCP de corretora) já
 contam normalmente, sem exclusão por `categoria_pluggy` — são dinheiro real
 que entrou ou saiu da conta.
 
-O drill-down mostra uma tabela de conferência sempre visível (sem acordeão):
-uma linha "Total em Conta Corrente (100%)" + uma linha por conta corrente,
-com as colunas Saldo início do mês, Receitas, Despesas, Saldo fim do mês,
-Salário recebido e Saldo efetivo (= Saldo fim − Salário recebido) — pensada
-para conferência manual contra o extrato do banco, mês a mês, sem precisar
-de SSH/consulta direta ao banco.
+Uma tabela de conferência fica sempre visível na tela (painel "Conciliação",
+acima do drill-down — nenhum clique necessário, desde a Sprint 34): uma linha
+"Total em Conta Corrente (100%)" + uma linha por conta corrente, com as
+colunas Saldo início do mês, Receitas, Despesas, Saldo fim do mês, Salário
+recebido e Saldo efetivo (= Saldo fim − Salário recebido) — pensada para
+conferência manual contra o extrato do banco, mês a mês, sem precisar de
+SSH/consulta direta ao banco. O drill-down do card (clique no KPI) continua
+existindo à parte, com o gráfico de tendência maior e a nota explicativa —
+mas não duplica mais a tabela.
 
 ## Saldo Anterior
 
