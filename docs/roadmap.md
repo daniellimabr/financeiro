@@ -30,7 +30,7 @@ explícita do CEO a cada vez, nunca automática/agendada.
 
 | Última auditoria | Sprint de referência | Próxima checagem devida | Status |
 |---|---|---|---|
-| nenhuma ainda | — | Sprint 34 (30 + 4) | 3/5 sprints completadas (Sprint 30, Sprint 31, Sprint 32); mecanismo criado na Sprint 29 |
+| nenhuma ainda | — | Sprint 34 (30 + 4) | 4/5 sprints completadas (Sprint 30, Sprint 31, Sprint 32, Sprint 33); mecanismo criado na Sprint 29 |
 
 ## Sequência proposta (dependências)
 
@@ -1196,6 +1196,44 @@ Commit `9bae0f4`, CI verde confirmado, deployado na VM de dev (`docker compose p
 passo (não bloquearam a aprovação): confirmar se `saldo_inicial` da XP (R$535,55, já configurado ao
 vivo) está correto, validação visual da tabela nova no app real, e recategorizar as 8 transações de
 Aporte/Resgate ainda em "Transferência interna".
+
+### ✅ Sprint 33 — Auditoria do Saldo Acumulado: agosto (mês corrente) e continuidade abril-julho (cross-epic, sem épico prévio) concluída em 2026-08-21
+
+Sem sessão de `/plan` prévia — continuação direta da auditoria mês a mês aberta na Sprint 32,
+mesmo padrão retroativo das Sprints 30/31/32. **Sem nenhuma mudança de código** — 3 investigações
+read-only contra o Postgres real da VM de dev, todas as correções feitas pelo CEO via dado de
+configuração (não código).
+
+Agosto/2026 (mês corrente): card mostrava R$3.574,69, CEO somou R$3.419,21 nos 3 bancos.
+Decomposto em R$88,04 de timing (extrato conferido depois do último sync) + R$67,44 de
+`saldo_inicial` descalibrado (XP R$535,55→R$421,54 — mesmo valor já calculado e nunca aplicado
+desde o PRD-032; NuBank R$0,30→R$46,51, achado novo). CEO rodou sync novo e corrigiu os 2 valores
+pela UI; revalidação bateu exata (R$0,00) em NuBank e XP.
+
+Continuidade abril-julho/2026 sem gap nas 3 contas. Achado: abril reproduzia o problema sinalizado
+(não resolvido) desde a Sprint 32 — Itaú com `saldo_efetivo` negativo (−R$10.224,69) porque duas
+transações "Salário" no mesmo fim de semana (bônus R$11.118,85 + salário R$9.925,60, competência
+maio) eram subtraídas do Itaú, mas o bônus já tinha saído da conta (Pix pro NuBank) antes do fim
+do mês — dupla subtração. CEO confirmou o fato real (bônus virou compra de euros/francos de maio
+numa conta Global/Wise, fora de escopo de integração) e escolheu, entre 3 opções apresentadas,
+reclassificar o bônus fora de "Salário" em vez de mudar a regra de "salário antecipado".
+Revalidação: Itaú R$894,16, total de abril R$16.623,31 (era R$5.504,46). Achado secundário não
+resolvido: XP parada em R$992,11 de maio a agosto (zero movimento sincronizado nos 4 meses).
+
+Extrato real do Itaú (PDF, jan-jun/2026, fornecido pelo CEO): desvio constante de R$0,30 (sistema
+sempre abaixo do real) em todos os 6 meses — rastreado até `saldo_inicial` do Itaú (R$16.037,27
+configurado vs. R$16.037,57 real). Fora esse offset, toda a movimentação sincronizada do Itaú
+bateu exata contra o extrato. Explica também por que a Sprint 32 achou "Itaú+NuBank bate exato" em
+fev/mar — os dois erros (Itaú −0,30, NuBank em direção oposta) se cancelavam no total combinado até
+o NuBank ser corrigido nesta mesma sessão. CEO corrigiu `saldo_inicial` do Itaú para R$16.037,57.
+
+PRD: [PRD-033-auditoria-saldo-acumulado-abril-agosto.md](prd/PRD-033-auditoria-saldo-acumulado-abril-agosto.md).
+Plano: [SPRINT-033-auditoria-saldo-acumulado-abril-agosto-plan.md](sprints/SPRINT-033-auditoria-saldo-acumulado-abril-agosto-plan.md).
+Relatório: [SPRINT-033-auditoria-saldo-acumulado-abril-agosto-report.md](sprints/SPRINT-033-auditoria-saldo-acumulado-abril-agosto-report.md).
+**Sprint aprovada pelo CEO em 2026-08-21** ("registrar essa conversa como uma sprint retroativa,
+aprovada"). Pendências que seguem abertas: XP parada maio-agosto (confirmar se é real), fechar
+abril-julho com extratos reais de NuBank/XP, e as 8 transações de Aporte/Resgate mal categorizadas
+(pendência já registrada desde a Sprint 32).
 
 ## Registro de reavaliações futuras
 
