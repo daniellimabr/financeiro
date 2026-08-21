@@ -181,6 +181,45 @@ def test_list_transactions_applies_suggestion_but_never_confirms(db_session, use
         assert result.categorizacao_status == PluggyTransactionCategorizacaoStatus.pendente
 
 
+def test_list_transactions_never_recomputes_suggestion_for_confirmed_transaction(
+    db_session, user, subcategory, other_subcategory
+):
+    # Achado real (Sprint 34, browser-check ao vivo): uma transação já
+    # confirmada pra `other_subcategory` continuava carregando um
+    # `subcategoria_sugerida_id` antigo (dado histórico anterior a este
+    # guard) — a combobox de Categoria mostra sugerida??real e priorizava a
+    # sugestão obsoleta em vez da categoria real, divergindo do grupo que o
+    # próprio accordion do Dashboard usa (subcategory_id). Este teste trava
+    # que list_transactions nunca soma uma sugestão nova (nem mantém uma
+    # velha) numa transação já confirmada, mesmo quando uma regra bate com a
+    # descrição dela.
+    db_session.add(
+        CategorizationRule(
+            user_id=user.id,
+            subcategory_id=subcategory.id,
+            padrao_descricao="Pix Fulano",
+            padrao_normalizado="pix fulano",
+            origem="legado",
+        )
+    )
+    db_session.commit()
+    tx = _transaction(
+        db_session,
+        user,
+        "Pix Fulano",
+        status_categorizacao=PluggyTransactionCategorizacaoStatus.confirmada,
+        subcategory_id=other_subcategory.id,
+    )
+
+    items, total = service.list_transactions(db_session, user.id, status="confirmada")
+
+    assert total == 1
+    result = items[0]
+    assert result.id == tx.id
+    assert result.subcategory_id == other_subcategory.id
+    assert result.subcategoria_sugerida_id is None
+
+
 def test_list_transactions_includes_investimento_proventos_categoria_pluggy(db_session, user):
     # PRD-032: dividendo/JCP/taxa de investimentos administrados (XP), que
     # chegam numa conta corrente vinculada à corretora marcadas pela Pluggy
