@@ -528,6 +528,11 @@ input {
   background: var(--accent-bg);
 }
 
+/* Restilizado na Sprint 36 (épico E10, "Analyst Console") — só CSS, o JSX de
+   LoginPage.tsx não muda. Tokens --ac-* (--ac-border/--ac-blue/--ac-blue-bg,
+   já usados no tab ativo do sidebar) + tipografia Inter (--font-ac, mesma
+   variável de .ac-page), mesmo tratamento "filled background means active"
+   do resto do sistema novo. */
 .login-hero {
   min-height: 100svh;
   display: flex;
@@ -538,6 +543,7 @@ input {
   box-sizing: border-box;
   padding: var(--space-5);
   gap: var(--space-5);
+  font-family: var(--font-ac);
 }
 
 .login-hero a {
@@ -546,15 +552,15 @@ input {
   gap: var(--space-2);
   padding: var(--space-3) var(--space-5);
   border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--accent-bg);
-  color: var(--text-h);
+  border: 1px solid var(--ac-border);
+  background: var(--ac-blue-bg);
+  color: var(--ac-blue);
   font-weight: 500;
   text-decoration: none;
 }
 
 .login-hero a:hover {
-  border-color: var(--accent);
+  border-color: var(--ac-blue);
 }
 
 /* ==================== App shell ====================
@@ -2365,6 +2371,27 @@ button.ac-kpi:focus-visible {
   margin-left: auto;
 }
 
+/* Grid de KpiTiles em número variável (Investimentos, Sprint 36/PRD-036b —
+   um tile por investimento cadastrado, não um número fixo como as linhas
+   de KPI acima) — mesmo idioma auto-fit que .dash-summary já usa no
+   sistema antigo, só sob o namespace --ac-*. */
+.ac-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+/* Layout de 2 colunas (Investimentos, Sprint 36/PRD-036b) — gráfico
+   consolidado ao lado do ranking "Desempenho no mês", cada um seu próprio
+   .ac-panel; empilha em 1 coluna abaixo de 900px (ver media query no fim
+   do arquivo). */
+.ac-two-col {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 14px;
+}
+
 .ac-panel {
   background: var(--ac-surface);
   border: 1px solid var(--ac-border);
@@ -2537,6 +2564,10 @@ button.ac-kpi:focus-visible {
 
   .ac-kpi-row--compact {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .ac-two-col {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -2778,10 +2809,91 @@ button.ac-kpi:focus-visible {
   font-size: 12.5px;
 }
 
-/* .simple-list (Sprint 13) é compartilhado com OrcamentoPage, que continua
-   no sistema antigo — não pode virar --ac-* globalmente. AccountManagementPage
-   só existe dentro do drawer depois desta sprint, então o hover ganha a cor
-   nova só nesse escopo, sem tocar o componente/classe em si. */
+/* .simple-list (Sprint 13) é compartilhado por Gestão de Contas (dentro do
+   drawer, Sprint 35) e OrcamentoPage (migrada nesta sprint, Sprint 36) — a
+   classe em si não vira --ac-* globalmente (continua a mesma), só ganha
+   retonização escopada por consumidor, mesmo padrão já usado pro drawer.
+   Decisão de execução (PRD-036a item 4): evitar deixar OrcamentoPage
+   "parcialmente migrada" sem trocar o componente por um novo. */
 .ac-drawer-body .simple-list li:hover {
   background: var(--ac-blue-bg);
+}
+
+.ac-page .simple-list {
+  font-family: var(--font-ac);
+  color: var(--ac-text);
+}
+
+.ac-page .simple-list strong {
+  color: var(--ac-text-h);
+}
+
+.ac-page .simple-list li:hover {
+  background: var(--ac-blue-bg);
+}
+
+/* AcItemCard (frontend/src/components/AcItemCard.tsx, Sprint 36) — card
+   reutilizável entre Ativos/Passivos, extraído da estrutura duplicada
+   .dash-tile do sistema antigo (tipo/valor/nome/tag/sparkline/botões de
+   ação). Cobre também a lista secundária (baixados/quitados) via
+   .ac-item-card.secondary, equivalente ao dimming de .dash-tile.baixado. */
+.ac-item-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.ac-item-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--ac-surface);
+  border: 1px solid var(--ac-border);
+  border-radius: 8px;
+  padding: 14px;
+  font-family: var(--font-ac);
+  color: var(--ac-text);
+}
+
+.ac-item-card.secondary {
+  opacity: 0.55;
+}
+
+.ac-item-type {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ac-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ac-item-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ac-text-h);
+  font-variant-numeric: tabular-nums;
+}
+
+.ac-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ac-text-h);
+}
+
+.ac-item-tag {
+  font-size: 10.5px;
+  color: var(--ac-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Mesmo motivo de .ac-kpi .spark: sem largura/altura explícitas o
+   ResponsiveContainer do Recharts mede 0px (span "spark" é o wrapper que
+   TrendLineChart variant="spark" já renderiza). */
+.ac-item-card .spark {
+  display: block;
+  width: 100%;
+  height: 28px;
+  margin-top: 2px;
 }

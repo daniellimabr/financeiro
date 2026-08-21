@@ -67,6 +67,14 @@ export function fetchEvolucaoMensal(investimentoId: number): Promise<EvolucaoMen
   return apiFetch<EvolucaoMensal[]>(`/investimentos/${investimentoId}/evolucao-mensal`);
 }
 
+// Evolução mensal somando todos os investimentos do usuário (Sprint 36,
+// PRD-036b) — mesmo formato de `EvolucaoMensal`, fonte agregada no backend
+// (holdings de todos os Investimento do usuário, mesma regra de confiança
+// mista resolvida uma vez só em `get_evolucao_mensal_consolidada`).
+export function fetchEvolucaoMensalConsolidada(): Promise<EvolucaoMensal[]> {
+  return apiFetch<EvolucaoMensal[]>("/investimentos/evolucao-mensal");
+}
+
 export interface InvestimentoTransacao {
   data: string;
   tipo: string;

@@ -45,6 +45,46 @@ def test_user_does_not_see_other_users_investimentos(client, db_session):
     assert response.json() == []
 
 
+def test_evolucao_mensal_consolidada_without_cookie_returns_401(client):
+    response = client.get("/investimentos/evolucao-mensal")
+    assert response.status_code == 401
+
+
+def test_get_evolucao_mensal_consolidada_empty_when_no_investimentos(client, db_session):
+    _authenticate(client, db_session)
+
+    response = client.get("/investimentos/evolucao-mensal")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_get_evolucao_mensal_consolidada_does_not_require_investimento_id(client, db_session):
+    # Regressão de roteamento: "/investimentos/evolucao-mensal" não pode ser
+    # capturado pela rota parametrizada "/investimentos/{investimento_id}"
+    # (que exige int) nem pela "/investimentos/{investimento_id}/evolucao-
+    # mensal" — precisa da própria rota, sem exigir um investimento existente.
+    _authenticate(client, db_session)
+    client.post("/investimentos", json=INVESTIMENTO_PAYLOAD)
+
+    response = client.get("/investimentos/evolucao-mensal")
+
+    assert response.status_code == 200
+
+
+def test_get_evolucao_mensal_consolidada_isolated_by_user(client, db_session):
+    _authenticate(client, db_session, google_sub="google-1", email="a@example.com")
+    client.post("/investimentos", json=INVESTIMENTO_PAYLOAD)
+
+    client.cookies.clear()
+    _authenticate(client, db_session, google_sub="google-2", email="b@example.com")
+
+    response = client.get("/investimentos/evolucao-mensal")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
 def test_update_investimento(client, db_session):
     _authenticate(client, db_session)
     investimento = client.post("/investimentos", json=INVESTIMENTO_PAYLOAD).json()

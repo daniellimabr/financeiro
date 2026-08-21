@@ -278,11 +278,12 @@ describe("AssetsPage", () => {
     renderWithQueryClient(<AssetsPage />);
     await screen.findByText("Carro");
 
-    const grid = screen.getByText("Carro").closest(".dash-tile") as HTMLElement;
+    const grid = screen.getByText("Carro").closest(".ac-item-card") as HTMLElement;
     await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
 
     expect(await screen.findByText("R$ 300,00")).toBeInTheDocument();
-    // o funil renderiza fora do card, como painel próprio da página
+    // o funil renderiza fora do card, como painel próprio da página (sistema
+    // antigo, não migrado nesta sprint)
     const funnel = screen.getByText("R$ 300,00").closest(".dash-funnel") as HTMLElement;
     expect(funnel).not.toBeNull();
     expect(grid.contains(funnel)).toBe(false);
@@ -317,7 +318,7 @@ describe("AssetsPage", () => {
     renderWithQueryClient(<AssetsPage />);
     await screen.findByText("Carro");
 
-    const grid = screen.getByText("Carro").closest(".dash-tile") as HTMLElement;
+    const grid = screen.getByText("Carro").closest(".ac-item-card") as HTMLElement;
     await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
     expect(await screen.findByText("R$ 300,00")).toBeInTheDocument();
 
@@ -386,7 +387,7 @@ describe("AssetsPage", () => {
     renderWithQueryClient(<AssetsPage />);
     await screen.findByText("Carro");
 
-    const grid = screen.getByText("Carro").closest(".dash-tile") as HTMLElement;
+    const grid = screen.getByText("Carro").closest(".ac-item-card") as HTMLElement;
     await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
 
     // ambas transações caem no mesmo grupo/subcategoria (Transporte / Combustível)
@@ -490,7 +491,7 @@ describe("AssetsPage", () => {
     renderWithQueryClient(<AssetsPage />);
     await screen.findByText("Carro");
 
-    const grid = screen.getByText("Carro").closest(".dash-tile") as HTMLElement;
+    const grid = screen.getByText("Carro").closest(".ac-item-card") as HTMLElement;
     await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
 
     // dois grupos independentes, cada um com sua própria % do total do ativo
@@ -529,7 +530,7 @@ describe("AssetsPage", () => {
     renderWithQueryClient(<AssetsPage />);
     await screen.findByText("Carro");
 
-    const grid = screen.getByText("Carro").closest(".dash-tile") as HTMLElement;
+    const grid = screen.getByText("Carro").closest(".ac-item-card") as HTMLElement;
     await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
 
     const total = await screen.findByText("R$ 300,00");
@@ -564,7 +565,7 @@ describe("AssetsPage", () => {
     await screen.findByText("Carro");
 
     await waitFor(() => {
-      expect(container.querySelectorAll(".dash-tile .spark").length).toBeGreaterThan(0);
+      expect(container.querySelectorAll(".ac-item-card .spark").length).toBeGreaterThan(0);
     });
   });
 });

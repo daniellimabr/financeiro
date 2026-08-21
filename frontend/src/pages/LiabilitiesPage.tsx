@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 
 import type { Liability, LiabilityInput, LiabilityTipo } from "../api/liabilities";
 import type { PeriodoFilter, PontoTendencia, Regime } from "../api/dashboards";
+import { AcItemCard } from "../components/AcItemCard";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { RegimeToggle } from "../components/RegimeToggle";
 import { TransactionsTable } from "../components/TransactionsTable";
@@ -123,22 +124,24 @@ export function LiabilitiesPage() {
   }
 
   return (
-    <section className="dash-page">
-      <h2>Passivos</h2>
-
-      <div className="dash-filter">
-        <PeriodFilter
-          ano={ano}
-          mes={mes}
-          onChange={(next) => {
-            if (next.ano !== undefined) setAno(next.ano);
-            if (next.mes !== undefined) setMes(next.mes);
-          }}
-        />
-        <RegimeToggle value={regime} onChange={setRegime} />
-        <button type="button" onClick={openCreateForm}>
-          Novo passivo
-        </button>
+    <section className="ac-page">
+      <div className="ac-toolbar">
+        <div className="ac-toolbar-left">
+          <PeriodFilter
+            ano={ano}
+            mes={mes}
+            onChange={(next) => {
+              if (next.ano !== undefined) setAno(next.ano);
+              if (next.mes !== undefined) setMes(next.mes);
+            }}
+          />
+          <RegimeToggle value={regime} onChange={setRegime} variant="ac" />
+        </div>
+        <div className="ac-btn-row">
+          <button type="button" className="ac-btn ac-btn-primary" onClick={openCreateForm}>
+            Novo passivo
+          </button>
+        </div>
       </div>
 
       {(createLiability.isError || updateLiability.isError) && (
@@ -151,8 +154,9 @@ export function LiabilitiesPage() {
         <div
           role="dialog"
           aria-label={editingLiabilityId !== null ? "Editar passivo" : "Novo passivo"}
+          className="ac-panel"
         >
-          <form className="dash-filter" onSubmit={submitForm}>
+          <form className="ac-form-row" onSubmit={submitForm}>
             <label>
               Nome
               <input
@@ -205,10 +209,14 @@ export function LiabilitiesPage() {
                 }
               />
             </label>
-            <button type="submit" disabled={createLiability.isPending || updateLiability.isPending}>
+            <button
+              type="submit"
+              className="ac-btn ac-btn-primary"
+              disabled={createLiability.isPending || updateLiability.isPending}
+            >
               Salvar
             </button>
-            <button type="button" onClick={closeForm}>
+            <button type="button" className="ac-btn ac-btn-ghost" onClick={closeForm}>
               Cancelar
             </button>
           </form>
@@ -218,49 +226,56 @@ export function LiabilitiesPage() {
       {liabilitiesQuery.isLoading && <p>Carregando...</p>}
       {liabilitiesQuery.isError && <p role="alert">Não foi possível carregar os passivos.</p>}
       {!liabilitiesQuery.isLoading && ativos.length === 0 && (
-        <p className="dash-empty">Nenhum passivo cadastrado.</p>
+        <p className="ac-empty">Nenhum passivo cadastrado.</p>
       )}
 
-      <div className="dash-summary">
+      <div className="ac-item-grid">
         {ativos.map((liability) => (
-          <div key={liability.id} className="dash-tile">
-            <span className="k">{TIPO_LABEL[liability.tipo] ?? liability.tipo}</span>
-            <span className="v">{formatCurrency(liability.saldo_devedor)}</span>
-            <strong>{liability.nome}</strong>
-            <span className="tag">Total: {formatCurrency(liability.valor_total)}</span>
-            <TrendLineChart
-              variant="spark"
-              pontos={trendByLiability.get(liability.id)}
-              color="var(--despesa)"
-              onSelecionarMes={selecionarMes}
-            />
-            <div className="dash-filter">
-              <button
-                type="button"
-                aria-expanded={selectedLiabilityId === liability.id}
-                onClick={() => toggleDrilldown(liability.id)}
-              >
-                {selectedLiabilityId === liability.id ? "Fechar gasto" : "Ver gasto no período"}
-              </button>
-              <button className="btn-ghost" type="button" onClick={() => openEditForm(liability)}>
-                Editar
-              </button>
-              <button
-                className="btn-ghost"
-                type="button"
-                onClick={() => handleSettle(liability.id, liability.nome)}
-              >
-                Quitar
-              </button>
-              <button
-                className="btn-ghost btn-quiet btn-danger"
-                type="button"
-                onClick={() => handleDelete(liability.id, liability.nome)}
-              >
-                Excluir
-              </button>
-            </div>
-          </div>
+          <AcItemCard
+            key={liability.id}
+            tipo={TIPO_LABEL[liability.tipo] ?? liability.tipo}
+            valor={formatCurrency(liability.saldo_devedor)}
+            nome={liability.nome}
+            tag={`Total: ${formatCurrency(liability.valor_total)}`}
+            sparkline={
+              <TrendLineChart
+                variant="spark"
+                pontos={trendByLiability.get(liability.id)}
+                color="var(--ac-bad)"
+                onSelecionarMes={selecionarMes}
+              />
+            }
+          >
+            <button
+              type="button"
+              className="ac-btn"
+              aria-expanded={selectedLiabilityId === liability.id}
+              onClick={() => toggleDrilldown(liability.id)}
+            >
+              {selectedLiabilityId === liability.id ? "Fechar gasto" : "Ver gasto no período"}
+            </button>
+            <button
+              className="ac-btn ac-btn-ghost"
+              type="button"
+              onClick={() => openEditForm(liability)}
+            >
+              Editar
+            </button>
+            <button
+              className="ac-btn ac-btn-ghost"
+              type="button"
+              onClick={() => handleSettle(liability.id, liability.nome)}
+            >
+              Quitar
+            </button>
+            <button
+              className="ac-btn ac-btn-ghost ac-btn-danger"
+              type="button"
+              onClick={() => handleDelete(liability.id, liability.nome)}
+            >
+              Excluir
+            </button>
+          </AcItemCard>
         ))}
       </div>
 
@@ -286,27 +301,28 @@ export function LiabilitiesPage() {
         </div>
       )}
 
-      <h3>Quitados</h3>
+      <h3 className="ac-section-label">Quitados</h3>
       {quitados.length === 0 ? (
-        <p className="dash-empty">Nenhum passivo quitado.</p>
+        <p className="ac-empty">Nenhum passivo quitado.</p>
       ) : (
-        <div className="dash-summary">
+        <div className="ac-item-grid">
           {quitados.map((liability) => (
-            <div key={liability.id} className="dash-tile baixado">
-              <span className="k">{TIPO_LABEL[liability.tipo] ?? liability.tipo}</span>
-              <span className="v">{formatCurrency(liability.valor_total)}</span>
-              <strong>{liability.nome}</strong>
-              <span className="tag">Quitado em {liability.data_quitacao}</span>
-              <div className="dash-filter">
-                <button
-                  className="btn-ghost btn-quiet btn-danger"
-                  type="button"
-                  onClick={() => handleDelete(liability.id, liability.nome)}
-                >
-                  Excluir
-                </button>
-              </div>
-            </div>
+            <AcItemCard
+              key={liability.id}
+              tipo={TIPO_LABEL[liability.tipo] ?? liability.tipo}
+              valor={formatCurrency(liability.valor_total)}
+              nome={liability.nome}
+              tag={`Quitado em ${liability.data_quitacao}`}
+              secondary
+            >
+              <button
+                className="ac-btn ac-btn-ghost ac-btn-danger"
+                type="button"
+                onClick={() => handleDelete(liability.id, liability.nome)}
+              >
+                Excluir
+              </button>
+            </AcItemCard>
           ))}
         </div>
       )}

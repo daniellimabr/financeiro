@@ -7,6 +7,7 @@ import type {
   PontoTendencia,
   TransacaoTipo,
 } from "../api/dashboards";
+import { AcItemCard } from "../components/AcItemCard";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { TransactionsTable } from "../components/TransactionsTable";
 import { TrendLineChart } from "../components/TrendLineChart";
@@ -161,37 +162,39 @@ export function AssetsPage() {
   }
 
   return (
-    <section className="dash-page">
-      <h2>Ativos</h2>
-
-      <div className="dash-filter">
-        <PeriodFilter
-          ano={ano}
-          mes={mes}
-          onChange={(next) => {
-            if (next.ano !== undefined) setAno(next.ano);
-            if (next.mes !== undefined) setMes(next.mes);
-          }}
-        />
-        <div className="dash-toggle" role="group" aria-label="Tipo de transação">
-          <button
-            type="button"
-            aria-pressed={drillTipo === "debito"}
-            onClick={() => setDrillTipo("debito")}
-          >
-            Despesa
-          </button>
-          <button
-            type="button"
-            aria-pressed={drillTipo === "credito"}
-            onClick={() => setDrillTipo("credito")}
-          >
-            Receita
+    <section className="ac-page">
+      <div className="ac-toolbar">
+        <div className="ac-toolbar-left">
+          <PeriodFilter
+            ano={ano}
+            mes={mes}
+            onChange={(next) => {
+              if (next.ano !== undefined) setAno(next.ano);
+              if (next.mes !== undefined) setMes(next.mes);
+            }}
+          />
+          <div className="ac-seg" role="group" aria-label="Tipo de transação">
+            <button
+              type="button"
+              aria-pressed={drillTipo === "debito"}
+              onClick={() => setDrillTipo("debito")}
+            >
+              Despesa
+            </button>
+            <button
+              type="button"
+              aria-pressed={drillTipo === "credito"}
+              onClick={() => setDrillTipo("credito")}
+            >
+              Receita
+            </button>
+          </div>
+        </div>
+        <div className="ac-btn-row">
+          <button type="button" className="ac-btn ac-btn-primary" onClick={openCreateForm}>
+            Novo ativo
           </button>
         </div>
-        <button type="button" onClick={openCreateForm}>
-          Novo ativo
-        </button>
       </div>
 
       {(createAsset.isError || updateAsset.isError) && (
@@ -200,8 +203,12 @@ export function AssetsPage() {
       {deleteAsset.isError && <p role="alert">Não foi possível excluir o ativo.</p>}
 
       {formOpen && (
-        <div role="dialog" aria-label={editingAssetId !== null ? "Editar ativo" : "Novo ativo"}>
-          <form className="dash-filter" onSubmit={submitForm}>
+        <div
+          role="dialog"
+          aria-label={editingAssetId !== null ? "Editar ativo" : "Novo ativo"}
+          className="ac-panel"
+        >
+          <form className="ac-form-row" onSubmit={submitForm}>
             <label>
               Nome
               <input
@@ -253,10 +260,14 @@ export function AssetsPage() {
                 }
               />
             </label>
-            <button type="submit" disabled={createAsset.isPending || updateAsset.isPending}>
+            <button
+              type="submit"
+              className="ac-btn ac-btn-primary"
+              disabled={createAsset.isPending || updateAsset.isPending}
+            >
               Salvar
             </button>
-            <button type="button" onClick={closeForm}>
+            <button type="button" className="ac-btn ac-btn-ghost" onClick={closeForm}>
               Cancelar
             </button>
           </form>
@@ -264,8 +275,8 @@ export function AssetsPage() {
       )}
 
       {sellingAsset && (
-        <div role="dialog" aria-label={`Vender ${sellingAsset.nome}`}>
-          <form className="dash-filter" onSubmit={submitSell}>
+        <div role="dialog" aria-label={`Vender ${sellingAsset.nome}`} className="ac-panel">
+          <form className="ac-form-row" onSubmit={submitSell}>
             <label>
               Valor de venda
               <input
@@ -293,10 +304,14 @@ export function AssetsPage() {
               />
             </label>
             {sellAsset.isError && <p role="alert">Não foi possível registrar a venda.</p>}
-            <button type="submit" disabled={sellAsset.isPending}>
+            <button type="submit" className="ac-btn ac-btn-primary" disabled={sellAsset.isPending}>
               Confirmar venda
             </button>
-            <button type="button" onClick={() => setSellingAssetId(null)}>
+            <button
+              type="button"
+              className="ac-btn ac-btn-ghost"
+              onClick={() => setSellingAssetId(null)}
+            >
               Cancelar
             </button>
           </form>
@@ -306,45 +321,56 @@ export function AssetsPage() {
       {assetsQuery.isLoading && <p>Carregando...</p>}
       {assetsQuery.isError && <p role="alert">Não foi possível carregar os ativos.</p>}
       {!assetsQuery.isLoading && ativos.length === 0 && (
-        <p className="dash-empty">Nenhum ativo cadastrado.</p>
+        <p className="ac-empty">Nenhum ativo cadastrado.</p>
       )}
 
-      <div className="dash-summary">
+      <div className="ac-item-grid">
         {ativos.map((asset) => (
-          <div key={asset.id} className="dash-tile">
-            <span className="k">{TIPO_LABEL[asset.tipo] ?? asset.tipo}</span>
-            <span className="v">{formatCurrency(asset.valor_atual)}</span>
-            <strong>{asset.nome}</strong>
-            <span className="tag">Adquirido em {asset.data_aquisicao}</span>
-            <TrendLineChart
-              variant="spark"
-              pontos={trendByAsset.get(asset.id)}
-              color={groupColorVar(asset.id, colorIndex)}
-              onSelecionarMes={selecionarMes}
-            />
-            <div className="dash-filter">
-              <button
-                type="button"
-                aria-expanded={selectedAssetId === asset.id}
-                onClick={() => toggleDrilldown(asset.id)}
-              >
-                {selectedAssetId === asset.id ? "Fechar gasto" : "Ver gasto no período"}
-              </button>
-              <button className="btn-ghost" type="button" onClick={() => openEditForm(asset)}>
-                Editar
-              </button>
-              <button className="btn-ghost" type="button" onClick={() => openSellDialog(asset.id)}>
-                Vender
-              </button>
-              <button
-                className="btn-ghost btn-quiet btn-danger"
-                type="button"
-                onClick={() => handleDelete(asset.id, asset.nome)}
-              >
-                Excluir
-              </button>
-            </div>
-          </div>
+          <AcItemCard
+            key={asset.id}
+            tipo={TIPO_LABEL[asset.tipo] ?? asset.tipo}
+            valor={formatCurrency(asset.valor_atual)}
+            nome={asset.nome}
+            tag={`Adquirido em ${asset.data_aquisicao}`}
+            sparkline={
+              <TrendLineChart
+                variant="spark"
+                pontos={trendByAsset.get(asset.id)}
+                color={groupColorVar(asset.id, colorIndex)}
+                onSelecionarMes={selecionarMes}
+              />
+            }
+          >
+            <button
+              type="button"
+              className="ac-btn"
+              aria-expanded={selectedAssetId === asset.id}
+              onClick={() => toggleDrilldown(asset.id)}
+            >
+              {selectedAssetId === asset.id ? "Fechar gasto" : "Ver gasto no período"}
+            </button>
+            <button
+              className="ac-btn ac-btn-ghost"
+              type="button"
+              onClick={() => openEditForm(asset)}
+            >
+              Editar
+            </button>
+            <button
+              className="ac-btn ac-btn-ghost"
+              type="button"
+              onClick={() => openSellDialog(asset.id)}
+            >
+              Vender
+            </button>
+            <button
+              className="ac-btn ac-btn-ghost ac-btn-danger"
+              type="button"
+              onClick={() => handleDelete(asset.id, asset.nome)}
+            >
+              Excluir
+            </button>
+          </AcItemCard>
         ))}
       </div>
 
@@ -368,27 +394,28 @@ export function AssetsPage() {
         </div>
       )}
 
-      <h3>Baixados</h3>
+      <h3 className="ac-section-label">Baixados</h3>
       {baixados.length === 0 ? (
-        <p className="dash-empty">Nenhum ativo baixado.</p>
+        <p className="ac-empty">Nenhum ativo baixado.</p>
       ) : (
-        <div className="dash-summary">
+        <div className="ac-item-grid">
           {baixados.map((asset) => (
-            <div key={asset.id} className="dash-tile baixado">
-              <span className="k">{TIPO_LABEL[asset.tipo] ?? asset.tipo}</span>
-              <span className="v">{formatCurrency(asset.valor_venda)}</span>
-              <strong>{asset.nome}</strong>
-              <span className="tag">Vendido em {asset.data_venda}</span>
-              <div className="dash-filter">
-                <button
-                  className="btn-ghost btn-quiet btn-danger"
-                  type="button"
-                  onClick={() => handleDelete(asset.id, asset.nome)}
-                >
-                  Excluir
-                </button>
-              </div>
-            </div>
+            <AcItemCard
+              key={asset.id}
+              tipo={TIPO_LABEL[asset.tipo] ?? asset.tipo}
+              valor={formatCurrency(asset.valor_venda)}
+              nome={asset.nome}
+              tag={`Vendido em ${asset.data_venda}`}
+              secondary
+            >
+              <button
+                className="ac-btn ac-btn-ghost ac-btn-danger"
+                type="button"
+                onClick={() => handleDelete(asset.id, asset.nome)}
+              >
+                Excluir
+              </button>
+            </AcItemCard>
           ))}
         </div>
       )}

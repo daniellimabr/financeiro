@@ -259,7 +259,7 @@ describe("LiabilitiesPage", () => {
     renderWithQueryClient(<LiabilitiesPage />);
     await screen.findByText("Financiamento carro");
 
-    const grid = screen.getByText("Financiamento carro").closest(".dash-tile") as HTMLElement;
+    const grid = screen.getByText("Financiamento carro").closest(".ac-item-card") as HTMLElement;
     await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
 
     expect(await screen.findByText("R$ 1.200,00")).toBeInTheDocument();
@@ -296,7 +296,7 @@ describe("LiabilitiesPage", () => {
     renderWithQueryClient(<LiabilitiesPage />);
     await screen.findByText("Financiamento carro");
 
-    const grid = screen.getByText("Financiamento carro").closest(".dash-tile") as HTMLElement;
+    const grid = screen.getByText("Financiamento carro").closest(".ac-item-card") as HTMLElement;
     await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
     expect(await screen.findByText("R$ 1.200,00")).toBeInTheDocument();
 
@@ -347,7 +347,7 @@ describe("LiabilitiesPage", () => {
     renderWithQueryClient(<LiabilitiesPage />);
     await screen.findByText("Financiamento carro");
 
-    const grid = screen.getByText("Financiamento carro").closest(".dash-tile") as HTMLElement;
+    const grid = screen.getByText("Financiamento carro").closest(".ac-item-card") as HTMLElement;
     await userEvent.click(within(grid).getByRole("button", { name: "Ver gasto no período" }));
 
     await screen.findByRole("button", { name: "Parcela financiamento" });
@@ -396,7 +396,7 @@ describe("LiabilitiesPage", () => {
     await screen.findByText("Financiamento carro");
 
     await waitFor(() => {
-      expect(container.querySelectorAll(".dash-tile .spark").length).toBeGreaterThan(0);
+      expect(container.querySelectorAll(".ac-item-card .spark").length).toBeGreaterThan(0);
     });
   });
 });

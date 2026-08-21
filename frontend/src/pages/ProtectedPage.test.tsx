@@ -121,7 +121,10 @@ describe("ProtectedPage navigation", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Passivos" }));
 
-    expect(await screen.findByRole("heading", { name: "Passivos" })).toBeInTheDocument();
+    // LiabilitiesPage (Sprint 36, Analyst Console) não renderiza um <h2> de
+    // título de página — mesmo precedente de NaturezaPage/CategorizationReviewPage
+    // (Sprint 35): a aba já rotula a tela na sidebar.
+    expect(await screen.findByRole("button", { name: "Novo passivo" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Passivos" })).toHaveAttribute(
       "aria-current",
       "page"
@@ -149,7 +152,10 @@ describe("ProtectedPage navigation", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Orçamento" }));
 
-    expect(await screen.findByRole("heading", { name: "Orçamento" })).toBeInTheDocument();
+    // OrcamentoPage (Sprint 36, Analyst Console) não renderiza um <h2> de
+    // título de página — mesmo precedente de NaturezaPage/CategorizationReviewPage
+    // (Sprint 35): a aba já rotula a tela na sidebar.
+    expect(await screen.findByRole("button", { name: "Novo orçamento" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Orçamento" })).toHaveAttribute(
       "aria-current",
       "page"

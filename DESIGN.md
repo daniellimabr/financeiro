@@ -172,30 +172,38 @@ runs up to 1440px.
   distinctive enough to read as a considered choice, still an Operate-mode
   workhorse rather than an invented display face competing with the data.
 
-**Sprint 34/35 note:** everything below "Colors" through "Do's and Don'ts"
-describes this original system. As of Sprint 35 it still fully governs 5
-screens (Ativos, Investimentos, Passivos, Orçamento, Login) and partially
-governs 2 more — the drill-down funnel/accordion of Categorizar and
-Natureza stayed on this original system even though the rest of those two
-screens migrated (see "What stays on the original system" under Analyst
-Console below). The shell/sidebar, the Dashboard, Categorizar,
-Configurações, and Natureza now run a second, newer system — "Analyst
-Console" — documented in its own section right after this one. Read that
-section first if you're touching the shell, the Dashboard, or any of those
-3 screens; read the rest of this file for everything else.
+**Sprint 34/35/36 note:** everything below "Colors" through "Do's and
+Don'ts" describes this original system. Épico E10 closed in Sprint 36 — no
+screen runs entirely on this original system anymore. What remains of it is
+partial, inside otherwise-migrated screens: the drill-down funnel/accordion
+of Categorizar, Natureza, Ativos, Passivos, and (since PRD-036b)
+Investimentos (Extrato/Posições/Série histórica, "KPI migrates, funnel
+stays" applied a 4th time), plus Orçamento's `.simple-list` (original
+markup/component, scoped color retint only) — see "What stays on the
+original system" under Analyst Console below. The shell/sidebar and every
+one of the 9 screens now run a second, newer system — "Analyst Console" —
+documented in its own section right after this one. Read that section
+first for any UI work in this app; read the rest of this file only for the
+funnel/drill-down fragments named above, which this file still governs.
 
-## Analyst Console (Sprint 34/35, épico E10)
+## Analyst Console (Sprint 34/35/36, épico E10 — closed)
 
 A second design system, deliberately coexisting with the one described in
 the rest of this file rather than replacing it in one sprint. Sprint 34
 covered the app shell (sidebar/nav, every tab) and the Dashboard screen.
 Sprint 35 extended it to Categorizar (fila de revisão de transações),
 Categorias (CRUD, no longer its own nav tab — see Drawer below), Natureza,
-and Configurações. The remaining 5 screens (Ativos, Investimentos,
-Passivos, Orçamento, Login) stay on the original system until their own
-sprints in épico E10 migrate them one at a time — a deliberate scope cut
-(PRD-034/PRD-035) so each sprint stays a manageable size instead of
-attempting every screen at once.
+and Configurações. Sprint 36 closed the épico in two parallel PRDs:
+PRD-036a did the mechanical reskin — Ativos, Passivos, Orçamento, and
+Login — the same "KPI migrates, funnel stays" pattern already used twice,
+applied a 3rd time with no new design
+decisions. Investimentos was deliberately split into its own PRD (PRD-036b,
+same sprint window) because the CEO asked for a genuine content revamp
+there — a consolidated progress view (KPIs + trend chart + a
+performance ranking across every investimento), not a card-by-card reskin —
+picked via the épico's now-familiar rendered-comparison process (3
+proposals, Artifact, fictitious data) rather than assumed. See "Investimentos
+consolidada" below for what shipped.
 
 ### Why a second system, not a repaint of the first
 
@@ -387,18 +395,112 @@ uppercase 11px for KPI/section labels, 400 at 14px for body/table text.
   since a mid-migration variant prop on a shared component would have left
   one consumer's table looking stale inside a drawer that's otherwise fully
   `.ac-*`.
+- **`AcItemCard`** (`frontend/src/components/AcItemCard.tsx`, Sprint 36) —
+  card reutilizável entre `AssetsPage`/`LiabilitiesPage`, extraído porque as
+  duas telas duplicavam a mesma estrutura `.dash-tile` (tipo/valor grande/
+  nome/tag opcional/sparkline opcional/grupo de botões de ação via
+  `children`) — mesmo raciocínio que gerou `SubcategoryGroupTable` na Sprint
+  35. Cobre as duas densidades que as duas telas precisam com um único
+  prop booleano (`secondary`) em vez de duas variantes: a lista primária
+  (com sparkline, 3-4 botões de ação) e a lista secundária de itens
+  baixados/quitados (sem sparkline, só Excluir, dimmed via
+  `.ac-item-card.secondary` — equivalente ao `opacity` de
+  `.dash-tile.baixado` no sistema antigo). O sparkline é sempre passado via
+  prop nomeada (`sparkline`, mesmo padrão de `KpiTile`), nunca via
+  `children` — `children` é reservado só pro grupo de botões de ação, pra
+  não haver ambiguidade de ordem entre dois usos diferentes de `children`
+  na mesma renderização. A cor do sparkline em si continua sendo decisão de
+  quem chama (`AssetsPage` usa a paleta categórica por ativo,
+  `LiabilitiesPage` usa `--ac-bad` fixo — ver nota de cor abaixo).
 
-### What stays on the original system (Sprint 35)
+- **`MonthNav`** (`frontend/src/components/MonthNav.tsx`, promoted Sprint
+  36) — the ◀ month ▶ toolbar navigator `DashboardsPage` introduced in
+  Sprint 34 was local to that file; Investimentos (PRD-036b) is the second
+  screen to need it, so it moved out to a shared component together with
+  the month-rollover math it depends on (`mesAnterior`/`mesSeguinte`/
+  `isMesAtual`, now `frontend/src/utils/monthNav.ts`) — same reasoning as
+  every other promotion in this épico (`Drawer`, `SubcategoryGroupTable`):
+  a second consumer is the trigger, not anticipated ahead of time.
+- **Investimentos consolidada** (`InvestimentosPage.tsx`, Sprint 36,
+  PRD-036b) — the épico's one content revamp, not a reskin. Chosen via a
+  rendered-comparison session (3 proposals, Artifact, fictitious data,
+  same process that picked Proposta 3 originally): a `.ac-kpi-row` of 4
+  KpiTiles (Patrimônio Investido, Rendimento do Mês, Aportes, Resgates —
+  each with delta-vs-previous-month and sparkline, exactly the Dashboard's
+  "Fluxo do mês" recipe reused verbatim), a `.ac-two-col` panel row
+  (`Evolução do patrimônio` — `TrendLineChart variant="card"` — beside
+  `Desempenho no mês`, an `.ac-table` ranking every investimento by that
+  month's rendimento), and a per-investimento entry grid below
+  (`.ac-kpi-grid`, an auto-fit variant of the fixed-column KPI rows) —
+  reusing `KpiTile` directly as the entry point instead of a new card
+  component, since PRD-036b explicitly capped new screen-specific
+  components at zero. Clicking an entry tile opens the same
+  Extrato/Posições/Série histórica funil the screen already had, unchanged
+  (see "What stays" below); Editar/Excluir, which used to live on the old
+  card, moved into the funil header next to "Fechar" once the entry tile
+  became a single click target with no room for a button group.
+  - **Data source and its one honest gap:** all 4 KPIs and the chart come
+    from a new aggregated endpoint (`GET /investimentos/evolucao-mensal`,
+    `backend/app/investimentos/service.py`'s `get_evolucao_mensal_consolidada`)
+    — the CEO's pick over client-side `useQueries` composition, so the
+    "mês misto" confidence rule (a month is `reconstruido` if any
+    contributing holding is) is resolved once in the backend, tested via
+    pytest, not duplicated per client. Like the pre-existing per-investimento
+    Série histórica, this endpoint only sums holdings with a Pluggy
+    snapshot — bank-account-only investimentos have no monthly history yet.
+    The consolidated panel says so directly (`ac-panel-meta` caption) rather
+    than silently under-counting; each entry tile below still shows the
+    exact `valor_atual` (contas + holdings, real-time), so the two numbers
+    can legitimately differ and neither is a bug. The "Desempenho no mês"
+    ranking reuses the same per-investimento `evolucao-mensal` query each
+    entry tile's sparkline already fetches (shared `queryKey`, via
+    `useEvolucaoMensalPorInvestimento`/`useQueries`) rather than adding a
+    second network round-trip.
 
-Categorizar and Natureza are hybrids after Sprint 35: their toolbar/KPI/
-table-chrome layer runs Analyst Console, but the actual drill-down —
-`.dash-funnel`/`.dash-accordion`/`Row` in Natureza, and the funnel-free
-transaction table in Categorizar already ran the shared `.ac-txn-table`
-CSS since Sprint 34 (`TransactionsTable.tsx`'s styling, extended in Sprint
-35 to `CategorizationReviewPage`'s own bespoke table markup) — stays as-is.
-`AssetsPage`/`InvestimentosPage`/`LiabilitiesPage`/`OrcamentoPage`/
-`LoginPage` are untouched, fully on the original system, same as before
-Sprint 35.
+### What stays on the original system (Sprint 36)
+
+Categorizar, Natureza, Ativos, e Passivos são híbridos: a camada de
+topo — toolbar/KPI ou card/diálogos — roda Analyst Console, mas o
+drill-down real fica no sistema antigo, sem migração:
+`.dash-funnel`/`.dash-accordion`/`Row` em Natureza/Ativos/Passivos (o
+extrato por ativo/passivo, accordion Categoria→Subcategoria→Transação), e a
+tabela de transações sem funil em Categorizar já rodava `.ac-txn-table`
+desde a Sprint 34. Em Passivos, a cor do sparkline do card migrado
+(`--ac-bad`, fixa) é intencionalmente distinta da cor do funil abaixo dele
+(`var(--despesa)`, sistema antigo, inalterada) — os dois painéis não
+precisam concordar em paleta porque pertencem a sistemas visuais
+diferentes, mesmo lado a lado na mesma tela. Em Ativos, o card migrado
+continua na paleta categórica por ativo (`groupColorVar`/`--cat-*`), a
+mesma já usada pelo funil — não há distinção de cor a fazer ali porque o
+card nunca teve uma cor fixa pra divergir.
+
+`OrcamentoPage` não usa `AcItemCard` (não tem `.dash-tile`) — só a toolbar
+("Novo orçamento") e o diálogo de criar/editar (incluindo o toggle
+Eventual/Recorrente, `.ac-seg`) migraram para `.ac-*`. A lista de
+orçamentos (`.simple-list`, compartilhada com `AccountManagementPage`
+dentro do Drawer) não virou um componente novo — ganhou só uma retonização
+escopada (`.ac-page .simple-list`) pros tokens `--ac-*`, mesmo padrão já
+usado pro Drawer (`.ac-drawer-body .simple-list`), decisão de execução do
+PRD-036a pra a tela não ficar parcialmente migrada sem introduzir um
+componente novo pra uma lista sem funil.
+
+`LoginPage` está inteiramente em `--ac-*` (só CSS — `.login-hero`/
+`.login-hero a` retonizados pra `--ac-border`/`--ac-blue`/`--ac-blue-bg` +
+`--font-ac`, o JSX não mudou), sem nenhum vestígio do sistema antigo.
+
+`InvestimentosPage` (PRD-036b) segue o mesmo padrão híbrido dos outros:
+a camada consolidada nova (KPIs, gráfico, ranking, grid de tiles de
+entrada) roda inteiramente `--ac-*`, mas o funil por investimento
+individual — Extrato/Posições/Série histórica, `.dash-funnel`/
+`.dash-toggle`/`.dash-table` — permanece no sistema original, sem nenhuma
+mudança visual. É a 4ª vez que esse corte se repete no épico (Dashboards,
+Natureza/Ativos/Passivos, agora Investimentos), e a única tela do épico
+cujo cabeçalho do funil ganhou controles novos (Editar/Excluir, ao lado de
+"Fechar") — necessário porque o card de entrada virou um único alvo de
+clique sem espaço pra um grupo de botões, diferente de `AcItemCard`.
+
+Nenhuma tela do sistema visual original resta fora desses fragmentos de
+funil/drill-down depois da Sprint 36 — épico E10 fechado.
 
 ### What did not change
 

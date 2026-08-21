@@ -249,6 +249,36 @@ class EvolucaoMensal:
     confianca: str
 
 
+def _aggregate_snapshots_por_mes(
+    snapshots: list[PluggyInvestmentSnapshot],
+) -> list[EvolucaoMensal]:
+    """Função pura (testável isoladamente): agrupa snapshots de qualquer
+    conjunto de holdings por `ano_mes` e soma os campos. Usada tanto pela
+    evolução mensal de um único Investimento quanto pela consolidada de
+    todos (Sprint 36, PRD-036b) — a regra de confiança mista é a mesma nos
+    dois casos: um mês agregado é "reconstruido" se qualquer holding
+    contribuinte nesse mês for reconstruída."""
+    por_mes: dict[str, list[PluggyInvestmentSnapshot]] = {}
+    for snap in snapshots:
+        por_mes.setdefault(snap.ano_mes, []).append(snap)
+
+    return [
+        EvolucaoMensal(
+            ano_mes=ano_mes,
+            saldo=sum((r.saldo for r in rows), Decimal("0")),
+            valorizacao=sum((r.valorizacao for r in rows), Decimal("0")),
+            rendimento=sum((r.rendimento for r in rows), Decimal("0")),
+            dividendos=sum((r.dividendos or Decimal("0") for r in rows), Decimal("0")),
+            aportes=sum((r.aportes for r in rows), Decimal("0")),
+            resgates=sum((r.resgates for r in rows), Decimal("0")),
+            confianca="reconstruido"
+            if any(r.confianca == "reconstruido" for r in rows)
+            else "real",
+        )
+        for ano_mes, rows in sorted(por_mes.items())
+    ]
+
+
 def get_evolucao_mensal(db: Session, user_id: int, investimento_id: int) -> list[EvolucaoMensal]:
     """Série mês a mês (Sprint 21) — extensão de `get_evolucao` (snapshot
     atual), sem alterar seu cálculo. Agrega `pluggy_investment_snapshots` das
@@ -274,26 +304,40 @@ def get_evolucao_mensal(db: Session, user_id: int, investimento_id: int) -> list
         .order_by(PluggyInvestmentSnapshot.ano_mes)
         .all()
     )
+    return _aggregate_snapshots_por_mes(snapshots)
 
-    por_mes: dict[str, list[PluggyInvestmentSnapshot]] = {}
-    for snap in snapshots:
-        por_mes.setdefault(snap.ano_mes, []).append(snap)
 
-    return [
-        EvolucaoMensal(
-            ano_mes=ano_mes,
-            saldo=sum((r.saldo for r in rows), Decimal("0")),
-            valorizacao=sum((r.valorizacao for r in rows), Decimal("0")),
-            rendimento=sum((r.rendimento for r in rows), Decimal("0")),
-            dividendos=sum((r.dividendos or Decimal("0") for r in rows), Decimal("0")),
-            aportes=sum((r.aportes for r in rows), Decimal("0")),
-            resgates=sum((r.resgates for r in rows), Decimal("0")),
-            confianca="reconstruido"
-            if any(r.confianca == "reconstruido" for r in rows)
-            else "real",
-        )
-        for ano_mes, rows in sorted(por_mes.items())
+def get_evolucao_mensal_consolidada(db: Session, user_id: int) -> list[EvolucaoMensal]:
+    """Evolução mensal somando TODOS os investimentos do usuário (Sprint 36,
+    PRD-036b) — alimenta o gráfico/KPI consolidado da tela de Investimentos
+    revisitada. Mesma agregação de `get_evolucao_mensal`, só que sobre as
+    holdings de qualquer `Investimento` do usuário, não de um só. Isolamento
+    em duas camadas (Investimento.user_id no primeiro filtro, depois
+    PluggyInvestment.user_id de novo no segundo) — mesmo padrão defensivo já
+    usado em `list_investimentos_com_valor_atual`."""
+    investimento_ids = [
+        row[0] for row in db.query(Investimento.id).filter(Investimento.user_id == user_id)
     ]
+    if not investimento_ids:
+        return []
+
+    holding_ids = [
+        row[0]
+        for row in db.query(PluggyInvestment.id).filter(
+            PluggyInvestment.user_id == user_id,
+            PluggyInvestment.investimento_id.in_(investimento_ids),
+        )
+    ]
+    if not holding_ids:
+        return []
+
+    snapshots = (
+        db.query(PluggyInvestmentSnapshot)
+        .filter(PluggyInvestmentSnapshot.investment_id.in_(holding_ids))
+        .order_by(PluggyInvestmentSnapshot.ano_mes)
+        .all()
+    )
+    return _aggregate_snapshots_por_mes(snapshots)
 
 
 @dataclass

@@ -604,6 +604,98 @@ def test_get_evolucao_isolated_by_user(db_session, user, other_user):
         service.get_evolucao(db_session, user.id, investimento.id)
 
 
+# --- Sprint 36 (PRD-036b): get_evolucao_mensal_consolidada ---------------
+
+
+def test_get_evolucao_mensal_consolidada_returns_empty_when_no_investimentos(db_session, user):
+    assert service.get_evolucao_mensal_consolidada(db_session, user.id) == []
+
+
+def test_get_evolucao_mensal_consolidada_returns_empty_when_no_holdings(db_session, user):
+    service.create_investimento(db_session, user.id, nome="Sem holding")
+
+    assert service.get_evolucao_mensal_consolidada(db_session, user.id) == []
+
+
+def test_get_evolucao_mensal_consolidada_sums_across_investimentos_by_month(db_session, user):
+    reserva = service.create_investimento(db_session, user.id, nome="Reserva")
+    tesouro = service.create_investimento(db_session, user.id, nome="Tesouro IPCA+")
+    holding_reserva = _investment(
+        db_session, user, valor_atual=Decimal("6000.00"), investimento_id=reserva.id
+    )
+    holding_tesouro = _investment(
+        db_session, user, valor_atual=Decimal("9000.00"), investimento_id=tesouro.id
+    )
+    _snapshot(
+        db_session, holding_reserva, ano_mes="2026-01", saldo=Decimal("5000.00"), confianca="real"
+    )
+    _snapshot(
+        db_session, holding_tesouro, ano_mes="2026-01", saldo=Decimal("8000.00"), confianca="real"
+    )
+    _snapshot(
+        db_session,
+        holding_reserva,
+        ano_mes="2026-02",
+        saldo=Decimal("6000.00"),
+        rendimento=Decimal("300.00"),
+        confianca="real",
+    )
+    _snapshot(
+        db_session,
+        holding_tesouro,
+        ano_mes="2026-02",
+        saldo=Decimal("9000.00"),
+        rendimento=Decimal("700.00"),
+        confianca="real",
+    )
+
+    evolucao = service.get_evolucao_mensal_consolidada(db_session, user.id)
+
+    assert [e.ano_mes for e in evolucao] == ["2026-01", "2026-02"]
+    jan = evolucao[0]
+    assert jan.saldo == Decimal("13000.00")
+    fev = evolucao[1]
+    assert fev.saldo == Decimal("15000.00")
+    assert fev.rendimento == Decimal("1000.00")
+
+
+def test_get_evolucao_mensal_consolidada_mes_reconstruido_se_qualquer_holding_for(db_session, user):
+    reserva = service.create_investimento(db_session, user.id, nome="Reserva")
+    tesouro = service.create_investimento(db_session, user.id, nome="Tesouro IPCA+")
+    holding_reserva = _investment(db_session, user, investimento_id=reserva.id)
+    holding_tesouro = _investment(db_session, user, investimento_id=tesouro.id)
+    _snapshot(
+        db_session, holding_reserva, ano_mes="2026-01", saldo=Decimal("1000.00"), confianca="real"
+    )
+    _snapshot(
+        db_session,
+        holding_tesouro,
+        ano_mes="2026-01",
+        saldo=Decimal("2000.00"),
+        confianca="reconstruido",
+    )
+
+    evolucao = service.get_evolucao_mensal_consolidada(db_session, user.id)
+
+    assert evolucao[0].confianca == "reconstruido"
+
+
+def test_get_evolucao_mensal_consolidada_isolated_by_user(db_session, user, other_user):
+    investimento = service.create_investimento(db_session, other_user.id, nome="Do outro")
+    holding = _investment(db_session, other_user, investimento_id=investimento.id)
+    _snapshot(db_session, holding, ano_mes="2026-01", saldo=Decimal("999.00"))
+
+    assert service.get_evolucao_mensal_consolidada(db_session, user.id) == []
+
+
+def test_get_evolucao_mensal_consolidada_ignores_unlinked_holdings(db_session, user):
+    service.create_investimento(db_session, user.id, nome="Sem holding vinculado")
+    holding_solto = _investment(db_session, user, valor_atual=Decimal("1000.00"))
+    _snapshot(db_session, holding_solto, ano_mes="2026-01", saldo=Decimal("1000.00"))
+
+    assert service.get_evolucao_mensal_consolidada(db_session, user.id) == []
+
+
 # --- Sprint 23: get_transacoes (extrato unificado) ------------------------
 
 

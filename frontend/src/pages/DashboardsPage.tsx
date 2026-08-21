@@ -47,6 +47,7 @@ import { CategoriaComparativoChart } from "../components/CategoriaComparativoCha
 import { chartCursorProps } from "../components/ChartTooltip";
 import { KpiTile } from "../components/KpiTile";
 import type { KpiDelta } from "../components/KpiTile";
+import { ArrowIcon, MonthNav } from "../components/MonthNav";
 import { RegimeToggle } from "../components/RegimeToggle";
 import { TransactionsTable } from "../components/TransactionsTable";
 import { TrendLineChart } from "../components/TrendLineChart";
@@ -73,6 +74,7 @@ import {
   subcategoryColorVar,
 } from "../utils/categoryColors";
 import { formatCurrency } from "../utils/format";
+import { mesAnterior, mesSeguinte } from "../utils/monthNav";
 import { computeSharedDomain } from "../utils/sharedChartDomain";
 
 const ASSET_TIPO_LABEL: Record<string, string> = {
@@ -95,20 +97,6 @@ type DrillKind =
 
 function toggleId(list: number[], id: number): number[] {
   return list.includes(id) ? list.filter((existing) => existing !== id) : [...list, id];
-}
-
-// Rollover de ano incluído — dezembro do ano anterior é um "mês anterior"
-// válido para todo filtro exceto jan/2026 (início do registro histórico,
-// tratado à parte no clique do card "Saldo Anterior").
-function mesAnterior(ano: number, mes: number): { ano: number; mes: number } {
-  return mes === 1 ? { ano: ano - 1, mes: 12 } : { ano, mes: mes - 1 };
-}
-
-// Inverso de mesAnterior — navegação pro mês seguinte no card "Saldo
-// Acumulado" (fronteira tratada à parte no clique: não navega pro mês
-// corrente real em diante, mesmo alerta que mesAnterior usa pra jan/2026).
-function mesSeguinte(ano: number, mes: number): { ano: number; mes: number } {
-  return mes === 12 ? { ano: ano + 1, mes: 1 } : { ano, mes: mes + 1 };
 }
 
 interface DrillState {
@@ -608,86 +596,6 @@ export function DashboardsPage() {
         </div>
       )}
     </section>
-  );
-}
-
-// Seta decorativa dos cards "Saldo Anterior"/"Saldo Acumulado" — mesmo
-// padrão de ícone SVG inline de AccountTipoIcon.tsx (viewBox 16x16, stroke
-// currentColor), só com um path por direção em vez de um mapa por tipo.
-function ArrowIcon({ direction }: { direction: "left" | "right" }) {
-  const path = direction === "left" ? "M10 2.5 4 8l6 5.5M4 8h8" : "M6 2.5 12 8l-6 5.5M12 8H4";
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d={path} />
-    </svg>
-  );
-}
-
-const MESES_COMPLETOS = [
-  "Janeiro",
-  "Fevereiro",
-  "Março",
-  "Abril",
-  "Maio",
-  "Junho",
-  "Julho",
-  "Agosto",
-  "Setembro",
-  "Outubro",
-  "Novembro",
-  "Dezembro",
-];
-
-function isMesAtual(ano: number, mes: number): boolean {
-  const hoje = new Date();
-  return ano === hoje.getFullYear() && mes === hoje.getMonth() + 1;
-}
-
-// Navegador de mês (◀ mês ▶) da toolbar (Sprint 34) — substitui o filtro
-// ano/mês simples (PeriodFilter, que continua servindo as outras 8 telas).
-// Reaproveita mesAnterior/mesSeguinte já usados pelos cards Saldo Anterior/
-// Saldo Acumulado, mesma regra de fronteira: nunca avança além do mês
-// corrente real (botão "próximo" desabilitado, não só um alerta).
-function MonthNav({
-  ano,
-  mes,
-  onChange,
-}: {
-  ano: number;
-  mes: number;
-  onChange: (proximo: { ano: number; mes: number }) => void;
-}) {
-  return (
-    <div className="ac-month-nav" role="group" aria-label="Navegar entre meses">
-      <button
-        type="button"
-        aria-label="Mês anterior"
-        onClick={() => onChange(mesAnterior(ano, mes))}
-      >
-        <ArrowIcon direction="left" />
-      </button>
-      <span className="current">
-        {MESES_COMPLETOS[mes - 1]} {ano}
-      </span>
-      <button
-        type="button"
-        aria-label="Próximo mês"
-        disabled={isMesAtual(ano, mes)}
-        onClick={() => onChange(mesSeguinte(ano, mes))}
-      >
-        <ArrowIcon direction="right" />
-      </button>
-    </div>
   );
 }
 

@@ -34,6 +34,13 @@ def create_investimento(
     return service.create_investimento(db, current_user.id, nome=payload.nome)
 
 
+@router.get("/evolucao-mensal", response_model=list[EvolucaoMensalOut])
+def get_evolucao_mensal_consolidada(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    return service.get_evolucao_mensal_consolidada(db, current_user.id)
+
+
 @router.get("/{investimento_id}", response_model=InvestimentoOut)
 def get_investimento(
     investimento_id: int,

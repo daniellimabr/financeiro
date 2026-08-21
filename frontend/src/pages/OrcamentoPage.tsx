@@ -127,13 +127,13 @@ export function OrcamentoPage() {
   }
 
   return (
-    <section className="dash-page">
-      <h2>Orçamento</h2>
-
-      <div className="dash-filter">
-        <button type="button" onClick={openCreateForm}>
-          Novo orçamento
-        </button>
+    <section className="ac-page">
+      <div className="ac-toolbar">
+        <div className="ac-btn-row">
+          <button type="button" className="ac-btn ac-btn-primary" onClick={openCreateForm}>
+            Novo orçamento
+          </button>
+        </div>
       </div>
 
       {(createOrcamento.isError || updateOrcamento.isError) && (
@@ -142,8 +142,12 @@ export function OrcamentoPage() {
       {deleteOrcamento.isError && <p role="alert">Não foi possível excluir o orçamento.</p>}
 
       {formOpen && (
-        <div role="dialog" aria-label={editingId !== null ? "Editar orçamento" : "Novo orçamento"}>
-          <form className="dash-filter" onSubmit={submitForm}>
+        <div
+          role="dialog"
+          aria-label={editingId !== null ? "Editar orçamento" : "Novo orçamento"}
+          className="ac-panel"
+        >
+          <form className="ac-form-row" onSubmit={submitForm}>
             <label>
               Subcategoria
               <CategoryCombobox
@@ -155,7 +159,7 @@ export function OrcamentoPage() {
               />
             </label>
 
-            <div className="dash-toggle" role="group" aria-label="Tipo de orçamento">
+            <div className="ac-seg" role="group" aria-label="Tipo de orçamento">
               <button
                 type="button"
                 aria-pressed={formState.tipo === "eventual"}
@@ -246,6 +250,7 @@ export function OrcamentoPage() {
 
             <button
               type="submit"
+              className="ac-btn ac-btn-primary"
               disabled={
                 createOrcamento.isPending ||
                 updateOrcamento.isPending ||
@@ -254,7 +259,7 @@ export function OrcamentoPage() {
             >
               Salvar
             </button>
-            <button type="button" onClick={closeForm}>
+            <button type="button" className="ac-btn ac-btn-ghost" onClick={closeForm}>
               Cancelar
             </button>
           </form>
@@ -264,7 +269,7 @@ export function OrcamentoPage() {
       {orcamentosQuery.isLoading && <p>Carregando...</p>}
       {orcamentosQuery.isError && <p role="alert">Não foi possível carregar os orçamentos.</p>}
       {!orcamentosQuery.isLoading && grupos.length === 0 && (
-        <p className="dash-empty">Nenhum orçamento cadastrado.</p>
+        <p className="ac-empty">Nenhum orçamento cadastrado.</p>
       )}
 
       <ul className="simple-list">
@@ -278,14 +283,14 @@ export function OrcamentoPage() {
                   <span>{descricaoVigencia(orcamento)}</span>
                   <span>{formatCurrency(orcamento.valor)}</span>
                   <button
-                    className="btn-ghost"
+                    className="ac-btn ac-btn-ghost"
                     type="button"
                     onClick={() => openEditForm(orcamento)}
                   >
                     Editar
                   </button>
                   <button
-                    className="btn-ghost btn-quiet btn-danger"
+                    className="ac-btn ac-btn-ghost ac-btn-danger"
                     type="button"
                     onClick={() => handleDelete(orcamento.id, grupo.label)}
                   >
