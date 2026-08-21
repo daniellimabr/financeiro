@@ -1900,6 +1900,13 @@ tr.hidden-row .valor-cell {
   gap: 7px;
   text-align: left;
   width: 100%;
+  /* Item de grid (.ac-kpi-row/--compact): sem min-width:0 o item nunca
+     encolhe abaixo do min-content do próprio conteúdo (label+delta na
+     mesma linha, valor de 22px) — o grid `1fr` então cresce a coluna pra
+     caber, e a linha inteira de 5 KPIs vaza pra fora do viewport no
+     mobile em vez de quebrar em 2 colunas (achado real via browser-check,
+     Sprint 34: overflow horizontal cortando "Receita"/"Saldo" na tela). */
+  min-width: 0;
   font-family: var(--font-ac);
   color: var(--ac-text);
 }
