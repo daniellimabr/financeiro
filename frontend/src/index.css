@@ -1920,8 +1920,9 @@ button.ac-kpi:focus-visible {
 .ac-kpi .ac-kpi-head {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 6px;
+  gap: 4px 6px;
 }
 
 .ac-kpi .ac-kpi-label-row {
