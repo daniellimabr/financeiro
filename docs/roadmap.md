@@ -15,6 +15,7 @@ Fases em épicos, derivados do escopo funcional do bootstrap. PRDs individuais s
 | E7 | Conta e perfil ✅ | Perfil de usuário, logout; tela de Configurações (absorve Gestão de Contas) + regra de competência de salário + saldo inicial por conta/Saldo Acumulado — ✅ Sprint 15 (2026-08-17). Multiusuário/item 11 (UI de convidar/remover) adiado pra sprint futura, decisão do CEO — arquitetura já suporta |
 | E8 | Migração de dados legados ✅ | Import de categorias (Sprint 2) + memória de classificação do v1 (Sprint 4) — concluído em 2026-08-14 |
 | E9 | Natureza e projeção de custos ✅ | Classificação de subcategoria por natureza (fixo recorrente/variável recorrente/eventual) + dashboard de visibilidade — ✅ Sprint 12 (2026-08-16); rótulo "Eventual", funil Natureza>Categoria>Subcategoria>Transação e redesign de tabelas/botões do app — ✅ Sprint 13 (2026-08-16); projeção de custos futuros (receita/despesa/saldo) com simulação efêmera de hipotéticas — ✅ Sprint 14 (2026-08-16) — épico fechado |
+| E10 | Redesign visual (Analyst Console) | Substituição do sistema visual atual por um novo sistema ("Analyst Console" — paleta desaturada estilo BI, KPIs com delta+sparkline, conciliação do Saldo Acumulado sempre visível), escolhido pelo CEO entre 3 propostas visuais comparadas (Artifacts). Fundação (tokens/tipografia/shell) + Dashboard ✅ Sprint 34 (2026-08-21); as 10 telas restantes (Categorização, Ativos, Investimentos, Passivos, Configurações, Natureza, Orçamento, Categorias, Login) ficam como backlog do épico, a planejar sprint a sprint |
 
 Backlog futuro (não desenhar agora): sync Pluggy agendada, otimização para comercialização/escala >10 usuários, reavaliação do plugin Understand Anything quando o codebase passar de ~100 arquivos.
 
@@ -30,7 +31,7 @@ explícita do CEO a cada vez, nunca automática/agendada.
 
 | Última auditoria | Sprint de referência | Próxima checagem devida | Status |
 |---|---|---|---|
-| nenhuma ainda | — | Sprint 34 (30 + 4) | 4/5 sprints completadas (Sprint 30, Sprint 31, Sprint 32, Sprint 33); mecanismo criado na Sprint 29 |
+| nenhuma ainda | — | Sprint 34 (30 + 4) | 4/5 sprints completadas (Sprint 30, Sprint 31, Sprint 32, Sprint 33); mecanismo criado na Sprint 29. **Checkpoint da Sprint 34 (2026-08-21):** CTO propôs rodar `structural-auditor` antes do redesign visual do E10 (ADR-003 cita troca de sistema de design como o cenário que a auditoria existe para pegar) — **CEO decidiu adiar**, não reabrir sem pedido explícito dele |
 
 ## Sequência proposta (dependências)
 
@@ -1244,4 +1245,14 @@ abril-julho com extratos reais de NuBank/XP, e as 8 transações de Aporte/Resga
 - **Persistir despesas/receitas hipotéticas como cenários salvos:** decisão explícita do CEO na sessão de planejamento da Sprint 14 (2026-08-16) — a simulação da tela "Projeção" fica efêmera (sem CRUD, sem tabela) por ora. Se o CEO quiser voltar a um cenário entre sessões (ex.: comparar "com reforma" vs. "sem reforma" ao longo de semanas), viraria candidata a sprint futura com tabela nova + CRUD — sem PRD/plano ainda.
 - **Heurística de dia útil para o lag Pluggy vs. extrato bancário real:** decisão explícita do CEO na sessão de planejamento da Sprint 16 (2026-08-17) — transações de fim de semana às vezes aparecem no extrato do Itaú só no próximo dia útil (até 2 dias depois da data bruta que a Pluggy reporta), sem outro campo no payload (`postDate`/`settlementDate`) para corrigir automaticamente. Não implementado por ora (risco de heurística errada, sem tratar feriados); candidata a revisão futura se a Pluggy passar a expor um campo de liquidação, ou se o CEO priorizar uma heurística mesmo com o risco.
 - **Toggle competência/caixa nas telas "Natureza"/"Projeção":** fora de escopo da Sprint 16 (toggle só no Dashboard) — candidata a extensão futura se o CEO quiser o mesmo regime nessas telas.
+- **Indicador de status de conciliação na sidebar (E10):** o mockup aprovado do redesign "Analyst
+  Console" tem um rodapé de sidebar mostrando quantas contas correntes estão conferidas (ex.: "3 de
+  3 contas"). Não implementado na Sprint 34 — precisa de hook/endpoint novo que não existe ainda.
+  Candidata a sprint futura do épico E10.
+- **Sparkline/delta dos KPIs Ativos/Passivos/Patrimônio (E10):** decisão explícita do CEO durante a
+  execução da Sprint 34 (2026-08-21) — o mockup mostra sparkline nesses 3 tiles, mas não existe
+  endpoint de histórico pra esses totais hoje (só o snapshot atual via `usePatrimonioBreakdown`); o
+  CEO escolheu não expandir o backend nesta sprint, então os 3 tiles usam `KpiTile` em modo `compact`
+  (label + valor, sem delta/spark). Candidata a sprint futura do épico E10 se o CEO priorizar um
+  endpoint de série histórica de patrimônio.
 - **Sugestão automática pra holdings CDB com nome idêntico/código nulo:** achado real da Sprint 21 — a cascata código-exato→similaridade de nome não resolve as 18 posições de CDB da Nubank (nome genérico igual, sem ticker/ISIN). Vínculo dessa sprint foi reconstruído manualmente por correspondência de valor de aporte contra o extrato real do CEO. Sem PRD/plano ainda; candidata a sprint futura se o CEO priorizar automatizar (possível caminho: correspondência por data+valor de aporte, mas exige mais investigação de payload).

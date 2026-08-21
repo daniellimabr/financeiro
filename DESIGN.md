@@ -24,6 +24,28 @@ colors:
   despesa-dark: "#e0855c"
   danger-dark: "#d9748c"
   danger-bg-dark: "rgba(217, 116, 140, 0.14)"
+  # Analyst Console (Sprint 34, épico E10) — sistema novo, namespace ac-*
+  # inteiramente separado do bloco acima (ver seção "Analyst Console" para o
+  # porquê). Cobre hoje só o shell/sidebar e o Dashboard; as outras 8 telas
+  # continuam no bloco de cores acima até suas próprias sprints do épico.
+  ac-bg: "#f4f5f7"
+  ac-surface: "#ffffff"
+  ac-border: "#dfe2e8"
+  ac-text: "#6b7280"
+  ac-text-h: "#1a1d23"
+  ac-blue: "#2a5fd6"
+  ac-good: "#0d7a3f"
+  ac-bad: "#ac3232"
+  ac-amber: "#a4720a"
+  ac-bg-dark: "#14161a"
+  ac-surface-dark: "#1b1e24"
+  ac-border-dark: "#2c303a"
+  ac-text-dark: "#9199a8"
+  ac-text-h-dark: "#f0f1f4"
+  ac-blue-dark: "#6d93ec"
+  ac-good-dark: "#3fae72"
+  ac-bad-dark: "#e0696e"
+  ac-amber-dark: "#d1a13a"
 typography:
   display:
     fontFamily: "Archivo, system-ui, 'Segoe UI', Roboto, sans-serif"
@@ -46,6 +68,16 @@ typography:
     fontSize: "12px"
     fontWeight: 600
     letterSpacing: "0.04em"
+  ac-body:
+    fontFamily: "Inter, system-ui, 'Segoe UI', Roboto, sans-serif"
+    fontSize: "14px"
+    fontWeight: 400
+    lineHeight: 1.5
+  ac-kpi-value:
+    fontFamily: "Inter, system-ui, 'Segoe UI', Roboto, sans-serif"
+    fontSize: "22px"
+    fontWeight: 700
+    letterSpacing: "-0.01em"
 rounded:
   sm: "8px"
   md: "12px"
@@ -80,6 +112,18 @@ components:
   button-ghost-hover:
     backgroundColor: "{colors.accent-bg}"
     textColor: "{colors.text-h}"
+  ac-kpi-tile:
+    backgroundColor: "{colors.ac-surface}"
+    textColor: "{colors.ac-text-h}"
+    rounded: "8px"
+    padding: "13px 14px"
+  ac-kpi-tile-hover:
+    borderColor: "{colors.ac-blue}"
+  ac-panel:
+    backgroundColor: "{colors.ac-surface}"
+    textColor: "{colors.ac-text-h}"
+    rounded: "8px"
+    padding: "18px"
 ---
 
 # Design System: Financeiro v2
@@ -124,6 +168,160 @@ runs up to 1440px.
 - A real display/body pair (Archivo/Public Sans, self-hosted `.woff2`) —
   distinctive enough to read as a considered choice, still an Operate-mode
   workhorse rather than an invented display face competing with the data.
+
+**Sprint 34 note:** everything below "Colors" through "Do's and Don'ts"
+describes this original system, still governing 8 of the app's 9 screens.
+The shell/sidebar and the Dashboard now run a second, newer system —
+"Analyst Console" — documented in its own section right after this one.
+Read that section first if you're touching the shell or the Dashboard;
+read the rest of this file for everything else.
+
+## Analyst Console (Sprint 34, épico E10)
+
+A second design system, deliberately coexisting with the one described in
+the rest of this file rather than replacing it in one sprint. Covers the
+app shell (sidebar/nav, every tab) and the Dashboard screen only, as of
+Sprint 34; the other 8 screens (Categorização, Ativos, Investimentos,
+Passivos, Configurações, Natureza, Orçamento, Categorias) stay on the
+original system until their own sprints in épico E10 migrate them one at a
+time — a deliberate scope cut (PRD-034) so this sprint stays roughly the
+size of Sprint 13, the largest to date, instead of attempting all 9 screens
+at once.
+
+### Why a second system, not a repaint of the first
+
+The CEO asked for 3 comparable visual directions (rendered as Artifacts with
+fictitious data, each covering Dashboard + shell + one secondary screen) and
+picked **Proposta 3 — "Analyst Console"**: a data-analyst register (desaturated
+BI-tool palette, every KPI showing a delta vs. the prior period plus a
+sparkline) over the original's warm-neutral personal-finance register. This
+is a genuine direction change, not a token tweak — the two are meant to look
+like different products for the duration of the épico.
+
+### Coexistence mechanism: disjoint token namespace, not scoped CSS
+
+Every new token lives under an `--ac-*` prefix in `frontend/src/index.css`,
+fully separate from `--bg`/`--surface`/`--accent`/`--receita`/`--despesa`/
+etc. New component CSS (`.ac-*` classes) reads only `--ac-*` tokens; every
+untouched page keeps reading the original tokens under the original class
+names (`.dash-tile`, `.dash-table`, `.app-nav button`, …), completely
+unaware a second system exists. This was a deliberate choice over scoping
+overrides to a wrapper class (e.g. `.app-shell { --bg: ... }`) — the shell
+wraps *every* screen including the 8 untouched ones, so any override at that
+level would leak the new palette into old-system pages through CSS custom
+property inheritance. Two disjoint namespaces sidestep that risk entirely,
+at the cost of `#f4f5f7` (`--ac-bg`) and `#f5f6f1` (`--bg`) being separate
+tokens that happen to render as nearly the same neutral gray — intentional,
+so the shared `.app-main` background (which sits behind old-system pages
+too) doesn't create a visible seam.
+
+### Colors
+
+- **Steel Blue** (`--ac-blue`, `#2a5fd6` light / `#6d93ec` dark): the only
+  interactive accent — buttons, links, focus rings, the active nav tile, the
+  Saldo Acumulado KPI's value color. Never doubles as a data-semantic color
+  (a conceptual break from the original system, where green is both the
+  brand accent *and* the receita semantic — PRD-034 called this out
+  explicitly as a decision to reopen).
+- **Good/Bad** (`--ac-good` `#0d7a3f`/`#3fae72`, `--ac-bad` `#ac3232`/
+  `#e0696e`): a new, more desaturated green/red pair than `--receita`/
+  `--despesa` — not a reuse, a deliberate BI-style repaint. Used for KPI
+  delta badges (▲/▼ vs. prior period) and the two lines in the Receita vs.
+  Despesa comparativo. Framing is metric-aware, not literal: a Despesa KPI
+  going *down* renders `good` (see `resolveKpiDeltaPercent` in
+  `KpiTile.tsx`, `positiveIsGood` parameter) — spending less is the good
+  outcome even though the triangle points down.
+- **Amber** (`--ac-amber`, unused as of Sprint 34): reserved for a future
+  warning state on this system's screens (not wired to anything yet — no
+  screen built this sprint needed it).
+- **Neutrals** (`--ac-bg`/`--ac-surface`/`--ac-surface-2`/`--ac-border`/
+  `--ac-border-strong`/`--ac-text`/`--ac-text-dim`/`--ac-text-h`): a cooler,
+  more desaturated gray scale than the original's warm sage — two border
+  strengths (`--ac-border` for row dividers, `--ac-border-strong` for
+  section boundaries like the Total→per-account divider in the conferência
+  table) where the original system only has one.
+
+### Typography
+
+Inter, self-hosted (`frontend/public/fonts/inter-{400,500,600,700,800}.woff2`,
+same self-hosting pattern as Archivo/Public Sans — one variable-font file
+copied under 5 weight-named filenames, not 5 distinct static instances).
+Runs the full body-to-display range itself (no separate display face): 700
+weight at 22px for KPI values, 600 at ~14.5px for panel headings, 600
+uppercase 11px for KPI/section labels, 400 at 14px for body/table text.
+
+### Layout & Components
+
+- **Shell** (`.app-shell`/`.app-sidebar`/`.app-nav`, `ProtectedPage.tsx`):
+  224px sidebar (down from the original's 240px), Inter throughout, nav
+  icons (16×16 stroke SVGs, one per tab — 5 traced from the mockup, 4 drawn
+  fresh in the same stroke weight for the tabs the mockup didn't cover:
+  Natureza, Orçamento, Categorias, Configurações). Active tab: `--ac-blue`
+  text on `--ac-blue-bg`, same "filled background means you are here" idiom
+  as the original system, different color. This is the one piece of chrome
+  shared by every screen, so it changed for all 9 tabs even though only
+  Dashboard's content did.
+- **`KpiTile`** (`frontend/src/components/KpiTile.tsx`) — the one new
+  reusable component this sprint introduced, in two densities driven by a
+  `compact` prop rather than two components: primary (label + optional
+  delta-vs-prior-period badge + big value + optional sparkline, used for the
+  5 flow KPIs) and compact (label + value only, single row, used for
+  Ativos/Passivos/Patrimônio — no delta/sparkline because no history
+  endpoint exists yet for those three totals; a scope deviation flagged to
+  and accepted by the CEO during Sprint 34 execution rather than expanding
+  the backend unilaterally, see `docs/roadmap.md`). Delta math
+  (`resolveKpiDeltaPercent`) is a pure, independently-tested function, not
+  inlined JSX — `previous === 0` hides the delta rather than dividing by
+  zero. A tile becomes a real `<button>` when it only needs `onClick`, or a
+  `div[role=button]` when it also carries a nested interactive element (the
+  Saldo Acumulado tile's "next month" arrow) — nesting a real `<button>`
+  inside a `<button>` is invalid HTML, same constraint the original
+  system's Saldo Acumulado tile already worked around pre-Sprint-34.
+- **`ChartTooltip`** (`frontend/src/components/ChartTooltip.tsx`) — a
+  reusable custom Recharts tooltip content renderer + `chartCursorProps`,
+  not a hand-rolled SVG crosshair. Deliberately built on Recharts (already
+  the app's only charting library, via `TrendLineChart.tsx`) instead of
+  reimplementing mouse-tracking/hit-areas from scratch like the mockup's
+  static HTML demo did — same visual result (dark pill, month + exact
+  currency value), less bespoke interaction code to maintain. Meant to
+  outlive this sprint: any future Analyst Console line chart reaches for
+  this instead of a new one-off tooltip.
+- **Shared-scale small multiples**: the Receita vs. Despesa comparativo
+  renders two independent `LineChart`s (never one dual-axis chart — the
+  PRD explicitly rejected that) but computes one Y domain
+  (`computeSharedDomain` in `frontend/src/utils/sharedChartDomain.ts`) from
+  *both* series combined and passes it to both charts' `YAxis`. Never
+  normalize each chart to its own min/max — that would make a same-height
+  line mean two different things depending on which panel it's in, defeating
+  the point of a side-by-side comparison.
+- **Month navigator** (`MonthNav`, local to `DashboardsPage.tsx`): ◀ mês ▶
+  replacing the plain year/month `<select>` pair for this screen only (the
+  other 8 still use `PeriodFilter`, unchanged). Reuses the page's existing
+  `mesAnterior`/`mesSeguinte` helpers rather than duplicating month-rollover
+  math, and the "próximo mês" button is `disabled` outright at the current
+  real month (a stricter version of the pre-existing pattern elsewhere on
+  this page, which only alerts on click at that boundary).
+- **Conferência table, always visible**: `SaldoAcumuladoConferenciaTable`
+  (same component, same data, only its CSS classes changed to `.ac-table`)
+  moved out from behind the Saldo Acumulado drill-down click and now renders
+  unconditionally near the top of the page — the PRD's central acceptance
+  criterion, since Sprints 32/33 established this table as the CEO's actual
+  bank-reconciliation workflow, not a rarely-opened detail view. The
+  drill-down funnel for Saldo Acumulado still exists (click the KPI) but no
+  longer duplicates the table — only the larger trend chart and explanatory
+  text, content genuinely absent from the always-visible panel.
+
+### What did not change
+
+No color on this system carries meaning beyond what's documented above —
+`--ac-blue` never means "money," `--ac-good`/`--ac-bad` never mean anything
+except "this direction is favorable/unfavorable for this specific metric."
+The Tabular Money Rule and Flat Ledger Rule (see below) hold here too: every
+`--ac-*` currency value uses `tabular-nums`, and nothing in `.ac-*` CSS casts
+a shadow. The drill-down funnel below the Dashboard's new top section
+(categoria/subcategoria accordion, transaction tables) is untouched
+original-system UI — Sprint 34's scope stopped at the funnel's edge
+deliberately, to keep this sprint's size in check.
 
 ## Colors
 

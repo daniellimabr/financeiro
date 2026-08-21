@@ -194,13 +194,19 @@ const SALDO_ACUMULADO_FIXTURE = [
 ];
 
 // Tabela de conferência (PRD-032, Sprint 32) — Total + 2 contas corrente.
+// receitas/despesas usam valores DIFERENTES de SUMMARY_FIXTURE/TENDENCIA_FIXTURE
+// de propósito (Sprint 34): a tabela de conferência agora fica sempre visível
+// na tela (não só atrás de um clique), então um valor coincidentemente igual
+// ao card "Receita"/"Despesa" do topo (ex.: "8400.00"/"5120.30") tornava
+// screen.getByText(...) ambíguo em quase todo teste do arquivo — não é uma
+// premissa de negócio, só uma colisão de fixture.
 const SALDO_ACUMULADO_CONFERENCIA_FIXTURE = [
   {
     account_id: null,
     account_nome: "Total em Conta Corrente (100%)",
     saldo_inicio: "6000.00",
-    receitas: "8400.00",
-    despesas: "5120.30",
+    receitas: "8410.00",
+    despesas: "5130.30",
     saldo_fim: "9279.70",
     salario_recebido: "1000.00",
     saldo_efetivo: "8279.70",
@@ -209,8 +215,8 @@ const SALDO_ACUMULADO_CONFERENCIA_FIXTURE = [
     account_id: 1,
     account_nome: "Conta corrente",
     saldo_inicio: "5000.00",
-    receitas: "8400.00",
-    despesas: "5120.30",
+    receitas: "8410.00",
+    despesas: "5130.30",
     saldo_fim: "8279.70",
     salario_recebido: "1000.00",
     saldo_efetivo: "7279.70",
@@ -343,6 +349,33 @@ function normalizedText(el: HTMLElement): string {
   return (el.textContent ?? "").replace(/\u00A0/g, " ");
 }
 
+// Navegador de mês (Sprint 34) substitui o filtro ano/mês simples — este
+// helper clica ◀/▶ o número de vezes necessário a partir do mês corrente
+// real (padrão do componente) até o alvo, em vez de selectOptions num
+// <select> que não existe mais nesta tela.
+function monthsBetween(fromAno: number, fromMes: number, toAno: number, toMes: number): number {
+  return (fromAno - toAno) * 12 + (fromMes - toMes);
+}
+
+function mesAnteriorDoHoje(): { ano: number; mes: number } {
+  const hoje = new Date();
+  const ano = hoje.getFullYear();
+  const mes = hoje.getMonth() + 1;
+  return mes === 1 ? { ano: ano - 1, mes: 12 } : { ano, mes: mes - 1 };
+}
+
+async function irParaMes(ano: number, mes: number) {
+  const hoje = new Date();
+  const diff = monthsBetween(hoje.getFullYear(), hoje.getMonth() + 1, ano, mes);
+  if (diff === 0) return;
+  const button = screen.getByRole("button", {
+    name: diff > 0 ? "Mês anterior" : "Próximo mês",
+  });
+  for (let i = 0; i < Math.abs(diff); i++) {
+    await userEvent.click(button);
+  }
+}
+
 function routedFetchMock() {
   return vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     void init;
@@ -421,13 +454,15 @@ describe("DashboardsPage", () => {
     const { container } = renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
 
-    const rows = container.querySelectorAll(".dash-summary");
-    expect(rows).toHaveLength(2);
-    expect(rows[0]?.textContent).toContain("Ativos");
-    expect(rows[0]?.textContent).toContain("Passivos");
-    expect(rows[0]?.textContent).toContain("Patrimônio");
-    expect(rows[0]?.textContent).not.toContain("Receita");
-    expect(rows[1]?.textContent).toContain("Receita");
+    const compactRow = container.querySelector(".ac-kpi-row--compact");
+    const flowRow = container.querySelector(".ac-kpi-row");
+    expect(compactRow).not.toBeNull();
+    expect(flowRow).not.toBeNull();
+    expect(compactRow?.textContent).toContain("Ativos");
+    expect(compactRow?.textContent).toContain("Passivos");
+    expect(compactRow?.textContent).toContain("Patrimônio");
+    expect(compactRow?.textContent).not.toContain("Receita");
+    expect(flowRow?.textContent).toContain("Receita");
   });
 
   it("no longer shows the short disclaimer tags on Saldo Acumulado or Patrimonio", async () => {
@@ -451,12 +486,15 @@ describe("DashboardsPage", () => {
     renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
 
-    await userEvent.selectOptions(screen.getByLabelText("Mês"), "Janeiro");
+    await userEvent.click(screen.getByRole("button", { name: "Mês anterior" }));
+    const anterior = mesAnteriorDoHoje();
 
     await waitFor(() => {
       const calls = fetchMock.mock.calls.map((call) => String(call[0]));
       expect(
-        calls.some((url) => url.startsWith("/dashboards/summary") && url.includes("mes=1"))
+        calls.some(
+          (url) => url.startsWith("/dashboards/summary") && url.includes(`mes=${anterior.mes}`)
+        )
       ).toBe(true);
     });
   });
@@ -468,7 +506,7 @@ describe("DashboardsPage", () => {
     await screen.findByText("R$ 8.400,00");
 
     await waitFor(() => {
-      expect(container.querySelectorAll(".dash-tile .spark").length).toBeGreaterThan(0);
+      expect(container.querySelectorAll(".ac-kpi .spark").length).toBeGreaterThan(0);
     });
   });
 
@@ -726,7 +764,7 @@ describe("DashboardsPage", () => {
       expect(normalizedText(accordionRowButton(/Mercado/))).toContain("R$ 755,00");
     });
 
-    await userEvent.selectOptions(screen.getByLabelText("Mês"), "Janeiro");
+    await userEvent.click(screen.getByRole("button", { name: "Mês anterior" }));
     await waitFor(() => {
       expect(normalizedText(accordionRowButton(/Mercado/))).toContain("R$ 800,00");
     });
@@ -796,7 +834,8 @@ describe("DashboardsPage", () => {
     await screen.findByText("Mercado São João");
 
     function rowsDescricao() {
-      return within(screen.getByRole("table"))
+      const funil = document.querySelector(".dash-funnel") as HTMLElement;
+      return within(within(funil).getByRole("table"))
         .getAllByRole("row")
         .slice(1)
         .map((row) => within(row).getAllByRole("cell")[1].textContent);
@@ -895,14 +934,17 @@ describe("DashboardsPage", () => {
     renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
 
-    await userEvent.click(screen.getByRole("button", { name: /^SaldoR\$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Saldofluxo/ }));
 
     expect(await screen.findByText(/Receita R\$ 8\.400,00/)).toBeInTheDocument();
     expect(screen.getByText(/Despesa R\$ 5\.120,30/)).toBeInTheDocument();
     expect(screen.getByText(/Saldo R\$ 3\.279,70/)).toBeInTheDocument();
-    // SaldoPorContaList (snapshot bancário) não é mais mostrada aqui — só no
-    // card Ativos.
-    expect(screen.queryByText("Conta corrente")).not.toBeInTheDocument();
+    // SaldoPorContaList (snapshot bancário) não é mostrada dentro DESTE funil
+    // — só no card Ativos. "Conta corrente" ainda aparece na tela porque o
+    // painel de conferência do Saldo Acumulado (Sprint 34) é sempre visível,
+    // fora do funil — por isso o escopo da checagem é só dentro do funil.
+    const funil = document.querySelector(".dash-funnel") as HTMLElement;
+    expect(within(funil).queryByText("Conta corrente")).not.toBeInTheDocument();
   });
 
   function stubPatrimonioBreakdown(fetchMock: ReturnType<typeof routedFetchMock>) {
@@ -961,7 +1003,11 @@ describe("DashboardsPage", () => {
     const carroRow = await screen.findByRole("button", { name: /Carro/ });
     expect(accordionRowButton(/^Ativos/)).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("Reserva de emergência")).toBeInTheDocument();
-    expect(screen.getByText("Conta corrente")).toBeInTheDocument();
+    // "Conta corrente" também aparece no painel de conferência do Saldo
+    // Acumulado (Sprint 34, sempre visível) — escopar ao funil evita a
+    // ambiguidade entre as duas ocorrências.
+    const funil = carroRow.closest(".dash-funnel") as HTMLElement;
+    expect(within(funil).getByText("Conta corrente")).toBeInTheDocument();
 
     // "Carro" é o próprio Row expansível, que ao expandir mostra tipo + data
     // de aquisição.
@@ -1183,7 +1229,8 @@ describe("DashboardsPage", () => {
 
     expect(await screen.findByText("R$ 12.000,00")).toBeInTheDocument();
     expect(screen.getByText("R$ 11.500,00")).toBeInTheDocument();
-    expect(screen.getByText(/Saldo Anterior \(12\/2025\)/)).toBeInTheDocument();
+    expect(screen.getByText("Saldo Anterior")).toBeInTheDocument();
+    expect(screen.getByText("12/2025")).toBeInTheDocument();
   });
 
   it("clicking Saldo Anterior in January/2026 alerts instead of navigating", async () => {
@@ -1192,13 +1239,13 @@ describe("DashboardsPage", () => {
 
     renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
-    await userEvent.selectOptions(screen.getByLabelText("Ano"), "2026");
-    await userEvent.selectOptions(screen.getByLabelText("Mês"), "Janeiro");
+    await irParaMes(2026, 1);
+    await screen.findByText("Janeiro 2026");
 
     await userEvent.click(screen.getByRole("button", { name: /Saldo Anterior/ }));
 
     expect(alertSpy).toHaveBeenCalledTimes(1);
-    expect((screen.getByLabelText("Mês") as HTMLSelectElement).value).toBe("1");
+    expect(screen.getByText("Janeiro 2026")).toBeInTheDocument();
     alertSpy.mockRestore();
   });
 
@@ -1207,15 +1254,14 @@ describe("DashboardsPage", () => {
 
     renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
-    await userEvent.selectOptions(screen.getByLabelText("Ano"), "2026");
-    await userEvent.selectOptions(screen.getByLabelText("Mês"), "Março");
+    await irParaMes(2026, 3);
+    await screen.findByText("Março 2026");
 
     await userEvent.click(screen.getByRole("button", { name: /Saldo Anterior/ }));
 
     await waitFor(() => {
-      expect((screen.getByLabelText("Mês") as HTMLSelectElement).value).toBe("2");
+      expect(screen.getByText("Fevereiro 2026")).toBeInTheDocument();
     });
-    expect((screen.getByLabelText("Ano") as HTMLSelectElement).value).toBe("2026");
   });
 
   it("opens the Saldo Acumulado drilldown with a trend chart when the card is clicked", async () => {
@@ -1237,15 +1283,14 @@ describe("DashboardsPage", () => {
 
     renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
-    await userEvent.selectOptions(screen.getByLabelText("Ano"), "2025");
-    await userEvent.selectOptions(screen.getByLabelText("Mês"), "Novembro");
+    await irParaMes(2025, 11);
+    await screen.findByText("Novembro 2025");
 
     await userEvent.click(screen.getByRole("button", { name: "Ver mês seguinte" }));
 
     await waitFor(() => {
-      expect((screen.getByLabelText("Mês") as HTMLSelectElement).value).toBe("12");
+      expect(screen.getByText("Dezembro 2025")).toBeInTheDocument();
     });
-    expect((screen.getByLabelText("Ano") as HTMLSelectElement).value).toBe("2025");
     expect(screen.queryByRole("heading", { name: "Saldo Acumulado" })).not.toBeInTheDocument();
   });
 
@@ -1253,7 +1298,7 @@ describe("DashboardsPage", () => {
     const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
     vi.stubGlobal("fetch", routedFetchMock());
     // now() é jan/2026 por padrão no componente — o filtro inicial já é o
-    // mês corrente real, sem precisar mudar o seletor.
+    // mês corrente real, sem precisar navegar antes.
 
     renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
@@ -1261,9 +1306,24 @@ describe("DashboardsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Ver mês seguinte" }));
 
     expect(alertSpy).toHaveBeenCalledTimes(1);
-    expect((screen.getByLabelText("Mês") as HTMLSelectElement).value).toBe(
-      String(new Date().getMonth() + 1)
-    );
+    const hoje = new Date();
+    const MESES_COMPLETOS = [
+      "Janeiro",
+      "Fevereiro",
+      "Março",
+      "Abril",
+      "Maio",
+      "Junho",
+      "Julho",
+      "Agosto",
+      "Setembro",
+      "Outubro",
+      "Novembro",
+      "Dezembro",
+    ];
+    expect(
+      screen.getByText(`${MESES_COMPLETOS[hoje.getMonth()]} ${hoje.getFullYear()}`)
+    ).toBeInTheDocument();
     alertSpy.mockRestore();
   });
 
@@ -1294,15 +1354,13 @@ describe("DashboardsPage", () => {
     expect(await screen.findByText("CDB Nubank 120%")).toBeInTheDocument();
   });
 
-  it("shows the Saldo Acumulado conferencia table (Total + one row per conta) above the trend chart", async () => {
+  it("shows the Saldo Acumulado conferencia table (Total + one row per conta) always visible, no click needed", async () => {
     vi.stubGlobal("fetch", routedFetchMock());
 
     renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
 
-    await userEvent.click(screen.getByRole("button", { name: /^Saldo Acumulado/ }));
-    await screen.findByRole("heading", { name: "Saldo Acumulado" });
-
+    // Sem clicar em nada — a tabela de conferência é sempre visível (PRD-034).
     const table = await screen.findByRole("table");
     expect(within(table).getByText("Total em Conta Corrente (100%)")).toBeInTheDocument();
     expect(within(table).getByText("Conta corrente")).toBeInTheDocument();
@@ -1328,7 +1386,6 @@ describe("DashboardsPage", () => {
     renderWithQueryClient(<DashboardsPage />);
     await screen.findByText("R$ 8.400,00");
 
-    await userEvent.click(screen.getByRole("button", { name: /^Saldo Acumulado/ }));
     const table = await screen.findByRole("table");
 
     expect(within(table).queryAllByRole("button")).toHaveLength(0);

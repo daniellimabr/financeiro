@@ -30,6 +30,53 @@
   src: url("/fonts/public-sans-600.woff2") format("woff2");
 }
 
+/* Inter (Sprint 34) — tipografia do sistema "Analyst Console" (épico E10),
+   mesmo padrão self-hosted do Archivo/Public Sans acima. Pesos 400/500/600/
+   700/800: o arquivo .woff2 é uma fonte variável única (mesma técnica já em
+   uso pro Archivo/Public Sans — os pares 600/700 e 400/600 daquelas famílias
+   também compartilham bytes idênticos entre pesos), referenciada 5x com
+   font-weight distinto porque a Proposta 3 usa uma faixa maior de peso (400
+   corpo até 800 marca da sidebar) que os pares anteriores. */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/inter-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/inter-500.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/inter-600.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/inter-700.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/fonts/inter-800.woff2") format("woff2");
+}
+
 :root {
   /* Base — neutro levemente frio, evita o cliché "creme + serifa" */
   --text: #6d6f61;
@@ -103,6 +150,39 @@
   --nat-fixa-bg: rgba(61, 90, 128, 0.1);
   --nat-variavel-bg: rgba(122, 100, 32, 0.1);
   --nat-eventual-bg: rgba(122, 85, 128, 0.1);
+
+  /* "Analyst Console" (Sprint 34, épico E10) — sistema visual novo, namespace
+     --ac-* inteiramente separado do sistema acima (--bg/--surface/--accent/
+     --receita/--despesa etc.), de propósito: as 9 telas ainda não migradas
+     continuam lendo os tokens antigos sem nenhuma mudança, e só os
+     componentes novos (shell/sidebar, KpiTile, Dashboard) leem --ac-*. Dois
+     sistemas coexistindo lado a lado durante o épico, decisão explícita do
+     CEO (PRD-034) pra não repetir o excesso de escopo da Sprint 13. Paleta e
+     valores vêm do mockup aprovado ("Analyst Console", Proposta 3) — azul-
+     aço como accent de interação, verde/vermelho como semântica de dado
+     (--ac-good/--ac-bad), deliberadamente dessaturados frente ao --receita/
+     --despesa antigo (não é o mesmo par de cor, é um novo par "estilo BI").
+     --ac-bg/--ac-surface ficam a poucos pontos de diferença de --bg/--surface
+     (ex.: #f4f5f7 vs #f5f6f1) — não por coincidência, mas porque o `.app-main`
+     compartilhado por todas as abas adota --ac-bg (ver .app-main abaixo) sem
+     criar uma emenda visível atrás das 9 páginas ainda no sistema antigo. */
+  --ac-bg: #f4f5f7;
+  --ac-surface: #ffffff;
+  --ac-surface-2: #fafbfc;
+  --ac-border: #dfe2e8;
+  --ac-border-strong: #c7ccd6;
+  --ac-text: #6b7280;
+  --ac-text-dim: #9aa0ac;
+  --ac-text-h: #1a1d23;
+  --ac-blue: #2a5fd6;
+  --ac-blue-bg: rgba(42, 95, 214, 0.08);
+  --ac-good: #0d7a3f;
+  --ac-good-bg: rgba(13, 122, 63, 0.08);
+  --ac-bad: #ac3232;
+  --ac-bad-bg: rgba(172, 50, 50, 0.08);
+  --ac-amber: #a4720a;
+  --ac-amber-bg: rgba(164, 114, 10, 0.1);
+  --font-ac: "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
 
   /* Par de tipografia — Sprint 6, escolhido por comparação visual real
      (ver docs/sprints/SPRINT-006-...-report.md). Archivo (grotesca
@@ -185,6 +265,23 @@
     --nat-fixa-bg: rgba(127, 163, 201, 0.14);
     --nat-variavel-bg: rgba(201, 172, 92, 0.14);
     --nat-eventual-bg: rgba(185, 140, 196, 0.14);
+
+    --ac-bg: #14161a;
+    --ac-surface: #1b1e24;
+    --ac-surface-2: #20232a;
+    --ac-border: #2c303a;
+    --ac-border-strong: #3a3f4b;
+    --ac-text: #9199a8;
+    --ac-text-dim: #6b7280;
+    --ac-text-h: #f0f1f4;
+    --ac-blue: #6d93ec;
+    --ac-blue-bg: rgba(109, 147, 236, 0.12);
+    --ac-good: #3fae72;
+    --ac-good-bg: rgba(63, 174, 114, 0.12);
+    --ac-bad: #e0696e;
+    --ac-bad-bg: rgba(224, 105, 110, 0.12);
+    --ac-amber: #d1a13a;
+    --ac-amber-bg: rgba(209, 161, 58, 0.14);
   }
 }
 
@@ -229,6 +326,23 @@
   --nat-fixa-bg: rgba(127, 163, 201, 0.14);
   --nat-variavel-bg: rgba(201, 172, 92, 0.14);
   --nat-eventual-bg: rgba(185, 140, 196, 0.14);
+
+  --ac-bg: #14161a;
+  --ac-surface: #1b1e24;
+  --ac-surface-2: #20232a;
+  --ac-border: #2c303a;
+  --ac-border-strong: #3a3f4b;
+  --ac-text: #9199a8;
+  --ac-text-dim: #6b7280;
+  --ac-text-h: #f0f1f4;
+  --ac-blue: #6d93ec;
+  --ac-blue-bg: rgba(109, 147, 236, 0.12);
+  --ac-good: #3fae72;
+  --ac-good-bg: rgba(63, 174, 114, 0.12);
+  --ac-bad: #e0696e;
+  --ac-bad-bg: rgba(224, 105, 110, 0.12);
+  --ac-amber: #d1a13a;
+  --ac-amber-bg: rgba(209, 161, 58, 0.14);
 }
 
 * {
@@ -443,86 +557,100 @@ input {
   border-color: var(--accent);
 }
 
-/* ==================== App shell ==================== */
+/* ==================== App shell ====================
+   Restilizado na Sprint 34 (épico E10, "Analyst Console") — único trecho de
+   chrome que muda pra TODAS as abas de uma vez (mesmo as 9 ainda no sistema
+   antigo), porque a sidebar/nav é compartilhada; PRD-034 escopo item 3. Usa
+   --ac-* (ver bloco de tokens acima), nunca --accent/--surface antigos. */
 
 .app-shell {
   display: flex;
   min-height: 100svh;
+  font-family: var(--font-ac);
 }
 
 .app-sidebar {
-  flex: 0 0 240px;
+  flex: 0 0 224px;
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  background: var(--surface);
-  border-right: 1px solid var(--border);
-  padding: var(--space-5);
+  background: var(--ac-surface);
+  border-right: 1px solid var(--ac-border);
+  padding: var(--space-5) var(--space-4);
 }
 
 .app-brand {
-  font-size: var(--text-lg);
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 800;
   letter-spacing: -0.01em;
-  color: var(--text-h);
+  color: var(--ac-text-h);
   margin: 0;
+  padding: 0 var(--space-2);
 }
 
 .app-nav {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 1px;
   flex: 1;
 }
 
 .app-nav button {
   display: flex;
   align-items: center;
-  min-height: 44px;
+  gap: 9px;
+  min-height: 38px;
   background: none;
   border: none;
-  border-radius: 8px;
-  padding: var(--space-2) var(--space-3);
+  border-radius: 6px;
+  padding: 0 var(--space-3);
   text-align: left;
-  font-size: var(--text-sm);
+  font-size: 13px;
   font-weight: 500;
-  color: var(--text);
+  color: var(--ac-text);
 }
 
 .app-nav button:hover {
-  background: var(--accent-bg);
-  color: var(--text-h);
+  background: var(--ac-surface-2);
+  color: var(--ac-text-h);
 }
 
 .app-nav button.active {
-  background: var(--accent-bg);
-  color: var(--accent-text);
+  background: var(--ac-blue-bg);
+  color: var(--ac-blue);
   font-weight: 600;
 }
 
+.app-nav button svg {
+  flex: none;
+  opacity: 0.85;
+}
+
 .app-user {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--ac-border);
   padding-top: var(--space-4);
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
 }
 
 .app-user-name {
-  font-size: var(--text-sm);
+  font-size: 12.5px;
   font-weight: 600;
-  color: var(--text-h);
+  color: var(--ac-text-h);
 }
 
 .app-user-email {
-  font-size: var(--text-xs);
-  color: var(--text);
+  font-size: 11px;
+  color: var(--ac-text-dim);
 }
 
 .app-main {
   flex: 1;
   min-width: 0;
-  background: var(--bg);
+  background: var(--ac-bg);
   padding: var(--space-6);
   overflow-y: auto;
 }
@@ -532,6 +660,7 @@ input {
   flex-direction: column;
   gap: var(--space-3);
   max-width: 60ch;
+  font-family: var(--sans);
 }
 
 .app-home p {
@@ -548,7 +677,7 @@ input {
     flex-direction: row;
     align-items: center;
     border-right: none;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ac-border);
     gap: var(--space-4);
     padding: var(--space-3) var(--space-4);
   }
@@ -1616,5 +1745,449 @@ tr.hidden-row .valor-cell {
 @media (prefers-reduced-motion: reduce) {
   .dash-tile.clickable {
     transition: none;
+  }
+}
+
+/* ==================== Analyst Console — Dashboard (Sprint 34) ====================
+   Cobre só o topo do Dashboard (toolbar, KPIs, patrimônio, conferência,
+   comparativo receita/despesa) — o funil de drill-down abaixo (.dash-funnel/
+   .dash-accordion/Row) continua no sistema antigo, fora do escopo desta
+   sprint (PRD-034). Tudo aqui usa --ac-*, nunca os tokens antigos. */
+
+.ac-page {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--font-ac);
+  color: var(--ac-text);
+}
+
+.ac-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: var(--ac-surface);
+  border: 1px solid var(--ac-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+
+.ac-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ac-month-nav {
+  display: flex;
+  align-items: stretch;
+  background: var(--ac-surface-2);
+  border: 1px solid var(--ac-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.ac-month-nav button {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  color: var(--ac-text-dim);
+  cursor: pointer;
+}
+
+.ac-month-nav button:hover {
+  background: var(--ac-blue-bg);
+  color: var(--ac-blue);
+}
+
+.ac-month-nav button:focus-visible {
+  outline: 2px solid var(--ac-blue);
+  outline-offset: -2px;
+}
+
+.ac-month-nav button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  background: none;
+  color: var(--ac-text-dim);
+}
+
+.ac-month-nav .current {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ac-text-h);
+  border-left: 1px solid var(--ac-border);
+  border-right: 1px solid var(--ac-border);
+  white-space: nowrap;
+}
+
+.ac-select {
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--ac-text-h);
+  font-weight: 500;
+  background: var(--ac-surface-2);
+  border: 1px solid var(--ac-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.ac-seg {
+  display: flex;
+  background: var(--ac-surface-2);
+  border: 1px solid var(--ac-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.ac-seg button {
+  all: unset;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  color: var(--ac-text);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ac-seg button[aria-pressed="true"] {
+  background: var(--ac-blue);
+  color: #fff;
+  font-weight: 600;
+}
+
+.ac-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ac-text-dim);
+  margin: 16px 0 8px;
+}
+
+.ac-section-label:first-child {
+  margin-top: 0;
+}
+
+/* KpiTile — linha primária (5 KPIs de fluxo): rótulo + delta no topo, valor
+   grande, sparkline embaixo. Reaproveitada em densidade compacta
+   (.ac-kpi--compact) pra Ativos/Passivos/Patrimônio, que hoje não têm série
+   histórica (ver investigação da Sprint 34 — endpoint não existe, decisão do
+   CEO foi não expandir o backend agora): mesmo componente, sem delta/spark. */
+.ac-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.ac-kpi {
+  background: var(--ac-surface);
+  border: 1px solid var(--ac-border);
+  border-radius: 8px;
+  padding: 13px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  text-align: left;
+  width: 100%;
+  font-family: var(--font-ac);
+  color: var(--ac-text);
+}
+
+button.ac-kpi:hover,
+button.ac-kpi:focus-visible {
+  border-color: var(--ac-blue);
+  outline: none;
+}
+
+.ac-kpi .ac-kpi-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.ac-kpi .ac-kpi-label-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ac-kpi .ac-kpi-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ac-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ac-kpi .ac-kpi-delta {
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.ac-kpi .ac-kpi-delta.good {
+  color: var(--ac-good);
+}
+
+.ac-kpi .ac-kpi-delta.bad {
+  color: var(--ac-bad);
+}
+
+.ac-kpi .ac-kpi-delta.flat {
+  color: var(--ac-text-dim);
+}
+
+.ac-kpi .ac-kpi-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ac-text-h);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.ac-kpi .ac-kpi-value.accent {
+  color: var(--ac-blue);
+}
+
+.ac-kpi .ac-kpi-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 22px;
+}
+
+.ac-kpi .ac-kpi-caption {
+  font-size: 11px;
+  color: var(--ac-text-dim);
+}
+
+.ac-kpi-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ac-good);
+  background: var(--ac-good-bg);
+  border-radius: 5px;
+  padding: 2px 6px;
+  letter-spacing: 0.01em;
+}
+
+.ac-kpi-badge svg {
+  width: 9px;
+  height: 9px;
+}
+
+/* Seta "próximo mês" dentro do cabeçalho do KpiTile Saldo Acumulado — mesma
+   geometria de .dash-tile-arrow (sistema antigo), cor --ac-blue pra não
+   destoar do resto do tile novo. */
+.ac-kpi-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--ac-text-dim);
+  flex: none;
+}
+
+.ac-kpi-arrow:hover {
+  border-color: var(--ac-blue);
+  color: var(--ac-blue);
+}
+
+/* Row secundária (Ativos/Passivos/Patrimônio) — layout horizontal compacto,
+   mesmo componente KpiTile em modo "compact" (sem delta/sparkline hoje). */
+.ac-kpi-row--compact {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.ac-kpi--compact {
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  background: var(--ac-surface-2);
+  padding: 10px 14px;
+}
+
+.ac-kpi--compact .ac-kpi-label {
+  font-size: 11.5px;
+  color: var(--ac-text-dim);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  flex: none;
+  white-space: nowrap;
+}
+
+.ac-kpi--compact .ac-kpi-value {
+  font-size: 15px;
+  margin-left: auto;
+}
+
+.ac-panel {
+  background: var(--ac-surface);
+  border: 1px solid var(--ac-border);
+  border-radius: 8px;
+  padding: 18px;
+  margin-bottom: 14px;
+}
+
+.ac-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ac-panel-head h2 {
+  font-family: var(--font-ac);
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--ac-text-h);
+}
+
+.ac-panel-head .ac-panel-meta {
+  font-size: 11.5px;
+  color: var(--ac-text-dim);
+  margin-top: 2px;
+}
+
+.ac-table-wrap {
+  overflow-x: auto;
+}
+
+.ac-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-ac);
+}
+
+.ac-table th,
+.ac-table td {
+  padding: 9px 10px;
+  text-align: right;
+  border-bottom: 1px solid var(--ac-border);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ac-table th:first-child,
+.ac-table td:first-child {
+  text-align: left;
+  font-variant-numeric: normal;
+}
+
+.ac-table thead th {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ac-text-dim);
+  border-bottom: 1px solid var(--ac-border-strong);
+}
+
+.ac-table tbody tr.total td {
+  font-weight: 700;
+  color: var(--ac-text-h);
+  background: var(--ac-surface-2);
+}
+
+.ac-table tbody tr.acct-start td {
+  border-top: 2px solid var(--ac-border-strong);
+}
+
+.ac-table tbody tr.acct td {
+  color: var(--ac-text-h);
+}
+
+.ac-table tbody tr.acct:hover td {
+  background: var(--ac-surface-2);
+}
+
+/* Comparativo Receita vs. Despesa — pequenos múltiplos com escala
+   compartilhada (o domínio Y de cada LineChart vem do mesmo par [min,max]
+   calculado sobre as duas séries juntas, nunca normalizado por série — ver
+   DashboardsPage.tsx). Tooltip/crosshair funcional via ChartTooltip.tsx. */
+.ac-sm-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.ac-sm-chart-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ac-text-h);
+  margin-bottom: 4px;
+  font-family: var(--font-ac);
+}
+
+.ac-chart-tooltip {
+  background: var(--ac-text-h);
+  color: var(--ac-surface);
+  font-family: var(--font-ac);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.ac-chart-tooltip-month {
+  font-weight: 500;
+  opacity: 0.7;
+  margin-right: 6px;
+}
+
+@media (max-width: 960px) {
+  .ac-kpi-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .ac-kpi-row--compact {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ac-sm-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .ac-kpi-row,
+  .ac-kpi-row--compact {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ac-table {
+    min-width: 480px;
   }
 }

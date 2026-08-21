@@ -31,6 +31,7 @@
  */
 import { useMemo, useState } from "react";
 import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
+import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import {
   type CategoriaTotal,
@@ -38,11 +39,14 @@ import {
   type PeriodoHistorico,
   type PontoTendencia,
   type Regime,
+  type TendenciaMes,
   type TransacaoTipo,
 } from "../api/dashboards";
 import type { PluggyInvestment } from "../api/pluggy";
 import { CategoriaComparativoChart } from "../components/CategoriaComparativoChart";
-import { PeriodFilter } from "../components/PeriodFilter";
+import { chartCursorProps, ChartTooltip } from "../components/ChartTooltip";
+import { KpiTile } from "../components/KpiTile";
+import type { KpiDelta } from "../components/KpiTile";
 import { RegimeToggle } from "../components/RegimeToggle";
 import { TransactionsTable } from "../components/TransactionsTable";
 import { TrendLineChart } from "../components/TrendLineChart";
@@ -69,6 +73,7 @@ import {
   subcategoryColorVar,
 } from "../utils/categoryColors";
 import { formatCurrency } from "../utils/format";
+import { computeSharedDomain } from "../utils/sharedChartDomain";
 
 const ASSET_TIPO_LABEL: Record<string, string> = {
   imovel: "Imóvel",
@@ -290,32 +295,58 @@ export function DashboardsPage() {
     }
   }
 
+  const tendenciaAtual = tendenciaQuery.data?.at(-1);
+  const tendenciaAnterior =
+    tendenciaQuery.data && tendenciaQuery.data.length >= 2 ? tendenciaQuery.data.at(-2) : undefined;
+
+  function buildDelta(campo: "receita" | "despesa", positiveIsGood: boolean): KpiDelta | undefined {
+    if (!tendenciaAtual || !tendenciaAnterior) return undefined;
+    return {
+      mode: "percent",
+      current: Number(tendenciaAtual[campo]),
+      previous: Number(tendenciaAnterior[campo]),
+      positiveIsGood,
+    };
+  }
+
+  const receitaDelta = buildDelta("receita", true);
+  const despesaDelta = buildDelta("despesa", false);
+  const saldoAcumuladoDelta: KpiDelta | undefined =
+    saldoAcumuladoAtual && saldoAnterior
+      ? {
+          mode: "percent",
+          current: Number(saldoAcumuladoAtual.total),
+          previous: Number(saldoAnterior.total),
+          positiveIsGood: true,
+        }
+      : undefined;
+
   return (
-    <section className="dash-page">
-      <div className="dash-filter">
-        <PeriodFilter
-          ano={ano}
-          mes={mes}
-          onChange={(next) => {
-            if (next.ano !== undefined) setAno(next.ano);
-            if (next.mes !== undefined) setMes(next.mes);
-          }}
-        />
-        <label>
-          Histórico
+    <section className="ac-page">
+      <div className="ac-toolbar">
+        <div className="ac-toolbar-left">
+          <MonthNav
+            ano={ano}
+            mes={mes}
+            onChange={(next) => {
+              setAno(next.ano);
+              setMes(next.mes);
+            }}
+          />
           <select
+            className="ac-select"
             aria-label="Período histórico"
             value={periodoHistorico}
             onChange={(event) =>
               setPeriodoHistorico(Number(event.target.value) as PeriodoHistorico)
             }
           >
-            <option value={3}>3 meses</option>
-            <option value={6}>6 meses</option>
-            <option value={12}>12 meses</option>
+            <option value={3}>Últimos 3 meses</option>
+            <option value={6}>Últimos 6 meses</option>
+            <option value={12}>Últimos 12 meses</option>
           </select>
-        </label>
-        <RegimeToggle value={regime} onChange={setRegime} />
+          <RegimeToggle value={regime} onChange={setRegime} variant="ac" />
+        </div>
       </div>
 
       {summaryQuery.isLoading && <p>Carregando...</p>}
@@ -323,137 +354,165 @@ export function DashboardsPage() {
 
       {summaryQuery.data && (
         <>
-          <div className="dash-summary">
-            <button
-              type="button"
-              className="dash-tile clickable"
-              onClick={() => abrirFunil("ativos")}
-            >
-              <span className="k">Ativos</span>
-              <span className="v">{formatCurrency(summaryQuery.data.ativos_totais)}</span>
-            </button>
-            <button
-              type="button"
-              className="dash-tile clickable"
-              onClick={() => abrirFunil("passivos")}
-            >
-              <span className="k">Passivos</span>
-              <span className="v">{formatCurrency(summaryQuery.data.passivos)}</span>
-            </button>
-            <button
-              type="button"
-              className="dash-tile clickable"
-              onClick={() => abrirFunil("patrimonio")}
-            >
-              <span className="k">Patrimônio</span>
-              <span className="v">{formatCurrency(summaryQuery.data.patrimonio)}</span>
-            </button>
-          </div>
-
-          <div className="dash-summary">
-            <button type="button" className="dash-tile clickable" onClick={clicarSaldoAnterior}>
-              <span className="k">
-                <ArrowIcon direction="left" />
-                Saldo Anterior
-                {saldoAnterior &&
-                  ` (${String(saldoAnterior.mes).padStart(2, "0")}/${saldoAnterior.ano})`}
-              </span>
-              <span className="v">{saldoAnterior ? formatCurrency(saldoAnterior.total) : "—"}</span>
-            </button>
-            <button
-              type="button"
-              className="dash-tile clickable"
+          <div className="ac-section-label">Fluxo do mês</div>
+          <div className="ac-kpi-row">
+            <KpiTile
+              label="Saldo Anterior"
+              value={saldoAnterior ? formatCurrency(saldoAnterior.total) : "—"}
+              caption={
+                saldoAnterior
+                  ? `${String(saldoAnterior.mes).padStart(2, "0")}/${saldoAnterior.ano}`
+                  : undefined
+              }
+              onClick={clicarSaldoAnterior}
+            />
+            <KpiTile
+              label="Receita"
+              value={formatCurrency(receitaAjustada)}
+              delta={receitaDelta}
               onClick={() => abrirFunil("receita")}
-            >
-              <span className="k">Receita</span>
-              <span className="v receita">{formatCurrency(receitaAjustada)}</span>
-              <TrendLineChart
-                variant="spark"
-                pontos={applyHiddenToTrend(
-                  tendenciaQuery.data?.map((p) => ({ ano: p.ano, mes: p.mes, total: p.receita })),
-                  ano,
-                  mes,
-                  hiddenAplicaA === "receita" ? hiddenSumTotal : 0
-                )}
-                color="var(--receita)"
-                onSelecionarMes={selecionarMes}
-              />
-            </button>
-            <button
-              type="button"
-              className="dash-tile clickable"
+              sparkline={
+                <TrendLineChart
+                  variant="spark"
+                  pontos={applyHiddenToTrend(
+                    tendenciaQuery.data?.map((p) => ({
+                      ano: p.ano,
+                      mes: p.mes,
+                      total: p.receita,
+                    })),
+                    ano,
+                    mes,
+                    hiddenAplicaA === "receita" ? hiddenSumTotal : 0
+                  )}
+                  color="var(--ac-good)"
+                  onSelecionarMes={selecionarMes}
+                />
+              }
+            />
+            <KpiTile
+              label="Despesa"
+              value={formatCurrency(despesaAjustada)}
+              delta={despesaDelta}
               onClick={() => abrirFunil("despesa")}
-            >
-              <span className="k">Despesa</span>
-              <span className="v despesa">{formatCurrency(despesaAjustada)}</span>
-              <TrendLineChart
-                variant="spark"
-                pontos={applyHiddenToTrend(
-                  tendenciaQuery.data?.map((p) => ({ ano: p.ano, mes: p.mes, total: p.despesa })),
-                  ano,
-                  mes,
-                  hiddenAplicaA === "despesa" ? hiddenSumTotal : 0
-                )}
-                color="var(--despesa)"
-                onSelecionarMes={selecionarMes}
-              />
-            </button>
-            <button
-              type="button"
-              className="dash-tile clickable"
+              sparkline={
+                <TrendLineChart
+                  variant="spark"
+                  pontos={applyHiddenToTrend(
+                    tendenciaQuery.data?.map((p) => ({
+                      ano: p.ano,
+                      mes: p.mes,
+                      total: p.despesa,
+                    })),
+                    ano,
+                    mes,
+                    hiddenAplicaA === "despesa" ? hiddenSumTotal : 0
+                  )}
+                  color="var(--ac-bad)"
+                  onSelecionarMes={selecionarMes}
+                />
+              }
+            />
+            <KpiTile
+              label="Saldo"
+              value={formatCurrency(saldoAjustado)}
+              delta={{
+                mode: "flat",
+                label: "fluxo",
+                title: "fluxo do mês, não é o saldo bancário",
+              }}
               onClick={() => abrirFunil("saldo")}
-            >
-              <span className="k">Saldo</span>
-              <span className="v">{formatCurrency(saldoAjustado)}</span>
-              <TrendLineChart
-                variant="spark"
-                pontos={applyHiddenToTrend(
-                  tendenciaQuery.data?.map((p) => ({ ano: p.ano, mes: p.mes, total: p.saldo })),
-                  ano,
-                  mes,
-                  hiddenAplicaA === "despesa"
-                    ? -hiddenSumTotal
-                    : hiddenAplicaA === "receita"
-                      ? hiddenSumTotal
-                      : 0
-                )}
-                color="var(--accent)"
-                onSelecionarMes={selecionarMes}
-              />
-            </button>
-            <div
-              role="button"
-              tabIndex={0}
-              aria-label={`Saldo Acumulado ${
+              sparkline={
+                <TrendLineChart
+                  variant="spark"
+                  pontos={applyHiddenToTrend(
+                    tendenciaQuery.data?.map((p) => ({ ano: p.ano, mes: p.mes, total: p.saldo })),
+                    ano,
+                    mes,
+                    hiddenAplicaA === "despesa"
+                      ? -hiddenSumTotal
+                      : hiddenAplicaA === "receita"
+                        ? hiddenSumTotal
+                        : 0
+                  )}
+                  color="var(--ac-text-h)"
+                  onSelecionarMes={selecionarMes}
+                />
+              }
+            />
+            <KpiTile
+              label="Saldo Acumulado"
+              value={saldoAcumuladoAtual ? formatCurrency(saldoAcumuladoAtual.total) : "—"}
+              valueVariant="accent"
+              delta={saldoAcumuladoDelta}
+              badge={{ label: "saldo real" }}
+              ariaLabel={`Saldo Acumulado ${
                 saldoAcumuladoAtual ? formatCurrency(saldoAcumuladoAtual.total) : "—"
               }`}
-              className="dash-tile clickable"
               onClick={() => abrirFunil("saldoAcumulado")}
               onKeyDown={teclaSaldoAcumulado}
-            >
-              <span className="k v-row">
-                Saldo Acumulado
+              labelExtra={
                 <button
                   type="button"
-                  className="dash-tile-arrow"
+                  className="ac-kpi-arrow"
                   aria-label="Ver mês seguinte"
                   onClick={clicarSaldoAcumuladoSeguinte}
                 >
                   <ArrowIcon direction="right" />
                 </button>
-              </span>
-              <span className="v">
-                {saldoAcumuladoAtual ? formatCurrency(saldoAcumuladoAtual.total) : "—"}
-              </span>
-              <TrendLineChart
-                variant="spark"
-                pontos={saldoAcumuladoSparkline}
-                color="var(--accent)"
-                onSelecionarMes={selecionarMes}
-              />
-            </div>
+              }
+              sparkline={
+                <TrendLineChart
+                  variant="spark"
+                  pontos={saldoAcumuladoSparkline}
+                  color="var(--ac-blue)"
+                  onSelecionarMes={selecionarMes}
+                />
+              }
+            />
+          </div>
+
+          <div className="ac-section-label">Patrimônio</div>
+          <div className="ac-kpi-row--compact">
+            <KpiTile
+              compact
+              label="Ativos"
+              value={formatCurrency(summaryQuery.data.ativos_totais)}
+              onClick={() => abrirFunil("ativos")}
+            />
+            <KpiTile
+              compact
+              label="Passivos"
+              value={formatCurrency(summaryQuery.data.passivos)}
+              onClick={() => abrirFunil("passivos")}
+            />
+            <KpiTile
+              compact
+              label="Patrimônio"
+              value={formatCurrency(summaryQuery.data.patrimonio)}
+              onClick={() => abrirFunil("patrimonio")}
+            />
           </div>
         </>
+      )}
+
+      <div className="ac-panel">
+        <div className="ac-panel-head">
+          <div>
+            <h2>Conciliação — Saldo acumulado por conta</h2>
+            <div className="ac-panel-meta">
+              Saldo real de cada conta corrente ao fim do mês, comparado ao extrato bancário — a
+              ferramenta usada para bater as contas ao centavo.
+            </div>
+          </div>
+        </div>
+        <SaldoAcumuladoConferenciaTable ano={ano} mes={mes} />
+      </div>
+
+      {tendenciaQuery.data && tendenciaQuery.data.length > 1 && (
+        <ReceitaDespesaComparativo
+          pontos={tendenciaQuery.data}
+          periodoHistorico={periodoHistorico}
+        />
       )}
 
       {drill && (
@@ -530,9 +589,9 @@ export function DashboardsPage() {
                 Saldo real das contas corrente com "Saldo inicial" configurado (ver Configurações),
                 menos o salário recebido no mês (competência do mês seguinte, mesmo já estando na
                 conta) — não depende do toggle Competência/Caixa acima. Pra ver o saldo bancário
-                bruto por conta, use o card "Saldo".
+                bruto por conta, use o card "Saldo". A tabela de conferência por conta está sempre
+                visível no painel "Conciliação" acima, fora deste funil.
               </p>
-              <SaldoAcumuladoConferenciaTable ano={ano} mes={mes} />
               {saldoAcumuladoSparkline && saldoAcumuladoSparkline.length > 0 ? (
                 <TrendLineChart
                   variant="card"
@@ -570,6 +629,146 @@ function ArrowIcon({ direction }: { direction: "left" | "right" }) {
     >
       <path d={path} />
     </svg>
+  );
+}
+
+const MESES_COMPLETOS = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
+
+function isMesAtual(ano: number, mes: number): boolean {
+  const hoje = new Date();
+  return ano === hoje.getFullYear() && mes === hoje.getMonth() + 1;
+}
+
+// Navegador de mês (◀ mês ▶) da toolbar (Sprint 34) — substitui o filtro
+// ano/mês simples (PeriodFilter, que continua servindo as outras 8 telas).
+// Reaproveita mesAnterior/mesSeguinte já usados pelos cards Saldo Anterior/
+// Saldo Acumulado, mesma regra de fronteira: nunca avança além do mês
+// corrente real (botão "próximo" desabilitado, não só um alerta).
+function MonthNav({
+  ano,
+  mes,
+  onChange,
+}: {
+  ano: number;
+  mes: number;
+  onChange: (proximo: { ano: number; mes: number }) => void;
+}) {
+  return (
+    <div className="ac-month-nav" role="group" aria-label="Navegar entre meses">
+      <button
+        type="button"
+        aria-label="Mês anterior"
+        onClick={() => onChange(mesAnterior(ano, mes))}
+      >
+        <ArrowIcon direction="left" />
+      </button>
+      <span className="current">
+        {MESES_COMPLETOS[mes - 1]} {ano}
+      </span>
+      <button
+        type="button"
+        aria-label="Próximo mês"
+        disabled={isMesAtual(ano, mes)}
+        onClick={() => onChange(mesSeguinte(ano, mes))}
+      >
+        <ArrowIcon direction="right" />
+      </button>
+    </div>
+  );
+}
+
+// Comparativo Receita vs. Despesa em pequenos múltiplos (Sprint 34) — duas
+// séries com o MESMO domínio Y (computeSharedDomain sobre as duas juntas,
+// nunca cada uma normalizada no seu próprio mínimo/máximo — comparação
+// visual real, não só formato). Tooltip/crosshair via ChartTooltip.tsx.
+function ReceitaDespesaComparativo({
+  pontos,
+  periodoHistorico,
+}: {
+  pontos: TendenciaMes[];
+  periodoHistorico: PeriodoHistorico;
+}) {
+  const receitaData = pontos.map((p) => ({
+    label: `${String(p.mes).padStart(2, "0")}/${p.ano}`,
+    ano: p.ano,
+    mes: p.mes,
+    total: Number(p.receita),
+  }));
+  const despesaData = pontos.map((p) => ({
+    label: `${String(p.mes).padStart(2, "0")}/${p.ano}`,
+    ano: p.ano,
+    mes: p.mes,
+    total: Number(p.despesa),
+  }));
+  const domain = computeSharedDomain([
+    receitaData.map((d) => d.total),
+    despesaData.map((d) => d.total),
+  ]);
+
+  return (
+    <div className="ac-panel">
+      <div className="ac-panel-head">
+        <div>
+          <h2>Receita vs. despesa — {periodoHistorico} meses</h2>
+          <div className="ac-panel-meta">
+            Duas séries na mesma escala, sem eixo duplo. Passe o mouse pra ver cada mês.
+          </div>
+        </div>
+      </div>
+      <div className="ac-sm-grid">
+        <div>
+          <div className="ac-sm-chart-label">Receita</div>
+          <ResponsiveContainer width="100%" height={100}>
+            <LineChart data={receitaData} margin={{ top: 8, right: 8, bottom: 4, left: 4 }}>
+              <XAxis dataKey="label" hide />
+              <YAxis domain={domain} hide />
+              <Tooltip content={<ChartTooltip />} cursor={chartCursorProps} />
+              <Line
+                type="monotone"
+                dataKey="total"
+                stroke="var(--ac-good)"
+                strokeWidth={2.2}
+                dot={false}
+                activeDot={{ r: 4.5 }}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        <div>
+          <div className="ac-sm-chart-label">Despesa</div>
+          <ResponsiveContainer width="100%" height={100}>
+            <LineChart data={despesaData} margin={{ top: 8, right: 8, bottom: 4, left: 4 }}>
+              <XAxis dataKey="label" hide />
+              <YAxis domain={domain} hide />
+              <Tooltip content={<ChartTooltip />} cursor={chartCursorProps} />
+              <Line
+                type="monotone"
+                dataKey="total"
+                stroke="var(--ac-bad)"
+                strokeWidth={2.2}
+                dot={false}
+                activeDot={{ r: 4.5 }}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -617,16 +816,16 @@ function SaldoAcumuladoConferenciaTable({ ano, mes }: { ano: number; mes: number
   }
 
   return (
-    <div className="dash-table-wrap">
-      <table className="dash-table saldo-acumulado-conferencia-table">
+    <div className="ac-table-wrap">
+      <table className="ac-table">
         <colgroup>
-          <col className="col-conta" />
-          <col className="col-valor" />
-          <col className="col-valor" />
-          <col className="col-valor" />
-          <col className="col-valor" />
-          <col className="col-valor" />
-          <col className="col-valor" />
+          <col style={{ width: "19%" }} />
+          <col />
+          <col />
+          <col />
+          <col />
+          <col />
+          <col />
         </colgroup>
         <thead>
           <tr>
@@ -643,7 +842,7 @@ function SaldoAcumuladoConferenciaTable({ ano, mes }: { ano: number; mes: number
           {linhas.map((linha, index) => (
             <tr
               key={linha.account_id ?? "total"}
-              className={index === 1 ? "group-start" : undefined}
+              className={index === 0 ? "total" : index === 1 ? "acct acct-start" : "acct"}
             >
               <td>{linha.account_nome}</td>
               <td>{formatCurrency(linha.saldo_inicio)}</td>
