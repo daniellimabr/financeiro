@@ -2,8 +2,9 @@
 
 - **Plano:** [SPRINT-035-redesign-analyst-console-categorizar-configuracoes-natureza-plan.md](./SPRINT-035-redesign-analyst-console-categorizar-configuracoes-natureza-plan.md)
 - **Data do relatório:** 2026-08-21
-- **Aprovado pelo CEO em:** pendente — deploy na VM de dev e validação ao vivo já feitos (autonomia de
-  execução, ver `docs/infra/ssh-workflow.md`); este relatório aguarda revisão final.
+- **Aprovado pelo CEO em:** 2026-08-21 ("aprovada") — deploy na VM de dev e validação ao vivo já
+  feitos antes da aprovação formal, mesmo padrão da Sprint 34 (deploy como tarefa da própria sprint,
+  autonomia de execução via `docs/infra/ssh-workflow.md`).
 
 ## Resumo
 

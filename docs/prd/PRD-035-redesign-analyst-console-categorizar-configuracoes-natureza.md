@@ -1,6 +1,6 @@
 # PRD-035: Redesign visual "Analyst Console" — Categorizar, Categorias, Configurações, Natureza
 
-- **Status:** proposto, aguardando aprovação do CEO
+- **Status:** ✅ implementado e aprovado pelo CEO em 2026-08-21
 - **Épico relacionado:** E10 — Redesign visual (Analyst Console) (ver `docs/roadmap.md`). Segunda
   sprint do épico — a Sprint 34 cobriu fundação (tokens/tipografia/shell) + Dashboard.
 - **Sprint(s):** [SPRINT-035-redesign-analyst-console-categorizar-configuracoes-natureza-plan.md](../sprints/SPRINT-035-redesign-analyst-console-categorizar-configuracoes-natureza-plan.md)
