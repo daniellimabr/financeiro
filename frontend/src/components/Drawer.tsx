@@ -25,7 +25,15 @@ export function Drawer({ open, onClose, title, children }: DrawerProps) {
       if (event.key === "Escape") onClose();
     }
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    // A backdrop fixa cobre a tela toda visualmente, mas não intercepta
+    // scroll por si só — sem isto, a roda do mouse/teclado ainda rola a
+    // página por trás do drawer (achado real via browser-check, Sprint 35).
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [open, onClose]);
 
   if (!open) return null;

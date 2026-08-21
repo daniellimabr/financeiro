@@ -30,6 +30,25 @@ describe("Drawer", () => {
     expect(screen.getByText("Conteúdo")).toBeInTheDocument();
   });
 
+  it("locks body scroll while open and restores it on close", () => {
+    const { rerender, unmount } = render(
+      <Drawer open={false} onClose={vi.fn()} title="Categorias">
+        <p>Conteúdo</p>
+      </Drawer>
+    );
+    expect(document.body.style.overflow).not.toBe("hidden");
+
+    rerender(
+      <Drawer open onClose={vi.fn()} title="Categorias">
+        <p>Conteúdo</p>
+      </Drawer>
+    );
+    expect(document.body.style.overflow).toBe("hidden");
+
+    unmount();
+    expect(document.body.style.overflow).not.toBe("hidden");
+  });
+
   it("focuses the close button on open", () => {
     render(
       <Drawer open onClose={vi.fn()} title="Categorias">
