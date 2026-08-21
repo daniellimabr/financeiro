@@ -2607,6 +2607,7 @@ button.ac-kpi:focus-visible {
   justify-content: center;
   width: 28px;
   height: 28px;
+  padding: 0;
   flex: none;
   background: none;
   border: 1px solid var(--ac-border);
