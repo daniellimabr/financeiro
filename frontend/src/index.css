@@ -1977,6 +1977,20 @@ button.ac-kpi:focus-visible {
   color: var(--ac-text-dim);
 }
 
+/* Sem esta largura/altura explícitas, o wrapper `<span class="spark">` do
+   TrendLineChart (variant="spark") fica com width:auto (display inline
+   herdado) — o ResponsiveContainer do Recharts mede a largura do pai via
+   ResizeObserver e, sem uma largura própria pra medir, resolve pra 0px e
+   não desenha nada (achado real em QA ao vivo: os 4 sparklines da linha de
+   KPIs primária renderizavam um container de largura zero, invisível).
+   Mesma técnica do mockup aprovado (.kpi .spark). */
+.ac-kpi .spark {
+  display: block;
+  width: 70px;
+  height: 22px;
+  flex: none;
+}
+
 .ac-kpi-badge {
   display: inline-flex;
   align-items: center;
