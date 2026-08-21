@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -79,18 +79,34 @@ describe("ConfiguracoesPage", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders the 3 sections: Perfil, Competência de Salário, Gestão de Contas", async () => {
+  it("renders the Perfil, Competência de Salário and Contas sections", async () => {
     vi.stubGlobal("fetch", routedFetchMock());
 
     renderWithQueryClient(<ConfiguracoesPage user={USER} />);
 
-    expect(screen.getByRole("heading", { name: "Configurações" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Perfil" })).toBeInTheDocument();
     expect(screen.getByText("Alice")).toBeInTheDocument();
     expect(screen.getByText("alice@example.com")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Competência de Salário" })).toBeInTheDocument();
-    expect(await screen.findByRole("heading", { name: "Gestão de Contas" })).toBeInTheDocument();
-    expect(await screen.findByText(/Conta Corrente/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Contas" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Gerenciar contas" })).toBeInTheDocument();
+  });
+
+  it("opens the Gestão de contas drawer via 'Gerenciar contas'", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<ConfiguracoesPage user={USER} />);
+
+    expect(screen.queryByRole("dialog", { name: "Gestão de contas" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Gerenciar contas" }));
+
+    const drawer = screen.getByRole("dialog", { name: "Gestão de contas" });
+    expect(await within(drawer).findByText(/Conta Corrente/)).toBeInTheDocument();
+
+    await userEvent.click(within(drawer).getByRole("button", { name: "Fechar" }));
+
+    expect(screen.queryByRole("dialog", { name: "Gestão de contas" })).not.toBeInTheDocument();
   });
 
   it("clicking Sair calls POST /auth/logout", async () => {

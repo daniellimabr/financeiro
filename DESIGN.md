@@ -24,10 +24,13 @@ colors:
   despesa-dark: "#e0855c"
   danger-dark: "#d9748c"
   danger-bg-dark: "rgba(217, 116, 140, 0.14)"
-  # Analyst Console (Sprint 34, épico E10) — sistema novo, namespace ac-*
+  # Analyst Console (Sprint 34/35, épico E10) — sistema novo, namespace ac-*
   # inteiramente separado do bloco acima (ver seção "Analyst Console" para o
-  # porquê). Cobre hoje só o shell/sidebar e o Dashboard; as outras 8 telas
-  # continuam no bloco de cores acima até suas próprias sprints do épico.
+  # porquê). Cobre o shell/sidebar, o Dashboard, Categorizar, Categorias (via
+  # Drawer), Configurações e Natureza (KPIs/chrome; funil continua no bloco
+  # de cores abaixo). As 5 telas restantes (Ativos, Investimentos, Passivos,
+  # Orçamento, Login) continuam no bloco de cores acima até suas próprias
+  # sprints do épico.
   ac-bg: "#f4f5f7"
   ac-surface: "#ffffff"
   ac-border: "#dfe2e8"
@@ -169,24 +172,30 @@ runs up to 1440px.
   distinctive enough to read as a considered choice, still an Operate-mode
   workhorse rather than an invented display face competing with the data.
 
-**Sprint 34 note:** everything below "Colors" through "Do's and Don'ts"
-describes this original system, still governing 8 of the app's 9 screens.
-The shell/sidebar and the Dashboard now run a second, newer system —
-"Analyst Console" — documented in its own section right after this one.
-Read that section first if you're touching the shell or the Dashboard;
-read the rest of this file for everything else.
+**Sprint 34/35 note:** everything below "Colors" through "Do's and Don'ts"
+describes this original system. As of Sprint 35 it still fully governs 5
+screens (Ativos, Investimentos, Passivos, Orçamento, Login) and partially
+governs 2 more — the drill-down funnel/accordion of Categorizar and
+Natureza stayed on this original system even though the rest of those two
+screens migrated (see "What stays on the original system" under Analyst
+Console below). The shell/sidebar, the Dashboard, Categorizar,
+Configurações, and Natureza now run a second, newer system — "Analyst
+Console" — documented in its own section right after this one. Read that
+section first if you're touching the shell, the Dashboard, or any of those
+3 screens; read the rest of this file for everything else.
 
-## Analyst Console (Sprint 34, épico E10)
+## Analyst Console (Sprint 34/35, épico E10)
 
 A second design system, deliberately coexisting with the one described in
-the rest of this file rather than replacing it in one sprint. Covers the
-app shell (sidebar/nav, every tab) and the Dashboard screen only, as of
-Sprint 34; the other 8 screens (Categorização, Ativos, Investimentos,
-Passivos, Configurações, Natureza, Orçamento, Categorias) stay on the
-original system until their own sprints in épico E10 migrate them one at a
-time — a deliberate scope cut (PRD-034) so this sprint stays roughly the
-size of Sprint 13, the largest to date, instead of attempting all 9 screens
-at once.
+the rest of this file rather than replacing it in one sprint. Sprint 34
+covered the app shell (sidebar/nav, every tab) and the Dashboard screen.
+Sprint 35 extended it to Categorizar (fila de revisão de transações),
+Categorias (CRUD, no longer its own nav tab — see Drawer below), Natureza,
+and Configurações. The remaining 5 screens (Ativos, Investimentos,
+Passivos, Orçamento, Login) stay on the original system until their own
+sprints in épico E10 migrate them one at a time — a deliberate scope cut
+(PRD-034/PRD-035) so each sprint stays a manageable size instead of
+attempting every screen at once.
 
 ### Why a second system, not a repaint of the first
 
@@ -277,6 +286,16 @@ uppercase 11px for KPI/section labels, 400 at 14px for body/table text.
   Saldo Acumulado tile's "next month" arrow) — nesting a real `<button>`
   inside a `<button>` is invalid HTML, same constraint the original
   system's Saldo Acumulado tile already worked around pre-Sprint-34.
+  Sprint 35 added two more additive, optional props rather than forking the
+  component: `ariaExpanded` (Natureza's 3 tiles reuse `KpiTile` for the
+  Fixo/Variável/Eventual cards and need to expose the same "funil aberto"
+  state the old `.dash-tile` cards carried) and `valueColor` (a scope
+  deviation beyond what PRD-035 asked for — Natureza's tertiary color axis,
+  `--nat-fixa`/`--nat-variavel`/`--nat-eventual`, is per-natureza, not one of
+  the 2 fixed values `valueVariant` supports; an inline-style override was
+  judged simpler than adding a 3rd `valueVariant` or forking the component,
+  flagged in the Sprint 35 report rather than silently dropped or silently
+  added without a note).
 - **`ChartTooltip`** (`frontend/src/components/ChartTooltip.tsx`) — a
   reusable custom Recharts tooltip content renderer + `chartCursorProps`,
   not a hand-rolled SVG crosshair. Deliberately built on Recharts (already
@@ -310,6 +329,76 @@ uppercase 11px for KPI/section labels, 400 at 14px for body/table text.
   drill-down funnel for Saldo Acumulado still exists (click the KPI) but no
   longer duplicates the table — only the larger trend chart and explanatory
   text, content genuinely absent from the always-visible panel.
+- **`Drawer`** (`frontend/src/components/Drawer.tsx`, Sprint 35) — the
+  system's first "panel over the screen" pattern, introduced when the CEO
+  decided Categorias (previously its own nav tab) belonged inside
+  Categorizar as a "Gerenciar categorias" button instead, and Configurações
+  echoed the same shape for "Gerenciar contas" (`AccountManagementPage`).
+  `createPortal` to `document.body` (same pattern as `CategoryCombobox`),
+  560px fixed width tested against the widest table that ends up inside it
+  (the saldo-por-conta auditoria table in `AccountManagementPage`, up to 12
+  columns — handled by the existing `.ac-table-wrap { overflow-x: auto }`
+  scroll, not by widening the drawer). Closes on backdrop click, the header
+  close button, or Escape; a click inside the panel does not close it.
+  Deliberately does not mount `children` while closed — each open triggers
+  the content's data queries fresh, never a stale cache from the last time
+  it was open. No library focus-trap — initial focus on the close button
+  plus Escape was judged consistent with the app's existing accessibility
+  bar (same call already made for other interactive components). Meant to
+  outlive this sprint: any future Analyst Console screen that needs a
+  "panel over the screen" reaches for this instead of a new one-off.
+- **Button vocabulary** (`.ac-btn`/`.ac-btn-primary`/`.ac-btn-ghost`/
+  `.ac-btn-danger`, Sprint 35) — the system's first formal button classes;
+  Dashboards (Sprint 34) only ever needed clickable tiles and the `.ac-seg`
+  toggle, never an isolated action button. Mirrors the original system's
+  Default/Ghost/Danger vocabulary (see Components → Buttons below) under
+  the `--ac-*` namespace rather than reusing those classes directly, same
+  disjoint-namespace reasoning as everything else in this section. `.ac-btn`
+  is the base (bordered, `--ac-surface`); `-primary` fills `--ac-blue`;
+  `-ghost` drops the border/background until hover; `-danger` (stacks with
+  `-ghost`, same as the original system's `.btn-danger`) recolors to
+  `--ac-bad`, not a new destructive token — the original's separate
+  `--danger` red is not reused here, `--ac-bad` already carries the "this
+  is unfavorable" meaning this system needs. `.ac-form-row` (stacked
+  label-above-field, for real forms — the group/subcategory dialogs inside
+  the Categorias drawer, Configurações' Competência/Salário forms) is a
+  distinct class from `.ac-toolbar` (filters laid out side by side in the
+  bar at the top of a screen) — the two were never meant to be the same
+  shape, even though both hold `<label>`/`<select>` pairs.
+- **KPI-migrates/funnel-stays cut, repeated** — Natureza (Sprint 35) followed
+  the exact cut Dashboards (Sprint 34) established: the 3 Fixo/Variável/
+  Eventual cards became `KpiTile`s (with sparkline, in a 3-column row —
+  `.ac-kpi-row--3`, a column-count variant of `.ac-kpi-row--compact`'s grid
+  that keeps the tiles at primary density, not compact), but the
+  Natureza→Categoria→Subcategoria→Transação funnel/accordion below stayed
+  on `.dash-funnel`/`.dash-accordion`, untouched. This is now a repeated
+  precedent (2 screens), not a one-off scope cut — a future screen in this
+  épico with the same "KPI row + funnel below" shape should default to the
+  same split rather than reopening the question.
+- **`SubcategoryGroupTable`** (`frontend/src/components/
+  SubcategoryGroupTable.tsx`, originally Sprint 30) — migrated to `.ac-*`
+  tokens in Sprint 35, standalone rather than extending `.ac-table` (whose
+  default is right-aligned text for money-shaped tables — this table's 3
+  columns are Categoria/Subcategoria/ação-or-select, never money), same
+  left-aligned-base pattern as `.ac-txn-table`. Both of its consumers
+  (`CategoriasPage`, now inside the Categorias drawer, and `NaturezaPage`'s
+  classification table) migrated in the same sprint rather than carrying a
+  temporary variant prop — the CEO's explicit call during PRD-035 planning,
+  since a mid-migration variant prop on a shared component would have left
+  one consumer's table looking stale inside a drawer that's otherwise fully
+  `.ac-*`.
+
+### What stays on the original system (Sprint 35)
+
+Categorizar and Natureza are hybrids after Sprint 35: their toolbar/KPI/
+table-chrome layer runs Analyst Console, but the actual drill-down —
+`.dash-funnel`/`.dash-accordion`/`Row` in Natureza, and the funnel-free
+transaction table in Categorizar already ran the shared `.ac-txn-table`
+CSS since Sprint 34 (`TransactionsTable.tsx`'s styling, extended in Sprint
+35 to `CategorizationReviewPage`'s own bespoke table markup) — stays as-is.
+`AssetsPage`/`InvestimentosPage`/`LiabilitiesPage`/`OrcamentoPage`/
+`LoginPage` are untouched, fully on the original system, same as before
+Sprint 35.
 
 ### What did not change
 
@@ -321,7 +410,9 @@ The Tabular Money Rule and Flat Ledger Rule (see below) hold here too: every
 a shadow. The drill-down funnel below the Dashboard's new top section
 (categoria/subcategoria accordion, transaction tables) is untouched
 original-system UI — Sprint 34's scope stopped at the funnel's edge
-deliberately, to keep this sprint's size in check.
+deliberately, to keep this sprint's size in check; Sprint 35 kept the same
+discipline for Natureza's funnel (see "What stays on the original system"
+above), no migration reopened this boundary.
 
 ## Colors
 

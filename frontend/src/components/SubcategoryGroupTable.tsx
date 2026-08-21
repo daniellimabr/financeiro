@@ -26,7 +26,8 @@ interface SubcategoryGroupTableProps {
 // tabela de classificação de Natureza (Sprint 12) pra reuso em CategoriasPage
 // (Sprint 30). Cada consumidor controla o conteúdo da 3a coluna (select de
 // natureza, ou ações de CRUD) via render prop; o agrupamento/ordenação em si
-// é sempre o mesmo.
+// é sempre o mesmo. Migrada pro Analyst Console na Sprint 35 (épico E10) —
+// sem prop de variante, os dois consumidores migram juntos.
 export function SubcategoryGroupTable({
   grupos,
   sortKey,
@@ -38,8 +39,8 @@ export function SubcategoryGroupTable({
   renderEmptyGroupRow,
 }: SubcategoryGroupTableProps) {
   return (
-    <div className="dash-table-wrap">
-      <table className="dash-table subcategory-group-table">
+    <div className="ac-table-wrap">
+      <table className="subcategory-group-table">
         <colgroup>
           <col className="col-grupo" />
           <col className="col-subcategoria" />

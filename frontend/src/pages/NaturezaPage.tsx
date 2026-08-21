@@ -8,6 +8,7 @@ import {
   type PontoTendencia,
   type TransacaoTipo,
 } from "../api/dashboards";
+import { KpiTile } from "../components/KpiTile";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { SubcategoryGroupTable } from "../components/SubcategoryGroupTable";
 import { TransactionsTable } from "../components/TransactionsTable";
@@ -164,29 +165,33 @@ export function NaturezaPage() {
   }
 
   return (
-    <section className="dash-page">
-      <h2>Natureza</h2>
-
-      <div className="dash-filter">
-        <PeriodFilter
-          ano={ano}
-          mes={mes}
-          onChange={(next) => {
-            if (next.ano !== undefined) setAno(next.ano);
-            if (next.mes !== undefined) setMes(next.mes);
-          }}
-        />
-        <div className="dash-toggle" role="group" aria-label="Tipo de transação">
-          <button type="button" aria-pressed={tipo === "debito"} onClick={() => setTipo("debito")}>
-            Despesa
-          </button>
-          <button
-            type="button"
-            aria-pressed={tipo === "credito"}
-            onClick={() => setTipo("credito")}
-          >
-            Receita
-          </button>
+    <section className="ac-page">
+      <div className="ac-toolbar">
+        <div className="ac-toolbar-left">
+          <PeriodFilter
+            ano={ano}
+            mes={mes}
+            onChange={(next) => {
+              if (next.ano !== undefined) setAno(next.ano);
+              if (next.mes !== undefined) setMes(next.mes);
+            }}
+          />
+          <div className="ac-seg" role="group" aria-label="Tipo de transação">
+            <button
+              type="button"
+              aria-pressed={tipo === "debito"}
+              onClick={() => setTipo("debito")}
+            >
+              Despesa
+            </button>
+            <button
+              type="button"
+              aria-pressed={tipo === "credito"}
+              onClick={() => setTipo("credito")}
+            >
+              Receita
+            </button>
+          </div>
         </div>
       </div>
 
@@ -194,30 +199,28 @@ export function NaturezaPage() {
       {naturezaQuery.isError && <p role="alert">Não foi possível carregar a natureza.</p>}
 
       {naturezaQuery.data && (
-        <div className="dash-summary">
+        <div className="ac-kpi-row--3">
           {NATUREZA_ORDER.map((natureza) => {
             const item = naturezaQuery.data?.find((n) => n.natureza === natureza);
             const color = naturezaColorVar(natureza);
             return (
-              <button
+              <KpiTile
                 key={natureza}
-                type="button"
-                className="dash-tile clickable"
+                label={naturezaLabel(natureza)}
+                value={formatCurrency(item?.total ?? "0")}
+                valueColor={color}
+                caption={`${formatPercent(item?.percentual ?? "0")} do período`}
                 onClick={() => toggleNatureza(natureza)}
-                aria-expanded={selectedNatureza === natureza}
-              >
-                <span className="k">{naturezaLabel(natureza)}</span>
-                <span className="v" style={{ color }}>
-                  {formatCurrency(item?.total ?? "0")}
-                </span>
-                <span className="tag">{formatPercent(item?.percentual ?? "0")} do período</span>
-                <TrendLineChart
-                  variant="spark"
-                  pontos={trendByNatureza.get(natureza)}
-                  color={color}
-                  onSelecionarMes={selecionarMes}
-                />
-              </button>
+                ariaExpanded={selectedNatureza === natureza}
+                sparkline={
+                  <TrendLineChart
+                    variant="spark"
+                    pontos={trendByNatureza.get(natureza)}
+                    color={color}
+                    onSelecionarMes={selecionarMes}
+                  />
+                }
+              />
             );
           })}
         </div>
@@ -251,8 +254,8 @@ export function NaturezaPage() {
         </div>
       )}
 
-      <h3>Classificar subcategorias</h3>
-      <p className="dash-empty">
+      <div className="ac-section-label">Classificar subcategorias</div>
+      <p className="ac-empty">
         Subcategorias sem classificação contam como Eventual nos cards acima.
       </p>
 

@@ -6,6 +6,8 @@ import type {
   TransactionTipo,
 } from "../api/categorization";
 import { CategoryCombobox } from "../components/CategoryCombobox";
+import { DirectionIcon } from "../components/DirectionIcon";
+import { Drawer } from "../components/Drawer";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { SortableHeader } from "../components/SortableHeader";
 import { StatusIcon } from "../components/StatusIcon";
@@ -15,7 +17,6 @@ import {
   DescriptionCell,
   InvestimentoSelectCell,
 } from "../components/TransactionEditCells";
-import { TransactionTipoIcon } from "../components/TransactionTipoIcon";
 import { useAssets } from "../hooks/useAssets";
 import { useBulkConfirmCategorization } from "../hooks/useBulkConfirmCategorization";
 import { useCategorizationTransactions } from "../hooks/useCategorizationTransactions";
@@ -33,6 +34,7 @@ import {
   investimentoLabel,
   subcategoryLabel,
 } from "../utils/transactionEdit";
+import { CategoriasPage } from "./CategoriasPage";
 
 const PAGE_SIZE = 20;
 
@@ -78,6 +80,7 @@ export function CategorizationReviewPage() {
     Record<number, number | undefined>
   >({});
   const [checked, setChecked] = useState<Record<number, boolean>>({});
+  const [categoriasOpen, setCategoriasOpen] = useState(false);
 
   const totalPaginas = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
   const {
@@ -168,99 +171,109 @@ export function CategorizationReviewPage() {
   ).length;
 
   return (
-    <section className="dash-page">
-      <h2>Categorização</h2>
-
-      <div className="dash-filter">
-        <PeriodFilter ano={ano} mes={mes} onChange={mudarFiltro} />
-        <label>
-          Tipo
-          <select
-            aria-label="Tipo"
-            value={tipo}
-            onChange={(event) =>
-              mudarFiltro({ tipo: event.target.value as TransactionTipo | "todos" })
-            }
+    <section className="ac-page">
+      <div className="ac-toolbar">
+        <div className="ac-toolbar-left">
+          <PeriodFilter ano={ano} mes={mes} onChange={mudarFiltro} />
+          <label>
+            Tipo
+            <select
+              aria-label="Tipo"
+              value={tipo}
+              onChange={(event) =>
+                mudarFiltro({ tipo: event.target.value as TransactionTipo | "todos" })
+              }
+            >
+              <option value="todos">Todos</option>
+              <option value="debito">Despesa</option>
+              <option value="credito">Receita</option>
+            </select>
+          </label>
+          <label>
+            Status
+            <select
+              aria-label="Status"
+              value={status}
+              onChange={(event) =>
+                mudarFiltro({ status: event.target.value as CategorizationStatus })
+              }
+            >
+              <option value="pendente">Pendentes</option>
+              <option value="confirmada">Confirmadas</option>
+              <option value="todas">Todas</option>
+            </select>
+          </label>
+          <label>
+            Associado a ativo
+            <select
+              aria-label="Associado a ativo"
+              value={hasAssetFilter}
+              onChange={(event) =>
+                mudarFiltro({ hasAssetFilter: event.target.value as HasAssetFilter })
+              }
+            >
+              <option value="todos">Todos</option>
+              <option value="sim">Sim</option>
+              <option value="nao">Não</option>
+            </select>
+          </label>
+          <label>
+            Categoria
+            <select
+              aria-label="Categoria"
+              value={groupId}
+              onChange={(event) =>
+                mudarFiltro({
+                  groupId: event.target.value === "todos" ? "todos" : Number(event.target.value),
+                })
+              }
+            >
+              <option value="todos">Todas</option>
+              {groups?.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Conta
+            <select
+              aria-label="Conta"
+              value={accountId}
+              onChange={(event) =>
+                mudarFiltro({
+                  accountId: event.target.value === "todas" ? "todas" : Number(event.target.value),
+                })
+              }
+            >
+              <option value="todas">Todas</option>
+              {accounts?.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.apelido ?? account.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="ac-btn-row">
+          <button
+            type="button"
+            className="ac-btn"
+            onClick={() => syncItems.mutate(undefined)}
+            disabled={syncItems.isPending}
           >
-            <option value="todos">Todos</option>
-            <option value="debito">Despesa</option>
-            <option value="credito">Receita</option>
-          </select>
-        </label>
-        <label>
-          Status
-          <select
-            aria-label="Status"
-            value={status}
-            onChange={(event) =>
-              mudarFiltro({ status: event.target.value as CategorizationStatus })
-            }
-          >
-            <option value="pendente">Pendentes</option>
-            <option value="confirmada">Confirmadas</option>
-            <option value="todas">Todas</option>
-          </select>
-        </label>
-        <label>
-          Associado a ativo
-          <select
-            aria-label="Associado a ativo"
-            value={hasAssetFilter}
-            onChange={(event) =>
-              mudarFiltro({ hasAssetFilter: event.target.value as HasAssetFilter })
-            }
-          >
-            <option value="todos">Todos</option>
-            <option value="sim">Sim</option>
-            <option value="nao">Não</option>
-          </select>
-        </label>
-        <label>
-          Categoria
-          <select
-            aria-label="Categoria"
-            value={groupId}
-            onChange={(event) =>
-              mudarFiltro({
-                groupId: event.target.value === "todos" ? "todos" : Number(event.target.value),
-              })
-            }
-          >
-            <option value="todos">Todas</option>
-            {groups?.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.nome}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Conta
-          <select
-            aria-label="Conta"
-            value={accountId}
-            onChange={(event) =>
-              mudarFiltro({
-                accountId: event.target.value === "todas" ? "todas" : Number(event.target.value),
-              })
-            }
-          >
-            <option value="todas">Todas</option>
-            {accounts?.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.apelido ?? account.nome}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          onClick={() => syncItems.mutate(undefined)}
-          disabled={syncItems.isPending}
-        >
-          {syncItems.isPending ? "Sincronizando..." : "Sincronizar contas"}
-        </button>
+            {syncItems.isPending ? "Sincronizando..." : "Sincronizar contas"}
+          </button>
+          <button type="button" className="ac-btn" onClick={() => setCategoriasOpen(true)}>
+            Gerenciar categorias
+          </button>
+        </div>
       </div>
+
+      <Drawer open={categoriasOpen} onClose={() => setCategoriasOpen(false)} title="Categorias">
+        <CategoriasPage />
+      </Drawer>
 
       {isLoading && <p>Carregando...</p>}
       {data && data.total === 0 && <p>Nenhuma transação encontrada.</p>}
@@ -268,15 +281,20 @@ export function CategorizationReviewPage() {
       {syncItems.isError && <p role="alert">Não foi possível sincronizar as contas.</p>}
 
       {pendentesDaPagina.length > 0 && (
-        <div className="dash-filter">
-          <button type="button" onClick={aprovarMarcadas} disabled={marcadasParaAprovar === 0}>
+        <div className="ac-btn-row">
+          <button
+            type="button"
+            className="ac-btn ac-btn-primary"
+            onClick={aprovarMarcadas}
+            disabled={marcadasParaAprovar === 0}
+          >
             Aprovar marcadas ({marcadasParaAprovar})
           </button>
         </div>
       )}
 
-      <div className="dash-table-wrap">
-        <table className="dash-table cat-review-table">
+      <div className="ac-table-wrap">
+        <table className="ac-txn-table cat-review-table">
           <colgroup>
             <col className="col-check" />
             <col className="col-status" />
@@ -399,15 +417,17 @@ export function CategorizationReviewPage() {
                   <td>
                     <InvestimentoSelectCell transaction={tx} investimentos={investimentos} />
                   </td>
-                  <td>
-                    <span className="valor-cell">
-                      <TransactionTipoIcon tipo={tx.tipo} />
-                      {formatCurrency(tx.valor)}
+                  <td className="ac-col-valor">
+                    <span className="ac-valor-cell">
+                      <DirectionIcon despesa={tx.tipo === "debito"} />
+                      <span className="ac-valor-amt">{formatCurrency(tx.valor)}</span>
                     </span>
                   </td>
                   <td>
                     {isPendente && (
                       <button
+                        type="button"
+                        className="ac-btn ac-btn-primary"
                         onClick={() => {
                           if (subcategoryValue === undefined) return;
                           setCategory.mutate({
@@ -429,19 +449,21 @@ export function CategorizationReviewPage() {
       </div>
 
       {data && data.total > 0 && (
-        <div className="dash-filter">
+        <div className="ac-btn-row">
           <button
             type="button"
+            className="ac-btn"
             onClick={() => setPage((current) => Math.max(1, current - 1))}
             disabled={page <= 1}
           >
             ← Anterior
           </button>
-          <span>
+          <span className="ac-empty">
             Página {page} de {totalPaginas} ({data.total} transações)
           </span>
           <button
             type="button"
+            className="ac-btn"
             onClick={() => setPage((current) => Math.min(totalPaginas, current + 1))}
             disabled={page >= totalPaginas}
           >

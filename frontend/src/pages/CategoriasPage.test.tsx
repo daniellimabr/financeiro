@@ -56,6 +56,21 @@ describe("CategoriasPage", () => {
     vi.restoreAllMocks();
   });
 
+  it("renders without its own page heading (title comes from the Drawer that hosts it)", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/category-groups") return Promise.resolve(jsonResponse([GROUP_MORADIA]));
+      if (url === "/subcategories") return Promise.resolve(jsonResponse([]));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<CategoriasPage />);
+    await screen.findByRole("button", { name: "Novo grupo" });
+
+    expect(screen.queryByRole("heading", { name: "Categorias" })).not.toBeInTheDocument();
+  });
+
   it("lists groups and subcategories grouped, including a group with no subcategories", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);

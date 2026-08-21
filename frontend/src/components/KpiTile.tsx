@@ -32,6 +32,13 @@ interface KpiTileProps {
   label: string;
   value: string;
   valueVariant?: "default" | "accent";
+  // Sprint 35 (Natureza) — sobrepõe a cor do valor via inline style, pra
+  // preservar o eixo semântico terciário de Natureza (--nat-fixa/--nat-
+  // variavel/--nat-eventual, DESIGN.md), que é por natureza e não cabe nos 2
+  // valores fixos de valueVariant (default/accent). Só usado por NaturezaPage;
+  // scope deviation registrado no relatório da Sprint 35 (o PRD só previa a
+  // prop ariaExpanded).
+  valueColor?: string;
   delta?: KpiDelta;
   caption?: string;
   badge?: KpiBadge;
@@ -44,6 +51,11 @@ interface KpiTileProps {
   onKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void;
   compact?: boolean;
   ariaLabel?: string;
+  // Sprint 35 (Natureza) — expõe o estado "funil aberto" no tile clicável,
+  // equivalente ao aria-expanded que os cards de Natureza já tinham no
+  // sistema antigo. Aditiva: undefined preserva o comportamento anterior
+  // (sem o atributo) pros usos existentes em Dashboards.
+  ariaExpanded?: boolean;
 }
 
 function formatPercent1(value: number): string {
@@ -124,16 +136,21 @@ export function KpiTile({
   onKeyDown,
   compact = false,
   ariaLabel,
+  ariaExpanded,
+  valueColor,
 }: KpiTileProps) {
   const className = `ac-kpi${compact ? " ac-kpi--compact" : ""}`;
   const valueClassName = `ac-kpi-value${valueVariant === "accent" ? " accent" : ""}`;
+  const valueStyle = valueColor ? { color: valueColor } : undefined;
 
   if (compact) {
     const content = (
       <>
         <span className="ac-kpi-label">{label}</span>
         {sparkline}
-        <span className={valueClassName}>{value}</span>
+        <span className={valueClassName} style={valueStyle}>
+          {value}
+        </span>
       </>
     );
     return onClick ? (
@@ -160,7 +177,9 @@ export function KpiTile({
           </span>
         )}
       </div>
-      <span className={valueClassName}>{value}</span>
+      <span className={valueClassName} style={valueStyle}>
+        {value}
+      </span>
       <div className="ac-kpi-foot">
         {caption && <span className="ac-kpi-caption">{caption}</span>}
         {sparkline}
@@ -177,6 +196,7 @@ export function KpiTile({
         role="button"
         tabIndex={0}
         aria-label={ariaLabel ?? label}
+        aria-expanded={ariaExpanded}
         className={className}
         onClick={onClick}
         onKeyDown={onKeyDown}
@@ -188,7 +208,13 @@ export function KpiTile({
 
   if (onClick) {
     return (
-      <button type="button" className={className} onClick={onClick} aria-label={ariaLabel}>
+      <button
+        type="button"
+        className={className}
+        onClick={onClick}
+        aria-label={ariaLabel}
+        aria-expanded={ariaExpanded}
+      >
         {content}
       </button>
     );

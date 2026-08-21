@@ -215,7 +215,7 @@ describe("NaturezaPage", () => {
 
     const { container } = renderWithQueryClient(<NaturezaPage />);
     await screen.findByText("R$ 1.000,00");
-    const summary = within(container.querySelector(".dash-summary") as HTMLElement);
+    const summary = within(container.querySelector(".ac-kpi-row--3") as HTMLElement);
 
     expect(summary.getByText("Fixo recorrente")).toBeInTheDocument();
     expect(summary.getByText("Variável recorrente")).toBeInTheDocument();
@@ -230,7 +230,7 @@ describe("NaturezaPage", () => {
 
     const { container } = renderWithQueryClient(<NaturezaPage />);
     await screen.findByText("R$ 1.000,00");
-    const summary = within(container.querySelector(".dash-summary") as HTMLElement);
+    const summary = within(container.querySelector(".ac-kpi-row--3") as HTMLElement);
 
     await userEvent.click(summary.getByRole("button", { name: /Fixo recorrente/ }));
     const funnel = () => within(container.querySelector(".dash-funnel") as HTMLElement);
@@ -256,7 +256,7 @@ describe("NaturezaPage", () => {
 
     const { container } = renderWithQueryClient(<NaturezaPage />);
     await screen.findByText("R$ 1.000,00");
-    const summary = within(container.querySelector(".dash-summary") as HTMLElement);
+    const summary = within(container.querySelector(".ac-kpi-row--3") as HTMLElement);
     const funnel = () => within(container.querySelector(".dash-funnel") as HTMLElement);
 
     await userEvent.click(summary.getByRole("button", { name: /Eventual/ }));
@@ -284,7 +284,7 @@ describe("NaturezaPage", () => {
 
     const { container } = renderWithQueryClient(<NaturezaPage />);
     await screen.findByText("R$ 1.000,00");
-    const summary = within(container.querySelector(".dash-summary") as HTMLElement);
+    const summary = within(container.querySelector(".ac-kpi-row--3") as HTMLElement);
 
     await userEvent.click(summary.getByRole("button", { name: /Fixo recorrente/ }));
     const funnel = within(container.querySelector(".dash-funnel") as HTMLElement);

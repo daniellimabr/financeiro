@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -468,9 +468,9 @@ describe("CategorizationReviewPage", () => {
     renderWithQueryClient(<CategorizationReviewPage />);
     await screen.findByText("Mercado Sao Joao");
 
-    const valorCell = document.querySelector(".dash-table tbody .valor-cell");
+    const valorCell = document.querySelector(".ac-txn-table tbody .ac-valor-cell");
     expect(valorCell).not.toBeNull();
-    expect(valorCell?.querySelector(".transaction-tipo-icon.despesa")).not.toBeNull();
+    expect(valorCell?.querySelector(".ac-valor-direction.bad")).not.toBeNull();
   });
 
   it("sorts the current page by Data/Valor when a sortable header is clicked", async () => {
@@ -711,5 +711,47 @@ describe("CategorizationReviewPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Sincronizar contas" }));
 
     expect(await screen.findByText("Não foi possível sincronizar as contas.")).toBeInTheDocument();
+  });
+
+  it("opens the Categorias drawer via 'Gerenciar categorias', shows the CRUD, and closes it", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      const base = baseHandlers(url);
+      if (base) return base;
+      if (url.startsWith("/categorization/transactions"))
+        return Promise.resolve(jsonResponse(transactionsPage([BASE_TRANSACTION])));
+      if (url === "/category-groups" && method === "POST") {
+        return Promise.resolve(jsonResponse({ ...GROUP_FIXTURE, id: 2, nome: "Educação" }, 201));
+      }
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<CategorizationReviewPage />);
+    await screen.findByText("Mercado Sao Joao");
+
+    expect(screen.queryByRole("dialog", { name: "Categorias" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Gerenciar categorias" }));
+
+    const drawer = screen.getByRole("dialog", { name: "Categorias" });
+    expect(drawer).toBeInTheDocument();
+    expect(await within(drawer).findByText("Alimentação")).toBeInTheDocument();
+
+    await userEvent.click(within(drawer).getByRole("button", { name: "Novo grupo" }));
+    await userEvent.type(within(drawer).getByLabelText("Nome do grupo"), "Educação");
+    await userEvent.click(within(drawer).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (c) => String(c[0]) === "/category-groups" && (c[1] as RequestInit)?.method === "POST"
+      );
+      expect(call).toBeDefined();
+    });
+
+    await userEvent.click(within(drawer).getByRole("button", { name: "Fechar" }));
+
+    expect(screen.queryByRole("dialog", { name: "Categorias" })).not.toBeInTheDocument();
   });
 });

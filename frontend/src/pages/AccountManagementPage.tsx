@@ -203,15 +203,19 @@ export function AccountManagementPage() {
   }
 
   return (
-    <section className="dash-page">
-      <h2>Gestão de contas</h2>
-
-      <div className="dash-filter">
-        <button onClick={handleConnect} disabled={connecting}>
+    <div>
+      <div className="ac-btn-row">
+        <button
+          type="button"
+          className="ac-btn ac-btn-primary"
+          onClick={handleConnect}
+          disabled={connecting}
+        >
           Conectar conta bancária
         </button>
         <button
           type="button"
+          className="ac-btn"
           onClick={openSyncDialog}
           disabled={!accounts || accounts.length === 0}
         >
@@ -223,7 +227,7 @@ export function AccountManagementPage() {
       {deleteAccount.isError && <p role="alert">Não foi possível excluir a conta.</p>}
 
       {syncDialogOpen && (
-        <div role="dialog" aria-label="Sincronizar MeuPluggy" className="dash-filter">
+        <div role="dialog" aria-label="Sincronizar MeuPluggy" className="ac-panel">
           <div>
             <p>Selecione as contas a sincronizar:</p>
             <ul className="simple-list">
@@ -245,17 +249,28 @@ export function AccountManagementPage() {
                 </li>
               ))}
             </ul>
-            <button type="button" onClick={confirmSync} disabled={syncItems.isPending}>
-              Confirmar sincronização
-            </button>
-            <button type="button" onClick={() => setSyncDialogOpen(false)}>
-              Cancelar
-            </button>
+            <div className="ac-btn-row">
+              <button
+                type="button"
+                className="ac-btn ac-btn-primary"
+                onClick={confirmSync}
+                disabled={syncItems.isPending}
+              >
+                Confirmar sincronização
+              </button>
+              <button
+                type="button"
+                className="ac-btn ac-btn-ghost"
+                onClick={() => setSyncDialogOpen(false)}
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      <h3>Contas conectadas</h3>
+      <div className="ac-section-label">Contas conectadas</div>
       {isLoading && <p>Carregando...</p>}
       {accounts && accounts.length === 0 && <p>Nenhuma conta conectada.</p>}
       <ul className="simple-list">
@@ -277,13 +292,18 @@ export function AccountManagementPage() {
                 />
                 <button
                   type="button"
+                  className="ac-btn ac-btn-primary"
                   onClick={() =>
                     saveApelido(account.id, account.sync_enabled, account.investimento_id)
                   }
                 >
                   Salvar
                 </button>
-                <button type="button" onClick={() => setEditingAccountId(null)}>
+                <button
+                  type="button"
+                  className="ac-btn ac-btn-ghost"
+                  onClick={() => setEditingAccountId(null)}
+                >
                   Cancelar
                 </button>
               </>
@@ -296,12 +316,14 @@ export function AccountManagementPage() {
                 {!account.sync_enabled && " · fora da sincronização"}
                 <button
                   type="button"
+                  className="ac-btn ac-btn-ghost"
                   onClick={() => startEditing(account.id, account.apelido, account.nome)}
                 >
                   Editar
                 </button>
                 <button
                   type="button"
+                  className="ac-btn ac-btn-ghost"
                   onClick={() =>
                     toggleSyncEnabled(
                       account.id,
@@ -315,7 +337,7 @@ export function AccountManagementPage() {
                 </button>
                 <button
                   type="button"
-                  className="btn-danger"
+                  className="ac-btn ac-btn-ghost ac-btn-danger"
                   disabled={account.sync_enabled || deleteAccount.isPending}
                   title={
                     account.sync_enabled
@@ -368,10 +390,18 @@ export function AccountManagementPage() {
                       if (event.key === "Escape") setEditingSaldoInicialId(null);
                     }}
                   />
-                  <button type="button" onClick={() => saveSaldoInicial(account.id)}>
+                  <button
+                    type="button"
+                    className="ac-btn ac-btn-primary"
+                    onClick={() => saveSaldoInicial(account.id)}
+                  >
                     Salvar
                   </button>
-                  <button type="button" onClick={() => setEditingSaldoInicialId(null)}>
+                  <button
+                    type="button"
+                    className="ac-btn ac-btn-ghost"
+                    onClick={() => setEditingSaldoInicialId(null)}
+                  >
                     Cancelar
                   </button>
                 </>
@@ -382,6 +412,7 @@ export function AccountManagementPage() {
                     : "não informado"}
                   <button
                     type="button"
+                    className="ac-btn ac-btn-ghost"
                     onClick={() => startEditingSaldoInicial(account.id, account.saldo_inicial)}
                   >
                     Editar
@@ -393,7 +424,7 @@ export function AccountManagementPage() {
         ))}
       </ul>
 
-      <h3>Posições de investimento</h3>
+      <div className="ac-section-label">Posições de investimento</div>
       {isLoadingInvestments && <p>Carregando...</p>}
       {investments && investments.length === 0 && <p>Nenhuma posição sincronizada.</p>}
       <ul className="simple-list">
@@ -437,6 +468,7 @@ export function AccountManagementPage() {
                       </span>{" "}
                       <button
                         type="button"
+                        className="ac-btn ac-btn-ghost"
                         onClick={() =>
                           updateInvestment.mutate({
                             investmentId: investment.id,
@@ -465,10 +497,18 @@ export function AccountManagementPage() {
                         if (event.key === "Escape") setEditingInvestmentSaldoInicialId(null);
                       }}
                     />
-                    <button type="button" onClick={() => saveInvestmentSaldoInicial(investment.id)}>
+                    <button
+                      type="button"
+                      className="ac-btn ac-btn-primary"
+                      onClick={() => saveInvestmentSaldoInicial(investment.id)}
+                    >
                       Salvar
                     </button>
-                    <button type="button" onClick={() => setEditingInvestmentSaldoInicialId(null)}>
+                    <button
+                      type="button"
+                      className="ac-btn ac-btn-ghost"
+                      onClick={() => setEditingInvestmentSaldoInicialId(null)}
+                    >
                       Cancelar
                     </button>
                   </>
@@ -479,6 +519,7 @@ export function AccountManagementPage() {
                       : "não informado"}
                     <button
                       type="button"
+                      className="ac-btn ac-btn-ghost"
                       onClick={() =>
                         startEditingInvestmentSaldoInicial(investment.id, investment.saldo_inicial)
                       }
@@ -493,14 +534,14 @@ export function AccountManagementPage() {
         })}
       </ul>
 
-      <h3>Baseline de saldo em 31/12/2025</h3>
-      <p className="dash-empty">
+      <div className="ac-section-label">Baseline de saldo em 31/12/2025</div>
+      <p className="ac-empty">
         Proposta gerada por holding a partir do payload real da Pluggy (juros compostos quando a
         taxa é fixa; senão estimativa por fluxo) — confiança marcada por linha. Ações não têm fonte
         de cotação histórica: a proposta pra elas é sempre "estimada". Nada é gravado até confirmar.
       </p>
       {!baselineOpen && (
-        <button type="button" onClick={() => setBaselineOpen(true)}>
+        <button type="button" className="ac-btn" onClick={() => setBaselineOpen(true)}>
           Revisar proposta de baseline
         </button>
       )}
@@ -511,11 +552,11 @@ export function AccountManagementPage() {
             <p role="alert">Não foi possível carregar a proposta de baseline.</p>
           )}
           {baselineProposal.data && baselineProposal.data.length === 0 && (
-            <p className="dash-empty">Nenhuma holding sincronizada.</p>
+            <p className="ac-empty">Nenhuma holding sincronizada.</p>
           )}
           {baselineProposal.data && baselineProposal.data.length > 0 && (
-            <div className="dash-table-wrap">
-              <table className="dash-table baseline-table">
+            <div className="ac-table-wrap">
+              <table className="baseline-table">
                 <colgroup>
                   <col className="col-holding" />
                   <col className="col-tipo" />
@@ -570,9 +611,10 @@ export function AccountManagementPage() {
             </div>
           )}
           {confirmBaseline.isError && <p role="alert">Não foi possível confirmar o baseline.</p>}
-          <div className="dash-filter">
+          <div className="ac-btn-row">
             <button
               type="button"
+              className="ac-btn ac-btn-primary"
               disabled={
                 !baselineProposal.data ||
                 baselineProposal.data.length === 0 ||
@@ -584,6 +626,7 @@ export function AccountManagementPage() {
             </button>
             <button
               type="button"
+              className="ac-btn ac-btn-ghost"
               onClick={() => {
                 setBaselineOpen(false);
                 setBaselineDrafts({});
@@ -595,42 +638,46 @@ export function AccountManagementPage() {
         </>
       )}
 
-      <h3>Auditoria de saldo por conta</h3>
-      <p className="dash-empty">
+      <div className="ac-section-label">Auditoria de saldo por conta</div>
+      <p className="ac-empty">
         Ferramenta de conferência: saldo calculado mês a mês (saldo inicial + soma cumulativa da
         data real de cada transação, desde 01/01/2026) — compare com o extrato bancário real.
       </p>
-      <div className="dash-filter">
-        <PeriodFilter
-          ano={auditoriaAno}
-          mes={auditoriaMes}
-          onChange={(next) => {
-            if (next.ano !== undefined) setAuditoriaAno(next.ano);
-            if (next.mes !== undefined) setAuditoriaMes(next.mes);
-          }}
-        />
-        <label>
-          Meses
-          <select
-            aria-label="Meses de auditoria"
-            value={auditoriaMeses}
-            onChange={(event) => setAuditoriaMeses(Number(event.target.value) as PeriodoHistorico)}
-          >
-            <option value={3}>3 meses</option>
-            <option value={6}>6 meses</option>
-            <option value={12}>12 meses</option>
-          </select>
-        </label>
+      <div className="ac-toolbar">
+        <div className="ac-toolbar-left">
+          <PeriodFilter
+            ano={auditoriaAno}
+            mes={auditoriaMes}
+            onChange={(next) => {
+              if (next.ano !== undefined) setAuditoriaAno(next.ano);
+              if (next.mes !== undefined) setAuditoriaMes(next.mes);
+            }}
+          />
+          <label>
+            Meses
+            <select
+              aria-label="Meses de auditoria"
+              value={auditoriaMeses}
+              onChange={(event) =>
+                setAuditoriaMeses(Number(event.target.value) as PeriodoHistorico)
+              }
+            >
+              <option value={3}>3 meses</option>
+              <option value={6}>6 meses</option>
+              <option value={12}>12 meses</option>
+            </select>
+          </label>
+        </div>
       </div>
 
       {evolucaoQuery.isLoading && <p>Carregando...</p>}
       {evolucaoQuery.isError && <p role="alert">Não foi possível carregar a auditoria de saldo.</p>}
       {evolucaoQuery.data && evolucaoQuery.data.length === 0 && (
-        <p className="dash-empty">Nenhuma conta com saldo inicial informado.</p>
+        <p className="ac-empty">Nenhuma conta com saldo inicial informado.</p>
       )}
       {evolucaoQuery.data && evolucaoQuery.data.length > 0 && (
-        <div className="dash-table-wrap">
-          <table className="dash-table">
+        <div className="ac-table-wrap">
+          <table className="ac-table">
             <colgroup>
               <col className="col-componente" />
               {evolucaoQuery.data[0].pontos.map((p) => (
@@ -660,6 +707,6 @@ export function AccountManagementPage() {
           </table>
         </div>
       )}
-    </section>
+    </div>
   );
 }

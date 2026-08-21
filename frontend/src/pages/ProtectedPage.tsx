@@ -3,7 +3,6 @@ import { useState } from "react";
 
 import type { CurrentUser } from "../api/auth";
 import { AssetsPage } from "./AssetsPage";
-import { CategoriasPage } from "./CategoriasPage";
 import { CategorizationReviewPage } from "./CategorizationReviewPage";
 import { ConfiguracoesPage } from "./ConfiguracoesPage";
 import { DashboardsPage } from "./DashboardsPage";
@@ -24,7 +23,6 @@ type Tab =
   | "passivos"
   | "natureza"
   | "orcamento"
-  | "categorias"
   | "configuracoes";
 
 // Ícones de navegação (Sprint 34, "Analyst Console") — mesmo idioma visual do
@@ -101,16 +99,6 @@ const NAV_ICONS: Record<Tab, ReactNode> = {
       <circle cx="8" cy="8" r="0.6" fill="currentColor" />
     </svg>
   ),
-  categorias: (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M2 4.6c0-.66.54-1.2 1.2-1.2h2.8l1.3 1.6h5.5c.66 0 1.2.54 1.2 1.2v5.8c0 .66-.54 1.2-1.2 1.2H3.2c-.66 0-1.2-.54-1.2-1.2V4.6Z"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-      />
-    </svg>
-  ),
   configuracoes: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <circle cx="8" cy="8" r="2.4" stroke="currentColor" strokeWidth="1.3" />
@@ -132,7 +120,6 @@ const NAV_ITEMS: { tab: Tab; label: string }[] = [
   { tab: "passivos", label: "Passivos" },
   { tab: "natureza", label: "Natureza" },
   { tab: "orcamento", label: "Orçamento" },
-  { tab: "categorias", label: "Categorias" },
   { tab: "configuracoes", label: "Configurações" },
 ];
 
@@ -173,7 +160,6 @@ export function ProtectedPage({ user }: ProtectedPageProps) {
         {tab === "passivos" && <LiabilitiesPage />}
         {tab === "natureza" && <NaturezaPage />}
         {tab === "orcamento" && <OrcamentoPage />}
-        {tab === "categorias" && <CategoriasPage />}
         {tab === "configuracoes" && <ConfiguracoesPage user={user} />}
       </main>
     </div>

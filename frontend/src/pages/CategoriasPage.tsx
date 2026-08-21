@@ -163,14 +163,10 @@ export function CategoriasPage() {
   }
 
   return (
-    <section className="dash-page">
-      <h2>Categorias</h2>
-
-      <div className="dash-filter">
-        <button type="button" onClick={openCreateGroupForm}>
-          Novo grupo
-        </button>
-      </div>
+    <div>
+      <button type="button" className="ac-btn ac-btn-primary" onClick={openCreateGroupForm}>
+        Novo grupo
+      </button>
 
       {(createGroup.isError || updateGroup.isError) && (
         <p role="alert">Não foi possível salvar o grupo.</p>
@@ -181,8 +177,12 @@ export function CategoriasPage() {
       {deleteError && <p role="alert">{deleteError}</p>}
 
       {groupFormOpen && (
-        <div role="dialog" aria-label={editingGroupId !== null ? "Editar grupo" : "Novo grupo"}>
-          <form className="dash-filter" onSubmit={submitGroupForm}>
+        <div
+          role="dialog"
+          aria-label={editingGroupId !== null ? "Editar grupo" : "Novo grupo"}
+          className="ac-panel"
+        >
+          <form className="ac-form-row" onSubmit={submitGroupForm}>
             <label>
               Nome do grupo
               <input
@@ -192,10 +192,18 @@ export function CategoriasPage() {
                 onChange={(event) => setGroupNome(event.target.value)}
               />
             </label>
-            <button type="submit" disabled={createGroup.isPending || updateGroup.isPending}>
+            <button
+              type="submit"
+              className="ac-btn ac-btn-primary"
+              disabled={createGroup.isPending || updateGroup.isPending}
+            >
               Salvar
             </button>
-            <button type="button" onClick={() => setGroupFormOpen(false)}>
+            <button
+              type="button"
+              className="ac-btn ac-btn-ghost"
+              onClick={() => setGroupFormOpen(false)}
+            >
               Cancelar
             </button>
           </form>
@@ -206,8 +214,9 @@ export function CategoriasPage() {
         <div
           role="dialog"
           aria-label={editingSubcategory !== null ? "Editar subcategoria" : "Nova subcategoria"}
+          className="ac-panel"
         >
-          <form className="dash-filter" onSubmit={submitSubForm}>
+          <form className="ac-form-row" onSubmit={submitSubForm}>
             <label>
               Nome da subcategoria
               <input
@@ -237,11 +246,16 @@ export function CategoriasPage() {
             </label>
             <button
               type="submit"
+              className="ac-btn ac-btn-primary"
               disabled={createSubcategory.isPending || updateSubcategory.isPending}
             >
               Salvar
             </button>
-            <button type="button" onClick={() => setSubFormOpen(false)}>
+            <button
+              type="button"
+              className="ac-btn ac-btn-ghost"
+              onClick={() => setSubFormOpen(false)}
+            >
               Cancelar
             </button>
           </form>
@@ -260,19 +274,23 @@ export function CategoriasPage() {
         renderGroupCell={(group) => (
           <>
             {group.nome}
-            <div className="dash-filter">
-              <button className="btn-ghost" type="button" onClick={() => openEditGroupForm(group)}>
+            <div className="ac-btn-row">
+              <button
+                className="ac-btn ac-btn-ghost"
+                type="button"
+                onClick={() => openEditGroupForm(group)}
+              >
                 Editar
               </button>
               <button
-                className="btn-ghost"
+                className="ac-btn ac-btn-ghost"
                 type="button"
                 onClick={() => openCreateSubForm(group.id)}
               >
                 Nova subcategoria
               </button>
               <button
-                className="btn-ghost btn-quiet btn-danger"
+                className="ac-btn ac-btn-ghost ac-btn-danger"
                 type="button"
                 onClick={() => handleDeleteGroup(group)}
               >
@@ -282,15 +300,19 @@ export function CategoriasPage() {
           </>
         )}
         renderEmptyGroupRow={() => (
-          <span className="dash-empty">Nenhuma subcategoria neste grupo.</span>
+          <span className="ac-empty">Nenhuma subcategoria neste grupo.</span>
         )}
         renderThirdColumn={(sub) => (
-          <div className="dash-filter">
-            <button className="btn-ghost" type="button" onClick={() => openEditSubForm(sub)}>
+          <div className="ac-btn-row">
+            <button
+              className="ac-btn ac-btn-ghost"
+              type="button"
+              onClick={() => openEditSubForm(sub)}
+            >
               Editar
             </button>
             <button
-              className="btn-ghost btn-quiet btn-danger"
+              className="ac-btn ac-btn-ghost ac-btn-danger"
               type="button"
               onClick={() => handleDeleteSubcategory(sub)}
             >
@@ -299,6 +321,6 @@ export function CategoriasPage() {
           </div>
         )}
       />
-    </section>
+    </div>
   );
 }

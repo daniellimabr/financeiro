@@ -77,7 +77,7 @@ describe("ProtectedPage navigation", () => {
     expect(screen.getByRole("button", { name: "Passivos" })).toBeInTheDocument();
   });
 
-  it("orders the nav as Dashboards, Categorizar, Ativos, Investimentos, Passivos, Natureza, Orçamento, Categorias, Configurações", () => {
+  it("orders the nav as Dashboards, Categorizar, Ativos, Investimentos, Passivos, Natureza, Orçamento, Configurações (8 abas, sem Categorias)", () => {
     vi.stubGlobal("fetch", catchAllFetchMock());
 
     renderProtectedPage();
@@ -95,7 +95,6 @@ describe("ProtectedPage navigation", () => {
       "Passivos",
       "Natureza",
       "Orçamento",
-      "Categorias",
       "Configurações",
     ]);
   });
@@ -107,7 +106,8 @@ describe("ProtectedPage navigation", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Configurações" }));
 
-    expect(await screen.findByRole("heading", { name: "Configurações" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Perfil" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Gerenciar contas" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Configurações" })).toHaveAttribute(
       "aria-current",
       "page"
@@ -135,7 +135,7 @@ describe("ProtectedPage navigation", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Natureza" }));
 
-    expect(await screen.findByRole("heading", { name: "Natureza" })).toBeInTheDocument();
+    expect(await screen.findByText("Classificar subcategorias")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Natureza" })).toHaveAttribute(
       "aria-current",
       "page"
@@ -156,17 +156,11 @@ describe("ProtectedPage navigation", () => {
     );
   });
 
-  it("switches to the Categorias tab and renders CategoriasPage", async () => {
+  it("has no separate Categorias tab in the nav", () => {
     vi.stubGlobal("fetch", catchAllFetchMock());
 
     renderProtectedPage();
 
-    await userEvent.click(screen.getByRole("button", { name: "Categorias" }));
-
-    expect(await screen.findByRole("heading", { name: "Categorias" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Categorias" })).toHaveAttribute(
-      "aria-current",
-      "page"
-    );
+    expect(screen.queryByRole("button", { name: "Categorias" })).not.toBeInTheDocument();
   });
 });
