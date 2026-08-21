@@ -26,11 +26,18 @@ function formatPercent(value: number): string {
 // mockup aprovado: só a setinha é colorida (--ac-good/--ac-bad), o valor em
 // si continua em --ac-text-h (evita competir com o restante da paleta —
 // esta tabela já tem cor no ícone de conta e no combobox de categoria).
-function DirectionIcon({ negative }: { negative: boolean }) {
-  const path = negative ? "M5 9L1 3h8z" : "M5 1l4 6H1z";
+// Direção vem de `transaction.tipo` (debito/credito), NUNCA do sinal de
+// `valor` — regressão real encontrada em QA (Sprint 34): despesas no
+// cartão de crédito guardam `valor` positivo (é um aumento da fatura, não
+// uma saída de caixa como no débito), então `Number(valor) < 0` classifica
+// essas despesas como receita. `tipo` é o mesmo campo que
+// TransactionTipoIcon.tsx já usa por causa exatamente desse bug (achado
+// "NuTag" documentado ali, Sprint 10) — não reinventar o sinal aqui.
+function DirectionIcon({ despesa }: { despesa: boolean }) {
+  const path = despesa ? "M5 9L1 3h8z" : "M5 1l4 6H1z";
   return (
     <svg
-      className={`ac-valor-direction ${negative ? "bad" : "good"}`}
+      className={`ac-valor-direction ${despesa ? "bad" : "good"}`}
       width="8"
       height="8"
       viewBox="0 0 10 10"
@@ -256,7 +263,7 @@ export function TransactionsTable({
                 <td className="ac-col-valor">
                   <span className="ac-valor-cell">
                     <AccountTipoIcon tipo={transaction.account_tipo} />
-                    <DirectionIcon negative={Number(transaction.valor) < 0} />
+                    <DirectionIcon despesa={transaction.tipo === "debito"} />
                     <span className="ac-valor-amt">{formatCurrency(transaction.valor)}</span>
                   </span>
                 </td>

@@ -274,6 +274,22 @@ const TRANSACAO_FIXTURE = {
   updated_at: "2026-01-10T00:00:00Z",
 };
 
+// Despesa no cartão de crédito com `valor` armazenado POSITIVO — a Pluggy
+// registra fatura de cartão como aumento do saldo devedor, não como saída
+// de caixa negativa igual ao débito. `tipo: "debito"` continua sendo o
+// sinal correto de despesa (mesmo campo que TransactionTipoIcon já usa por
+// causa do achado "NuTag", Sprint 10) — usada pra travar que a seta de
+// direção da célula de valor não regride pro sinal de `valor`.
+const TRANSACAO_FIXTURE_CARTAO_DESPESA_POSITIVA = {
+  ...TRANSACAO_FIXTURE,
+  id: 3,
+  pluggy_transaction_id: "tx-3",
+  descricao: "Fatura Cartao Loja X",
+  valor: "89.90",
+  tipo: "debito",
+  account_tipo: "cartao_credito",
+};
+
 const TRANSACAO_FIXTURE_2 = {
   ...TRANSACAO_FIXTURE,
   id: 2,
@@ -839,6 +855,31 @@ describe("DashboardsPage", () => {
     expect(valorCell).not.toBeNull();
     expect(valorCell?.querySelector(".account-tipo-icon")).not.toBeNull();
     expect(valorCell?.textContent).toContain("R$");
+  });
+
+  it("shows the despesa direction (red, down) for a cartão de crédito expense even though valor is stored positive", async () => {
+    const base = routedFetchMock();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith("/pluggy/transactions")) {
+        return Promise.resolve(jsonResponse([TRANSACAO_FIXTURE_CARTAO_DESPESA_POSITIVA]));
+      }
+      return base.getMockImplementation()!(input, init);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<DashboardsPage />);
+    await screen.findByText("R$ 8.400,00");
+
+    await userEvent.click(screen.getByRole("button", { name: /Despesa/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Alimentação/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Mercado/ }));
+    await screen.findByText("Fatura Cartao Loja X");
+
+    const direction = document.querySelector(".ac-valor-direction");
+    expect(direction).not.toBeNull();
+    expect(direction?.classList.contains("bad")).toBe(true);
+    expect(direction?.classList.contains("good")).toBe(false);
   });
 
   it("reorders the transaction table when a column header is clicked", async () => {
