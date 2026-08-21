@@ -2,9 +2,12 @@
 
 - **Plano:** [SPRINT-034-redesign-analyst-console-fundacao-dashboard-plan.md](./SPRINT-034-redesign-analyst-console-fundacao-dashboard-plan.md)
 - **Data do relatório:** 2026-08-21
-- **Aprovado pelo CEO em:** deploy autorizado antecipadamente na mesma sessão ("go ahead and deploy
-  as well when its time", "go full auto on this sprint, require less aprovals from me") — segue o
-  mesmo padrão das Sprints 31/32, plano com deploy como tarefa da própria sprint.
+- **Aprovado pelo CEO em:** 2026-08-21 ("aprovado") — deploy já autorizado antecipadamente na mesma
+  sessão ("go ahead and deploy as well when its time", "go full auto on this sprint, require less
+  aprovals from me") e feito antes da aprovação formal, mesmo padrão das Sprints 31/32 (plano com
+  deploy como tarefa da própria sprint). Aprovação final cobre a entrega completa, incluindo os 2
+  pedidos pós-entrega (gráfico combinado, restyle da tabela de drilldowns) e os 2 achados de dado
+  corrigidos ao vivo (categoria obsoleta, seta de direção no cartão).
 
 ## Resumo
 
