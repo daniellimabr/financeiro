@@ -4,9 +4,9 @@
 - **PRDs:** [PRD-036a](../prd/PRD-036a-redesign-analyst-console-ativos-passivos-orcamento-login.md),
   [PRD-036b](../prd/PRD-036b-redesign-analyst-console-investimentos.md)
 - **Data do relatório:** 2026-08-21
-- **Aprovado pelo CEO em:** pendente — deploy na VM de dev e validação ao vivo já feitos antes da
-  aprovação formal, mesmo padrão das Sprints 34/35 (deploy como tarefa da própria sprint, autonomia
-  de execução via `docs/infra/ssh-workflow.md`).
+- **Aprovado pelo CEO em:** 2026-08-21 ("sprint aprovada") — deploy na VM de dev e validação ao vivo
+  já feitos antes da aprovação formal, mesmo padrão das Sprints 34/35 (deploy como tarefa da própria
+  sprint, autonomia de execução via `docs/infra/ssh-workflow.md`).
 
 ## Resumo
 
