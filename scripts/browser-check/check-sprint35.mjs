@@ -48,10 +48,15 @@ async function run(browser, viewport, colorScheme, label) {
   await page.waitForTimeout(600);
   await page.screenshot({ path: path.join(shotsDir, `sprint35-categorizar-${label}.png`), fullPage: true });
 
-  // Drawer de Categorias, aberto a partir de Categorizar
+  // Drawer de Categorias, aberto a partir de Categorizar — fullPage:false
+  // aqui: o painel é position:fixed, então uma captura fullPage (que
+  // redimensiona o viewport pro tamanho do documento inteiro) faz o drawer
+  // "descolar" e cobrir só o topo da imagem gerada, sem refletir o que um
+  // usuário real vê (o backdrop sempre acompanha o viewport real). Captura
+  // no tamanho do viewport mostra o drawer como ele realmente aparece.
   await page.getByRole("button", { name: "Gerenciar categorias" }).click();
   await page.waitForTimeout(400);
-  await page.screenshot({ path: path.join(shotsDir, `sprint35-categorias-drawer-${label}.png`), fullPage: true });
+  await page.screenshot({ path: path.join(shotsDir, `sprint35-categorias-drawer-${label}.png`) });
   await page.getByRole("button", { name: "Fechar" }).click();
   await page.waitForTimeout(200);
 
@@ -65,10 +70,11 @@ async function run(browser, viewport, colorScheme, label) {
   await page.waitForTimeout(600);
   await page.screenshot({ path: path.join(shotsDir, `sprint35-configuracoes-${label}.png`), fullPage: true });
 
-  // Drawer de Gestão de contas, aberto a partir de Configurações
+  // Drawer de Gestão de contas, aberto a partir de Configurações (mesmo
+  // motivo acima para fullPage:false).
   await page.getByRole("button", { name: "Gerenciar contas" }).click();
   await page.waitForTimeout(400);
-  await page.screenshot({ path: path.join(shotsDir, `sprint35-contas-drawer-${label}.png`), fullPage: true });
+  await page.screenshot({ path: path.join(shotsDir, `sprint35-contas-drawer-${label}.png`) });
 
   console.log(`[${label}] done`);
   await context.close();
