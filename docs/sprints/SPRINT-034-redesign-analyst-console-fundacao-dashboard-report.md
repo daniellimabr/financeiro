@@ -120,13 +120,43 @@ confirmar via `GET .../actions/runs?per_page=5` que o `head_sha` exato do commit
 GitHub Actions antes de declarar o CI verde para um commit específico — checar só `status:
 completed` do "último run" sem essa comparação pode capturar o run de um commit anterior.
 
+## Achado adicional: categoria errada exibida nos drilldowns (dado, não visual)
+
+Depois do restyle da tabela de transações, o CEO reportou que a Categoria exibida numa linha do
+drilldown de Despesa ("Empréstimos / Empréstimos Concedidos") não batia com o grupo do accordion em
+que ela estava aninhada (Moradia → Aluguel), mesmo a categoria real estando salva corretamente.
+Investigado antes de qualquer mudança (regra "investigar antes de reinterpretar dado"):
+
+- `CategorySelectCell` (`TransactionEditCells.tsx`) mostra `subcategoria_sugerida_id ??
+  subcategory_id` — prioriza a sugestão pendente sobre a categoria real confirmada.
+- O código atual (`list_transactions`, `backend/app/categorization/service.py`) só recalcula
+  `subcategoria_sugerida_id` pras linhas **pendentes** da página — já correto, sem bug de código
+  ativo. Confirmado com um teste novo
+  (`test_list_transactions_never_recomputes_suggestion_for_confirmed_transaction`, passou de
+  primeira contra o código sem alteração).
+- O problema era **dado histórico sujo** na VM de dev: 876 transações já confirmadas do CEO (todas
+  do `user_id=1` real) ainda carregavam um `subcategoria_sugerida_id` de antes deste guard existir
+  — 27 delas com valor de fato divergente da categoria confirmada (as outras 849 coincidiam por
+  acaso). Corrigido com um `UPDATE` direto no Postgres da VM de dev (não uma migration — correção
+  de estado derivado/cache, não mudança de schema), limpando os 5 campos de sugestão
+  (`subcategoria_sugerida_id`/`sugestao_confianca`/`sugestao_fonte_tipo`/`sugestao_fonte_id`/
+  `sugestao_score`) nas transações confirmadas, mesmo padrão que `set_category`/`bulk_confirm` já
+  aplicam ao confirmar. Verificado ao vivo: a transação do exemplo (id 24) agora mostra "Moradia /
+  Aluguel", batendo com o accordion.
+
 ## Evidência de testes
 
-Frontend (único stack tocado nesta sprint — nenhuma mudança de backend):
+Frontend:
 
 ```
 Test Files  28 passed (28)
      Tests  252 passed (252)
+```
+
+Backend (só o arquivo de teste do achado de categoria acima — nenhum código de produção mudou):
+
+```
+75 passed (tests/test_categorization_service.py)
 ```
 
 Cobertura (`npm run test:coverage`):
