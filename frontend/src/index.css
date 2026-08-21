@@ -2392,6 +2392,16 @@ button.ac-kpi:focus-visible {
   gap: 14px;
 }
 
+/* Mesmo motivo de .ac-kpi (ver comentário acima, "Item de grid"): sem
+   min-width:0 o painel nunca encolhe abaixo do min-content da tabela de
+   ranking (nomes longos de investimento sem quebra), então o item de grid
+   força a página inteira a estourar horizontalmente no mobile mesmo com
+   .ac-table-wrap { overflow-x: auto } — achado real via browser-check da
+   Sprint 36. */
+.ac-two-col > .ac-panel {
+  min-width: 0;
+}
+
 .ac-panel {
   background: var(--ac-surface);
   border: 1px solid var(--ac-border);
