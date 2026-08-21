@@ -120,6 +120,21 @@ confirmar via `GET .../actions/runs?per_page=5` que o `head_sha` exato do commit
 GitHub Actions antes de declarar o CI verde para um commit específico — checar só `status:
 completed` do "último run" sem essa comparação pode capturar o run de um commit anterior.
 
+## Achado adicional 2: seta de direção errada em despesas no cartão de crédito
+
+Depois de validar o restyle da tabela, o CEO reportou que despesas no cartão de crédito mostravam a
+seta verde (receita) em vez da vermelha (despesa) na célula de Valor nova — débito/conta corrente
+estava correto. `DirectionIcon` (`TransactionsTable.tsx`) decidia a direção por
+`Number(transaction.valor) < 0`, mas a Pluggy registra fatura de cartão como aumento do saldo
+devedor (`valor` **positivo**), diferente do débito (`valor` negativo = saída de caixa). Isso é uma
+regressão de um bug **já corrigido antes**: `TransactionTipoIcon.tsx` (usado na tela de
+Categorização) já resolve exatamente esse problema usando `transaction.tipo` (`debito`/`credito`)
+em vez do sinal de `valor` — comentário no próprio arquivo cita o "achado NuTag" da Sprint 10 como
+motivo. `DirectionIcon` passou a usar o mesmo campo. Regressão travada com um teste novo em
+`DashboardsPage.test.tsx` usando uma transação de cartão com `valor` positivo. Verificado ao vivo
+contra uma transação real ("iFood", `R$ 103,63`, cartão de crédito) — mostra seta vermelha
+corretamente após o fix.
+
 ## Achado adicional: categoria errada exibida nos drilldowns (dado, não visual)
 
 Depois do restyle da tabela de transações, o CEO reportou que a Categoria exibida numa linha do
