@@ -12,13 +12,20 @@ Levou a direção visual "Analyst Console" (Proposta 3, escolhida pelo CEO entre
 comparadas em Artifacts) do mockup ao sistema real: novo namespace de tokens `--ac-*` coexistindo
 com o sistema atual (nenhum token antigo alterado), tipografia Inter self-hosted, shell/sidebar
 novo em todas as abas, e o Dashboard migrado por completo — 5 KPIs de fluxo com delta+sparkline,
-row Ativos/Passivos/Patrimônio, conferência do Saldo Acumulado sempre visível (sem clique),
-comparativo Receita/Despesa em pequenos múltiplos com escala compartilhada e tooltip funcional, e
+row Ativos/Passivos/Patrimônio, conferência do Saldo Acumulado sempre visível (sem clique), e
 navegador de mês (◀ mês ▶). Dois componentes novos reutilizáveis (`KpiTile`, `ChartTooltip`) e um
 utilitário (`computeSharedDomain`) ficam disponíveis pras próximas sprints do épico E10. Cobertura
 de testes configurada (`@vitest/coverage-v8`) pela primeira vez no projeto. Implementado, testado,
 commitado, CI verde confirmado, deployado na VM de dev, validado ao vivo com browser-check (3
 achados de layout corrigidos no processo) e `DESIGN.md`/`docs/roadmap.md` atualizados.
+
+Depois da entrega inicial, na mesma sessão, o CEO pediu 2 ajustes adicionais ao ver o resultado ao
+vivo — ambos implementados, testados e deployados como parte desta mesma sprint (ver "Pedidos do
+CEO pós-entrega inicial" abaixo): o comparativo Receita/Despesa deixou de ser pequenos múltiplos e
+virou um único gráfico com as 3 séries (Receita/Despesa/Saldo Acumulado) sobrepostas na mesma
+escala; e a tabela de transações dos drilldowns do Dashboard (`TransactionsTable.tsx`, compartilhada
+com Ativos/Passivos) foi restilizada no modelo refinado que apareceu no mockup da tela de
+Categorização (não migrada nesta sprint).
 
 ## Itens do plano vs. entregue
 
@@ -67,22 +74,68 @@ funcionando (`sprint34-tooltip-hover.png`) e um de regressão confirmando que a 
 não tocada, sistema antigo) renderiza sem nenhum vazamento do sistema novo
 (`sprint34-regressao-categorizar.png`).
 
+## Pedidos do CEO pós-entrega inicial (mesma sessão)
+
+Depois de ver o Dashboard novo ao vivo, o CEO pediu 2 mudanças adicionais — tratadas como parte
+desta mesma sprint (execução contínua, sem `/clear`), não como sprint separada:
+
+1. **Gráfico combinado.** "Os gráficos Receita/Despesa devem ser sobrepostos... e neste plot,
+   adicionar uma linha para o saldo acumulado." Isso reabre uma rejeição explícita do PRD-034
+   original a "gráfico de eixo duplo" — mas as 3 séries são valores monetários na mesma unidade,
+   então sobrepor não reintroduz o problema real que o PRD queria evitar (grandezas diferentes
+   competindo por um eixo). Os 2 painéis de pequenos múltiplos (`ac-sm-grid`, CSS removido —
+   ficaria morto) viraram um `ReceitaDespesaSaldoChart` único: 3 `<Line>` do Recharts com o mesmo
+   domínio Y (`computeSharedDomain` sobre as 3 séries juntas), tooltip multi-valor
+   (`ComparativoTooltipContent`, local — diferente de `ChartTooltip.tsx`, que continua servindo
+   gráficos de série única) e legenda HTML.
+2. **Tabela dos drilldowns.** "A tabela que é exibida dentro dos acordeões/drilldowns... me parece
+   estar no modelo da versão anterior... o design da tabela da tela de Categorias desse esboço
+   havia sido ajustado, e ficado num ótimo modelo." Restilizado `TransactionsTable.tsx` (usada nos
+   drilldowns Despesa/Receita do Dashboard e também em Ativos/Passivos) pra `.ac-txn-table`: cabeçalho
+   ordenável denso/uppercase, hover de linha, valor com seta de direção colorida
+   (`--ac-good`/`--ac-bad`) + ícone de meio de pagamento existente (o número em si fica neutro
+   `--ac-text-h`, mesmo padrão do mockup — só a seta carrega cor). As células editáveis
+   (Descrição/Categoria/Ativo/Investimento, via `TransactionEditCells.tsx`) são compartilhadas com
+   `CategorizationReviewPage` (sistema antigo, intocado) — o restyle é só via seletor descendente
+   `.ac-txn-table ...`, nunca mudando a classe base desses componentes, e ficam "parecendo texto"
+   em repouso, ganhando cromado de campo só no hover/foco. **Limitação técnica assumida:** o popup
+   do combobox de categoria é renderizado via portal em `document.body`, fora da subárvore do DOM
+   da tabela — um seletor CSS descendente não alcança lá, então o popup em si segue no visual
+   antigo. E a exibição "grupo mudo / nome em destaque" de duas cores do mockup não foi replicada
+   dentro do `<input>` da combobox (um `<input>` HTML só suporta uma cor de texto); se o CEO quiser
+   essa fidelidade visual completa, precisa de um rework do componente pra um modo
+   display-vs-edição (como `DescriptionCell` já faz), não coberto nesta sprint.
+
+**Achado real durante o redeploy destes 2 pedidos:** o primeiro ciclo de deploy do segundo pedido
+serviu a imagem Docker **errada** — o script de checagem de CI (`GET .../actions/runs?branch=main
+&per_page=1`, sem filtrar por `head_sha`) confirmou "completed/success" olhando pro run do commit
+*anterior* (que já tinha terminado), não pro run do commit que acabara de ser empurrado (que
+ainda não tinha nem aparecido como "latest run" na API). `docker compose pull` então buscou a tag
+`:latest` de antes do build novo terminar de publicar. Detectado ao vivo comparando o CSS servido
+(`curl` no bundle `/static/index-*.css`, `grep -c "ac-txn-table"` retornando 0) contra o que estava
+no commit; corrigido com `docker compose pull && docker compose up -d --force-recreate` depois de
+confirmar via `GET .../actions/runs?per_page=5` que o `head_sha` exato do commit já tinha
+`conclusion: success`. Nenhum dado de usuário em risco (só o frontend estava desatualizado por
+~15 minutos, dev VM). Lição registrada em memória: sempre conferir `head_sha` no payload da API do
+GitHub Actions antes de declarar o CI verde para um commit específico — checar só `status:
+completed` do "último run" sem essa comparação pode capturar o run de um commit anterior.
+
 ## Evidência de testes
 
 Frontend (único stack tocado nesta sprint — nenhuma mudança de backend):
 
 ```
 Test Files  28 passed (28)
-     Tests  251 passed (251)
+     Tests  252 passed (252)
 ```
 
 Cobertura (`npm run test:coverage`):
 
 ```
-Statements   : 89.09% ( 1822/2045 )
-Branches     : 81.76% ( 1282/1568 )
-Functions    : 90.44% ( 805/890 )
-Lines        : 92.04% ( 1655/1798 )
+Statements   : 88.96% ( 1830/2057 )
+Branches     : 81.22% ( 1289/1587 )
+Functions    : 90.27% ( 808/895 )
+Lines        : 91.91% ( 1660/1806 )
 ```
 
 Thresholds por arquivo (100% nos 3 arquivos de lógica de negócio novos desta sprint — `KpiTile.tsx`,
@@ -113,13 +166,19 @@ componente + função auxiliar — mesmo padrão já tolerado em outros arquivos
   backend nesta sprint. Registrado em `docs/roadmap.md` § Decisões e descartes.
 - **Indicador de conciliação na sidebar** (mockup): já estava fora de escopo desde o PRD, confirmado
   não implementado.
+- **Gráfico combinado (Receita/Despesa/Saldo Acumulado) e restyle da tabela de drilldowns:** não
+  estavam no PRD-034 original (que pedia pequenos múltiplos e não tocava no funil) — pedidos
+  explícitos do CEO durante a execução, tratados como parte desta sprint. Ver "Pedidos do CEO
+  pós-entrega inicial".
 
 ## Deploy
 
-Commits `d87c858` (feature), `5d36a0c`/`9d7c9aa`/`8680c14` (fixes do browser-check) — todos com CI
-verde confirmado (`GET /repos/daniellimabr/financeiro/actions/runs`, `conclusion: success` pro
-`head_sha` exato) antes de cada `docker compose pull && docker compose up -d` na VM de dev. Estado
-final: `api`/`frontend`/`postgres`/`caddy` todos `healthy`/`running` no commit `8680c14`.
+Commits `d87c858` (feature), `5d36a0c`/`9d7c9aa`/`8680c14` (fixes do browser-check), `48e81ca`
+(gráfico combinado) e `b292c2a` (restyle da tabela de transações) — todos com CI verde confirmado
+antes do deploy. O deploy de `b292c2a` serviu a imagem errada na primeira tentativa (ver "Pedidos
+do CEO pós-entrega inicial" acima); corrigido com `--force-recreate` depois de reconfirmar o
+`head_sha` exato no CI. Estado final: `api`/`frontend`/`postgres`/`caddy` todos `healthy`/`running`
+no commit `b292c2a`, CSS servido confirmado (`grep -c "ac-txn-table"` no bundle > 0).
 
 ## Próximos passos (backlog do épico E10)
 
