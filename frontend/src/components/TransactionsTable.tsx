@@ -22,6 +22,25 @@ function formatPercent(value: number): string {
   return `${value.toFixed(1)}%`;
 }
 
+// Ícone de direção do valor (Sprint 34, "Analyst Console") — mesmo idioma do
+// mockup aprovado: só a setinha é colorida (--ac-good/--ac-bad), o valor em
+// si continua em --ac-text-h (evita competir com o restante da paleta —
+// esta tabela já tem cor no ícone de conta e no combobox de categoria).
+function DirectionIcon({ negative }: { negative: boolean }) {
+  const path = negative ? "M5 9L1 3h8z" : "M5 1l4 6H1z";
+  return (
+    <svg
+      className={`ac-valor-direction ${negative ? "bad" : "good"}`}
+      width="8"
+      height="8"
+      viewBox="0 0 10 10"
+      aria-hidden="true"
+    >
+      <path d={path} fill="currentColor" />
+    </svg>
+  );
+}
+
 type TransacaoSortKey =
   "data" | "descricao" | "categoria" | "ativo" | "investimento" | "valor" | "percentual";
 
@@ -121,8 +140,8 @@ export function TransactionsTable({
   if (data.length === 0) return <p className="dash-empty">{emptyMessage}</p>;
 
   return (
-    <div className="dash-table-wrap">
-      <table className="dash-table txn-table">
+    <div className="ac-table-wrap">
+      <table className="ac-txn-table">
         <colgroup>
           <col className="col-data" />
           <col className="col-descricao" />
@@ -208,8 +227,8 @@ export function TransactionsTable({
             const oculta = hiddenIds?.has(transaction.id) ?? false;
             return (
               <tr key={transaction.id} className={oculta ? "hidden-row" : undefined}>
-                <td>{transaction.data}</td>
-                <td>
+                <td className="date-cell">{transaction.data}</td>
+                <td className="desc-cell">
                   <DescriptionCell transaction={transaction} />
                 </td>
                 {showCategoria && (
@@ -234,10 +253,11 @@ export function TransactionsTable({
                     />
                   </td>
                 )}
-                <td>
-                  <span className="valor-cell">
+                <td className="ac-col-valor">
+                  <span className="ac-valor-cell">
                     <AccountTipoIcon tipo={transaction.account_tipo} />
-                    {formatCurrency(transaction.valor)}
+                    <DirectionIcon negative={Number(transaction.valor) < 0} />
+                    <span className="ac-valor-amt">{formatCurrency(transaction.valor)}</span>
                   </span>
                 </td>
                 {total !== undefined && <td className="pct-col">{formatPercent(percentual)}</td>}

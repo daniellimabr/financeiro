@@ -1448,47 +1448,231 @@ input {
   text-align: right;
 }
 
-/* Tabela de transação unificada (Sprint 13) — drill-downs de Dashboard/
-   Natureza/Ativos/Passivos, via components/TransactionsTable.tsx. Colunas
-   Categoria/Ativo/% são condicionais (showCategoria/showAtivo/total) — o
-   colgroup no componente já reflete isso, então as classes de largura não
-   precisam de :nth-child. Descrição ficava sem largura fixa (table-layout:
-   fixed dava todo o espaço restante pra ela) — no painel largo do funil de
-   Dashboards isso deixava a coluna enorme; teto de 30% (mesma técnica de
-   .col-descricao em .cat-review-table) achado real do CEO ao vivo. */
-.txn-table .col-data {
-  width: 90px;
+/* Tabela de transação unificada, restilizada (Sprint 34, "Analyst Console")
+   — components/TransactionsTable.tsx trocou de .dash-table/.txn-table
+   (sistema antigo) pra .ac-txn-table, a pedido do CEO depois de ver o
+   modelo de tabela refinado da tela de Categorização no mockup aprovado
+   (checkbox/status/categoria com grupo+memória/valor com seta de direção).
+   Reaproveita a estrutura de dados/edição inline 100% intacta — só
+   CSS muda. DescriptionCell/CategorySelectCell/AssetSelectCell/DateCell
+   (TransactionEditCells.tsx) são compartilhados com CategorizationReviewPage
+   (sistema antigo, não tocado), então o restyle é só via seletor descendente
+   .ac-txn-table ..., nunca mudando a classe base desses componentes. */
+.ac-table-wrap {
+  overflow-x: auto;
 }
 
-.txn-table .col-descricao {
-  width: 30%;
+.ac-txn-table {
+  width: 100%;
+  min-width: 480px;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-family: var(--font-ac);
 }
 
-.txn-table .col-categoria {
-  width: 220px;
+.ac-txn-table th,
+.ac-txn-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--ac-border);
+  font-size: 12.5px;
+  text-align: left;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.txn-table .col-ativo {
-  width: 140px;
+.ac-txn-table thead th {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ac-text-dim);
+  border-bottom: 1px solid var(--ac-border-strong);
 }
 
-.txn-table .col-valor {
-  width: 110px;
+.ac-txn-table thead th.sortable {
+  cursor: pointer;
+  user-select: none;
 }
 
-.txn-table .col-percentual {
-  width: 70px;
+.ac-txn-table thead th.sortable button {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
 }
 
-.txn-table .col-ocultar {
-  width: 40px;
+.ac-txn-table thead th.sortable:hover {
+  color: var(--ac-text-h);
+}
+
+.ac-txn-table thead th.sortable[aria-sort="ascending"],
+.ac-txn-table thead th.sortable[aria-sort="descending"] {
+  color: var(--ac-blue);
+}
+
+.ac-txn-table thead th.sortable[aria-sort="ascending"] button,
+.ac-txn-table thead th.sortable[aria-sort="descending"] button {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ac-txn-table thead th .sort-arrow {
+  margin-left: 3px;
+  font-size: 9px;
+}
+
+.ac-txn-table tbody tr:hover td {
+  background: var(--ac-surface-2);
+}
+
+.ac-txn-table .col-data {
+  width: 80px;
+}
+
+.ac-txn-table .col-descricao {
+  width: 26%;
+}
+
+.ac-txn-table .col-categoria {
+  width: 210px;
+}
+
+.ac-txn-table .col-ativo {
+  width: 130px;
+}
+
+.ac-txn-table .col-investimento {
+  width: 150px;
+}
+
+.ac-txn-table .col-valor {
+  width: 130px;
+}
+
+.ac-txn-table .col-percentual {
+  width: 60px;
+  text-align: right;
+}
+
+.ac-txn-table .col-ocultar {
+  width: 36px;
+}
+
+.ac-txn-table td.date-cell {
+  color: var(--ac-text-dim);
+}
+
+.ac-txn-table td.pct-col {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ac-text-dim);
+}
+
+/* Descrição/Data — DescriptionCell/DateCell (compartilhados com
+   CategorizationReviewPage) renderizam um <button> "cru" (sem classe
+   própria); aqui ele deve ler como texto até o hover, não como um botão
+   com borda — mesmo idioma "clique pra editar" do resto do app, só sem o
+   cromado de botão competindo com a densidade da tabela. */
+.ac-txn-table .desc-cell button {
+  all: unset;
+  cursor: pointer;
+  color: var(--ac-text-h);
+  font-weight: 500;
+  font-size: inherit;
+  font-family: inherit;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ac-txn-table .desc-cell button:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--ac-border-strong);
+}
+
+.ac-txn-table .desc-cell input {
+  width: 100%;
+  font: inherit;
+  color: var(--ac-text-h);
+  background: var(--ac-surface);
+  border: 1px solid var(--ac-blue);
+  border-radius: 6px;
+  padding: 3px 6px;
+}
+
+/* Categoria/Ativo/Investimento — combobox/select "em repouso parecem
+   texto", ganham cromado de campo (borda/fundo) só no hover/foco, evitando
+   que toda linha pareça um formulário em vez de uma lista de leitura. */
+.ac-txn-table .cat-combobox-input,
+.ac-txn-table select {
+  width: 100%;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ac-text-h);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 3px 6px;
+  margin: -3px -6px;
+}
+
+.ac-txn-table .cat-combobox-input:hover,
+.ac-txn-table select:hover {
+  border-color: var(--ac-border);
+  background: var(--ac-surface);
+}
+
+.ac-txn-table .cat-combobox-input:focus,
+.ac-txn-table select:focus {
+  outline: none;
+  border-color: var(--ac-blue);
+  background: var(--ac-surface);
+}
+
+.ac-txn-table .ac-col-valor {
+  text-align: right;
+}
+
+.ac-valor-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.ac-valor-cell .account-tipo-icon {
+  color: var(--ac-text-dim);
+}
+
+.ac-valor-direction {
+  flex: none;
+}
+
+.ac-valor-direction.good {
+  color: var(--ac-good);
+}
+
+.ac-valor-direction.bad {
+  color: var(--ac-bad);
+}
+
+.ac-valor-amt {
+  color: var(--ac-text-h);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 /* "Ocultar gasto" (Sprint 27) — toggle de binóculo por linha, simulação
-   client-side efêmera (ver GrupoAccordion em DashboardsPage.tsx). Linha
-   marcada como oculta fica esmaecida e com o valor riscado — sinaliza que
-   ela saiu da soma exibida sem removê-la da lista (o usuário ainda precisa
-   poder desmarcar). */
+   client-side efêmera (ver GrupoAccordion em DashboardsPage.tsx). Único
+   consumidor é TransactionsTable, então o token novo entra direto na regra
+   base (não precisa de escopo .ac-txn-table). Linha marcada como oculta
+   fica esmaecida e com o valor riscado — sinaliza que ela saiu da soma
+   exibida sem removê-la da lista (o usuário ainda precisa poder desmarcar). */
 .hide-toggle {
   display: inline-flex;
   align-items: center;
@@ -1498,23 +1682,23 @@ input {
   background: none;
   border: 1px solid transparent;
   border-radius: 6px;
-  color: var(--text);
+  color: var(--ac-text-dim);
 }
 
 .hide-toggle:hover {
-  border-color: var(--border);
+  border-color: var(--ac-border);
 }
 
 .hide-toggle.active {
-  color: var(--accent-text);
-  background: var(--accent-bg);
+  color: var(--ac-blue);
+  background: var(--ac-blue-bg);
 }
 
 tr.hidden-row {
   opacity: 0.5;
 }
 
-tr.hidden-row .valor-cell {
+tr.hidden-row .ac-valor-amt {
   text-decoration: line-through;
 }
 

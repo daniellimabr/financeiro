@@ -835,7 +835,7 @@ describe("DashboardsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /Mercado/ }));
     await screen.findByText("Mercado São João");
 
-    const valorCell = document.querySelector(".dash-table tbody .valor-cell");
+    const valorCell = document.querySelector(".ac-txn-table tbody .ac-valor-cell");
     expect(valorCell).not.toBeNull();
     expect(valorCell?.querySelector(".account-tipo-icon")).not.toBeNull();
     expect(valorCell?.textContent).toContain("R$");
