@@ -25,5 +25,7 @@ class Settings(BaseSettings):
     pluggy_base_url: str = "https://api.pluggy.ai"
     pluggy_sync_cutoff_date: date = date(2026, 1, 1)
 
+    demo_allowed_email: str = "daniellimabr@gmail.com"
+
 
 settings = Settings()

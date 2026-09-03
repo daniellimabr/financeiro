@@ -569,6 +569,35 @@ input {
    antigo), porque a sidebar/nav é compartilhada; PRD-034 escopo item 3. Usa
    --ac-* (ver bloco de tokens acima), nunca --accent/--surface antigos. */
 
+.app-shell-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+}
+
+.app-shell-page .app-shell {
+  flex: 1;
+  min-height: 0;
+}
+
+/* MODO DEMO (Sprint 37) — vocabulário de alerta já existente (--danger/
+   --danger-bg, ver .btn-danger), sem token novo. */
+.demo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.demo-banner button {
+  flex: none;
+}
+
 .app-shell {
   display: flex;
   min-height: 100svh;

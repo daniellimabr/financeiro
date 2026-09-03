@@ -5,6 +5,7 @@ export interface CurrentUser {
   email: string;
   name: string;
   salario_competencia_cutoff_dia: number;
+  is_demo: boolean;
   created_at: string;
 }
 

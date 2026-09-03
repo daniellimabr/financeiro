@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 
 import type { CurrentUser } from "../api/auth";
+import { useLogout } from "../hooks/useLogout";
 import { AssetsPage } from "./AssetsPage";
 import { CategorizationReviewPage } from "./CategorizationReviewPage";
 import { ConfiguracoesPage } from "./ConfiguracoesPage";
@@ -125,43 +126,59 @@ const NAV_ITEMS: { tab: Tab; label: string }[] = [
 
 export function ProtectedPage({ user }: ProtectedPageProps) {
   const [tab, setTab] = useState<Tab>("dashboards");
+  const logout = useLogout();
 
   return (
-    <div className="app-shell">
-      <aside className="app-sidebar">
-        <p className="app-brand">Financeiro</p>
-
-        <nav className="app-nav" aria-label="Navegação principal">
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item.tab}
-              type="button"
-              className={item.tab === tab ? "active" : undefined}
-              aria-current={item.tab === tab ? "page" : undefined}
-              onClick={() => setTab(item.tab)}
-            >
-              {NAV_ICONS[item.tab]}
-              {item.label}
-            </button>
-          ))}
-        </nav>
-
-        <div className="app-user">
-          <p className="app-user-name">{user.name}</p>
-          <p className="app-user-email">{user.email}</p>
+    <div className="app-shell-page">
+      {user.is_demo && (
+        <div className="demo-banner" role="status">
+          <span>MODO DEMO — dados fictícios, nenhuma ação aqui afeta a conta real</span>
+          <button
+            type="button"
+            className="ac-btn"
+            onClick={() => logout.mutate()}
+            disabled={logout.isPending}
+          >
+            Sair do modo demo
+          </button>
         </div>
-      </aside>
+      )}
+      <div className="app-shell">
+        <aside className="app-sidebar">
+          <p className="app-brand">Financeiro</p>
 
-      <main className="app-main">
-        {tab === "dashboards" && <DashboardsPage />}
-        {tab === "categorizar" && <CategorizationReviewPage />}
-        {tab === "ativos" && <AssetsPage />}
-        {tab === "investimentos" && <InvestimentosPage />}
-        {tab === "passivos" && <LiabilitiesPage />}
-        {tab === "natureza" && <NaturezaPage />}
-        {tab === "orcamento" && <OrcamentoPage />}
-        {tab === "configuracoes" && <ConfiguracoesPage user={user} />}
-      </main>
+          <nav className="app-nav" aria-label="Navegação principal">
+            {NAV_ITEMS.map((item) => (
+              <button
+                key={item.tab}
+                type="button"
+                className={item.tab === tab ? "active" : undefined}
+                aria-current={item.tab === tab ? "page" : undefined}
+                onClick={() => setTab(item.tab)}
+              >
+                {NAV_ICONS[item.tab]}
+                {item.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="app-user">
+            <p className="app-user-name">{user.name}</p>
+            <p className="app-user-email">{user.email}</p>
+          </div>
+        </aside>
+
+        <main className="app-main">
+          {tab === "dashboards" && <DashboardsPage />}
+          {tab === "categorizar" && <CategorizationReviewPage />}
+          {tab === "ativos" && <AssetsPage />}
+          {tab === "investimentos" && <InvestimentosPage />}
+          {tab === "passivos" && <LiabilitiesPage />}
+          {tab === "natureza" && <NaturezaPage />}
+          {tab === "orcamento" && <OrcamentoPage />}
+          {tab === "configuracoes" && <ConfiguracoesPage user={user} />}
+        </main>
+      </div>
     </div>
   );
 }

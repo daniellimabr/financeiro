@@ -10,6 +10,7 @@ class UserOut(BaseModel):
     email: str
     name: str
     salario_competencia_cutoff_dia: int
+    is_demo: bool
     created_at: datetime
 
 

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -11,8 +11,11 @@ const USER: CurrentUser = {
   email: "alice@example.com",
   name: "Alice",
   salario_competencia_cutoff_dia: 25,
+  is_demo: false,
   created_at: "2026-01-01T00:00:00Z",
 };
+
+const DEMO_USER: CurrentUser = { ...USER, id: 2, name: "Conta Demo", is_demo: true };
 
 const SUMMARY_FIXTURE = {
   receita: "0",
@@ -52,11 +55,11 @@ function catchAllFetchMock() {
   });
 }
 
-function renderProtectedPage() {
+function renderProtectedPage(user: CurrentUser = USER) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <ProtectedPage user={USER} />
+      <ProtectedPage user={user} />
     </QueryClientProvider>
   );
 }
@@ -168,5 +171,28 @@ describe("ProtectedPage navigation", () => {
     renderProtectedPage();
 
     expect(screen.queryByRole("button", { name: "Categorias" })).not.toBeInTheDocument();
+  });
+
+  it("does not render the MODO DEMO banner for a regular user", () => {
+    vi.stubGlobal("fetch", catchAllFetchMock());
+
+    renderProtectedPage(USER);
+
+    expect(screen.queryByText(/MODO DEMO/)).not.toBeInTheDocument();
+  });
+
+  it("renders the MODO DEMO banner with a Sair do modo demo button for a demo user", async () => {
+    const fetchMock = catchAllFetchMock();
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderProtectedPage(DEMO_USER);
+
+    expect(screen.getByText(/MODO DEMO/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Sair do modo demo" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find((c) => String(c[0]) === "/auth/logout");
+      expect(call).toBeDefined();
+    });
   });
 });

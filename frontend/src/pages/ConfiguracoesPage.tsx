@@ -1,13 +1,19 @@
 import { useState, type FormEvent } from "react";
 
 import type { CurrentUser } from "../api/auth";
+import { enterDemoUrl } from "../api/demo";
 import { Drawer } from "../components/Drawer";
 import { usePluggyAccounts } from "../hooks/usePluggyAccounts";
 import { useLogout } from "../hooks/useLogout";
+import { useResetDemoAccount } from "../hooks/useResetDemoAccount";
 import { useSalarioAjusteDezembro } from "../hooks/useSalarioAjusteDezembro";
 import { useUpdateSalarioAjusteDezembro } from "../hooks/useUpdateSalarioAjusteDezembro";
 import { useUpdateUserSettings } from "../hooks/useUpdateUserSettings";
 import { AccountManagementPage } from "./AccountManagementPage";
+
+// Só o CEO vê o painel "Modo Demo" — barreira de UX; a barreira real é no
+// backend (checagem de e-mail em cada request a /demo/*), esta é só estética.
+const DEMO_ALLOWED_EMAIL = "daniellimabr@gmail.com";
 
 interface ConfiguracoesPageProps {
   user: CurrentUser;
@@ -16,6 +22,7 @@ interface ConfiguracoesPageProps {
 export function ConfiguracoesPage({ user }: ConfiguracoesPageProps) {
   const logout = useLogout();
   const [contasOpen, setContasOpen] = useState(false);
+  const resetDemo = useResetDemoAccount();
 
   const updateSettings = useUpdateUserSettings();
   const [cutoffDraft, setCutoffDraft] = useState(String(user.salario_competencia_cutoff_dia));
@@ -184,6 +191,50 @@ export function ConfiguracoesPage({ user }: ConfiguracoesPageProps) {
           Gerenciar contas
         </button>
       </div>
+
+      {user.email === DEMO_ALLOWED_EMAIL && (
+        <div className="ac-panel">
+          <div className="ac-panel-head">
+            <div>
+              <h2>Modo Demo</h2>
+              <div className="ac-panel-meta">
+                Troca a sessão ativa deste navegador para uma conta fictícia com dado sintético,
+                pronta para demonstrar o app sem expor dados financeiros reais. Para voltar, use
+                "Sair" e faça login com o Google novamente.
+              </div>
+            </div>
+          </div>
+          <div className="ac-form-row">
+            <button
+              type="button"
+              className="ac-btn ac-btn-primary"
+              onClick={() => {
+                if (
+                  window.confirm("Isso vai trocar a sessão ativa para a conta demo. Continuar?")
+                ) {
+                  window.location.href = enterDemoUrl;
+                }
+              }}
+            >
+              Entrar no modo demo
+            </button>
+            <button
+              type="button"
+              className="ac-btn btn-danger"
+              disabled={resetDemo.isPending}
+              onClick={() => {
+                if (window.confirm("Isso apaga e repopula os dados da conta demo. Continuar?")) {
+                  resetDemo.mutate();
+                }
+              }}
+            >
+              Resetar dados demo
+            </button>
+            {resetDemo.isSuccess && <span className="ac-empty">Dados demo resetados.</span>}
+            {resetDemo.isError && <p role="alert">Não foi possível resetar os dados demo.</p>}
+          </div>
+        </div>
+      )}
 
       <Drawer open={contasOpen} onClose={() => setContasOpen(false)} title="Gestão de contas">
         <AccountManagementPage />

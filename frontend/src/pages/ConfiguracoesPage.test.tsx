@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CurrentUser } from "../api/auth";
+import { enterDemoUrl } from "../api/demo";
 import { ConfiguracoesPage } from "./ConfiguracoesPage";
 
 const USER: CurrentUser = {
@@ -12,7 +13,15 @@ const USER: CurrentUser = {
   email: "alice@example.com",
   name: "Alice",
   salario_competencia_cutoff_dia: 25,
+  is_demo: false,
   created_at: "2026-01-01T00:00:00Z",
+};
+
+const CEO_USER: CurrentUser = {
+  ...USER,
+  id: 2,
+  email: "daniellimabr@gmail.com",
+  name: "Daniel",
 };
 
 const ITEM_FIXTURE = {
@@ -70,6 +79,7 @@ function routedFetchMock() {
       return Promise.resolve(jsonResponse(null));
     if (url === "/auth/logout" && method === "POST")
       return Promise.resolve(jsonResponse(null, 204));
+    if (url === "/demo/reset" && method === "POST") return Promise.resolve(jsonResponse(null, 204));
     throw new Error(`Unexpected fetch: ${method} ${url}`);
   });
 }
@@ -184,5 +194,85 @@ describe("ConfiguracoesPage", () => {
       const body = JSON.parse((call?.[1] as RequestInit).body as string);
       expect(body).toEqual({ account_id: 1, data: "2025-12-30", valor: "5000" });
     });
+  });
+
+  it("does not render the Modo Demo panel for a non-CEO email", () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<ConfiguracoesPage user={USER} />);
+
+    expect(screen.queryByRole("heading", { name: "Modo Demo" })).not.toBeInTheDocument();
+  });
+
+  it("renders the Modo Demo panel for the CEO email", () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<ConfiguracoesPage user={CEO_USER} />);
+
+    expect(screen.getByRole("heading", { name: "Modo Demo" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Entrar no modo demo" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Resetar dados demo" })).toBeInTheDocument();
+  });
+
+  it("clicking Entrar no modo demo, after confirming, navigates to /demo/enter", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...originalLocation, href: "" },
+    });
+
+    renderWithQueryClient(<ConfiguracoesPage user={CEO_USER} />);
+    await userEvent.click(screen.getByRole("button", { name: "Entrar no modo demo" }));
+
+    expect(window.location.href).toBe(enterDemoUrl);
+
+    Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
+  });
+
+  it("clicking Entrar no modo demo, without confirming, does not navigate", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...originalLocation, href: "" },
+    });
+
+    renderWithQueryClient(<ConfiguracoesPage user={CEO_USER} />);
+    await userEvent.click(screen.getByRole("button", { name: "Entrar no modo demo" }));
+
+    expect(window.location.href).toBe("");
+
+    Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
+  });
+
+  it("clicking Resetar dados demo, after confirming, calls POST /demo/reset", async () => {
+    const fetchMock = routedFetchMock();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    renderWithQueryClient(<ConfiguracoesPage user={CEO_USER} />);
+    await userEvent.click(screen.getByRole("button", { name: "Resetar dados demo" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (c) => String(c[0]) === "/demo/reset" && (c[1] as RequestInit)?.method === "POST"
+      );
+      expect(call).toBeDefined();
+    });
+  });
+
+  it("clicking Resetar dados demo, without confirming, does not call the API", async () => {
+    const fetchMock = routedFetchMock();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    renderWithQueryClient(<ConfiguracoesPage user={CEO_USER} />);
+    await userEvent.click(screen.getByRole("button", { name: "Resetar dados demo" }));
+
+    const call = fetchMock.mock.calls.find((c) => String(c[0]) === "/demo/reset");
+    expect(call).toBeUndefined();
   });
 });
