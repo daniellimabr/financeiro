@@ -196,11 +196,18 @@ def _seed_investimentos(
         db.add(holding)
         db.flush()
 
+        # O aporte mensal batido aqui precisa ser o mesmo valor da transação
+        # real "Aporte investimento demo" (conta corrente -> investimentos[0],
+        # ver _seed_transacoes) — divergir os dois faz `rendimento_estimado`
+        # (residual: saldo_atual - saldo_base - total_aportes) ficar
+        # artificialmente negativo, porque o dinheiro "chega" na transação mas
+        # o saldo do holding só cresceria por um aporte interno menor.
+        aporte_real = _APORTE_VALOR if investimento is investimentos[0] else Decimal("0")
+
         saldo = saldo_inicial
         for mes in _MESES:
             crescimento = saldo_inicial * Decimal("0.008")
-            aporte = Decimal("300.00") if tipo == "FIXED_INCOME" else Decimal("0")
-            saldo = saldo + crescimento + aporte
+            saldo = saldo + crescimento + aporte_real
             db.add(
                 PluggyInvestmentSnapshot(
                     investment_id=holding.id,
@@ -209,7 +216,7 @@ def _seed_investimentos(
                     saldo=saldo,
                     valorizacao=crescimento,
                     rendimento=crescimento,
-                    aportes=aporte,
+                    aportes=aporte_real,
                     resgates=Decimal("0"),
                     confianca="real",
                 )
