@@ -83,9 +83,7 @@ def reset_demo_data(db: Session) -> None:
 
     db.query(Asset).filter(Asset.user_id == user_id).delete(synchronize_session=False)
     db.query(Liability).filter(Liability.user_id == user_id).delete(synchronize_session=False)
-    db.query(Investimento).filter(Investimento.user_id == user_id).delete(
-        synchronize_session=False
-    )
+    db.query(Investimento).filter(Investimento.user_id == user_id).delete(synchronize_session=False)
     db.query(Orcamento).filter(Orcamento.user_id == user_id).delete(synchronize_session=False)
     db.commit()
 

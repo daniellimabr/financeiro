@@ -363,9 +363,7 @@ def _seed_transacoes(
             tx.subcategory_id = subcategory_id
             tx.categorizacao_status = PluggyTransactionCategorizacaoStatus.confirmada
             if subcategory_id == salario_id:
-                tx.data_competencia = competencia_salario(
-                    data, user.salario_competencia_cutoff_dia
-                )
+                tx.data_competencia = competencia_salario(data, user.salario_competencia_cutoff_dia)
             else:
                 tx.data_competencia = competencia_padrao(data, account.tipo)
             tx.data_caixa = caixa(tx.data_competencia, account.tipo)
