@@ -3,8 +3,9 @@
 - **Plano:** [SPRINT-037-conta-demo-plan.md](./SPRINT-037-conta-demo-plan.md)
 - **PRD:** [PRD-037-conta-demo.md](../prd/PRD-037-conta-demo.md)
 - **Data do relatório:** 2026-09-03
-- **Aprovação:** pendente do CEO — deploy na VM de dev e validação ao vivo já feitos antes da
-  aprovação formal, mesmo padrão das Sprints 34/35/36 (deploy como tarefa da própria sprint).
+- **Aprovado pelo CEO em 2026-09-04** ("sprint aprovada") — deploy na VM de dev e validação ao vivo
+  já feitos antes da aprovação formal, mesmo padrão das Sprints 34/35/36 (deploy como tarefa da
+  própria sprint).
 
 ## Resumo
 
