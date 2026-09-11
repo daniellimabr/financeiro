@@ -4,7 +4,6 @@ from app.models.asset import Asset
 from app.models.category import CategoryGroup, Subcategory
 from app.models.investimento import Investimento
 from app.models.liability import Liability
-from app.models.orcamento import Orcamento
 from app.models.pluggy import (
     PluggyAccount,
     PluggyInvestment,
@@ -43,7 +42,6 @@ def test_seed_demo_data_creates_minimum_counts_per_entity(db_session):
     )
     assert db_session.query(Asset).filter(Asset.user_id == user.id).count() >= 2
     assert db_session.query(Liability).filter(Liability.user_id == user.id).count() >= 1
-    assert db_session.query(Orcamento).filter(Orcamento.user_id == user.id).count() >= 1
 
     transactions = (
         db_session.query(PluggyTransaction).filter(PluggyTransaction.user_id == user.id).all()

@@ -12,7 +12,6 @@ from app.models.asset import Asset, AssetStatus
 from app.models.category import SEM_CATEGORIA_ID, CategoryGroup, Natureza, Subcategory
 from app.models.investimento import Investimento
 from app.models.liability import Liability, LiabilityStatus
-from app.models.orcamento import Orcamento
 from app.models.pluggy import (
     PluggyAccount,
     PluggyAccountTipo,
@@ -20,7 +19,6 @@ from app.models.pluggy import (
     PluggyTransaction,
     PluggyTransactionTipo,
 )
-from app.orcamentos.service import orcamentos_vigentes_query
 
 Regime = Literal["competencia", "caixa"]
 
@@ -951,66 +949,6 @@ def get_tendencia_por_passivo(
             pontos=[PontoTendencia(ano=y, mes=m, total=dado["pontos"][(y, m)]) for y, m in periodo],
         )
         for liability_id, dado in por_passivo.items()
-    ]
-
-
-@dataclass
-class OrcamentoStatus:
-    subcategory_id: int
-    orcado: Decimal
-    realizado: Decimal
-
-
-def get_orcamento_status(
-    db: Session,
-    user_id: int,
-    *,
-    tipo: PluggyTransactionTipo,
-    ano: int,
-    mes: int,
-    regime: Regime = "competencia",
-) -> list[OrcamentoStatus]:
-    # Orçado: soma de todos os orçamentos vigentes no mês, por subcategoria
-    # (múltiplos orçamentos na mesma subcategoria somam — decisão do CEO).
-    orcados_rows = (
-        orcamentos_vigentes_query(db, user_id, ano=ano, mes=mes)
-        .with_entities(Orcamento.subcategory_id, func.sum(Orcamento.valor))
-        .group_by(Orcamento.subcategory_id)
-        .all()
-    )
-    orcado_by_subcategoria = {
-        subcategory_id: _to_decimal(total) for subcategory_id, total in orcados_rows
-    }
-    if not orcado_by_subcategoria:
-        return []
-
-    # Realizado: só para as subcategorias com orçamento vigente — reaproveita
-    # o mesmo filtro base (excluir_de_totais/regime/investimento) de todo
-    # outro agregador desta função.
-    query = _apply_periodo(
-        _base_query(db, user_id, regime=regime), ano=ano, mes=mes, regime=regime
-    ).filter(
-        PluggyTransaction.tipo == tipo,
-        PluggyTransaction.subcategory_id.in_(orcado_by_subcategoria.keys()),
-    )
-    realizado_rows = (
-        query.with_entities(
-            PluggyTransaction.subcategory_id, func.sum(func.abs(PluggyTransaction.valor))
-        )
-        .group_by(PluggyTransaction.subcategory_id)
-        .all()
-    )
-    realizado_by_subcategoria = {
-        subcategory_id: _to_decimal(total) for subcategory_id, total in realizado_rows
-    }
-
-    return [
-        OrcamentoStatus(
-            subcategory_id=subcategory_id,
-            orcado=orcado,
-            realizado=realizado_by_subcategoria.get(subcategory_id, Decimal("0")),
-        )
-        for subcategory_id, orcado in orcado_by_subcategoria.items()
     ]
 
 

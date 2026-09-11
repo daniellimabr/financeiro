@@ -35,7 +35,6 @@ import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "rec
 
 import {
   type CategoriaTotal,
-  type OrcamentoStatus,
   type PeriodoHistorico,
   type PontoTendencia,
   type Regime,
@@ -55,7 +54,6 @@ import { useAssets } from "../hooks/useAssets";
 import { useCategoryGroups } from "../hooks/useCategoryGroups";
 import { useDashboardByCategoria } from "../hooks/useDashboardByCategoria";
 import { useDashboardCategoriaTendencia } from "../hooks/useDashboardCategoriaTendencia";
-import { useDashboardPorOrcamento } from "../hooks/useDashboardPorOrcamento";
 import { useDashboardSaldoAcumulado } from "../hooks/useDashboardSaldoAcumulado";
 import { useDashboardSummary } from "../hooks/useDashboardSummary";
 import { useDashboardTendencia } from "../hooks/useDashboardTendencia";
@@ -898,13 +896,6 @@ function GrupoAccordion({
   );
   const groupsQuery = useCategoryGroups();
   const subcategoriesQuery = useSubcategories();
-  const orcamentoQuery = useDashboardPorOrcamento(tipo, { ...filter, regime });
-
-  const orcamentoBySubcategoria = useMemo(() => {
-    const map = new Map<number, OrcamentoStatus>();
-    for (const item of orcamentoQuery.data ?? []) map.set(item.subcategory_id, item);
-    return map;
-  }, [orcamentoQuery.data]);
 
   const groupColorIndex = useMemo(
     () => buildColorIndexFromIds((groupsQuery.data ?? []).map((g) => g.id)),
@@ -1042,7 +1033,6 @@ function GrupoAccordion({
                     hiddenSumBySubcategoria={hiddenSumBySubcategoria}
                     hiddenIds={hiddenIds}
                     onToggleHidden={onToggleHidden}
-                    orcamentoBySubcategoria={orcamentoBySubcategoria}
                   />
                 </div>
               )}
@@ -1069,7 +1059,6 @@ function SubcategoriaAccordion({
   hiddenSumBySubcategoria,
   hiddenIds,
   onToggleHidden,
-  orcamentoBySubcategoria,
 }: {
   tipo: TransacaoTipo;
   groupId: number;
@@ -1088,10 +1077,6 @@ function SubcategoriaAccordion({
   hiddenSumBySubcategoria: Map<number, number>;
   hiddenIds: Set<number>;
   onToggleHidden: (subcategoryId: number, transactionId: number, valor: number) => void;
-  // Barra orçado-vs-realizado (PRD-030) — só presente nos dois funis de
-  // Despesa/Receita (Row aceita a prop opcionalmente, sem componente
-  // paralelo); ausente em qualquer outro consumidor de SubcategoriaAccordion.
-  orcamentoBySubcategoria?: Map<number, OrcamentoStatus>;
 }) {
   const max = Number(subcategorias[0]?.total ?? 1);
 
@@ -1106,18 +1091,6 @@ function SubcategoriaAccordion({
           filter.mes,
           hiddenSumBySubcategoria.get(item.subcategory_id) ?? 0
         );
-        const orcamentoStatus = orcamentoBySubcategoria?.get(item.subcategory_id);
-        const orcamento: OrcamentoRowInfo | undefined = orcamentoStatus
-          ? {
-              orcado: orcamentoStatus.orcado,
-              realizado: orcamentoStatus.realizado,
-              tipo,
-              alerta:
-                tipo === "debito"
-                  ? Number(orcamentoStatus.realizado) > Number(orcamentoStatus.orcado)
-                  : Number(orcamentoStatus.realizado) < Number(orcamentoStatus.orcado),
-            }
-          : undefined;
         return (
           <li key={item.subcategory_id}>
             <div className="dash-accordion-item">
@@ -1136,7 +1109,6 @@ function SubcategoriaAccordion({
                 onClick={() => onToggleSubcategoria(item.subcategory_id)}
                 trend={trend}
                 onSelecionarMes={onSelecionarMes}
-                orcamento={orcamento}
               />
               {expandedSubcategorias.includes(item.subcategory_id) && (
                 <div className="dash-accordion-panel">
@@ -1594,17 +1566,6 @@ function PatrimonioBreakdownPanel({
   );
 }
 
-export interface OrcamentoRowInfo {
-  orcado: string;
-  realizado: string;
-  // true = despesa estourou o orçado, ou receita não o atingiu — mesma
-  // barra, sentido oposto de alerta por tipo (ver PRD-030). Decidido via
-  // rodada Impeccable (Artifact): sem cor nova — sinaliza com contorno na
-  // barra + símbolo ▲/▼, não com um 4º token semântico.
-  alerta: boolean;
-  tipo: TransacaoTipo;
-}
-
 export function Row({
   nome,
   total,
@@ -1615,7 +1576,6 @@ export function Row({
   expanded,
   trend,
   onSelecionarMes,
-  orcamento,
 }: {
   nome: string;
   total: string;
@@ -1626,7 +1586,6 @@ export function Row({
   expanded: boolean;
   trend?: PontoTendencia[];
   onSelecionarMes?: (ponto: { ano: number; mes: number }) => void;
-  orcamento?: OrcamentoRowInfo;
 }) {
   const pct = max > 0 ? Math.max(4, (Number(total) / max) * 100) : 0;
   return (
@@ -1639,11 +1598,6 @@ export function Row({
       <span className="chev" aria-hidden="true">
         ›
       </span>
-      {orcamento && (
-        <span className={`orcamento-signal${orcamento.alerta ? " alerta" : ""}`} aria-hidden="true">
-          {orcamento.alerta ? (orcamento.tipo === "debito" ? "▲" : "▼") : ""}
-        </span>
-      )}
       <span className="nm">{nome}</span>
       {trend && trend.length > 1 && (
         <TrendLineChart
@@ -1653,21 +1607,10 @@ export function Row({
           onSelecionarMes={onSelecionarMes}
         />
       )}
-      <span className={`track${orcamento?.alerta ? " orcamento-alerta" : ""}`}>
+      <span className="track">
         <span className="fillbar" style={{ width: `${pct}%`, background: color }} />
       </span>
-      <span className="amt">
-        {formatCurrency(total)}
-        {orcamento && (
-          <span className="orcamento-sub">
-            {orcamento.alerta
-              ? orcamento.tipo === "debito"
-                ? "estourou o orçado"
-                : "abaixo do orçado"
-              : `de ${formatCurrency(orcamento.orcado)} orçado`}
-          </span>
-        )}
-      </span>
+      <span className="amt">{formatCurrency(total)}</span>
       {percentual !== undefined && <span className="pct">{formatPercent(percentual)}</span>}
     </button>
   );

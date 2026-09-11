@@ -26,7 +26,6 @@ from app.models.categorization import CategorizationRule
 from app.models.category import CategoryGroup, Subcategory
 from app.models.investimento import Investimento
 from app.models.liability import Liability, LiabilityTipo
-from app.models.orcamento import Orcamento, OrcamentoTipo
 from app.models.pluggy import (
     PluggyAccount,
     PluggyAccountTipo,
@@ -544,40 +543,6 @@ def _seed_transacoes(
             )
 
 
-def _seed_orcamentos(db: Session, user: User) -> None:
-    db.add(
-        Orcamento(
-            user_id=user.id,
-            subcategory_id=_subcategory_id(db, user.id, "Alimentação", "Supermercado"),
-            tipo=OrcamentoTipo.recorrente,
-            valor=Decimal("1500.00"),
-            data_inicio=_data(1, 1),
-            data_fim=None,
-        )
-    )
-    db.add(
-        Orcamento(
-            user_id=user.id,
-            subcategory_id=_subcategory_id(db, user.id, "Alimentação", "Comer fora"),
-            tipo=OrcamentoTipo.recorrente,
-            valor=Decimal("600.00"),
-            data_inicio=_data(1, 1),
-            data_fim=None,
-        )
-    )
-    db.add(
-        Orcamento(
-            user_id=user.id,
-            subcategory_id=_subcategory_id(db, user.id, "Lazer", "Viagens"),
-            tipo=OrcamentoTipo.eventual,
-            valor=Decimal("3000.00"),
-            ano=_ANO,
-            mes=7,
-        )
-    )
-    db.flush()
-
-
 def seed_demo_data(db: Session, user: User) -> None:
     """Popula a conta demo com ~9 meses (jan-set/2026) de dado sintético
     cobrindo todas as telas do app. Idempotente na parte de categorias
@@ -596,6 +561,5 @@ def seed_demo_data(db: Session, user: User) -> None:
     liabilities = _seed_liabilities(db, user)
     _seed_categorization_rules(db, user)
     _seed_transacoes(db, user, contas, investimentos, assets, liabilities, rng)
-    _seed_orcamentos(db, user)
 
     db.commit()

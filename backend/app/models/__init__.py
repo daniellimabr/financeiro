@@ -3,7 +3,7 @@ from app.models.categorization import CategorizationRule
 from app.models.category import CategoryGroup, Subcategory
 from app.models.investimento import Investimento
 from app.models.liability import Liability
-from app.models.orcamento import Orcamento
+from app.models.planejamento import ItemPlanejado, PlanejamentoValor
 from app.models.pluggy import (
     PluggyAccount,
     PluggyInvestment,
@@ -19,8 +19,9 @@ __all__ = [
     "CategorizationRule",
     "CategoryGroup",
     "Investimento",
+    "ItemPlanejado",
     "Liability",
-    "Orcamento",
+    "PlanejamentoValor",
     "PluggyAccount",
     "PluggyInvestment",
     "PluggyInvestmentSnapshot",

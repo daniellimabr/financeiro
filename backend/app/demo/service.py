@@ -9,7 +9,6 @@ from app.models.categorization import (
 )
 from app.models.investimento import Investimento
 from app.models.liability import Liability
-from app.models.orcamento import Orcamento
 from app.models.pluggy import (
     PluggyAccount,
     PluggyInvestment,
@@ -84,7 +83,6 @@ def reset_demo_data(db: Session) -> None:
     db.query(Asset).filter(Asset.user_id == user_id).delete(synchronize_session=False)
     db.query(Liability).filter(Liability.user_id == user_id).delete(synchronize_session=False)
     db.query(Investimento).filter(Investimento.user_id == user_id).delete(synchronize_session=False)
-    db.query(Orcamento).filter(Orcamento.user_id == user_id).delete(synchronize_session=False)
     db.commit()
 
     seed_demo_data(db, user)

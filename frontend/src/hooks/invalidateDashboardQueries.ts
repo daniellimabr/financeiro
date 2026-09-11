@@ -30,10 +30,3 @@ export function invalidateAfterSubcategoryEdit(queryClient: QueryClient): void {
   queryClient.invalidateQueries({ queryKey: ["categoryGroups"] });
   invalidateAllDashboardQueries(queryClient);
 }
-
-// CRUD de Orçamento muda o "orçado" da barra orçado-vs-realizado nos funis
-// de Dashboard (dashboardPorOrcamento) sem tocar em nenhuma transação.
-export function invalidateAfterOrcamentoEdit(queryClient: QueryClient): void {
-  queryClient.invalidateQueries({ queryKey: ["orcamentos"] });
-  invalidateAllDashboardQueries(queryClient);
-}

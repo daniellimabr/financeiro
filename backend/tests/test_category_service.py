@@ -16,7 +16,6 @@ from app.categories.service import (
 from app.exceptions import DuplicateNameError, InvalidStateError, NotFoundError
 from app.models.categorization import CategorizationRule
 from app.models.category import Natureza
-from app.models.orcamento import OrcamentoTipo
 from app.models.pluggy import (
     PluggyAccount,
     PluggyAccountTipo,
@@ -27,7 +26,6 @@ from app.models.pluggy import (
     PluggyTransactionTipo,
 )
 from app.models.user import User
-from app.orcamentos.service import create_orcamento
 
 
 @pytest.fixture()
@@ -222,27 +220,6 @@ def test_delete_subcategory_blocked_when_used_by_categorization_rule(db_session,
         )
     )
     db_session.commit()
-
-    with pytest.raises(InvalidStateError):
-        delete_subcategory(db_session, user.id, subcategory.id)
-
-
-def test_delete_subcategory_blocked_when_used_by_orcamento(db_session, user):
-    group = create_group(db_session, user.id, nome="Moradia")
-    subcategory = create_subcategory(
-        db_session, user.id, group_id=group.id, nome="Aluguel", natureza=None
-    )
-    create_orcamento(
-        db_session,
-        user.id,
-        subcategory_id=subcategory.id,
-        tipo=OrcamentoTipo.eventual,
-        valor=Decimal("1000.00"),
-        ano=2026,
-        mes=3,
-        data_inicio=None,
-        data_fim=None,
-    )
 
     with pytest.raises(InvalidStateError):
         delete_subcategory(db_session, user.id, subcategory.id)

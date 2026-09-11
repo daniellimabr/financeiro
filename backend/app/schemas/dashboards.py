@@ -135,14 +135,6 @@ class PatrimonioBreakdownOut(BaseModel):
     total: Decimal
 
 
-class OrcamentoStatusOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    subcategory_id: int
-    orcado: Decimal
-    realizado: Decimal
-
-
 class SaldoContaOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

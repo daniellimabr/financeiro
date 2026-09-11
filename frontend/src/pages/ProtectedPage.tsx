@@ -10,7 +10,6 @@ import { DashboardsPage } from "./DashboardsPage";
 import { InvestimentosPage } from "./InvestimentosPage";
 import { LiabilitiesPage } from "./LiabilitiesPage";
 import { NaturezaPage } from "./NaturezaPage";
-import { OrcamentoPage } from "./OrcamentoPage";
 
 interface ProtectedPageProps {
   user: CurrentUser;
@@ -23,15 +22,14 @@ type Tab =
   | "investimentos"
   | "passivos"
   | "natureza"
-  | "orcamento"
   | "configuracoes";
 
 // Ícones de navegação (Sprint 34, "Analyst Console") — mesmo idioma visual do
 // mockup aprovado (viewBox 16x16, stroke currentColor, 1.3px): Dashboards/
 // Categorizar/Ativos/Investimentos/Passivos vêm direto do mockup; Natureza/
-// Orçamento/Categorias/Configurações são novos (o mockup só cobriu 6 telas),
-// desenhados no mesmo traço pra não destoar. aria-hidden porque o nome
-// acessível do botão já vem do texto do label ao lado.
+// Categorias/Configurações são novos (o mockup só cobriu 6 telas), desenhados
+// no mesmo traço pra não destoar. aria-hidden porque o nome acessível do
+// botão já vem do texto do label ao lado.
 const NAV_ICONS: Record<Tab, ReactNode> = {
   dashboards: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -93,13 +91,6 @@ const NAV_ICONS: Record<Tab, ReactNode> = {
       />
     </svg>
   ),
-  orcamento: (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <circle cx="8" cy="8" r="5.7" stroke="currentColor" strokeWidth="1.3" />
-      <circle cx="8" cy="8" r="2.8" stroke="currentColor" strokeWidth="1.3" />
-      <circle cx="8" cy="8" r="0.6" fill="currentColor" />
-    </svg>
-  ),
   configuracoes: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <circle cx="8" cy="8" r="2.4" stroke="currentColor" strokeWidth="1.3" />
@@ -120,7 +111,6 @@ const NAV_ITEMS: { tab: Tab; label: string }[] = [
   { tab: "investimentos", label: "Investimentos" },
   { tab: "passivos", label: "Passivos" },
   { tab: "natureza", label: "Natureza" },
-  { tab: "orcamento", label: "Orçamento" },
   { tab: "configuracoes", label: "Configurações" },
 ];
 
@@ -175,7 +165,6 @@ export function ProtectedPage({ user }: ProtectedPageProps) {
           {tab === "investimentos" && <InvestimentosPage />}
           {tab === "passivos" && <LiabilitiesPage />}
           {tab === "natureza" && <NaturezaPage />}
-          {tab === "orcamento" && <OrcamentoPage />}
           {tab === "configuracoes" && <ConfiguracoesPage user={user} />}
         </main>
       </div>

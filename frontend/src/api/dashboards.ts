@@ -35,12 +35,6 @@ export interface CategoriaTotal {
   percentual: string;
 }
 
-export interface OrcamentoStatus {
-  subcategory_id: number;
-  orcado: string;
-  realizado: string;
-}
-
 export interface MeioPagamentoTotal {
   account_tipo: string;
   total: string;
@@ -179,13 +173,6 @@ export function fetchDashboardPorCategoria(
   filter: PeriodoFilter & RegimeFilter = {}
 ): Promise<CategoriaTotal[]> {
   return apiFetch<CategoriaTotal[]>(`/dashboards/por-categoria${buildQuery({ tipo, ...filter })}`);
-}
-
-export function fetchDashboardPorOrcamento(
-  tipo: TransacaoTipo,
-  filter: Required<PeriodoFilter> & RegimeFilter
-): Promise<OrcamentoStatus[]> {
-  return apiFetch<OrcamentoStatus[]>(`/dashboards/por-orcamento${buildQuery({ tipo, ...filter })}`);
 }
 
 export function fetchDashboardPorMeioPagamento(

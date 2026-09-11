@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 from app.exceptions import DuplicateNameError, InvalidStateError, NotFoundError
 from app.models.categorization import CategorizationRule
 from app.models.category import CategoryGroup, Natureza, Subcategory
-from app.models.orcamento import Orcamento
 from app.models.pluggy import PluggyTransaction
 
 
@@ -71,9 +70,6 @@ def _subcategory_usage_counts(db: Session, user_id: int, subcategory_id: int) ->
             CategorizationRule.user_id == user_id,
             CategorizationRule.subcategory_id == subcategory_id,
         )
-        .count(),
-        "orçamentos": db.query(Orcamento)
-        .filter(Orcamento.user_id == user_id, Orcamento.subcategory_id == subcategory_id)
         .count(),
     }
 

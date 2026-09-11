@@ -1,4 +1,5 @@
 from app.auth.jwt import COOKIE_NAME, create_access_token
+from app.models.categorization import CategorizationRule
 from app.models.user import User
 
 
@@ -260,22 +261,22 @@ def test_delete_other_users_subcategory_returns_404(client, db_session):
     assert response.status_code == 404
 
 
-def test_delete_subcategory_in_use_by_orcamento_returns_400(client, db_session):
-    _authenticate(client, db_session)
+def test_delete_subcategory_in_use_by_categorization_rule_returns_400(client, db_session):
+    user = _authenticate(client, db_session)
     group = client.post("/category-groups", json={"nome": "Moradia"}).json()
     subcategory = client.post(
         "/subcategories", json={"group_id": group["id"], "nome": "Aluguel", "natureza": None}
     ).json()
-    client.post(
-        "/orcamentos",
-        json={
-            "subcategory_id": subcategory["id"],
-            "tipo": "eventual",
-            "valor": "1000.00",
-            "ano": 2026,
-            "mes": 3,
-        },
+    db_session.add(
+        CategorizationRule(
+            user_id=user.id,
+            subcategory_id=subcategory["id"],
+            padrao_descricao="Imobiliaria XYZ",
+            padrao_normalizado="imobiliaria xyz",
+            origem="manual",
+        )
     )
+    db_session.commit()
 
     response = client.delete(f"/subcategories/{subcategory['id']}")
 
@@ -283,21 +284,21 @@ def test_delete_subcategory_in_use_by_orcamento_returns_400(client, db_session):
 
 
 def test_delete_group_with_subcategory_in_use_returns_400(client, db_session):
-    _authenticate(client, db_session)
+    user = _authenticate(client, db_session)
     group = client.post("/category-groups", json={"nome": "Moradia"}).json()
     subcategory = client.post(
         "/subcategories", json={"group_id": group["id"], "nome": "Aluguel", "natureza": None}
     ).json()
-    client.post(
-        "/orcamentos",
-        json={
-            "subcategory_id": subcategory["id"],
-            "tipo": "eventual",
-            "valor": "1000.00",
-            "ano": 2026,
-            "mes": 3,
-        },
+    db_session.add(
+        CategorizationRule(
+            user_id=user.id,
+            subcategory_id=subcategory["id"],
+            padrao_descricao="Imobiliaria XYZ",
+            padrao_normalizado="imobiliaria xyz",
+            origem="manual",
+        )
     )
+    db_session.commit()
 
     response = client.delete(f"/category-groups/{group['id']}")
 

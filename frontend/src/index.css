@@ -1090,31 +1090,6 @@ input {
   text-align: right;
 }
 
-/* Barra orçado-vs-realizado (Sprint 30, PRD-030) — rodada Impeccable
-   (Artifact, 2 candidatas), CEO escolheu a sem cor nova: nenhum 4º token
-   semântico é introduzido, o alerta é só contorno na barra existente +
-   símbolo ▲/▼ (estouro em Despesa, déficit em Receita). Ausente por padrão
-   (elemento só existe quando a linha tem orçamento vigente). */
-.dash-row .orcamento-signal {
-  flex: 0 0 14px;
-  font-size: var(--text-xs);
-  font-weight: 700;
-  color: var(--text-h);
-  text-align: center;
-}
-
-.dash-row .track.orcamento-alerta {
-  outline: 1.5px solid var(--text-h);
-  outline-offset: 1.5px;
-}
-
-.dash-row .amt .orcamento-sub {
-  display: block;
-  font-size: var(--text-2xs);
-  font-weight: 400;
-  color: var(--text);
-}
-
 .dash-accordion-item {
   display: flex;
   flex-direction: column;
@@ -2849,11 +2824,9 @@ button.ac-kpi:focus-visible {
 }
 
 /* .simple-list (Sprint 13) é compartilhado por Gestão de Contas (dentro do
-   drawer, Sprint 35) e OrcamentoPage (migrada nesta sprint, Sprint 36) — a
-   classe em si não vira --ac-* globalmente (continua a mesma), só ganha
-   retonização escopada por consumidor, mesmo padrão já usado pro drawer.
-   Decisão de execução (PRD-036a item 4): evitar deixar OrcamentoPage
-   "parcialmente migrada" sem trocar o componente por um novo. */
+   drawer, Sprint 35) e outros consumidores — a classe em si não vira --ac-*
+   globalmente (continua a mesma), só ganha retonização escopada por
+   consumidor, mesmo padrão já usado pro drawer. */
 .ac-drawer-body .simple-list li:hover {
   background: var(--ac-blue-bg);
 }

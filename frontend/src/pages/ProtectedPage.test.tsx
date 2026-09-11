@@ -46,7 +46,6 @@ function catchAllFetchMock() {
     if (url.startsWith("/subcategories")) return Promise.resolve(jsonResponse([]));
     if (url.startsWith("/assets")) return Promise.resolve(jsonResponse([]));
     if (url.startsWith("/liabilities")) return Promise.resolve(jsonResponse([]));
-    if (url.startsWith("/orcamentos")) return Promise.resolve(jsonResponse([]));
     if (url.startsWith("/categorization/transactions")) {
       return Promise.resolve(jsonResponse({ items: [], total: 0, page: 1, page_size: 20 }));
     }
@@ -80,7 +79,7 @@ describe("ProtectedPage navigation", () => {
     expect(screen.getByRole("button", { name: "Passivos" })).toBeInTheDocument();
   });
 
-  it("orders the nav as Dashboards, Categorizar, Ativos, Investimentos, Passivos, Natureza, Orçamento, Configurações (8 abas, sem Categorias)", () => {
+  it("orders the nav as Dashboards, Categorizar, Ativos, Investimentos, Passivos, Natureza, Configurações (7 abas, sem Categorias)", () => {
     vi.stubGlobal("fetch", catchAllFetchMock());
 
     renderProtectedPage();
@@ -97,7 +96,6 @@ describe("ProtectedPage navigation", () => {
       "Investimentos",
       "Passivos",
       "Natureza",
-      "Orçamento",
       "Configurações",
     ]);
   });
@@ -143,23 +141,6 @@ describe("ProtectedPage navigation", () => {
 
     expect(await screen.findByText("Classificar subcategorias")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Natureza" })).toHaveAttribute(
-      "aria-current",
-      "page"
-    );
-  });
-
-  it("switches to the Orçamento tab and renders OrcamentoPage", async () => {
-    vi.stubGlobal("fetch", catchAllFetchMock());
-
-    renderProtectedPage();
-
-    await userEvent.click(screen.getByRole("button", { name: "Orçamento" }));
-
-    // OrcamentoPage (Sprint 36, Analyst Console) não renderiza um <h2> de
-    // título de página — mesmo precedente de NaturezaPage/CategorizationReviewPage
-    // (Sprint 35): a aba já rotula a tela na sidebar.
-    expect(await screen.findByRole("button", { name: "Novo orçamento" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Orçamento" })).toHaveAttribute(
       "aria-current",
       "page"
     );
