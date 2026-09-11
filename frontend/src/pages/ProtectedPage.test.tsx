@@ -46,6 +46,10 @@ function catchAllFetchMock() {
     if (url.startsWith("/subcategories")) return Promise.resolve(jsonResponse([]));
     if (url.startsWith("/assets")) return Promise.resolve(jsonResponse([]));
     if (url.startsWith("/liabilities")) return Promise.resolve(jsonResponse([]));
+    if (url.startsWith("/planejamento/grade")) {
+      return Promise.resolve(jsonResponse({ periodo: [], subcategorias: [], itens: [] }));
+    }
+    if (url.startsWith("/planejamento/itens")) return Promise.resolve(jsonResponse([]));
     if (url.startsWith("/categorization/transactions")) {
       return Promise.resolve(jsonResponse({ items: [], total: 0, page: 1, page_size: 20 }));
     }
@@ -79,7 +83,7 @@ describe("ProtectedPage navigation", () => {
     expect(screen.getByRole("button", { name: "Passivos" })).toBeInTheDocument();
   });
 
-  it("orders the nav as Dashboards, Categorizar, Ativos, Investimentos, Passivos, Natureza, Configurações (7 abas, sem Categorias)", () => {
+  it("orders the nav as Dashboards, Categorizar, Ativos, Investimentos, Passivos, Natureza, Planejamento, Configurações (8 abas, sem Categorias)", () => {
     vi.stubGlobal("fetch", catchAllFetchMock());
 
     renderProtectedPage();
@@ -96,6 +100,7 @@ describe("ProtectedPage navigation", () => {
       "Investimentos",
       "Passivos",
       "Natureza",
+      "Planejamento",
       "Configurações",
     ]);
   });

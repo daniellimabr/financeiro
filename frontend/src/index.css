@@ -2909,3 +2909,258 @@ button.ac-kpi:focus-visible {
   height: 28px;
   margin-top: 2px;
 }
+
+/* Mesa de Planejamento (Sprint 38, PRD-038) — rodada Impeccable (Artifact,
+   2 candidatas), CEO escolheu a Candidata A: itens planejados como linhas
+   da própria grade (sem painel separado) e alerta do mês corrente via cor
+   no valor realizado, reaproveitando o mesmo idioma de delta do KpiTile —
+   nenhum token novo. Acréscimo pedido pelo CEO na aprovação: linha de
+   Total por seção (despesas/receitas). */
+.planejamento-grid-scroll {
+  overflow-x: auto;
+}
+
+table.planejamento-grade {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  font-family: var(--font-ac);
+  font-variant-numeric: tabular-nums;
+}
+
+table.planejamento-grade th,
+table.planejamento-grade td {
+  padding: 8px 10px;
+  font-size: 12.5px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--ac-border);
+}
+
+table.planejamento-grade thead th {
+  position: sticky;
+  top: 0;
+  background: var(--ac-surface);
+  z-index: 2;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ac-text-dim);
+  border-bottom: 1px solid var(--ac-border-strong);
+}
+
+table.planejamento-grade th.col-nome,
+table.planejamento-grade td.col-nome {
+  position: sticky;
+  left: 0;
+  background: var(--ac-surface);
+  z-index: 1;
+  text-align: left;
+  min-width: 168px;
+  max-width: 220px;
+  border-right: 1px solid var(--ac-border);
+  font-weight: 600;
+  color: var(--ac-text-h);
+  white-space: normal;
+}
+
+table.planejamento-grade thead th.col-nome {
+  z-index: 3;
+}
+
+table.planejamento-grade td {
+  min-width: 78px;
+  color: var(--ac-text-h);
+}
+
+table.planejamento-grade th.col-atual,
+table.planejamento-grade td.col-atual {
+  background: var(--ac-blue-bg);
+}
+
+table.planejamento-grade tr.section-row td {
+  background: var(--ac-surface-2);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ac-text-dim);
+  text-align: left;
+  position: sticky;
+  left: 0;
+}
+
+table.planejamento-grade tbody tr:hover td:not(.section-row):not(.total-row td) {
+  background: var(--ac-surface-2);
+}
+
+table.planejamento-grade tr.total-row td {
+  border-top: 2px solid var(--ac-border-strong);
+  font-weight: 700;
+}
+
+table.planejamento-grade tr.total-row td.col-nome {
+  color: var(--ac-text-h);
+}
+
+.planejamento-val-realizado {
+  color: var(--ac-text-dim);
+  font-weight: 400;
+}
+
+.planejamento-val-sugerido {
+  color: var(--ac-amber);
+  font-weight: 500;
+  border-bottom: 1.5px dashed var(--ac-amber);
+  padding-bottom: 1px;
+  cursor: pointer;
+}
+
+.planejamento-val-confirmado {
+  color: var(--ac-text-h);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.planejamento-val-hipotetico {
+  color: var(--ac-text-dim);
+  font-weight: 500;
+  border-bottom: 1.5px dashed var(--ac-text-dim);
+  padding-bottom: 1px;
+}
+
+.planejamento-val-cumprido {
+  color: var(--ac-good);
+  font-weight: 700;
+}
+
+.planejamento-val-vazio {
+  color: var(--ac-border-strong);
+}
+
+.planejamento-atual-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.planejamento-atual-realizado {
+  font-size: 10.5px;
+}
+
+.planejamento-atual-realizado.dentro {
+  color: var(--ac-good);
+}
+
+.planejamento-atual-realizado.alerta {
+  color: var(--ac-bad);
+  font-weight: 700;
+}
+
+.planejamento-item-tag {
+  display: inline-block;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.planejamento-item-tag.hipotetico {
+  background: var(--ac-surface-2);
+  border: 1px dashed var(--ac-border-strong);
+  color: var(--ac-text-dim);
+}
+
+.planejamento-item-tag.cumprido {
+  background: var(--ac-good-bg);
+  color: var(--ac-good);
+}
+
+.planejamento-item-tag.recorrente {
+  background: var(--ac-blue-bg);
+  color: var(--ac-blue);
+}
+
+.planejamento-cell-edit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.planejamento-cell-edit input {
+  width: 76px;
+  font: inherit;
+  text-align: right;
+  padding: 3px 5px;
+  border: 1px solid var(--ac-blue);
+  border-radius: 4px;
+  background: var(--ac-surface);
+  color: var(--ac-text-h);
+}
+
+.planejamento-item-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--ac-border);
+  border-radius: 8px;
+  background: var(--ac-surface-2);
+  margin-bottom: 8px;
+}
+
+.planejamento-item-card-nome {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.planejamento-item-card-meta {
+  font-size: 11.5px;
+  color: var(--ac-text-dim);
+  margin-top: 2px;
+}
+
+.planejamento-item-card-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.planejamento-item-card-valor {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+.planejamento-picker {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px dashed var(--ac-border-strong);
+  border-radius: 6px;
+  background: var(--ac-surface);
+}
+
+.planejamento-picker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--ac-border);
+  font-size: 12.5px;
+}
+
+.planejamento-picker-row:last-child {
+  border-bottom: none;
+}
