@@ -178,13 +178,14 @@ screen runs entirely on this original system anymore. What remains of it is
 partial, inside otherwise-migrated screens: the drill-down funnel/accordion
 of Categorizar, Natureza, Ativos, Passivos, and (since PRD-036b)
 Investimentos (Extrato/Posições/Série histórica, "KPI migrates, funnel
-stays" applied a 4th time), plus Orçamento's `.simple-list` (original
-markup/component, scoped color retint only) — see "What stays on the
-original system" under Analyst Console below. The shell/sidebar and every
-one of the 9 screens now run a second, newer system — "Analyst Console" —
-documented in its own section right after this one. Read that section
-first for any UI work in this app; read the rest of this file only for the
-funnel/drill-down fragments named above, which this file still governs.
+stays" applied a 4th time) — see "What stays on the original system" under
+Analyst Console below (Sprint 38: Orçamento removed entirely, replaced 1:1 in
+the nav by Planejamento — same screen count, no net change). The shell/sidebar
+and every one of the 9 screens now run a second, newer system — "Analyst
+Console" — documented in its own section right after this one. Read that
+section first for any UI work in this app; read the rest of this file only
+for the funnel/drill-down fragments named above, which this file still
+governs.
 
 ## Analyst Console (Sprint 34/35/36, épico E10 — closed)
 
@@ -474,19 +475,17 @@ continua na paleta categórica por ativo (`groupColorVar`/`--cat-*`), a
 mesma já usada pelo funil — não há distinção de cor a fazer ali porque o
 card nunca teve uma cor fixa pra divergir.
 
-`OrcamentoPage` não usa `AcItemCard` (não tem `.dash-tile`) — só a toolbar
-("Novo orçamento") e o diálogo de criar/editar (incluindo o toggle
-Eventual/Recorrente, `.ac-seg`) migraram para `.ac-*`. A lista de
-orçamentos (`.simple-list`, compartilhada com `AccountManagementPage`
-dentro do Drawer) não virou um componente novo — ganhou só uma retonização
-escopada (`.ac-page .simple-list`) pros tokens `--ac-*`, mesmo padrão já
-usado pro Drawer (`.ac-drawer-body .simple-list`), decisão de execução do
-PRD-036a pra a tela não ficar parcialmente migrada sem introduzir um
-componente novo pra uma lista sem funil.
-
 `LoginPage` está inteiramente em `--ac-*` (só CSS — `.login-hero`/
 `.login-hero a` retonizados pra `--ac-border`/`--ac-blue`/`--ac-blue-bg` +
 `--font-ac`, o JSX não mudou), sem nenhum vestígio do sistema antigo.
+
+### Sprint 38 — Mesa de Planejamento (E12, abre o épico)
+
+`PlanejamentoPage.tsx` (nova aba "Planejamento", ocupa a mesma posição no nav que "Orçamento" tinha, entre Natureza e Configurações) roda inteiramente **Analyst Console** — classes novas `.planejamento-*` só em `frontend/src/index.css`, nenhum componente compartilhado novo (tudo vive na própria page), reaproveitando só tokens `--ac-*` já existentes, nenhum token novo. Grade de 16 colunas (3 meses de histórico + mês corrente + 12 futuros) com primeira coluna e cabeçalho fixos (`position: sticky`), edição inline de sugestão, seção "Itens planejados" com CRUD.
+
+Rodada Impeccable (Artifact, 2 candidatas, dado real da conta demo) — CEO escolheu a Candidata A: itens planejados como linhas da própria grade (sem painel separado); alerta do mês corrente sinalizado só por cor (verde/vermelho, sem símbolo ▲/▼), reaproveitando o mesmo idioma de delta do `KpiTile` — nenhum token de cor novo. Acréscimo pedido pelo CEO na aprovação: linha de "Total" por seção (Despesas, Receitas), somando o planejado e o realizado-até-agora de todas as subcategorias da seção, com o mesmo indicador de cor.
+
+Orçamento (Sprint 30, PRD-030) removido por completo nesta sprint — model, módulo `app/orcamentos/`, `OrcamentoPage.tsx`, barra orçado-vs-realizado do Dashboard, migration `0022` derruba a tabela. Rodou 8 sprints (30–37) sem uso real confirmado pelo CEO.
 
 `InvestimentosPage` (PRD-036b) segue o mesmo padrão híbrido dos outros:
 a camada consolidada nova (KPIs, gráfico, ranking, grid de tiles de

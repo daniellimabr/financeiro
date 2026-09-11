@@ -17,6 +17,7 @@ Fases em épicos, derivados do escopo funcional do bootstrap. PRDs individuais s
 | E9 | Natureza e projeção de custos ✅ | Classificação de subcategoria por natureza (fixo recorrente/variável recorrente/eventual) + dashboard de visibilidade — ✅ Sprint 12 (2026-08-16); rótulo "Eventual", funil Natureza>Categoria>Subcategoria>Transação e redesign de tabelas/botões do app — ✅ Sprint 13 (2026-08-16); projeção de custos futuros (receita/despesa/saldo) com simulação efêmera de hipotéticas — ✅ Sprint 14 (2026-08-16) — épico fechado |
 | E10 | Redesign visual (Analyst Console) ✅ | Substituição do sistema visual atual por um novo sistema ("Analyst Console" — paleta desaturada estilo BI, KPIs com delta+sparkline, conciliação do Saldo Acumulado sempre visível), escolhido pelo CEO entre 3 propostas visuais comparadas (Artifacts). Fundação (tokens/tipografia/shell) + Dashboard ✅ Sprint 34 (2026-08-21); Categorizar, Categorias (virou Drawer, saiu do sidebar), Configurações e Natureza ✅ Sprint 35 (2026-08-21); Ativos, Passivos, Orçamento, Login (reskin mecânico, PRD-036a) + Investimentos (revamp de conteúdo — visão consolidada de progresso, PRD-036b, proposta escolhida via sessão de avaliação de layout) ✅ Sprint 36 (2026-08-21) — épico fechado, nenhuma tela resta no sistema visual original (só fragmentos de funil/drill-down, ver DESIGN.md) |
 | E11 | Conta demo ✅ | Acesso restrito a uma conta demo (usuário sentinela, sem OAuth próprio) só alcançável a partir da sessão real de `daniellimabr@gmail.com` via botão escondido em Configurações (`GET /demo/enter`), populada com ~9 meses de dado sintético (`POST /demo/reset` para repopular) cobrindo Dashboards/Categorização/Ativos/Passivos/Investimentos/Orçamento/Natureza — ✅ Sprint 37 (2026-09-03), épico novo sem trabalho anterior |
+| E12 | Planejamento financeiro (em progresso) | Planejamento de fluxo futuro com 16 colunas de histórico + projeção (3 meses passados + 1 corrente + 12 futuros) por subcategoria com natureza fixa/variável, sugestão automática via média de 3 meses, modo de edição inline com linha de Total por seção — Sprint 38 (2026-09-11), código em `main`, QA/relatório/aprovação do CEO pendentes; sucessor de E9 (Projeção, removida em Sprint 30) e do mecanismo de Orçamento (removido nesta sprint após 8 sprints de uso) |
 
 Backlog futuro (não desenhar agora): sync Pluggy agendada, otimização para comercialização/escala >10 usuários, reavaliação do plugin Understand Anything quando o codebase passar de ~100 arquivos.
 
@@ -32,7 +33,7 @@ explícita do CEO a cada vez, nunca automática/agendada.
 
 | Última auditoria | Sprint de referência | Próxima checagem devida | Status |
 |---|---|---|---|
-| nenhuma ainda | — | Sprint 34 (30 + 4), adiada | 7/5 sprints completadas e aprovadas (Sprint 30, Sprint 31, Sprint 32, Sprint 33, Sprint 34, Sprint 35, Sprint 36); mecanismo criado na Sprint 29. **Checkpoint da Sprint 34 (2026-08-21):** CTO propôs rodar `structural-auditor` antes do redesign visual do E10 (ADR-003 cita troca de sistema de design como o cenário que a auditoria existe para pegar) — **CEO decidiu adiar**, não reabrir sem pedido explícito dele. Sprints 35 e 36 (mesmo dia, 2ª e 3ª/última sprint do redesign, épico E10 agora fechado) concluídas sem reabrir o pedido, conforme essa decisão — CTO só registra a contagem, não volta a propor a cada sprint. **Sprint 37 (2026-09-03, abre E11) aprovada pelo CEO em 2026-09-04** — contagem sobe para 8/5 sprints completadas e aprovadas (Sprint 30, 31, 32, 33, 34, 35, 36, 37) |
+| nenhuma ainda | — | Sprint 34 (30 + 4), adiada | 8/5 sprints completadas e aprovadas (Sprint 30, Sprint 31, Sprint 32, Sprint 33, Sprint 34, Sprint 35, Sprint 36, Sprint 37); mecanismo criado na Sprint 29. **Checkpoint da Sprint 34 (2026-08-21):** CTO propôs rodar `structural-auditor` antes do redesign visual do E10 (ADR-003 cita troca de sistema de design como o cenário que a auditoria existe para pegar) — **CEO decidiu adiar**, não reabrir sem pedido explícito dele. Sprints 35 e 36 (mesmo dia, 2ª e 3ª/última sprint do redesign, épico E10 agora fechado) concluídas sem reabrir o pedido, conforme essa decisão — CTO só registra a contagem, não volta a propor a cada sprint. **Sprint 37 (2026-09-03, abre E11) aprovada pelo CEO em 2026-09-04** — contagem sobe para 8/5 sprints completadas. **Sprint 38 (2026-09-11, abre E12): código em `main`, ainda sem relatório/aprovação do CEO — não contada até aprovação; sobe para 9/5 quando aprovada.** |
 
 ## Sequência proposta (dependências)
 
@@ -1237,7 +1238,35 @@ aprovada"). Pendências que seguem abertas: XP parada maio-agosto (confirmar se 
 abril-julho com extratos reais de NuBank/XP, e as 8 transações de Aporte/Resgate mal categorizadas
 (pendência já registrada desde a Sprint 32).
 
+### ✅ Sprint 37 — Conta Demo (E11, fecha o épico) concluída em 2026-09-03
+
+Acesso restrito a uma conta demo (usuário sentinela, sem OAuth próprio) alcançável via botão escondido em Configurações a partir da sessão real de `daniellimabr@gmail.com`. Populada com ~9 meses de dado sintético cobrindo Dashboards/Categorização/Ativos/Passivos/Investimentos/Orçamento/Natureza (meses: jan-ago/2026, e início de setembro). Backend: `GET /demo/enter` (login direto como usuário sentinela), `POST /demo/reset` (repopula dado sintético via seed idempotente). Frontend: botão escondido no footer/sidebar de `ConfiguracoesPage`. 688 testes backend, 295 testes frontend, tsc/eslint/ruff/prettier limpos. PRD: [PRD-037-conta-demo.md](prd/PRD-037-conta-demo.md). Plano: [SPRINT-037-conta-demo-plan.md](sprints/SPRINT-037-conta-demo-plan.md). Relatório: [SPRINT-037-conta-demo-report.md](sprints/SPRINT-037-conta-demo-report.md). **Sprint aprovada pelo CEO em 2026-09-04**, épico E11 fechado.
+
+### Sprint 38 — Mesa de Planejamento (E12, abre o épico) — código em `main` em 2026-09-11, QA/relatório/aprovação pendentes
+
+Planejamento de fluxo futuro em 5 fases (todas concluídas, código em `main`):
+
+**Fase 0 — Remoção completa de Orçamento** (mecanismo criado em E9 Sprint 30, PRD-030, 8 sprints de uso): backend derruba modelos `Orcamento`/`OrcamentoStatus`, módulo `app/orcamentos/` inteiro, rota `GET /dashboards/por-orcamento`, migration `0022_drop_orcamentos.py`; frontend remove `OrcamentoPage.tsx`, `api/orcamentos.ts`, hooks `use*Orcamento*`, barra orçado-vs-realizado em `DashboardsPage.tsx`, aba "Orçamento" em `ProtectedPage.tsx`. Confirmado pelo CEO como funcionalidade não usada.
+
+**Fases 1-2 — Mecanismo de Mesa de Planejamento** (novo): backend módulo `app/planejamento/` novo (`service.py`, `router.py`), models `PlanejamentoValor` e `ItemPlanejado` em `app/models/planejamento.py`, migration `0023_create_planejamento_valores.py` (tabelas `planejamento_valores` e `itens_planejados`). Endpoints isolados por `user_id`: `GET /planejamento/grade?ano_base=&mes_base=` (grade 16 colunas: 3 meses histórico + mês corrente + 12 futuros, por subcategoria `natureza` fixa/variável, despesa e receita juntas), `PUT/DELETE /planejamento/valores/{subcategory_id}` (confirma/remove override de um mês), `GET/POST /planejamento/itens`, `PUT/DELETE /planejamento/itens/{id}`, `POST /planejamento/itens/{id}/vincular` e `/desvincular` (vínculo opcional a transação real via `pluggy_transactions`). Regra de negócio: sugestão automática = média dos últimos 3 meses com transação real na subcategoria (mesmas exclusões de `_base_query`) — nunca aplicada silenciosamente, sempre pendente de confirmação explícita. Só subcategorias `natureza` fixa/variável entram na grade; eventual/sem natureza ficam fora (usuário usa Item Planejado pra isso).
+
+**Fase 3 — Design**: rodada Impeccable (Artifact, 2 candidatas com dado real). CEO aprovou Candidata A (itens planejados como linhas da própria grade, sem painel separado; alerta do mês corrente via cor reaproveitando o idioma de delta do `KpiTile`, sem token novo) + acréscimo: linha de "Total" por seção (despesas/receitas), somando planejado e realizado-até-agora.
+
+**Fase 4 — Frontend**: `frontend/src/pages/PlanejamentoPage.tsx` novo (grade com `overflow-x:auto`, primeira coluna e cabeçalho fixos via `position:sticky`, edição inline de sugestão, seção "Itens planejados" com CRUD + vínculo/desvínculo buscando transação candidata). `api/planejamento.ts` + 8 hooks novos. Aba "Planejamento" substitui "Orçamento" em `ProtectedPage.tsx` (mesma posição nav, entre Natureza e Configurações). CSS novo em `frontend/src/index.css`, seção "Mesa de Planejamento (Sprint 38, PRD-038)", classes prefixadas `.planejamento-*`, reaproveitando só tokens `--ac-*` (Analyst Console) — nenhum token novo.
+
+688 testes backend (100% cobertura em `app/planejamento`, 99% total), 295 testes frontend, tsc/eslint/ruff/prettier limpos.
+
+**Fase 5 (QA visual + deploy)** em andamento nesta mesma sprint — não descrito como "concluída"; Fases 0-4 (todas implementação de backend/frontend) já commitadas em `main`.
+
+PRD: [PRD-038-mesa-de-planejamento.md](prd/PRD-038-mesa-de-planejamento.md). Plano: [SPRINT-038-mesa-de-planejamento-plan.md](sprints/SPRINT-038-mesa-de-planejamento-plan.md).
+
 ## Registro de reavaliações futuras
+
+**Sprint 38 — Candidatos sem sprint numerada aún:**
+- **Toggle Modo Projeção no Dashboard:** trazer o mecanismo de simulação efêmera de hipotéticas da tela Projeção (Sprint 14) para o Dashboard, fora de escopo do PRD-038.
+- **Fatura futura de cartão de crédito como abatimento automático na sugestão:** quando a fatura de um cartão de crédito é agendada no navegador, abater seu valor da sugestão de fluxo da semana/mês seguinte (captura de lag de cartão de crédito de um ponto de vista do planejamento); fora de escopo do PRD-038.
+
+**Sprints anteriores:**
 
 - **Understand Anything:** reavaliar instalação quando o codebase ultrapassar ~100 arquivos (ver ADR-002-plugins).
 - **Sync Pluggy agendada:** só entra no roadmap se o CEO priorizar explicitamente.
