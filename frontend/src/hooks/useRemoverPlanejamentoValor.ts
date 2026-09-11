@@ -6,8 +6,15 @@ export function useRemoverPlanejamentoValor() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ subcategoryId, ano, mes }: { subcategoryId: number; ano: number; mes: number }) =>
-      removerPlanejamentoValor(subcategoryId, ano, mes),
+    mutationFn: ({
+      subcategoryId,
+      ano,
+      mes,
+    }: {
+      subcategoryId: number;
+      ano: number;
+      mes: number;
+    }) => removerPlanejamentoValor(subcategoryId, ano, mes),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["planejamento", "grade"] });
     },

@@ -2,12 +2,7 @@ import { apiFetch } from "./client";
 import type { TransacaoTipo } from "./dashboards";
 
 export type CelulaOrigem =
-  | "realizado"
-  | "sugerido"
-  | "confirmado"
-  | "hipotetico"
-  | "cumprido"
-  | "vazio";
+  "realizado" | "sugerido" | "confirmado" | "hipotetico" | "cumprido" | "vazio";
 
 export interface CelulaGrade {
   ano: number;
@@ -126,10 +121,7 @@ export function deleteItemPlanejado(itemId: number): Promise<void> {
   return apiFetch<void>(`/planejamento/itens/${itemId}`, { method: "DELETE" });
 }
 
-export function vincularItemPlanejado(
-  itemId: number,
-  transacaoId: number
-): Promise<ItemPlanejado> {
+export function vincularItemPlanejado(itemId: number, transacaoId: number): Promise<ItemPlanejado> {
   return apiFetch<ItemPlanejado>(`/planejamento/itens/${itemId}/vincular`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

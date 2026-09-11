@@ -170,7 +170,11 @@ export function PlanejamentoPage() {
     );
   }
 
-  function renderTotalRow(label: string, linhas: LinhaSubcategoriaGrade[], periodo: [number, number][]) {
+  function renderTotalRow(
+    label: string,
+    linhas: LinhaSubcategoriaGrade[],
+    periodo: [number, number][]
+  ) {
     if (linhas.length === 0) return null;
     return (
       <tr className="total-row">
@@ -238,7 +242,10 @@ export function PlanejamentoPage() {
           <div className="ac-panel-head">
             <h2>
               Planejamento — {colunaLabel(grade.periodo[0][0], grade.periodo[0][1])} a{" "}
-              {colunaLabel(grade.periodo[grade.periodo.length - 1][0], grade.periodo[grade.periodo.length - 1][1])}
+              {colunaLabel(
+                grade.periodo[grade.periodo.length - 1][0],
+                grade.periodo[grade.periodo.length - 1][1]
+              )}
             </h2>
             <span className="ac-panel-meta">
               3 meses de histórico · mês corrente · 12 meses futuros
@@ -250,7 +257,10 @@ export function PlanejamentoPage() {
                 <tr>
                   <th className="col-nome">Subcategoria</th>
                   {grade.periodo.map(([ano, mes], idx) => (
-                    <th key={`${ano}-${mes}`} className={idx === IDX_ATUAL ? "col-atual" : undefined}>
+                    <th
+                      key={`${ano}-${mes}`}
+                      className={idx === IDX_ATUAL ? "col-atual" : undefined}
+                    >
                       {colunaLabel(ano, mes)}
                     </th>
                   ))}
@@ -548,7 +558,11 @@ function ItensPlanejadosPanel({ anoBase, mesBase }: { anoBase: number; mesBase: 
                 Vincular
               </button>
             )}
-            <button type="button" className="ac-btn ac-btn-ghost" onClick={() => openEditForm(item)}>
+            <button
+              type="button"
+              className="ac-btn ac-btn-ghost"
+              onClick={() => openEditForm(item)}
+            >
               Editar
             </button>
             <button
@@ -625,10 +639,7 @@ function VincularPicker({
             type="button"
             className="ac-btn ac-btn-primary"
             onClick={() =>
-              vincular.mutate(
-                { itemId: item.id, transacaoId: tx.id },
-                { onSuccess: onVinculado }
-              )
+              vincular.mutate({ itemId: item.id, transacaoId: tx.id }, { onSuccess: onVinculado })
             }
           >
             Vincular

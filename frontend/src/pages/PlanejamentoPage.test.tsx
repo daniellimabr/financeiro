@@ -157,7 +157,9 @@ function routedFetchMock(overrides?: { itens?: unknown[] }) {
       return Promise.resolve(jsonResponse({ ...ITEM_CUMPRIDO, transacao_vinculada_id: null }));
     }
     if (url.startsWith("/planejamento/valores/") && method === "PUT") {
-      return Promise.resolve(jsonResponse({ id: 1, subcategory_id: 10, ano: 2026, mes: 9, valor: "200.00" }));
+      return Promise.resolve(
+        jsonResponse({ id: 1, subcategory_id: 10, ano: 2026, mes: 9, valor: "200.00" })
+      );
     }
     if (url.startsWith("/planejamento/valores/") && method === "DELETE") {
       return Promise.resolve(jsonResponse(null, 204));
@@ -220,7 +222,9 @@ describe("PlanejamentoPage", () => {
 
     await waitFor(() => {
       const call = fetchMock.mock.calls.find(
-        (c) => String(c[0]).startsWith("/planejamento/valores/10") && (c[1] as RequestInit)?.method === "PUT"
+        (c) =>
+          String(c[0]).startsWith("/planejamento/valores/10") &&
+          (c[1] as RequestInit)?.method === "PUT"
       );
       expect(call).toBeDefined();
     });
@@ -272,7 +276,8 @@ describe("PlanejamentoPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Excluir" }));
     await waitFor(() => {
       const call = fetchMock.mock.calls.find(
-        (c) => String(c[0]) === "/planejamento/itens/1" && (c[1] as RequestInit)?.method === "DELETE"
+        (c) =>
+          String(c[0]) === "/planejamento/itens/1" && (c[1] as RequestInit)?.method === "DELETE"
       );
       expect(call).toBeDefined();
     });
