@@ -217,7 +217,16 @@ def test_confirmar_valor_persiste_e_sobrevive_a_nova_consulta(db_session, user):
         mes=5,
     )
 
-    service.confirmar_valor(db_session, user.id, sub.id, ano=2026, mes=7, valor=Decimal("999.00"))
+    service.confirmar_valor(
+        db_session,
+        user.id,
+        sub.id,
+        ano_base=ANO_BASE,
+        mes_base=MES_BASE,
+        ano=2026,
+        mes=7,
+        valor=Decimal("999.00"),
+    )
 
     grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
     linha = next(row for row in grade.subcategorias if row.subcategory_id == sub.id)
@@ -226,7 +235,16 @@ def test_confirmar_valor_persiste_e_sobrevive_a_nova_consulta(db_session, user):
     assert celula_confirmada.valor == Decimal("999.00")
 
     # Editar de novo — upsert, não duplica.
-    service.confirmar_valor(db_session, user.id, sub.id, ano=2026, mes=7, valor=Decimal("500.00"))
+    service.confirmar_valor(
+        db_session,
+        user.id,
+        sub.id,
+        ano_base=ANO_BASE,
+        mes_base=MES_BASE,
+        ano=2026,
+        mes=7,
+        valor=Decimal("500.00"),
+    )
     grade2 = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
     linha2 = next(row for row in grade2.subcategorias if row.subcategory_id == sub.id)
     celula2 = next(c for c in linha2.celulas if (c.ano, c.mes) == (2026, 7))
@@ -246,7 +264,16 @@ def test_remover_valor_volta_a_sugestao(db_session, user):
         ano=2026,
         mes=5,
     )
-    service.confirmar_valor(db_session, user.id, sub.id, ano=2026, mes=7, valor=Decimal("999.00"))
+    service.confirmar_valor(
+        db_session,
+        user.id,
+        sub.id,
+        ano_base=ANO_BASE,
+        mes_base=MES_BASE,
+        ano=2026,
+        mes=7,
+        valor=Decimal("999.00"),
+    )
 
     service.remover_valor(db_session, user.id, sub.id, ano=2026, mes=7)
 
@@ -371,7 +398,14 @@ def test_get_grade_isolado_por_usuario(db_session, user):
         mes=5,
     )
     service.confirmar_valor(
-        db_session, other.id, sub_other.id, ano=2026, mes=7, valor=Decimal("999.00")
+        db_session,
+        other.id,
+        sub_other.id,
+        ano_base=ANO_BASE,
+        mes_base=MES_BASE,
+        ano=2026,
+        mes=7,
+        valor=Decimal("999.00"),
     )
 
     grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
@@ -700,7 +734,16 @@ def test_confirmar_valor_sugerido_propaga_para_meses_seguintes(db_session, user)
 
     # jul/2026 (idx4) ainda está sugerido — confirmar propaga até o fim do
     # horizonte futuro (6 meses: jul..dez/2026, idx4..idx9).
-    service.confirmar_valor(db_session, user.id, sub.id, ano=2026, mes=7, valor=Decimal("999.00"))
+    service.confirmar_valor(
+        db_session,
+        user.id,
+        sub.id,
+        ano_base=ANO_BASE,
+        mes_base=MES_BASE,
+        ano=2026,
+        mes=7,
+        valor=Decimal("999.00"),
+    )
 
     grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
     linha = next(row for row in grade.subcategorias if row.subcategory_id == sub.id)
@@ -710,6 +753,80 @@ def test_confirmar_valor_sugerido_propaga_para_meses_seguintes(db_session, user)
         assert linha.celulas[idx].origem == "confirmado"
     # Mês corrente (idx3), antes do mês editado, não é afetado.
     assert linha.celulas[3].origem == "sugerido"
+
+
+def test_confirmar_valor_no_mes_corrente_propaga_ate_o_fim_do_horizonte(db_session, user):
+    """Regressão: confirmar o próprio mês corrente (idx3, jun/2026) deixava
+    de fora a última coluna do horizonte (dez/2026, idx9) porque a
+    propagação usava uma janela fixa de HORIZONTE_FUTURO meses a partir do
+    mês clicado, em vez de ir até o fim do horizonte exibido (bug reportado
+    pelo CEO: "aplicado em 5 meses seguintes, não em todos")."""
+    sub = _subcategory(db_session, user, natureza=Natureza.variavel)
+    account = _account(db_session, user)
+    _transaction(
+        db_session,
+        user,
+        account,
+        sub,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        ano=2026,
+        mes=5,
+    )
+
+    service.confirmar_valor(
+        db_session,
+        user.id,
+        sub.id,
+        ano_base=ANO_BASE,
+        mes_base=MES_BASE,
+        ano=ANO_BASE,
+        mes=MES_BASE,
+        valor=Decimal("999.00"),
+    )
+
+    grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
+    linha = next(row for row in grade.subcategorias if row.subcategory_id == sub.id)
+
+    # idx3 (mês corrente, clicado) até idx9 (última coluna futura) — 7 meses.
+    for idx in range(3, 10):
+        assert linha.celulas[idx].valor == Decimal("999.00")
+        assert linha.celulas[idx].origem == "confirmado"
+
+
+def test_confirmar_valor_numa_coluna_futura_que_nao_a_primeira_propaga_ate_o_fim(db_session, user):
+    sub = _subcategory(db_session, user, natureza=Natureza.variavel)
+    account = _account(db_session, user)
+    _transaction(
+        db_session,
+        user,
+        account,
+        sub,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        ano=2026,
+        mes=5,
+    )
+
+    # ago/2026 é idx5 (2ª coluna futura, não a primeira).
+    service.confirmar_valor(
+        db_session,
+        user.id,
+        sub.id,
+        ano_base=ANO_BASE,
+        mes_base=MES_BASE,
+        ano=2026,
+        mes=8,
+        valor=Decimal("999.00"),
+    )
+
+    grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
+    linha = next(row for row in grade.subcategorias if row.subcategory_id == sub.id)
+
+    for idx in range(5, 10):
+        assert linha.celulas[idx].valor == Decimal("999.00")
+    # jul/2026 (idx4), antes do mês editado, não é afetado.
+    assert linha.celulas[4].origem == "sugerido"
 
 
 def test_confirmar_valor_ja_confirmado_corrige_so_aquele_mes(db_session, user):
@@ -726,9 +843,27 @@ def test_confirmar_valor_ja_confirmado_corrige_so_aquele_mes(db_session, user):
         mes=5,
     )
 
-    service.confirmar_valor(db_session, user.id, sub.id, ano=2026, mes=7, valor=Decimal("999.00"))
+    service.confirmar_valor(
+        db_session,
+        user.id,
+        sub.id,
+        ano_base=ANO_BASE,
+        mes_base=MES_BASE,
+        ano=2026,
+        mes=7,
+        valor=Decimal("999.00"),
+    )
     # Reeditar um mês já confirmado é correção pontual — não repropaga.
-    service.confirmar_valor(db_session, user.id, sub.id, ano=2026, mes=7, valor=Decimal("500.00"))
+    service.confirmar_valor(
+        db_session,
+        user.id,
+        sub.id,
+        ano_base=ANO_BASE,
+        mes_base=MES_BASE,
+        ano=2026,
+        mes=7,
+        valor=Decimal("500.00"),
+    )
 
     grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
     linha = next(row for row in grade.subcategorias if row.subcategory_id == sub.id)
@@ -813,6 +948,8 @@ def test_linha_eventual_mes_corrente_tambem_aceita_override(db_session, user):
         db_session,
         user.id,
         PluggyTransactionTipo.debito,
+        ano_base=ANO_BASE,
+        mes_base=MES_BASE,
         ano=ANO_BASE,
         mes=MES_BASE,
         valor=Decimal("1.00"),
@@ -844,7 +981,14 @@ def test_confirmar_valor_eventual_sugerido_propaga_para_meses_seguintes(db_sessi
     )
 
     service.confirmar_valor_eventual(
-        db_session, user.id, PluggyTransactionTipo.debito, ano=2026, mes=7, valor=Decimal("999.00")
+        db_session,
+        user.id,
+        PluggyTransactionTipo.debito,
+        ano_base=ANO_BASE,
+        mes_base=MES_BASE,
+        ano=2026,
+        mes=7,
+        valor=Decimal("999.00"),
     )
 
     grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
@@ -855,6 +999,41 @@ def test_confirmar_valor_eventual_sugerido_propaga_para_meses_seguintes(db_sessi
         assert eventual.celulas[idx].origem == "confirmado"
     # Mês corrente (idx3), antes do mês editado, não é afetado.
     assert eventual.celulas[3].origem == "sugerido"
+
+
+def test_confirmar_valor_eventual_no_mes_corrente_propaga_ate_o_fim_do_horizonte(db_session, user):
+    """Mesma regressão de `test_confirmar_valor_no_mes_corrente_propaga_ate_o_fim_do_horizonte`,
+    pro override da linha Eventual."""
+    account = _account(db_session, user)
+    sub = _subcategory(db_session, user, nome="Viagem", natureza=Natureza.eventual)
+    _transaction(
+        db_session,
+        user,
+        account,
+        sub,
+        valor="-1000.00",
+        tipo=PluggyTransactionTipo.debito,
+        ano=2026,
+        mes=5,
+    )
+
+    service.confirmar_valor_eventual(
+        db_session,
+        user.id,
+        PluggyTransactionTipo.debito,
+        ano_base=ANO_BASE,
+        mes_base=MES_BASE,
+        ano=ANO_BASE,
+        mes=MES_BASE,
+        valor=Decimal("999.00"),
+    )
+
+    grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
+    eventual = next(e for e in grade.eventuais if e.tipo == PluggyTransactionTipo.debito)
+
+    for idx in range(3, 10):
+        assert eventual.celulas[idx].valor == Decimal("999.00")
+        assert eventual.celulas[idx].origem == "confirmado"
 
 
 def test_confirmar_valor_eventual_ja_confirmado_corrige_so_aquele_mes(db_session, user):
@@ -872,10 +1051,24 @@ def test_confirmar_valor_eventual_ja_confirmado_corrige_so_aquele_mes(db_session
     )
 
     service.confirmar_valor_eventual(
-        db_session, user.id, PluggyTransactionTipo.debito, ano=2026, mes=7, valor=Decimal("999.00")
+        db_session,
+        user.id,
+        PluggyTransactionTipo.debito,
+        ano_base=ANO_BASE,
+        mes_base=MES_BASE,
+        ano=2026,
+        mes=7,
+        valor=Decimal("999.00"),
     )
     service.confirmar_valor_eventual(
-        db_session, user.id, PluggyTransactionTipo.debito, ano=2026, mes=7, valor=Decimal("500.00")
+        db_session,
+        user.id,
+        PluggyTransactionTipo.debito,
+        ano_base=ANO_BASE,
+        mes_base=MES_BASE,
+        ano=2026,
+        mes=7,
+        valor=Decimal("500.00"),
     )
 
     grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
@@ -899,7 +1092,14 @@ def test_remover_valor_eventual_volta_a_sugestao(db_session, user):
         mes=5,
     )
     service.confirmar_valor_eventual(
-        db_session, user.id, PluggyTransactionTipo.debito, ano=2026, mes=7, valor=Decimal("999.00")
+        db_session,
+        user.id,
+        PluggyTransactionTipo.debito,
+        ano_base=ANO_BASE,
+        mes_base=MES_BASE,
+        ano=2026,
+        mes=7,
+        valor=Decimal("999.00"),
     )
 
     service.remover_valor_eventual(

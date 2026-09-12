@@ -372,7 +372,31 @@ describe("PlanejamentoPage", () => {
     const rowButtons = within(row).getAllByRole("button");
     await userEvent.click(rowButtons[rowButtons.length - 1]);
 
-    expect(screen.getByText(/Vale para os próximos 6 meses/)).toBeInTheDocument();
+    // Último botão da linha = última coluna do horizonte (idx9) — só 1 mês
+    // afetado pela propagação, já que não há mais nenhuma coluna depois dela.
+    expect(
+      screen.getByText(/Vale deste mês até o fim do horizonte \(1 meses\)/)
+    ).toBeInTheDocument();
+  });
+
+  it("propagates a current-month edit all the way to the last displayed column", async () => {
+    // Regressão: editar o próprio mês corrente (idx3) deixava de fora a
+    // última coluna do horizonte por causa de uma janela fixa de 6 meses a
+    // partir do mês clicado — o correto é ir até o fim do horizonte
+    // exibido, aqui 7 meses (idx3..idx9).
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<PlanejamentoPage />);
+    await screen.findByText("Mercado");
+
+    const row = screen.getByText("Mercado").closest("tr");
+    if (!row) throw new Error("row not found");
+    const rowButtons = within(row).getAllByRole("button");
+    await userEvent.click(rowButtons[0]); // idx3 — mês corrente
+
+    expect(
+      screen.getByText(/Vale deste mês até o fim do horizonte \(7 meses\)/)
+    ).toBeInTheDocument();
   });
 
   it("shows the alerta indicator on the current month when realizado exceeds the planned value", async () => {
@@ -410,6 +434,12 @@ describe("PlanejamentoPage", () => {
           (c[1] as RequestInit)?.method === "PUT"
       );
       expect(call).toBeDefined();
+      const body = JSON.parse((call?.[1] as RequestInit).body as string);
+      // ano_base/mes_base do filtro atual vão junto — o backend usa isso
+      // pra propagar até o fim do horizonte exibido, não um número fixo de
+      // meses a partir do mês clicado.
+      expect(body.ano_base).toBe(new Date().getFullYear());
+      expect(body.mes_base).toBe(new Date().getMonth() + 1);
     });
   });
 

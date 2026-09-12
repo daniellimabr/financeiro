@@ -42,6 +42,16 @@ const MES_ABREV = [
 const JANELA_HISTORICO = 3; // índice das 3 primeiras colunas (realizado, só leitura)
 const IDX_ATUAL = JANELA_HISTORICO; // índice da coluna do mês corrente
 const HORIZONTE_FUTURO = 6; // espelha app/planejamento/service.py HORIZONTE_FUTURO
+const TOTAL_COLUNAS = JANELA_HISTORICO + 1 + HORIZONTE_FUTURO; // histórico + atual + futuro
+
+// Confirmar um valor ainda sugerido propaga do mês clicado até a última
+// coluna exibida (espelha `_meses_ate_fim_horizonte` do backend) — o
+// número de meses afetados varia com a coluna clicada, não é sempre
+// HORIZONTE_FUTURO (bug pós-deploy da Sprint 38: editar o mês corrente ou
+// uma coluna futura que não a primeira deixava a última coluna de fora).
+function mesesAfetadosPelaPropagacao(idx: number): number {
+  return TOTAL_COLUNAS - idx;
+}
 
 function colunaLabel(ano: number, mes: number): string {
   return `${MES_ABREV[mes]}/${String(ano).slice(2)}`;
@@ -98,12 +108,19 @@ export function PlanejamentoPage() {
     if (valor === "") return;
     if (editing.kind === "subcategoria") {
       confirmar.mutate(
-        { subcategoryId: editing.subcategoryId, ano: editing.ano, mes: editing.mes, valor },
+        {
+          subcategoryId: editing.subcategoryId,
+          anoBase,
+          mesBase,
+          ano: editing.ano,
+          mes: editing.mes,
+          valor,
+        },
         { onSuccess: () => setEditing(null) }
       );
     } else {
       confirmarEventual.mutate(
-        { tipo: editing.tipo, ano: editing.ano, mes: editing.mes, valor },
+        { tipo: editing.tipo, anoBase, mesBase, ano: editing.ano, mes: editing.mes, valor },
         { onSuccess: () => setEditing(null) }
       );
     }
@@ -163,7 +180,9 @@ export function PlanejamentoPage() {
             </button>
           </div>
           {editing?.eraSugerido && (
-            <p className="planejamento-cell-hint">Vale para os próximos {HORIZONTE_FUTURO} meses</p>
+            <p className="planejamento-cell-hint">
+              Vale deste mês até o fim do horizonte ({mesesAfetadosPelaPropagacao(idx)} meses)
+            </p>
           )}
         </td>
       );
@@ -276,7 +295,9 @@ export function PlanejamentoPage() {
             </button>
           </div>
           {editing?.eraSugerido && (
-            <p className="planejamento-cell-hint">Vale para os próximos {HORIZONTE_FUTURO} meses</p>
+            <p className="planejamento-cell-hint">
+              Vale deste mês até o fim do horizonte ({mesesAfetadosPelaPropagacao(idx)} meses)
+            </p>
           )}
         </td>
       );

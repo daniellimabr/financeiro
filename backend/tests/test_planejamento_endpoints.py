@@ -161,7 +161,8 @@ def test_confirmar_e_remover_valor(client, db_session):
     )
 
     put_response = client.put(
-        f"/planejamento/valores/{sub.id}", json={"ano": 2026, "mes": 7, "valor": "999.00"}
+        f"/planejamento/valores/{sub.id}",
+        json={"ano_base": 2026, "mes_base": 6, "ano": 2026, "mes": 7, "valor": "999.00"},
     )
     assert put_response.status_code == 200
     assert put_response.json()["valor"] == "999.00"
@@ -195,7 +196,8 @@ def test_confirmar_valor_subcategoria_inexistente_returns_404(client, db_session
     _authenticate(client, db_session)
 
     response = client.put(
-        "/planejamento/valores/999999", json={"ano": 2026, "mes": 7, "valor": "100.00"}
+        "/planejamento/valores/999999",
+        json={"ano_base": 2026, "mes_base": 6, "ano": 2026, "mes": 7, "valor": "100.00"},
     )
 
     assert response.status_code == 404
@@ -222,13 +224,15 @@ def test_confirmar_e_remover_valor_eventual(client, db_session):
     # Mês corrente (idx 3, jun/2026) e meses futuros são editáveis, igual a
     # qualquer linha de subcategoria.
     put_atual_response = client.put(
-        "/planejamento/valores-eventual/debito", json={"ano": 2026, "mes": 6, "valor": "111.00"}
+        "/planejamento/valores-eventual/debito",
+        json={"ano_base": 2026, "mes_base": 6, "ano": 2026, "mes": 6, "valor": "111.00"},
     )
     assert put_atual_response.status_code == 200
     assert put_atual_response.json()["valor"] == "111.00"
 
     put_response = client.put(
-        "/planejamento/valores-eventual/debito", json={"ano": 2026, "mes": 7, "valor": "999.00"}
+        "/planejamento/valores-eventual/debito",
+        json={"ano_base": 2026, "mes_base": 6, "ano": 2026, "mes": 7, "valor": "999.00"},
     )
     assert put_response.status_code == 200
     assert put_response.json()["valor"] == "999.00"

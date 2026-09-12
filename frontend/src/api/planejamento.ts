@@ -53,7 +53,7 @@ export function fetchPlanejamentoGrade(anoBase: number, mesBase: number): Promis
 
 export function confirmarPlanejamentoValor(
   subcategoryId: number,
-  input: { ano: number; mes: number; valor: string }
+  input: { ano_base: number; mes_base: number; ano: number; mes: number; valor: string }
 ): Promise<unknown> {
   return apiFetch(`/planejamento/valores/${subcategoryId}`, {
     method: "PUT",
@@ -74,7 +74,7 @@ export function removerPlanejamentoValor(
 
 export function confirmarPlanejamentoValorEventual(
   tipo: TransacaoTipo,
-  input: { ano: number; mes: number; valor: string }
+  input: { ano_base: number; mes_base: number; ano: number; mes: number; valor: string }
 ): Promise<unknown> {
   return apiFetch(`/planejamento/valores-eventual/${tipo}`, {
     method: "PUT",

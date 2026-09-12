@@ -548,6 +548,17 @@ def get_grade(db: Session, user_id: int, *, ano_base: int, mes_base: int) -> Gra
     )
 
 
+def _meses_ate_fim_horizonte(ano_base: int, mes_base: int, ano: int, mes: int) -> int:
+    """Quantos meses de (ano, mes) até a última coluna futura exibida pro
+    filtro (ano_base, mes_base), inclusive — usado pra propagação de
+    confirmar_valor sempre alcançar o fim do horizonte, não um número fixo
+    de meses a partir do mês clicado (bug pós-deploy da Sprint 38: editar o
+    próprio mês corrente, ou uma coluna futura que não a primeira, deixava
+    de cobrir a última coluna)."""
+    fim_ano, fim_mes = _periodo_grade(ano_base, mes_base)[-1]
+    return max(_mes_ordinal(fim_ano, fim_mes) - _mes_ordinal(ano, mes) + 1, 1)
+
+
 def _buscar_valor(
     db: Session, user_id: int, subcategory_id: int, ano: int, mes: int
 ) -> PlanejamentoValor | None:
@@ -564,7 +575,15 @@ def _buscar_valor(
 
 
 def confirmar_valor(
-    db: Session, user_id: int, subcategory_id: int, *, ano: int, mes: int, valor: Decimal
+    db: Session,
+    user_id: int,
+    subcategory_id: int,
+    *,
+    ano_base: int,
+    mes_base: int,
+    ano: int,
+    mes: int,
+    valor: Decimal,
 ) -> PlanejamentoValor:
     get_subcategory(db, user_id, subcategory_id)
     existing = _buscar_valor(db, user_id, subcategory_id, ano, mes)
@@ -578,11 +597,12 @@ def confirmar_valor(
         return existing
 
     # Célula ainda sugerida: confirmar vale como nova baseline dali pra
-    # frente — propaga o valor pro mês clicado e os próximos, cobrindo todo
-    # o horizonte futuro exibido (mesmo se algum desses meses já tinha um
-    # override individual; o novo valor substitui).
+    # frente — propaga o valor pro mês clicado e os seguintes até a última
+    # coluna do horizonte exibido pro filtro atual (mesmo se algum desses
+    # meses já tinha um override individual; o novo valor substitui).
+    count = _meses_ate_fim_horizonte(ano_base, mes_base, ano, mes)
     alvo: PlanejamentoValor | None = None
-    for y, m in _months_forward(ano, mes, HORIZONTE_FUTURO):
+    for y, m in _months_forward(ano, mes, count):
         row = _buscar_valor(db, user_id, subcategory_id, y, m)
         if row is not None:
             row.valor = valor
@@ -625,11 +645,19 @@ def _buscar_valor_eventual(
 
 
 def confirmar_valor_eventual(
-    db: Session, user_id: int, tipo: PluggyTransactionTipo, *, ano: int, mes: int, valor: Decimal
+    db: Session,
+    user_id: int,
+    tipo: PluggyTransactionTipo,
+    *,
+    ano_base: int,
+    mes_base: int,
+    ano: int,
+    mes: int,
+    valor: Decimal,
 ) -> PlanejamentoValorEventual:
     """Espelha `confirmar_valor`: reeditar um mês já confirmado corrige só
     aquele mês; confirmar um mês ainda sugerido propaga a nova baseline pro
-    mês clicado e os seguintes, cobrindo o horizonte futuro."""
+    mês clicado e os seguintes até a última coluna do horizonte exibido."""
     existing = _buscar_valor_eventual(db, user_id, tipo, ano, mes)
 
     if existing is not None:
@@ -638,8 +666,9 @@ def confirmar_valor_eventual(
         db.refresh(existing)
         return existing
 
+    count = _meses_ate_fim_horizonte(ano_base, mes_base, ano, mes)
     alvo: PlanejamentoValorEventual | None = None
-    for y, m in _months_forward(ano, mes, HORIZONTE_FUTURO):
+    for y, m in _months_forward(ano, mes, count):
         row = _buscar_valor_eventual(db, user_id, tipo, y, m)
         if row is not None:
             row.valor = valor

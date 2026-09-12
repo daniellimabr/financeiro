@@ -60,6 +60,11 @@ class GradeOut(BaseModel):
 
 
 class PlanejamentoValorIn(BaseModel):
+    # ano_base/mes_base: o filtro exibido no momento da edição — usado só
+    # pra saber até onde propagar um valor ainda sugerido (até a última
+    # coluna do horizonte relativo a esse filtro), não persistido.
+    ano_base: int
+    mes_base: int
     ano: int
     mes: int
     valor: Decimal
@@ -76,6 +81,8 @@ class PlanejamentoValorOut(BaseModel):
 
 
 class PlanejamentoValorEventualIn(BaseModel):
+    ano_base: int
+    mes_base: int
     ano: int
     mes: int
     valor: Decimal
