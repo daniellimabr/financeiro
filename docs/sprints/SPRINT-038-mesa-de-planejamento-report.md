@@ -2,9 +2,14 @@
 
 - **Plano:** [SPRINT-038-mesa-de-planejamento-plan.md](./SPRINT-038-mesa-de-planejamento-plan.md)
 - **PRD:** [PRD-038-mesa-de-planejamento.md](../prd/PRD-038-mesa-de-planejamento.md)
-- **Data do relatório:** 2026-09-11
-- **Aguardando aprovação do CEO** — deploy na VM de dev e validação ao vivo já feitos antes da
-  aprovação formal, mesmo padrão das Sprints 34-37 (deploy como tarefa da própria sprint).
+- **Data do relatório:** 2026-09-11 (atualizado em 2026-09-12 com os ajustes pós-deploy — ver seção
+  dedicada abaixo)
+- **Aprovada pelo CEO em 2026-09-12** — deploy na VM de dev e validação ao vivo já feitos antes da
+  aprovação formal, mesmo padrão das Sprints 34-37 (deploy como tarefa da própria sprint). A grade
+  final aprovada tem **10 colunas** (3 histórico + atual + 6 futuros), não as 16 colunas descritas
+  no corpo original deste relatório — reduzida em ajuste pós-deploy pedido pelo próprio CEO (ver
+  "Ajustes pós-deploy" abaixo). O restante do relatório é mantido como registro histórico da
+  execução original; a seção de ajustes documenta o que mudou depois.
 
 ## Resumo
 
@@ -209,6 +214,62 @@ Migrations `0022` e `0023` aplicadas via `docker compose run --rm api alembic up
 (log confirmado: `Running upgrade 0021 -> 0022`, `0022 -> 0023`). `docker compose restart caddy`
 necessário (não bastou `reload`) pela mudança no `Caddyfile`.
 
+**Ajustes pós-deploy** (ver seção dedicada acima): commits `6a574ec` (ajustes pedidos pelo CEO após
+uso real), `792bc64`/`5c036de`/`55b6e78`/`7df2de0` (as 3 correções da linha Eventual + arredondamento,
+sessão de 2026-09-12) — todos com CI verde confirmado por `head_sha` antes do deploy, migration `0024`
+(`planejamento_valores_eventual`) aplicada sem erro, containers `api`/`frontend` recriados e
+`healthy` a cada rodada, validado via `curl` através do Caddy (`/` e `/api/health`, 200).
+
+## Ajustes pós-deploy (feedback do CEO, 2026-09-12)
+
+Depois do deploy inicial (commit `818a03f`), o CEO usou a Mesa de Planejamento de verdade e pediu 4
+rodadas de ajuste, todas na mesma tela, sem sprint numerada nova (mesmo padrão de pequena correção
+pós-deploy já usado noutras sprints).
+
+**1ª rodada — commit `6a574ec`, "ajustes pos-deploy na Mesa de Planejamento":**
+- Horizonte futuro reduzido de 12 para 6 meses — 16 colunas não cabiam sem scroll horizontal na
+  resolução de referência do CEO. Grade final: **10 colunas** (3 histórico + atual + 6 futuros), não
+  16 como descrito no corpo original deste relatório.
+- Confirmar uma célula ainda sugerida passou a propagar o valor pros próximos meses do horizonte
+  (nova baseline dali pra frente); reeditar uma célula já confirmada corrige só aquele mês.
+- Linha-lembrete "Eventual" nova, por seção (despesas/receitas) — agrega todas as subcategorias com
+  natureza `eventual` (que não entram na grade normal), média móvel de 3 meses, conta no total.
+- Totais por seção passam a incluir itens planejados hipotéticos (não cumpridos); linha "Saldo
+  simulado" nova ao final da tabela (receitas − despesas por coluna); Receitas passa a aparecer
+  antes de Despesas. Totais/saldo movidos para o backend (`GradeOut.total_despesas`/
+  `total_receitas`/`saldo`), antes calculados no cliente.
+- 695 testes backend / 299 frontend nesse ponto.
+
+**2ª–4ª rodadas — sessão de 2026-09-12, recuperação de 2 chats perdidos (VS Code fechado
+acidentalmente) e continuação direta com o CEO**, 3 correções sobre a linha "Eventual"/propagação
+que a 1ª rodada tinha deixado ambígua ou incompleta:
+
+1. **Linha "Eventual" 100% só-leitura, sem querer** (commit `792bc64`) — o pedido original ("eventual
+   não deve ser desconsiderado do planejamento futuro") virou uma linha travada em todas as colunas.
+   Corrigido: mês corrente continua sugestão fixa, mas os meses futuros passam a aceitar override
+   editável — nova tabela `planejamento_valores_eventual` (migration `0024`), endpoints
+   `PUT/DELETE /planejamento/valores-eventual/{tipo}`.
+2. **Mês corrente da linha "Eventual" também devia ser editável** (commit `5c036de`) — 2ª correção
+   pedida pelo CEO: a média é só a sugestão inicial, igual a qualquer linha de subcategoria; o mês
+   corrente não deveria ficar bloqueado.
+3. **Propagação não alcançava sempre o fim do horizonte** (commit `55b6e78`) — bug real encontrado
+   pelo CEO usando a tela ("Comer fora" só propagou 5 dos 6 meses futuros): `confirmar_valor`
+   propagava uma janela fixa de `HORIZONTE_FUTURO` meses a partir do mês clicado, o que só cobre a
+   última coluna quando se clica na 1ª coluna futura. Corrigido para propagar sempre do mês clicado
+   até a última coluna exibida (`_meses_ate_fim_horizonte`, novo), independente de qual coluna foi
+   editada — endpoints de confirmar valor (subcategoria e Eventual) passam a receber também
+   `ano_base`/`mes_base` do filtro exibido.
+4. **Sugestões arredondadas pra meta redonda** (commit `7df2de0`) — decisão do CEO: a média de 3
+   meses usada como sugestão passa a manter só as 3 primeiras casas significativas do inteiro
+   (1281,89 → 1280; 25437,45 → 25400; 123456,78 → 123000); valores já confirmados pelo usuário não
+   são afetados.
+
+Todas as 4 correções seguiram o mesmo rigor da sprint original: suíte completa rodada antes/depois
+de cada uma, deploy na VM de dev com validação de saúde (`docker compose ps`, logs de migration,
+`curl` via Caddy) depois de cada push com CI verde. Estado final: **712 testes backend (99%
+cobertura, `app/planejamento/service.py` em 99%), 303 testes frontend**, todos verdes; `ruff`/
+`eslint`/`prettier`/`tsc` limpos.
+
 ## Próximos passos
 
 Épico E12 (Planejamento financeiro) aberto, não fechado — só esta sprint até aqui. Candidatos
@@ -218,3 +279,9 @@ técnica aberta nesta sprint. Observação para sprint futura (não backlog form
 Mesa de Planejamento na conta real e uma subcategoria `fixa`/`variavel` sem histórico algum
 precisar aparecer na grade antes da primeira transação categorizada, revisitar a decisão de
 `_tipo_dominante` (hoje documentada como limitação aceita, não como bug).
+
+**Pós-ajustes (2026-09-12):** próximo candidato já com PRD/plano propostos (aguardando execução em
+sessão separada) — [PRD-040](../prd/PRD-040-projecao-saldo-acumulado.md)/
+[SPRINT-040](SPRINT-040-projecao-saldo-acumulado-plan.md), linha nova de projeção de saldo
+acumulado das contas ao longo do horizonte, partindo do saldo real do mês filtrado e somando o
+"Saldo simulado" de cada mês futuro.

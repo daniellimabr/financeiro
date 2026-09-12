@@ -216,11 +216,15 @@ atual" que venha a ser adicionado no futuro.
 
 ## Mesa de Planejamento
 
-Tela dedicada (aba "Planejamento") para planejar fluxo futuro com visibilidade de histórico e sugestões automáticas. A grade mostra 16 colunas: 3 meses passados (leitura) + 1 mês corrente + 12 meses futuros (edição), uma linha por subcategoria com `natureza` fixa/variável (despesa e receita juntas). Só subcategorias com natureza fixa/variável entram — eventual e sem natureza ficam de fora (usuário usa "Itens Planejados" para esses casos).
+Tela dedicada (aba "Planejamento") para planejar fluxo futuro com visibilidade de histórico e sugestões automáticas. A grade mostra 10 colunas: 3 meses passados (leitura) + 1 mês corrente + 6 meses futuros (edição) — reduzido de 16/12 futuros em ajuste pós-deploy (não cabia sem scroll horizontal na resolução de referência do CEO) —, uma linha por subcategoria com `natureza` fixa/variável (despesa e receita juntas). Subcategorias `eventual` não entram como linha própria, mas contam via a linha-lembrete "Eventual" (ver abaixo); sem natureza fica de fora (usuário usa "Itens Planejados" para esses casos).
 
 ### Funcionamento da sugestão
 
-Cada mês futuro mostra uma sugestão: média dos últimos 3 meses com transação real na subcategoria (só os meses com transação entram no divisor, mês sem movimento não dilui a média), mesmas exclusões de `_base_query` (transferência interna, cartão de crédito, categorias marcadas para excluir). Nunca aplicada silenciosamente — clicar no valor sugerido (tracejado) abre edição inline (input + "Salvar"/"Cancelar"); "Salvar" confirma o valor (aceito como veio ou editado) e persiste um override. Uma célula já confirmada mostra um "×" ao lado do valor para voltar a usar a sugestão (remove o override).
+Cada mês a partir do corrente mostra uma sugestão: média dos últimos 3 meses com transação real na subcategoria (só os meses com transação entram no divisor, mês sem movimento não dilui a média), mesmas exclusões de `_base_query` (transferência interna, cartão de crédito, categorias marcadas para excluir), **arredondada mantendo só as 3 primeiras casas significativas do inteiro** (ex.: 1281,89 → 1280; 25437,45 → 25400; 123456,78 → 123000 — vira uma meta redonda, mais fácil de planejar). Nunca aplicada silenciosamente — clicar no valor sugerido (tracejado) abre edição inline (input + "Salvar"/"Cancelar"); "Salvar" confirma o valor (aceito como veio ou editado) e persiste um override, propagando pros meses seguintes até a última coluna exibida (nova baseline dali pra frente); reeditar uma célula já confirmada corrige só aquele mês. Uma célula já confirmada mostra um "×" ao lado do valor para voltar a usar a sugestão (remove o override).
+
+### Linha-lembrete "Eventual"
+
+Uma linha por seção (Receitas/Despesas), abaixo das subcategorias normais, agregando todas as subcategorias com natureza `eventual` num único número por tipo (débito/crédito) — pra não deixar gastos/receitas eventuais de fora do planejamento futuro. Funciona igual a uma linha de subcategoria: mês corrente e meses futuros mostram a sugestão calculada pela média (mesma regra e arredondamento acima) como ponto de partida, editável exatamente como qualquer outra célula da grade.
 
 ### Mês corrente: planejado vs. realizado
 
@@ -245,9 +249,13 @@ Mesma lógica que governa o Dashboard e `_base_query`.
 
 ### Linha de Total por seção
 
-A grade mostra uma linha "Total" separada por seção (Despesas, depois Receitas) — acréscimo pedido pelo CEO na aprovação do design (Fase 3), somando:
-- Planejado: soma do valor (sugerido ou confirmado) de todas as subcategorias fixa/variável da seção, em cada uma das 16 colunas.
+A grade mostra uma linha "Total" separada por seção — **Receitas primeiro, depois Despesas** — acréscimo pedido pelo CEO na aprovação do design (Fase 3), somando:
+- Planejado: soma do valor (sugerido ou confirmado) de todas as subcategorias fixa/variável da seção, mais o valor da linha-lembrete "Eventual" e de itens planejados hipotéticos (não cumpridos), em cada uma das 10 colunas.
 - Mês corrente: soma também o realizado-até-agora de cada subcategoria da seção, com o mesmo indicador de cor (alerta/dentro) da célula individual, comparando a soma dos dois lados.
+
+### Linha "Saldo simulado"
+
+Última linha da tabela: receitas totais menos despesas totais de cada coluna, cor por sinal (verde se positivo, vermelho se negativo) — visão rápida do saldo do mês, planejado ou já confirmado, sem precisar subtrair manualmente os dois totais.
 
 ## Referências
 
