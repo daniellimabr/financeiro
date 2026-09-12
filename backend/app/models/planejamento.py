@@ -46,11 +46,11 @@ class PlanejamentoValor(Base):
 
 
 class PlanejamentoValorEventual(Base):
-    """Valor confirmado (aceito da sugestão ou editado) de um mês futuro da
-    linha-lembrete Eventual, por tipo (débito/crédito) — não tem
-    subcategoria própria pois agrega várias. O mês corrente nunca tem
-    override: a UI só permite editar a partir do mês seguinte ao corrente
-    (correção pós-deploy da Sprint 38, decisão do CEO)."""
+    """Valor confirmado (aceito da sugestão ou editado) de um mês corrente ou
+    futuro da linha-lembrete Eventual, por tipo (débito/crédito) — não tem
+    subcategoria própria pois agrega várias. Editável a partir do mês
+    corrente, igual a `PlanejamentoValor` (correção pós-deploy da Sprint 38,
+    decisão do CEO)."""
 
     __tablename__ = "planejamento_valores_eventual"
     __table_args__ = (

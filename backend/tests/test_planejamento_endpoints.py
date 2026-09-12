@@ -219,8 +219,14 @@ def test_confirmar_e_remover_valor_eventual(client, db_session):
         mes=5,
     )
 
-    # Mês corrente (idx 3, jun/2026) não é editável — só a partir do mês 4
-    # (idx 4, jul/2026) em diante.
+    # Mês corrente (idx 3, jun/2026) e meses futuros são editáveis, igual a
+    # qualquer linha de subcategoria.
+    put_atual_response = client.put(
+        "/planejamento/valores-eventual/debito", json={"ano": 2026, "mes": 6, "valor": "111.00"}
+    )
+    assert put_atual_response.status_code == 200
+    assert put_atual_response.json()["valor"] == "111.00"
+
     put_response = client.put(
         "/planejamento/valores-eventual/debito", json={"ano": 2026, "mes": 7, "valor": "999.00"}
     )
@@ -232,7 +238,8 @@ def test_confirmar_e_remover_valor_eventual(client, db_session):
     eventual = next(e for e in grade["eventuais"] if e["tipo"] == "debito")
     celula_atual = next(c for c in eventual["celulas"] if c["ano"] == 2026 and c["mes"] == 6)
     celula_futura = next(c for c in eventual["celulas"] if c["ano"] == 2026 and c["mes"] == 7)
-    assert celula_atual["origem"] == "sugerido"
+    assert celula_atual["origem"] == "confirmado"
+    assert celula_atual["valor"] == "111.00"
     assert celula_futura["origem"] == "confirmado"
     assert celula_futura["valor"] == "999.00"
 

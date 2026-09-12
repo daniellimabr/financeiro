@@ -258,7 +258,7 @@ describe("PlanejamentoPage", () => {
     expect(screen.getByText("média histórica")).toBeInTheDocument();
   });
 
-  it("keeps the Eventual row's current-month cell read-only but lets future months be edited", async () => {
+  it("keeps the Eventual row's history read-only but lets the current month and future months be edited", async () => {
     const fixtureWithEventual = {
       ...GRADE_FIXTURE,
       eventuais: [{ tipo: "debito", celulas: buildCelulas() }],
@@ -272,9 +272,11 @@ describe("PlanejamentoPage", () => {
     const eventualRow = container.querySelector("tr.planejamento-eventual-row");
     if (!eventualRow) throw new Error("eventual row not found");
     const tds = eventualRow.querySelectorAll("td");
-    // tds[0] = nome; tds[1..3] = histórico; tds[4] = mês corrente (idx 3, JANELA_HISTORICO);
-    // tds[5..10] = futuros (idx 4..9).
-    expect(tds[4].querySelector("button")).toBeNull();
+    // tds[0] = nome; tds[1..3] = histórico (idx 0..2, só leitura); tds[4] =
+    // mês corrente (idx 3, JANELA_HISTORICO); tds[5..10] = futuros (idx 4..9)
+    // — mês corrente e futuros são editáveis, igual a qualquer subcategoria.
+    expect(tds[1].querySelector("button")).toBeNull();
+    expect(tds[4].querySelector("button")).not.toBeNull();
     const futureButton = tds[5].querySelector("button");
     expect(futureButton).not.toBeNull();
 
@@ -282,6 +284,38 @@ describe("PlanejamentoPage", () => {
     const input = screen.getByRole("spinbutton");
     await userEvent.clear(input);
     await userEvent.type(input, "250");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (c) =>
+          String(c[0]).startsWith("/planejamento/valores-eventual/debito") &&
+          (c[1] as RequestInit)?.method === "PUT"
+      );
+      expect(call).toBeDefined();
+    });
+  });
+
+  it("confirms a sugerido value for the Eventual row's current month inline", async () => {
+    const fixtureWithEventual = {
+      ...GRADE_FIXTURE,
+      eventuais: [{ tipo: "debito", celulas: buildCelulas() }],
+    };
+    const fetchMock = routedFetchMock(undefined, { grade: fixtureWithEventual });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container } = renderWithQueryClient(<PlanejamentoPage />);
+    await screen.findByText("Eventual");
+
+    const eventualRow = container.querySelector("tr.planejamento-eventual-row");
+    if (!eventualRow) throw new Error("eventual row not found");
+    const atualButton = eventualRow.querySelectorAll("td")[4].querySelector("button");
+    if (!atualButton) throw new Error("current-month button not found");
+
+    await userEvent.click(atualButton);
+    const input = screen.getByRole("spinbutton");
+    await userEvent.clear(input);
+    await userEvent.type(input, "150");
     await userEvent.click(screen.getByRole("button", { name: "Salvar" }));
 
     await waitFor(() => {

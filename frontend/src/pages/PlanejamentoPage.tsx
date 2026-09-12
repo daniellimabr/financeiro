@@ -244,16 +244,17 @@ export function PlanejamentoPage() {
     );
   }
 
-  function renderEventualEditableCell(tipo: TransacaoTipo, celula: CelulaGrade) {
+  function renderEventualEditableCell(tipo: TransacaoTipo, celula: CelulaGrade, idx: number) {
     const isEditing =
       editing?.kind === "eventual" &&
       editing.tipo === tipo &&
       editing.ano === celula.ano &&
       editing.mes === celula.mes;
+    const className = idx === IDX_ATUAL ? "col-atual" : undefined;
 
     if (isEditing) {
       return (
-        <td key={`${celula.ano}-${celula.mes}`}>
+        <td key={`${celula.ano}-${celula.mes}`} className={className}>
           <div className="planejamento-cell-edit">
             <input
               aria-label={`Valor de Eventual em ${colunaLabel(celula.ano, celula.mes)}`}
@@ -284,25 +285,42 @@ export function PlanejamentoPage() {
     const valClass =
       celula.origem === "confirmado" ? "planejamento-val-confirmado" : "planejamento-val-sugerido";
 
+    const valorButton = (
+      <button
+        type="button"
+        className={valClass}
+        style={{ background: "none", border: "none", font: "inherit", padding: 0 }}
+        onClick={() =>
+          startEditingEventual(
+            tipo,
+            celula.ano,
+            celula.mes,
+            String(celula.valor),
+            celula.origem !== "confirmado"
+          )
+        }
+        title={celula.origem === "confirmado" ? "Editar valor confirmado" : "Confirmar sugestão"}
+      >
+        {formatCurrency(celula.valor)}
+      </button>
+    );
+
+    if (idx === IDX_ATUAL && celula.realizado_parcial !== null && celula.status !== null) {
+      return (
+        <td key={`${celula.ano}-${celula.mes}`} className={className}>
+          <div className="planejamento-atual-stack">
+            {valorButton}
+            <span className={`planejamento-atual-realizado ${celula.status}`}>
+              {formatCurrency(celula.realizado_parcial)} real.
+            </span>
+          </div>
+        </td>
+      );
+    }
+
     return (
-      <td key={`${celula.ano}-${celula.mes}`}>
-        <button
-          type="button"
-          className={valClass}
-          style={{ background: "none", border: "none", font: "inherit", padding: 0 }}
-          onClick={() =>
-            startEditingEventual(
-              tipo,
-              celula.ano,
-              celula.mes,
-              String(celula.valor),
-              celula.origem !== "confirmado"
-            )
-          }
-          title={celula.origem === "confirmado" ? "Editar valor confirmado" : "Confirmar sugestão"}
-        >
-          {formatCurrency(celula.valor)}
-        </button>
+      <td key={`${celula.ano}-${celula.mes}`} className={className}>
+        {valorButton}
         {celula.origem === "confirmado" && (
           <button
             type="button"
@@ -326,13 +344,9 @@ export function PlanejamentoPage() {
           <span className="planejamento-item-tag hipotetico">média histórica</span>
         </td>
         {linha.celulas.map((celula, idx) =>
-          idx <= IDX_ATUAL
-            ? renderReadOnlyCell(
-                celula,
-                idx,
-                idx < JANELA_HISTORICO ? "planejamento-val-realizado" : "planejamento-val-sugerido"
-              )
-            : renderEventualEditableCell(linha.tipo, celula)
+          idx < JANELA_HISTORICO
+            ? renderReadOnlyCell(celula, idx, "planejamento-val-realizado")
+            : renderEventualEditableCell(linha.tipo, celula, idx)
         )}
       </tr>
     );

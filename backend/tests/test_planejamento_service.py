@@ -792,7 +792,7 @@ def test_linha_eventual_ausente_sem_nenhuma_subcategoria_eventual(db_session, us
     assert grade.eventuais == []
 
 
-def test_linha_eventual_mes_corrente_nunca_aceita_override(db_session, user):
+def test_linha_eventual_mes_corrente_tambem_aceita_override(db_session, user):
     account = _account(db_session, user)
     sub = _subcategory(db_session, user, nome="Viagem", natureza=Natureza.eventual)
     _transaction(
@@ -806,9 +806,9 @@ def test_linha_eventual_mes_corrente_nunca_aceita_override(db_session, user):
         mes=5,
     )
 
-    # Ainda que exista um override persistido pra (ano_base, mes_base), o
-    # mês corrente (idx3) sempre mostra a sugestão calculada — correção
-    # pós-deploy da Sprint 38 (o pedido original tinha ficado ambíguo).
+    # Mês corrente (idx3) é editável igual a qualquer linha de subcategoria
+    # — a média é só a sugestão inicial (2ª correção pós-deploy da Sprint 38;
+    # a 1ª correção tinha travado só esse mês como só-leitura por engano).
     service.confirmar_valor_eventual(
         db_session,
         user.id,
@@ -821,8 +821,12 @@ def test_linha_eventual_mes_corrente_nunca_aceita_override(db_session, user):
     grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
     eventual = next(e for e in grade.eventuais if e.tipo == PluggyTransactionTipo.debito)
 
-    assert eventual.celulas[3].origem == "sugerido"
-    assert eventual.celulas[3].valor == Decimal("1000.00")
+    assert eventual.celulas[3].origem == "confirmado"
+    assert eventual.celulas[3].valor == Decimal("1.00")
+    # realizado_parcial/status do mês corrente continuam calculados mesmo
+    # com override, igual à linha de subcategoria.
+    assert eventual.celulas[3].realizado_parcial is not None
+    assert eventual.celulas[3].status is not None
 
 
 def test_confirmar_valor_eventual_sugerido_propaga_para_meses_seguintes(db_session, user):

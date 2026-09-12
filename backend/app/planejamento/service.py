@@ -60,12 +60,12 @@ class LinhaEventualGrade:
     """Linha-lembrete agregando TODAS as subcategorias `eventual` de um tipo
     (débito ou crédito) num único número — eventual não entra na grade
     normal (sem natureza fixa/variavel), mas também tem média histórica e
-    não deve ser esquecido do planejamento futuro (decisão do CEO). O mês
-    corrente é sempre a sugestão calculada pela média (só leitura, nunca
-    "confirmado" — não faz sentido editar um mês que já está em andamento);
-    os meses seguintes aceitam override editável, igual a qualquer linha de
-    subcategoria (correção pós-deploy da Sprint 38: a primeira versão travou
-    a linha inteira como só-leitura, o que não era a intenção)."""
+    não deve ser esquecido do planejamento futuro (decisão do CEO). Mês
+    corrente e meses futuros aceitam override editável, igual a qualquer
+    linha de subcategoria — a média é só a sugestão inicial (correção
+    pós-deploy da Sprint 38: a primeira versão travou a linha inteira como
+    só-leitura; uma segunda correção travou só o mês corrente, também não
+    era a intenção)."""
 
     tipo: PluggyTransactionTipo
     celulas: list[CelulaGrade] = field(default_factory=list)
@@ -263,25 +263,27 @@ def _linha_eventual(
             celulas.append(CelulaGrade(ano=y, mes=m, valor=valor, origem="realizado"))
             continue
 
-        if idx == JANELA_SUGESTAO:
-            # Mês corrente: sempre a sugestão, nunca override — mês já em
-            # andamento, sem sentido "prever" um valor diferente pra ele.
+        # Mês corrente e meses futuros: igual a qualquer linha de
+        # subcategoria — a média é só a sugestão inicial, editável como as
+        # demais (idem `_linha_subcategoria`).
+        override = confirmados.get((y, m))
+        valor = override if override is not None else sugestao
+        origem = "confirmado" if override is not None else "sugerido"
+
+        if idx == JANELA_SUGESTAO:  # mês corrente
             realizado_parcial = _total_mes_eventual(db, user_id, tipo, y, m)
-            status = _status_mes_corrente(tipo, sugestao, realizado_parcial)
+            status = _status_mes_corrente(tipo, valor, realizado_parcial)
             celulas.append(
                 CelulaGrade(
                     ano=y,
                     mes=m,
-                    valor=sugestao,
-                    origem="sugerido",
+                    valor=valor,
+                    origem=origem,
                     realizado_parcial=realizado_parcial,
                     status=status,
                 )
             )
         else:
-            override = confirmados.get((y, m))
-            valor = override if override is not None else sugestao
-            origem = "confirmado" if override is not None else "sugerido"
             celulas.append(CelulaGrade(ano=y, mes=m, valor=valor, origem=origem))
 
     return LinhaEventualGrade(tipo=tipo, celulas=celulas)
