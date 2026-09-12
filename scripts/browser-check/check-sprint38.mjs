@@ -1,7 +1,7 @@
 // Sprint 38 (PRD-038) — valida a Mesa de Planejamento de ponta a ponta contra
 // a VM de dev, logado direto como o usuário sentinela da conta demo (token
 // gerado na própria VM via create_access_token, sem depender do login real
-// do CEO): grade renderiza 16 colunas, mês corrente com indicador dentro/
+// do CEO): grade renderiza 10 colunas, mês corrente com indicador dentro/
 // excedido, confirmar uma sugestão, criar um item planejado, ausência total
 // de Orçamento em qualquer tela/nav. Diálogos nativos (window.confirm) são
 // aceitos automaticamente.
@@ -66,10 +66,10 @@ async function run(browser, viewport, colorScheme, label) {
     fullPage: true,
   });
 
-  // Grade: 16 colunas de mês + 1 coluna "Subcategoria".
+  // Grade: 10 colunas de mês (3 histórico + atual + 6 futuros) + 1 coluna "Linha".
   const headerCells = await page.locator("table.planejamento-grade thead th").count();
-  if (headerCells !== 17) {
-    console.error(`[${label}] grade não tem 17 colunas de cabeçalho (achou ${headerCells})`);
+  if (headerCells !== 11) {
+    console.error(`[${label}] grade não tem 11 colunas de cabeçalho (achou ${headerCells})`);
   }
 
   // Confirmar uma sugestão futura, se existir alguma célula sugerida.

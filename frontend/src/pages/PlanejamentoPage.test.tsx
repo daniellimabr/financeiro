@@ -23,19 +23,9 @@ const PERIODO: [number, number][] = [
   [2026, 6],
   [2026, 7],
   [2026, 8],
-  [2026, 9],
-  [2026, 10],
-  [2026, 11],
-  [2026, 12],
-  [2027, 1],
-  [2027, 2],
-  [2027, 3],
-  [2027, 4],
-  [2027, 5],
-  [2027, 6],
 ];
-// Completa até 16 colunas.
-while (PERIODO.length < 16) {
+// Completa até 10 colunas (3 histórico + 1 atual + 6 futuros).
+while (PERIODO.length < 10) {
   const [ano, mes] = PERIODO[PERIODO.length - 1];
   PERIODO.push(mes === 12 ? [ano + 1, 1] : [ano, mes + 1]);
 }
@@ -67,6 +57,26 @@ function buildCelulas(overridesAtIdx3?: Record<string, unknown>) {
   });
 }
 
+const MERCADO_CELULAS = buildCelulas({ realizado_parcial: "150.00", status: "alerta" });
+
+// Total/saldo — mesma forma que o backend produz (origem sempre
+// "confirmado", nenhum campo omitido) — só despesa (Mercado) contribui
+// nesta fixture, receitas ficam zeradas.
+const TOTAL_RECEITAS_CELULAS = PERIODO.map(([ano, mes], idx) =>
+  idx === 3
+    ? celula(ano, mes, "0.00", "confirmado", { realizado_parcial: "0.00", status: "dentro" })
+    : celula(ano, mes, "0.00", "confirmado")
+);
+const TOTAL_DESPESAS_CELULAS = MERCADO_CELULAS.map((c) => ({ ...c, origem: "confirmado" }));
+const SALDO_CELULAS = PERIODO.map(([ano, mes], idx) =>
+  idx === 3
+    ? celula(ano, mes, "-100.00", "confirmado", {
+        realizado_parcial: "-150.00",
+        status: "alerta",
+      })
+    : celula(ano, mes, "-100.00", "confirmado", { status: "alerta" })
+);
+
 const GRADE_FIXTURE = {
   periodo: PERIODO,
   subcategorias: [
@@ -76,10 +86,14 @@ const GRADE_FIXTURE = {
       group_id: 1,
       group_nome: "Alimentação",
       tipo: "debito",
-      celulas: buildCelulas({ realizado_parcial: "150.00", status: "alerta" }),
+      celulas: MERCADO_CELULAS,
     },
   ],
   itens: [],
+  eventuais: [],
+  total_despesas: TOTAL_DESPESAS_CELULAS,
+  total_receitas: TOTAL_RECEITAS_CELULAS,
+  saldo: SALDO_CELULAS,
 };
 
 const ITEM_HIPOTETICO = {
@@ -130,13 +144,13 @@ const TRANSACAO_CANDIDATA = {
   updated_at: "2026-08-10T00:00:00Z",
 };
 
-function routedFetchMock(overrides?: { itens?: unknown[] }) {
+function routedFetchMock(overrides?: { itens?: unknown[] }, gradeOverrides?: { grade?: unknown }) {
   return vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     const method = init?.method ?? "GET";
 
     if (url.startsWith("/planejamento/grade")) {
-      return Promise.resolve(jsonResponse(GRADE_FIXTURE));
+      return Promise.resolve(jsonResponse(gradeOverrides?.grade ?? GRADE_FIXTURE));
     }
     if (url.startsWith("/planejamento/itens") && method === "GET") {
       return Promise.resolve(jsonResponse(overrides?.itens ?? []));
@@ -181,15 +195,73 @@ describe("PlanejamentoPage", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the grade with 16 month columns", async () => {
+  it("renders the grade with 10 month columns (3 history + current + 6 future)", async () => {
     vi.stubGlobal("fetch", routedFetchMock());
 
     const { container } = renderWithQueryClient(<PlanejamentoPage />);
 
     await screen.findByText("Mercado");
     const headerCells = container.querySelectorAll("table.planejamento-grade thead th");
-    // 1 coluna "Subcategoria" + 16 colunas de mês.
-    expect(headerCells.length).toBe(17);
+    // 1 coluna "Linha" + 10 colunas de mês.
+    expect(headerCells.length).toBe(11);
+  });
+
+  it("renders Receitas before Despesas in the table", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    const { container } = renderWithQueryClient(<PlanejamentoPage />);
+    await screen.findByText("Mercado");
+
+    const sectionLabels = Array.from(container.querySelectorAll("tr.section-row td")).map(
+      (el) => el.textContent
+    );
+    expect(sectionLabels).toEqual(["Receitas", "Despesas", "Itens planejados"]);
+  });
+
+  it("renders the Total despesas and Saldo simulado rows", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<PlanejamentoPage />);
+    await screen.findByText("Mercado");
+
+    expect(screen.getByText("Total despesas")).toBeInTheDocument();
+    expect(screen.getByText("Total receitas")).toBeInTheDocument();
+    expect(screen.getByText("Saldo simulado")).toBeInTheDocument();
+    const saldoRow = screen.getByText("Saldo simulado").closest("tr");
+    expect(saldoRow?.querySelector(".planejamento-val-saldo.alerta")).not.toBeNull();
+  });
+
+  it("renders the Eventual reminder row inside a section when present", async () => {
+    const fixtureWithEventual = {
+      ...GRADE_FIXTURE,
+      eventuais: [
+        {
+          tipo: "debito",
+          celulas: buildCelulas(),
+        },
+      ],
+    };
+    vi.stubGlobal("fetch", routedFetchMock(undefined, { grade: fixtureWithEventual }));
+
+    renderWithQueryClient(<PlanejamentoPage />);
+    await screen.findByText("Mercado");
+
+    expect(screen.getByText("Eventual")).toBeInTheDocument();
+    expect(screen.getByText("média histórica")).toBeInTheDocument();
+  });
+
+  it("shows a propagation hint when editing a still-suggested cell, not when editing a confirmed one", async () => {
+    vi.stubGlobal("fetch", routedFetchMock());
+
+    renderWithQueryClient(<PlanejamentoPage />);
+    await screen.findByText("Mercado");
+
+    const row = screen.getByText("Mercado").closest("tr");
+    if (!row) throw new Error("row not found");
+    const rowButtons = within(row).getAllByRole("button");
+    await userEvent.click(rowButtons[rowButtons.length - 1]);
+
+    expect(screen.getByText(/Vale para os próximos 6 meses/)).toBeInTheDocument();
   });
 
   it("shows the alerta indicator on the current month when realizado exceeds the planned value", async () => {

@@ -20,7 +20,7 @@ from app.planejamento import service
 _SEQ = iter(range(1, 100_000))
 
 ANO_BASE = 2026
-MES_BASE = 6  # junho/2026 — histórico em mar/abr/mai, futuro até jun/2027
+MES_BASE = 6  # junho/2026 — histórico em mar/abr/mai, futuro até dez/2026
 
 
 @pytest.fixture()
@@ -623,7 +623,7 @@ def test_item_planejado_unico_aparece_so_no_mes_alvo(db_session, user):
 
 def test_item_planejado_recorrente_capado_pelo_horizonte(db_session, user):
     # Recorrente sem data_fim, começando no primeiro mês futuro — "ad
-    # eternum" é capado pelos 12 meses futuros exibidos, não além.
+    # eternum" é capado pelos 6 meses futuros exibidos, não além.
     service.create_item_planejado(
         db_session,
         user.id,
@@ -639,9 +639,9 @@ def test_item_planejado_recorrente_capado_pelo_horizonte(db_session, user):
 
     linha = grade.itens[0]
     aplicaveis = [c for c in linha.celulas if c.origem != "vazio"]
-    assert len(aplicaveis) == 12
+    assert len(aplicaveis) == 6
     assert (aplicaveis[0].ano, aplicaveis[0].mes) == (2026, 7)
-    assert (aplicaveis[-1].ano, aplicaveis[-1].mes) == (2027, 6)
+    assert (aplicaveis[-1].ano, aplicaveis[-1].mes) == (2026, 12)
 
 
 def test_item_planejado_cumprido_para_de_contar_como_hipotetico(db_session, user):
@@ -679,3 +679,226 @@ def test_item_planejado_cumprido_para_de_contar_como_hipotetico(db_session, user
     grade_depois = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
     assert grade_depois.itens[0].cumprido is True
     assert grade_depois.itens[0].celulas[5].origem == "cumprido"
+
+
+# --- propagação da confirmação de sugestão pros meses seguintes ---------------
+
+
+def test_confirmar_valor_sugerido_propaga_para_meses_seguintes(db_session, user):
+    sub = _subcategory(db_session, user, natureza=Natureza.variavel)
+    account = _account(db_session, user)
+    _transaction(
+        db_session,
+        user,
+        account,
+        sub,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        ano=2026,
+        mes=5,
+    )
+
+    # jul/2026 (idx4) ainda está sugerido — confirmar propaga até o fim do
+    # horizonte futuro (6 meses: jul..dez/2026, idx4..idx9).
+    service.confirmar_valor(db_session, user.id, sub.id, ano=2026, mes=7, valor=Decimal("999.00"))
+
+    grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
+    linha = next(row for row in grade.subcategorias if row.subcategory_id == sub.id)
+
+    for idx in range(4, 10):
+        assert linha.celulas[idx].valor == Decimal("999.00")
+        assert linha.celulas[idx].origem == "confirmado"
+    # Mês corrente (idx3), antes do mês editado, não é afetado.
+    assert linha.celulas[3].origem == "sugerido"
+
+
+def test_confirmar_valor_ja_confirmado_corrige_so_aquele_mes(db_session, user):
+    sub = _subcategory(db_session, user, natureza=Natureza.variavel)
+    account = _account(db_session, user)
+    _transaction(
+        db_session,
+        user,
+        account,
+        sub,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        ano=2026,
+        mes=5,
+    )
+
+    service.confirmar_valor(db_session, user.id, sub.id, ano=2026, mes=7, valor=Decimal("999.00"))
+    # Reeditar um mês já confirmado é correção pontual — não repropaga.
+    service.confirmar_valor(db_session, user.id, sub.id, ano=2026, mes=7, valor=Decimal("500.00"))
+
+    grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
+    linha = next(row for row in grade.subcategorias if row.subcategory_id == sub.id)
+
+    assert linha.celulas[4].valor == Decimal("500.00")  # jul — corrigido
+    assert linha.celulas[5].valor == Decimal("999.00")  # ago — valor da propagação original
+
+
+# --- linha-lembrete Eventual ----------------------------------------------------
+
+
+def test_linha_eventual_agrega_todas_as_subcategorias_eventual(db_session, user):
+    account = _account(db_session, user)
+    sub1 = _subcategory(db_session, user, nome="Viagem", natureza=Natureza.eventual)
+    sub2 = _subcategory(db_session, user, nome="Presente", natureza=Natureza.eventual)
+    _transaction(
+        db_session,
+        user,
+        account,
+        sub1,
+        valor="-1000.00",
+        tipo=PluggyTransactionTipo.debito,
+        ano=2026,
+        mes=5,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        sub2,
+        valor="-200.00",
+        tipo=PluggyTransactionTipo.debito,
+        ano=2026,
+        mes=5,
+    )
+
+    grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
+
+    eventual_despesa = next(e for e in grade.eventuais if e.tipo == PluggyTransactionTipo.debito)
+    assert eventual_despesa.celulas[2].valor == Decimal("1200.00")  # mai/2026: 1000+200
+    assert eventual_despesa.celulas[4].origem == "sugerido"
+    assert eventual_despesa.celulas[4].valor == Decimal("1200.00")  # única transação no divisor
+
+
+def test_linha_eventual_ausente_sem_nenhuma_subcategoria_eventual(db_session, user):
+    sub = _subcategory(db_session, user, natureza=Natureza.variavel)
+    account = _account(db_session, user)
+    _transaction(
+        db_session,
+        user,
+        account,
+        sub,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        ano=2026,
+        mes=5,
+    )
+
+    grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
+
+    assert grade.eventuais == []
+
+
+# --- totais por seção e saldo ---------------------------------------------------
+
+
+def test_total_despesas_inclui_item_hipotetico_mas_nao_cumprido(db_session, user):
+    account = _account(db_session, user)
+    sub = _subcategory(db_session, user, natureza=Natureza.variavel)
+    tx = _transaction(
+        db_session,
+        user,
+        account,
+        sub,
+        valor="-100.00",
+        tipo=PluggyTransactionTipo.debito,
+        ano=2026,
+        mes=5,
+    )
+    service.create_item_planejado(
+        db_session,
+        user.id,
+        nome="Presente",
+        tipo=PluggyTransactionTipo.debito,
+        valor=Decimal("300.00"),
+        data_inicio=date(2026, 7, 1),
+        recorrente=False,
+        data_fim=None,
+    )
+    item_cumprido = service.create_item_planejado(
+        db_session,
+        user.id,
+        nome="Conserto",
+        tipo=PluggyTransactionTipo.debito,
+        valor=Decimal("450.00"),
+        data_inicio=date(2026, 7, 1),
+        recorrente=False,
+        data_fim=None,
+    )
+    service.vincular_item_planejado(db_session, user.id, item_cumprido.id, transacao_id=tx.id)
+
+    grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
+    linha_sub = next(row for row in grade.subcategorias if row.subcategory_id == sub.id)
+
+    # jul/2026 (idx4): só a subcategoria (sugestão=100) + item hipotético
+    # (300) — o item cumprido (450) fica de fora, já contado via a
+    # transação real vinculada.
+    assert grade.total_despesas[4].valor == linha_sub.celulas[4].valor + Decimal("300.00")
+
+
+def test_saldo_e_receitas_menos_despesas(db_session, user):
+    account = _account(db_session, user)
+    sub_despesa = _subcategory(db_session, user, nome="Mercado", natureza=Natureza.variavel)
+    sub_receita = _subcategory(db_session, user, nome="Salario", natureza=Natureza.fixa)
+    for mes in (3, 4, 5):
+        _transaction(
+            db_session,
+            user,
+            account,
+            sub_despesa,
+            valor="-100.00",
+            tipo=PluggyTransactionTipo.debito,
+            ano=2026,
+            mes=mes,
+        )
+        _transaction(
+            db_session,
+            user,
+            account,
+            sub_receita,
+            valor="1000.00",
+            tipo=PluggyTransactionTipo.credito,
+            ano=2026,
+            mes=mes,
+        )
+
+    grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
+
+    assert grade.saldo[4].valor == grade.total_receitas[4].valor - grade.total_despesas[4].valor
+    assert grade.saldo[4].valor == Decimal("900.00")
+    assert len(grade.saldo) == len(grade.periodo) == 10
+
+
+def test_linha_eventual_receita_tambem_aparece_separada_da_despesa(db_session, user):
+    account = _account(db_session, user)
+    sub_despesa = _subcategory(db_session, user, nome="Viagem", natureza=Natureza.eventual)
+    sub_receita = _subcategory(db_session, user, nome="Reembolso", natureza=Natureza.eventual)
+    _transaction(
+        db_session,
+        user,
+        account,
+        sub_despesa,
+        valor="-500.00",
+        tipo=PluggyTransactionTipo.debito,
+        ano=2026,
+        mes=5,
+    )
+    _transaction(
+        db_session,
+        user,
+        account,
+        sub_receita,
+        valor="700.00",
+        tipo=PluggyTransactionTipo.credito,
+        ano=2026,
+        mes=5,
+    )
+
+    grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
+
+    assert len(grade.eventuais) == 2
+    eventual_receita = next(e for e in grade.eventuais if e.tipo == PluggyTransactionTipo.credito)
+    assert eventual_receita.celulas[4].valor == Decimal("700.00")

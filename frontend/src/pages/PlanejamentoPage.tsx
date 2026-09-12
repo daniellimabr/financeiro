@@ -2,7 +2,12 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import type { TransacaoTipo } from "../api/dashboards";
-import type { CelulaGrade, ItemPlanejado, LinhaSubcategoriaGrade } from "../api/planejamento";
+import type {
+  CelulaGrade,
+  ItemPlanejado,
+  LinhaEventualGrade,
+  LinhaSubcategoriaGrade,
+} from "../api/planejamento";
 import { fetchPluggyTransactions, type PluggyTransaction } from "../api/pluggy";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { useConfirmarPlanejamentoValor } from "../hooks/useConfirmarPlanejamentoValor";
@@ -34,6 +39,7 @@ const MES_ABREV = [
 
 const JANELA_HISTORICO = 3; // índice das 3 primeiras colunas (realizado, só leitura)
 const IDX_ATUAL = JANELA_HISTORICO; // índice da coluna do mês corrente
+const HORIZONTE_FUTURO = 6; // espelha app/planejamento/service.py HORIZONTE_FUTURO
 
 function colunaLabel(ano: number, mes: number): string {
   return `${MES_ABREV[mes]}/${String(ano).slice(2)}`;
@@ -43,6 +49,10 @@ interface EditingCell {
   subcategoryId: number;
   ano: number;
   mes: number;
+  // Editar uma célula ainda sugerida propaga o valor pros próximos meses do
+  // horizonte (regra do backend); reeditar uma já confirmada corrige só
+  // aquele mês. Guardado no momento do clique pra mostrar o aviso certo.
+  eraSugerido: boolean;
 }
 
 export function PlanejamentoPage() {
@@ -57,8 +67,14 @@ export function PlanejamentoPage() {
   const [editing, setEditing] = useState<EditingCell | null>(null);
   const [draft, setDraft] = useState("");
 
-  function startEditing(subcategoryId: number, ano: number, mes: number, valorAtual: string) {
-    setEditing({ subcategoryId, ano, mes });
+  function startEditing(
+    subcategoryId: number,
+    ano: number,
+    mes: number,
+    valorAtual: string,
+    eraSugerido: boolean
+  ) {
+    setEditing({ subcategoryId, ano, mes, eraSugerido });
     setDraft(valorAtual);
   }
 
@@ -79,6 +95,8 @@ export function PlanejamentoPage() {
   const grade = gradeQuery.data;
   const despesas = grade?.subcategorias.filter((linha) => linha.tipo === "debito") ?? [];
   const receitas = grade?.subcategorias.filter((linha) => linha.tipo === "credito") ?? [];
+  const eventualDespesa = grade?.eventuais.find((linha) => linha.tipo === "debito");
+  const eventualReceita = grade?.eventuais.find((linha) => linha.tipo === "credito");
 
   function renderCell(linha: LinhaSubcategoriaGrade, celula: CelulaGrade, idx: number) {
     const isEditing =
@@ -118,6 +136,9 @@ export function PlanejamentoPage() {
               Cancelar
             </button>
           </div>
+          {editing?.eraSugerido && (
+            <p className="planejamento-cell-hint">Vale para os próximos {HORIZONTE_FUTURO} meses</p>
+          )}
         </td>
       );
     }
@@ -131,7 +152,13 @@ export function PlanejamentoPage() {
         className={valClass}
         style={{ background: "none", border: "none", font: "inherit", padding: 0 }}
         onClick={() =>
-          startEditing(linha.subcategory_id, celula.ano, celula.mes, String(celula.valor))
+          startEditing(
+            linha.subcategory_id,
+            celula.ano,
+            celula.mes,
+            String(celula.valor),
+            celula.origem !== "confirmado"
+          )
         }
         title={celula.origem === "confirmado" ? "Editar valor confirmado" : "Confirmar sugestão"}
       >
@@ -170,49 +197,80 @@ export function PlanejamentoPage() {
     );
   }
 
-  function renderTotalRow(
-    label: string,
-    linhas: LinhaSubcategoriaGrade[],
-    periodo: [number, number][]
-  ) {
-    if (linhas.length === 0) return null;
+  function renderReadOnlyCell(celula: CelulaGrade, idx: number, valueClassName: string) {
+    const className = idx === IDX_ATUAL ? "col-atual" : undefined;
+    if (idx === IDX_ATUAL && celula.realizado_parcial !== null && celula.status !== null) {
+      return (
+        <td key={`${celula.ano}-${celula.mes}`} className={className}>
+          <div className="planejamento-atual-stack">
+            <span className={valueClassName}>{formatCurrency(celula.valor)}</span>
+            <span className={`planejamento-atual-realizado ${celula.status}`}>
+              {formatCurrency(celula.realizado_parcial)} real.
+            </span>
+          </div>
+        </td>
+      );
+    }
+    return (
+      <td key={`${celula.ano}-${celula.mes}`} className={className}>
+        <span className={valueClassName}>{formatCurrency(celula.valor)}</span>
+      </td>
+    );
+  }
+
+  function renderEventualRow(linha: LinhaEventualGrade) {
+    return (
+      <tr className="planejamento-eventual-row">
+        <td className="col-nome">
+          Eventual
+          <span className="planejamento-item-tag hipotetico">média histórica</span>
+        </td>
+        {linha.celulas.map((celula, idx) =>
+          renderReadOnlyCell(
+            celula,
+            idx,
+            idx < JANELA_HISTORICO ? "planejamento-val-realizado" : "planejamento-val-sugerido"
+          )
+        )}
+      </tr>
+    );
+  }
+
+  function renderTotalCellsRow(label: string, celulas: CelulaGrade[]) {
     return (
       <tr className="total-row">
         <td className="col-nome">{label}</td>
-        {periodo.map((_, idx) => {
-          const className = idx === IDX_ATUAL ? "col-atual" : undefined;
-          const somaValor = linhas.reduce((acc, l) => acc + Number(l.celulas[idx].valor), 0);
-          if (idx === IDX_ATUAL) {
-            const comRealizado = linhas.filter((l) => l.celulas[idx].realizado_parcial !== null);
-            if (comRealizado.length > 0) {
-              const somaRealizado = comRealizado.reduce(
-                (acc, l) => acc + Number(l.celulas[idx].realizado_parcial),
-                0
-              );
-              const tipo = linhas[0].tipo;
-              const excedeu =
-                tipo === "debito" ? somaRealizado > somaValor : somaRealizado < somaValor;
-              return (
-                <td key={idx} className={className}>
-                  <div className="planejamento-atual-stack">
-                    <span>{formatCurrency(somaValor)}</span>
-                    <span
-                      className={`planejamento-atual-realizado ${excedeu ? "alerta" : "dentro"}`}
-                    >
-                      {formatCurrency(somaRealizado)} real.
-                    </span>
-                  </div>
-                </td>
-              );
-            }
-          }
-          return (
-            <td key={idx} className={className}>
-              {formatCurrency(somaValor)}
-            </td>
-          );
-        })}
+        {celulas.map((celula, idx) =>
+          renderReadOnlyCell(celula, idx, "planejamento-val-confirmado")
+        )}
       </tr>
+    );
+  }
+
+  function renderSaldoCell(celula: CelulaGrade, idx: number) {
+    const className = idx === IDX_ATUAL ? "col-atual" : undefined;
+    const sinalPlanejado = celula.status === "alerta" ? "alerta" : "dentro";
+    if (idx === IDX_ATUAL && celula.realizado_parcial !== null) {
+      const sinalRealizado = Number(celula.realizado_parcial) < 0 ? "alerta" : "dentro";
+      return (
+        <td key={`${celula.ano}-${celula.mes}`} className={className}>
+          <div className="planejamento-atual-stack">
+            <span className={`planejamento-val-saldo ${sinalPlanejado}`}>
+              {formatCurrency(celula.valor)}
+            </span>
+            <span className={`planejamento-atual-realizado ${sinalRealizado}`}>
+              {formatCurrency(celula.realizado_parcial)} real.
+            </span>
+          </div>
+        </td>
+      );
+    }
+    return (
+      <td key={`${celula.ano}-${celula.mes}`} className={className}>
+        <span className={`planejamento-val-saldo ${sinalPlanejado}`}>
+          {formatCurrency(celula.valor)}
+        </span>
+      </td>
     );
   }
 
@@ -248,14 +306,14 @@ export function PlanejamentoPage() {
               )}
             </h2>
             <span className="ac-panel-meta">
-              3 meses de histórico · mês corrente · 12 meses futuros
+              3 meses de histórico · mês corrente · {HORIZONTE_FUTURO} meses futuros
             </span>
           </div>
           <div className="planejamento-grid-scroll">
             <table className="planejamento-grade">
               <thead>
                 <tr>
-                  <th className="col-nome">Subcategoria</th>
+                  <th className="col-nome">Linha</th>
                   {grade.periodo.map(([ano, mes], idx) => (
                     <th
                       key={`${ano}-${mes}`}
@@ -267,6 +325,25 @@ export function PlanejamentoPage() {
                 </tr>
               </thead>
               <tbody>
+                <tr className="section-row">
+                  <td colSpan={grade.periodo.length + 1}>Receitas</td>
+                </tr>
+                {receitas.length === 0 && (
+                  <tr>
+                    <td colSpan={grade.periodo.length + 1} className="ac-empty">
+                      Nenhuma subcategoria fixa/variável de receita com histórico.
+                    </td>
+                  </tr>
+                )}
+                {receitas.map((linha) => (
+                  <tr key={linha.subcategory_id}>
+                    <td className="col-nome">{linha.subcategory_nome}</td>
+                    {linha.celulas.map((celula, idx) => renderCell(linha, celula, idx))}
+                  </tr>
+                ))}
+                {eventualReceita && renderEventualRow(eventualReceita)}
+                {renderTotalCellsRow("Total receitas", grade.total_receitas)}
+
                 <tr className="section-row">
                   <td colSpan={grade.periodo.length + 1}>Despesas</td>
                 </tr>
@@ -283,7 +360,8 @@ export function PlanejamentoPage() {
                     {linha.celulas.map((celula, idx) => renderCell(linha, celula, idx))}
                   </tr>
                 ))}
-                {renderTotalRow("Total despesas", despesas, grade.periodo)}
+                {eventualDespesa && renderEventualRow(eventualDespesa)}
+                {renderTotalCellsRow("Total despesas", grade.total_despesas)}
 
                 <tr className="section-row">
                   <td colSpan={grade.periodo.length + 1}>Itens planejados</td>
@@ -330,23 +408,10 @@ export function PlanejamentoPage() {
                   </tr>
                 ))}
 
-                <tr className="section-row">
-                  <td colSpan={grade.periodo.length + 1}>Receitas</td>
+                <tr className="total-row planejamento-saldo-row">
+                  <td className="col-nome">Saldo simulado</td>
+                  {grade.saldo.map((celula, idx) => renderSaldoCell(celula, idx))}
                 </tr>
-                {receitas.length === 0 && (
-                  <tr>
-                    <td colSpan={grade.periodo.length + 1} className="ac-empty">
-                      Nenhuma subcategoria fixa/variável de receita com histórico.
-                    </td>
-                  </tr>
-                )}
-                {receitas.map((linha) => (
-                  <tr key={linha.subcategory_id}>
-                    <td className="col-nome">{linha.subcategory_nome}</td>
-                    {linha.celulas.map((celula, idx) => renderCell(linha, celula, idx))}
-                  </tr>
-                ))}
-                {renderTotalRow("Total receitas", receitas, grade.periodo)}
               </tbody>
             </table>
           </div>

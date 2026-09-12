@@ -40,12 +40,23 @@ class LinhaItemGradeOut(BaseModel):
     celulas: list[CelulaGradeOut]
 
 
+class LinhaEventualGradeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    tipo: PluggyTransactionTipo
+    celulas: list[CelulaGradeOut]
+
+
 class GradeOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     periodo: list[tuple[int, int]]
     subcategorias: list[LinhaSubcategoriaGradeOut]
     itens: list[LinhaItemGradeOut]
+    eventuais: list[LinhaEventualGradeOut]
+    total_despesas: list[CelulaGradeOut]
+    total_receitas: list[CelulaGradeOut]
+    saldo: list[CelulaGradeOut]
 
 
 class PlanejamentoValorIn(BaseModel):

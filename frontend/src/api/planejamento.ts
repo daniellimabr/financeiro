@@ -32,10 +32,19 @@ export interface LinhaItemGrade {
   celulas: CelulaGrade[];
 }
 
+export interface LinhaEventualGrade {
+  tipo: TransacaoTipo;
+  celulas: CelulaGrade[];
+}
+
 export interface Grade {
   periodo: [number, number][];
   subcategorias: LinhaSubcategoriaGrade[];
   itens: LinhaItemGrade[];
+  eventuais: LinhaEventualGrade[];
+  total_despesas: CelulaGrade[];
+  total_receitas: CelulaGrade[];
+  saldo: CelulaGrade[];
 }
 
 export function fetchPlanejamentoGrade(anoBase: number, mesBase: number): Promise<Grade> {

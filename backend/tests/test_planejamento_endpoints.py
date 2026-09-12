@@ -111,7 +111,7 @@ def test_get_grade_returns_subcategorias_fixa_variavel(client, db_session):
 
     assert response.status_code == 200
     body = response.json()
-    assert len(body["periodo"]) == 16
+    assert len(body["periodo"]) == 10
     assert len(body["subcategorias"]) == 1
     assert body["subcategorias"][0]["subcategory_id"] == sub.id
 

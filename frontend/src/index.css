@@ -3164,3 +3164,38 @@ table.planejamento-grade tr.total-row td.col-nome {
 .planejamento-picker-row:last-child {
   border-bottom: none;
 }
+
+/* Acréscimos pós-deploy da Sprint 38 (feedback do CEO usando a tela real):
+   linha-lembrete Eventual (mesmo estilo de "sugerido", só leitura), dica de
+   propagação ao editar uma célula ainda sugerida, e a linha de Saldo
+   simulado ao fim da tabela (cor por sinal, reaproveitando --ac-good/
+   --ac-bad — mesmo idioma dos demais indicadores desta tela). */
+tr.planejamento-eventual-row td.col-nome {
+  color: var(--ac-text-dim);
+  font-weight: 500;
+  font-style: italic;
+}
+
+.planejamento-cell-hint {
+  font-size: 10px;
+  color: var(--ac-text-dim);
+  margin: 3px 0 0;
+  text-align: right;
+}
+
+.planejamento-val-saldo {
+  font-weight: 700;
+}
+
+.planejamento-val-saldo.dentro {
+  color: var(--ac-good);
+}
+
+.planejamento-val-saldo.alerta {
+  color: var(--ac-bad);
+}
+
+tr.planejamento-saldo-row td {
+  border-top: 2px solid var(--ac-border-strong);
+  background: var(--ac-surface-2);
+}

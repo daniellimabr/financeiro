@@ -13,9 +13,11 @@ from app.models.planejamento import ItemPlanejado, PlanejamentoValor
 from app.models.pluggy import PluggyTransaction, PluggyTransactionTipo
 
 # Horizonte fixo desta sprint (decisão explícita do CEO) — 3 meses de
-# histórico (leitura), mês corrente, 12 meses futuros = 16 colunas.
+# histórico (leitura), mês corrente, 6 meses futuros = 10 colunas (reduzido
+# de 12 pós-deploy: 16 colunas não cabiam sem scroll horizontal na resolução
+# de referência do CEO).
 JANELA_SUGESTAO = 3
-HORIZONTE_FUTURO = 12
+HORIZONTE_FUTURO = 6
 
 
 @dataclass
@@ -54,24 +56,50 @@ class LinhaItemGrade:
 
 
 @dataclass
+class LinhaEventualGrade:
+    """Linha-lembrete agregando TODAS as subcategorias `eventual` de um tipo
+    (débito ou crédito) num único número — eventual não entra na grade
+    normal (sem natureza fixa/variavel), mas também tem média histórica e
+    não deve ser esquecido do planejamento futuro (decisão do CEO,
+    pós-deploy da Sprint 38). Só leitura: nunca vira "confirmado", sem
+    override persistido — recalcula a cada consulta como qualquer
+    sugestão."""
+
+    tipo: PluggyTransactionTipo
+    celulas: list[CelulaGrade] = field(default_factory=list)
+
+
+@dataclass
 class GradeOut:
     periodo: list[tuple[int, int]]
     subcategorias: list[LinhaSubcategoriaGrade]
     itens: list[LinhaItemGrade]
+    eventuais: list[LinhaEventualGrade]
+    total_despesas: list[CelulaGrade]
+    total_receitas: list[CelulaGrade]
+    saldo: list[CelulaGrade]
 
 
-def _periodo_grade(ano_base: int, mes_base: int) -> list[tuple[int, int]]:
-    """3 meses de histórico + mês corrente (via `_month_range`) seguidos de
-    `HORIZONTE_FUTURO` meses futuros — 16 colunas no total."""
-    periodo = _month_range(ano_base, mes_base, JANELA_SUGESTAO + 1)
-    y, m = ano_base, mes_base
-    for _ in range(HORIZONTE_FUTURO):
+def _months_forward(ano: int, mes: int, count: int) -> list[tuple[int, int]]:
+    """`count` meses a partir de (ano, mes) inclusive, em ordem cronológica."""
+    periodo = []
+    y, m = ano, mes
+    for _ in range(count):
+        periodo.append((y, m))
         m += 1
         if m == 13:
             m = 1
             y += 1
-        periodo.append((y, m))
     return periodo
+
+
+def _periodo_grade(ano_base: int, mes_base: int) -> list[tuple[int, int]]:
+    """3 meses de histórico + mês corrente (via `_month_range`) seguidos de
+    `HORIZONTE_FUTURO` meses futuros."""
+    periodo = _month_range(ano_base, mes_base, JANELA_SUGESTAO + 1)
+    ultimo_ano, ultimo_mes = periodo[-1]
+    futuro = _months_forward(ultimo_ano, ultimo_mes, HORIZONTE_FUTURO + 1)[1:]
+    return periodo + futuro
 
 
 def _tipo_dominante(db: Session, user_id: int, subcategory_id: int) -> PluggyTransactionTipo | None:
@@ -160,6 +188,164 @@ def _status_mes_corrente(
         else realizado_parcial < planejado
     )
     return "alerta" if excedeu else "dentro"
+
+
+def _total_mes_eventual(
+    db: Session, user_id: int, tipo: PluggyTransactionTipo, ano: int, mes: int
+) -> Decimal:
+    query = _apply_periodo(_base_query(db, user_id), ano=ano, mes=mes).filter(
+        Subcategory.natureza == Natureza.eventual,
+        PluggyTransaction.tipo == tipo,
+    )
+    total = query.with_entities(
+        func.coalesce(func.sum(func.abs(PluggyTransaction.valor)), 0)
+    ).scalar()
+    return _to_decimal(total)
+
+
+def _existe_eventual_com_tipo(db: Session, user_id: int, tipo: PluggyTransactionTipo) -> bool:
+    return (
+        _base_query(db, user_id)
+        .filter(Subcategory.natureza == Natureza.eventual, PluggyTransaction.tipo == tipo)
+        .with_entities(PluggyTransaction.id)
+        .first()
+        is not None
+    )
+
+
+def _sugestao_eventual_media_3_meses(
+    db: Session, user_id: int, tipo: PluggyTransactionTipo, ano: int, mes: int
+) -> Decimal:
+    meses_anteriores = _month_range(ano, mes, JANELA_SUGESTAO + 1)[:-1]
+    totais = [
+        total
+        for y, m in meses_anteriores
+        if (total := _total_mes_eventual(db, user_id, tipo, y, m)) > 0
+    ]
+    if not totais:
+        return Decimal("0")
+    media = sum(totais) / len(totais)
+    return media.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _linha_eventual(
+    db: Session,
+    user_id: int,
+    tipo: PluggyTransactionTipo,
+    *,
+    ano_base: int,
+    mes_base: int,
+    periodo: list[tuple[int, int]],
+) -> LinhaEventualGrade:
+    sugestao = _sugestao_eventual_media_3_meses(db, user_id, tipo, ano_base, mes_base)
+
+    celulas: list[CelulaGrade] = []
+    for idx, (y, m) in enumerate(periodo):
+        if idx < JANELA_SUGESTAO:
+            valor = _total_mes_eventual(db, user_id, tipo, y, m)
+            celulas.append(CelulaGrade(ano=y, mes=m, valor=valor, origem="realizado"))
+            continue
+
+        if idx == JANELA_SUGESTAO:
+            realizado_parcial = _total_mes_eventual(db, user_id, tipo, y, m)
+            status = _status_mes_corrente(tipo, sugestao, realizado_parcial)
+            celulas.append(
+                CelulaGrade(
+                    ano=y,
+                    mes=m,
+                    valor=sugestao,
+                    origem="sugerido",
+                    realizado_parcial=realizado_parcial,
+                    status=status,
+                )
+            )
+        else:
+            celulas.append(CelulaGrade(ano=y, mes=m, valor=sugestao, origem="sugerido"))
+
+    return LinhaEventualGrade(tipo=tipo, celulas=celulas)
+
+
+def _totais_secao(
+    linhas: list[LinhaSubcategoriaGrade],
+    itens: list[LinhaItemGrade],
+    eventual: LinhaEventualGrade | None,
+    tipo: PluggyTransactionTipo,
+    periodo: list[tuple[int, int]],
+) -> list[CelulaGrade]:
+    """Soma por coluna: subcategorias fixa/variavel da seção + itens
+    planejados hipotéticos (só hipotético — um item cumprido já conta via a
+    transação real vinculada, contá-lo de novo aqui duplicaria o valor) +
+    a linha-lembrete Eventual, quando existir."""
+    celulas: list[CelulaGrade] = []
+    for idx, (_ano, _mes) in enumerate(periodo):
+        soma_valor = sum((linha.celulas[idx].valor for linha in linhas), Decimal("0"))
+        soma_valor += sum(
+            (
+                item.celulas[idx].valor
+                for item in itens
+                if item.tipo == tipo and item.celulas[idx].origem == "hipotetico"
+            ),
+            Decimal("0"),
+        )
+        if eventual is not None:
+            soma_valor += eventual.celulas[idx].valor
+
+        if idx == JANELA_SUGESTAO:
+            soma_realizado = sum(
+                (linha.celulas[idx].realizado_parcial or Decimal("0") for linha in linhas),
+                Decimal("0"),
+            )
+            if eventual is not None:
+                soma_realizado += eventual.celulas[idx].realizado_parcial or Decimal("0")
+            status = _status_mes_corrente(tipo, soma_valor, soma_realizado)
+            celulas.append(
+                CelulaGrade(
+                    ano=_ano,
+                    mes=_mes,
+                    valor=soma_valor,
+                    origem="confirmado",
+                    realizado_parcial=soma_realizado,
+                    status=status,
+                )
+            )
+        else:
+            celulas.append(CelulaGrade(ano=_ano, mes=_mes, valor=soma_valor, origem="confirmado"))
+    return celulas
+
+
+def _saldo(
+    total_despesas: list[CelulaGrade],
+    total_receitas: list[CelulaGrade],
+    periodo: list[tuple[int, int]],
+) -> list[CelulaGrade]:
+    celulas: list[CelulaGrade] = []
+    for idx, (ano, mes) in enumerate(periodo):
+        valor = total_receitas[idx].valor - total_despesas[idx].valor
+        if idx == JANELA_SUGESTAO:
+            realizado_parcial = (total_receitas[idx].realizado_parcial or Decimal("0")) - (
+                total_despesas[idx].realizado_parcial or Decimal("0")
+            )
+            celulas.append(
+                CelulaGrade(
+                    ano=ano,
+                    mes=mes,
+                    valor=valor,
+                    origem="confirmado",
+                    realizado_parcial=realizado_parcial,
+                    status="alerta" if realizado_parcial < 0 else "dentro",
+                )
+            )
+        else:
+            celulas.append(
+                CelulaGrade(
+                    ano=ano,
+                    mes=mes,
+                    valor=valor,
+                    origem="confirmado",
+                    status="alerta" if valor < 0 else "dentro",
+                )
+            )
+    return celulas
 
 
 def _linha_subcategoria(
@@ -288,49 +474,109 @@ def get_grade(db: Session, user_id: int, *, ano_base: int, mes_base: int) -> Gra
     itens = list_itens_planejados(db, user_id)
     linhas_itens = [_linha_item(item, periodo) for item in itens]
 
-    return GradeOut(periodo=periodo, subcategorias=linhas_subcategorias, itens=linhas_itens)
+    despesas_linhas = [
+        linha for linha in linhas_subcategorias if linha.tipo == PluggyTransactionTipo.debito
+    ]
+    receitas_linhas = [
+        linha for linha in linhas_subcategorias if linha.tipo == PluggyTransactionTipo.credito
+    ]
+
+    eventuais: list[LinhaEventualGrade] = []
+    eventual_despesa: LinhaEventualGrade | None = None
+    eventual_receita: LinhaEventualGrade | None = None
+    if _existe_eventual_com_tipo(db, user_id, PluggyTransactionTipo.debito):
+        eventual_despesa = _linha_eventual(
+            db,
+            user_id,
+            PluggyTransactionTipo.debito,
+            ano_base=ano_base,
+            mes_base=mes_base,
+            periodo=periodo,
+        )
+        eventuais.append(eventual_despesa)
+    if _existe_eventual_com_tipo(db, user_id, PluggyTransactionTipo.credito):
+        eventual_receita = _linha_eventual(
+            db,
+            user_id,
+            PluggyTransactionTipo.credito,
+            ano_base=ano_base,
+            mes_base=mes_base,
+            periodo=periodo,
+        )
+        eventuais.append(eventual_receita)
+
+    total_despesas = _totais_secao(
+        despesas_linhas, linhas_itens, eventual_despesa, PluggyTransactionTipo.debito, periodo
+    )
+    total_receitas = _totais_secao(
+        receitas_linhas, linhas_itens, eventual_receita, PluggyTransactionTipo.credito, periodo
+    )
+    saldo = _saldo(total_despesas, total_receitas, periodo)
+
+    return GradeOut(
+        periodo=periodo,
+        subcategorias=linhas_subcategorias,
+        itens=linhas_itens,
+        eventuais=eventuais,
+        total_despesas=total_despesas,
+        total_receitas=total_receitas,
+        saldo=saldo,
+    )
+
+
+def _buscar_valor(
+    db: Session, user_id: int, subcategory_id: int, ano: int, mes: int
+) -> PlanejamentoValor | None:
+    return (
+        db.query(PlanejamentoValor)
+        .filter(
+            PlanejamentoValor.user_id == user_id,
+            PlanejamentoValor.subcategory_id == subcategory_id,
+            PlanejamentoValor.ano == ano,
+            PlanejamentoValor.mes == mes,
+        )
+        .one_or_none()
+    )
 
 
 def confirmar_valor(
     db: Session, user_id: int, subcategory_id: int, *, ano: int, mes: int, valor: Decimal
 ) -> PlanejamentoValor:
     get_subcategory(db, user_id, subcategory_id)
-    existing = (
-        db.query(PlanejamentoValor)
-        .filter(
-            PlanejamentoValor.user_id == user_id,
-            PlanejamentoValor.subcategory_id == subcategory_id,
-            PlanejamentoValor.ano == ano,
-            PlanejamentoValor.mes == mes,
-        )
-        .one_or_none()
-    )
+    existing = _buscar_valor(db, user_id, subcategory_id, ano, mes)
+
     if existing is not None:
+        # Célula já confirmada: reeditar é correção pontual daquele mês, sem
+        # propagar (decisão do CEO, pós-deploy da Sprint 38).
         existing.valor = valor
         db.commit()
         db.refresh(existing)
         return existing
 
-    novo = PlanejamentoValor(
-        user_id=user_id, subcategory_id=subcategory_id, ano=ano, mes=mes, valor=valor
-    )
-    db.add(novo)
+    # Célula ainda sugerida: confirmar vale como nova baseline dali pra
+    # frente — propaga o valor pro mês clicado e os próximos, cobrindo todo
+    # o horizonte futuro exibido (mesmo se algum desses meses já tinha um
+    # override individual; o novo valor substitui).
+    alvo: PlanejamentoValor | None = None
+    for y, m in _months_forward(ano, mes, HORIZONTE_FUTURO):
+        row = _buscar_valor(db, user_id, subcategory_id, y, m)
+        if row is not None:
+            row.valor = valor
+        else:
+            row = PlanejamentoValor(
+                user_id=user_id, subcategory_id=subcategory_id, ano=y, mes=m, valor=valor
+            )
+            db.add(row)
+        if (y, m) == (ano, mes):
+            alvo = row
     db.commit()
-    db.refresh(novo)
-    return novo
+    assert alvo is not None
+    db.refresh(alvo)
+    return alvo
 
 
 def remover_valor(db: Session, user_id: int, subcategory_id: int, *, ano: int, mes: int) -> None:
-    existing = (
-        db.query(PlanejamentoValor)
-        .filter(
-            PlanejamentoValor.user_id == user_id,
-            PlanejamentoValor.subcategory_id == subcategory_id,
-            PlanejamentoValor.ano == ano,
-            PlanejamentoValor.mes == mes,
-        )
-        .one_or_none()
-    )
+    existing = _buscar_valor(db, user_id, subcategory_id, ano, mes)
     if existing is None:
         raise NotFoundError(
             f"Nenhum valor confirmado para subcategoria {subcategory_id} em {mes}/{ano}"
