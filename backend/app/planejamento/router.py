@@ -4,12 +4,15 @@ from sqlalchemy.orm import Session
 from app.auth.deps import get_current_user
 from app.db import get_db
 from app.exceptions import InvalidStateError, NotFoundError
+from app.models.pluggy import PluggyTransactionTipo
 from app.models.user import User
 from app.planejamento import service
 from app.schemas.planejamento import (
     GradeOut,
     ItemPlanejadoIn,
     ItemPlanejadoOut,
+    PlanejamentoValorEventualIn,
+    PlanejamentoValorEventualOut,
     PlanejamentoValorIn,
     PlanejamentoValorOut,
     VincularItemPlanejadoIn,
@@ -58,6 +61,37 @@ def remover_valor(
 ):
     try:
         service.remover_valor(db, current_user.id, subcategory_id, ano=ano, mes=mes)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.put("/valores-eventual/{tipo}", response_model=PlanejamentoValorEventualOut)
+def confirmar_valor_eventual(
+    tipo: PluggyTransactionTipo,
+    payload: PlanejamentoValorEventualIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.confirmar_valor_eventual(
+        db,
+        current_user.id,
+        tipo,
+        ano=payload.ano,
+        mes=payload.mes,
+        valor=payload.valor,
+    )
+
+
+@router.delete("/valores-eventual/{tipo}", status_code=status.HTTP_204_NO_CONTENT)
+def remover_valor_eventual(
+    tipo: PluggyTransactionTipo,
+    ano: int,
+    mes: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        service.remover_valor_eventual(db, current_user.id, tipo, ano=ano, mes=mes)
     except NotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 

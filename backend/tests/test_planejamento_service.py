@@ -792,6 +792,129 @@ def test_linha_eventual_ausente_sem_nenhuma_subcategoria_eventual(db_session, us
     assert grade.eventuais == []
 
 
+def test_linha_eventual_mes_corrente_nunca_aceita_override(db_session, user):
+    account = _account(db_session, user)
+    sub = _subcategory(db_session, user, nome="Viagem", natureza=Natureza.eventual)
+    _transaction(
+        db_session,
+        user,
+        account,
+        sub,
+        valor="-1000.00",
+        tipo=PluggyTransactionTipo.debito,
+        ano=2026,
+        mes=5,
+    )
+
+    # Ainda que exista um override persistido pra (ano_base, mes_base), o
+    # mês corrente (idx3) sempre mostra a sugestão calculada — correção
+    # pós-deploy da Sprint 38 (o pedido original tinha ficado ambíguo).
+    service.confirmar_valor_eventual(
+        db_session,
+        user.id,
+        PluggyTransactionTipo.debito,
+        ano=ANO_BASE,
+        mes=MES_BASE,
+        valor=Decimal("1.00"),
+    )
+
+    grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
+    eventual = next(e for e in grade.eventuais if e.tipo == PluggyTransactionTipo.debito)
+
+    assert eventual.celulas[3].origem == "sugerido"
+    assert eventual.celulas[3].valor == Decimal("1000.00")
+
+
+def test_confirmar_valor_eventual_sugerido_propaga_para_meses_seguintes(db_session, user):
+    account = _account(db_session, user)
+    sub = _subcategory(db_session, user, nome="Viagem", natureza=Natureza.eventual)
+    _transaction(
+        db_session,
+        user,
+        account,
+        sub,
+        valor="-1000.00",
+        tipo=PluggyTransactionTipo.debito,
+        ano=2026,
+        mes=5,
+    )
+
+    service.confirmar_valor_eventual(
+        db_session, user.id, PluggyTransactionTipo.debito, ano=2026, mes=7, valor=Decimal("999.00")
+    )
+
+    grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
+    eventual = next(e for e in grade.eventuais if e.tipo == PluggyTransactionTipo.debito)
+
+    for idx in range(4, 10):
+        assert eventual.celulas[idx].valor == Decimal("999.00")
+        assert eventual.celulas[idx].origem == "confirmado"
+    # Mês corrente (idx3), antes do mês editado, não é afetado.
+    assert eventual.celulas[3].origem == "sugerido"
+
+
+def test_confirmar_valor_eventual_ja_confirmado_corrige_so_aquele_mes(db_session, user):
+    account = _account(db_session, user)
+    sub = _subcategory(db_session, user, nome="Viagem", natureza=Natureza.eventual)
+    _transaction(
+        db_session,
+        user,
+        account,
+        sub,
+        valor="-1000.00",
+        tipo=PluggyTransactionTipo.debito,
+        ano=2026,
+        mes=5,
+    )
+
+    service.confirmar_valor_eventual(
+        db_session, user.id, PluggyTransactionTipo.debito, ano=2026, mes=7, valor=Decimal("999.00")
+    )
+    service.confirmar_valor_eventual(
+        db_session, user.id, PluggyTransactionTipo.debito, ano=2026, mes=7, valor=Decimal("500.00")
+    )
+
+    grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
+    eventual = next(e for e in grade.eventuais if e.tipo == PluggyTransactionTipo.debito)
+
+    assert eventual.celulas[4].valor == Decimal("500.00")  # jul — corrigido
+    assert eventual.celulas[5].valor == Decimal("999.00")  # ago — valor da propagação original
+
+
+def test_remover_valor_eventual_volta_a_sugestao(db_session, user):
+    account = _account(db_session, user)
+    sub = _subcategory(db_session, user, nome="Viagem", natureza=Natureza.eventual)
+    _transaction(
+        db_session,
+        user,
+        account,
+        sub,
+        valor="-1000.00",
+        tipo=PluggyTransactionTipo.debito,
+        ano=2026,
+        mes=5,
+    )
+    service.confirmar_valor_eventual(
+        db_session, user.id, PluggyTransactionTipo.debito, ano=2026, mes=7, valor=Decimal("999.00")
+    )
+
+    service.remover_valor_eventual(
+        db_session, user.id, PluggyTransactionTipo.debito, ano=2026, mes=7
+    )
+
+    grade = service.get_grade(db_session, user.id, ano_base=ANO_BASE, mes_base=MES_BASE)
+    eventual = next(e for e in grade.eventuais if e.tipo == PluggyTransactionTipo.debito)
+    assert eventual.celulas[4].origem == "sugerido"
+    assert eventual.celulas[4].valor == Decimal("1000.00")
+
+
+def test_remover_valor_eventual_inexistente_levanta_not_found(db_session, user):
+    with pytest.raises(NotFoundError):
+        service.remover_valor_eventual(
+            db_session, user.id, PluggyTransactionTipo.debito, ano=2026, mes=7
+        )
+
+
 # --- totais por seção e saldo ---------------------------------------------------
 
 

@@ -11,12 +11,14 @@ import type {
 import { fetchPluggyTransactions, type PluggyTransaction } from "../api/pluggy";
 import { PeriodFilter } from "../components/PeriodFilter";
 import { useConfirmarPlanejamentoValor } from "../hooks/useConfirmarPlanejamentoValor";
+import { useConfirmarPlanejamentoValorEventual } from "../hooks/useConfirmarPlanejamentoValorEventual";
 import { useCreateItemPlanejado } from "../hooks/useCreateItemPlanejado";
 import { useDeleteItemPlanejado } from "../hooks/useDeleteItemPlanejado";
 import { useDesvincularItemPlanejado } from "../hooks/useDesvincularItemPlanejado";
 import { useItensPlanejados } from "../hooks/useItensPlanejados";
 import { usePlanejamentoGrade } from "../hooks/usePlanejamentoGrade";
 import { useRemoverPlanejamentoValor } from "../hooks/useRemoverPlanejamentoValor";
+import { useRemoverPlanejamentoValorEventual } from "../hooks/useRemoverPlanejamentoValorEventual";
 import { useUpdateItemPlanejado } from "../hooks/useUpdateItemPlanejado";
 import { useVincularItemPlanejado } from "../hooks/useVincularItemPlanejado";
 import { formatCurrency } from "../utils/format";
@@ -45,15 +47,14 @@ function colunaLabel(ano: number, mes: number): string {
   return `${MES_ABREV[mes]}/${String(ano).slice(2)}`;
 }
 
-interface EditingCell {
-  subcategoryId: number;
-  ano: number;
-  mes: number;
-  // Editar uma célula ainda sugerida propaga o valor pros próximos meses do
-  // horizonte (regra do backend); reeditar uma já confirmada corrige só
-  // aquele mês. Guardado no momento do clique pra mostrar o aviso certo.
-  eraSugerido: boolean;
-}
+// Editar uma célula ainda sugerida propaga o valor pros próximos meses do
+// horizonte (regra do backend); reeditar uma já confirmada corrige só
+// aquele mês. `eraSugerido` é guardado no momento do clique pra mostrar o
+// aviso certo. A linha Eventual não tem subcategory_id (agrega várias),
+// por isso o discriminador `kind`.
+type EditingCell =
+  | { kind: "subcategoria"; subcategoryId: number; ano: number; mes: number; eraSugerido: boolean }
+  | { kind: "eventual"; tipo: TransacaoTipo; ano: number; mes: number; eraSugerido: boolean };
 
 export function PlanejamentoPage() {
   const now = new Date();
@@ -63,6 +64,8 @@ export function PlanejamentoPage() {
   const gradeQuery = usePlanejamentoGrade(anoBase, mesBase);
   const confirmar = useConfirmarPlanejamentoValor();
   const remover = useRemoverPlanejamentoValor();
+  const confirmarEventual = useConfirmarPlanejamentoValorEventual();
+  const removerEventual = useRemoverPlanejamentoValorEventual();
 
   const [editing, setEditing] = useState<EditingCell | null>(null);
   const [draft, setDraft] = useState("");
@@ -74,7 +77,18 @@ export function PlanejamentoPage() {
     valorAtual: string,
     eraSugerido: boolean
   ) {
-    setEditing({ subcategoryId, ano, mes, eraSugerido });
+    setEditing({ kind: "subcategoria", subcategoryId, ano, mes, eraSugerido });
+    setDraft(valorAtual);
+  }
+
+  function startEditingEventual(
+    tipo: TransacaoTipo,
+    ano: number,
+    mes: number,
+    valorAtual: string,
+    eraSugerido: boolean
+  ) {
+    setEditing({ kind: "eventual", tipo, ano, mes, eraSugerido });
     setDraft(valorAtual);
   }
 
@@ -82,14 +96,25 @@ export function PlanejamentoPage() {
     if (!editing) return;
     const valor = draft.trim();
     if (valor === "") return;
-    confirmar.mutate(
-      { subcategoryId: editing.subcategoryId, ano: editing.ano, mes: editing.mes, valor },
-      { onSuccess: () => setEditing(null) }
-    );
+    if (editing.kind === "subcategoria") {
+      confirmar.mutate(
+        { subcategoryId: editing.subcategoryId, ano: editing.ano, mes: editing.mes, valor },
+        { onSuccess: () => setEditing(null) }
+      );
+    } else {
+      confirmarEventual.mutate(
+        { tipo: editing.tipo, ano: editing.ano, mes: editing.mes, valor },
+        { onSuccess: () => setEditing(null) }
+      );
+    }
   }
 
   function usarSugestao(subcategoryId: number, ano: number, mes: number) {
     remover.mutate({ subcategoryId, ano, mes }, { onSuccess: () => setEditing(null) });
+  }
+
+  function usarSugestaoEventual(tipo: TransacaoTipo, ano: number, mes: number) {
+    removerEventual.mutate({ tipo, ano, mes }, { onSuccess: () => setEditing(null) });
   }
 
   const grade = gradeQuery.data;
@@ -100,7 +125,8 @@ export function PlanejamentoPage() {
 
   function renderCell(linha: LinhaSubcategoriaGrade, celula: CelulaGrade, idx: number) {
     const isEditing =
-      editing?.subcategoryId === linha.subcategory_id &&
+      editing?.kind === "subcategoria" &&
+      editing.subcategoryId === linha.subcategory_id &&
       editing.ano === celula.ano &&
       editing.mes === celula.mes;
     const className = idx === IDX_ATUAL ? "col-atual" : undefined;
@@ -218,6 +244,80 @@ export function PlanejamentoPage() {
     );
   }
 
+  function renderEventualEditableCell(tipo: TransacaoTipo, celula: CelulaGrade) {
+    const isEditing =
+      editing?.kind === "eventual" &&
+      editing.tipo === tipo &&
+      editing.ano === celula.ano &&
+      editing.mes === celula.mes;
+
+    if (isEditing) {
+      return (
+        <td key={`${celula.ano}-${celula.mes}`}>
+          <div className="planejamento-cell-edit">
+            <input
+              aria-label={`Valor de Eventual em ${colunaLabel(celula.ano, celula.mes)}`}
+              type="number"
+              step="0.01"
+              value={draft}
+              autoFocus
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") saveEditing();
+                if (event.key === "Escape") setEditing(null);
+              }}
+            />
+            <button type="button" className="ac-btn ac-btn-primary" onClick={saveEditing}>
+              Salvar
+            </button>
+            <button type="button" className="ac-btn ac-btn-ghost" onClick={() => setEditing(null)}>
+              Cancelar
+            </button>
+          </div>
+          {editing?.eraSugerido && (
+            <p className="planejamento-cell-hint">Vale para os próximos {HORIZONTE_FUTURO} meses</p>
+          )}
+        </td>
+      );
+    }
+
+    const valClass =
+      celula.origem === "confirmado" ? "planejamento-val-confirmado" : "planejamento-val-sugerido";
+
+    return (
+      <td key={`${celula.ano}-${celula.mes}`}>
+        <button
+          type="button"
+          className={valClass}
+          style={{ background: "none", border: "none", font: "inherit", padding: 0 }}
+          onClick={() =>
+            startEditingEventual(
+              tipo,
+              celula.ano,
+              celula.mes,
+              String(celula.valor),
+              celula.origem !== "confirmado"
+            )
+          }
+          title={celula.origem === "confirmado" ? "Editar valor confirmado" : "Confirmar sugestão"}
+        >
+          {formatCurrency(celula.valor)}
+        </button>
+        {celula.origem === "confirmado" && (
+          <button
+            type="button"
+            className="ac-btn ac-btn-ghost"
+            style={{ marginLeft: 4, padding: "1px 6px", fontSize: 10 }}
+            title="Voltar a usar a sugestão"
+            onClick={() => usarSugestaoEventual(tipo, celula.ano, celula.mes)}
+          >
+            ×
+          </button>
+        )}
+      </td>
+    );
+  }
+
   function renderEventualRow(linha: LinhaEventualGrade) {
     return (
       <tr className="planejamento-eventual-row">
@@ -226,11 +326,13 @@ export function PlanejamentoPage() {
           <span className="planejamento-item-tag hipotetico">média histórica</span>
         </td>
         {linha.celulas.map((celula, idx) =>
-          renderReadOnlyCell(
-            celula,
-            idx,
-            idx < JANELA_HISTORICO ? "planejamento-val-realizado" : "planejamento-val-sugerido"
-          )
+          idx <= IDX_ATUAL
+            ? renderReadOnlyCell(
+                celula,
+                idx,
+                idx < JANELA_HISTORICO ? "planejamento-val-realizado" : "planejamento-val-sugerido"
+              )
+            : renderEventualEditableCell(linha.tipo, celula)
         )}
       </tr>
     );
@@ -291,9 +393,10 @@ export function PlanejamentoPage() {
 
       {gradeQuery.isLoading && <p>Carregando...</p>}
       {gradeQuery.isError && <p role="alert">Não foi possível carregar a Mesa de Planejamento.</p>}
-      {(confirmar.isError || remover.isError) && (
-        <p role="alert">Não foi possível salvar o valor planejado.</p>
-      )}
+      {(confirmar.isError ||
+        remover.isError ||
+        confirmarEventual.isError ||
+        removerEventual.isError) && <p role="alert">Não foi possível salvar o valor planejado.</p>}
 
       {grade && (
         <div className="ac-panel">

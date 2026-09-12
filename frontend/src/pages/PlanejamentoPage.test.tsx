@@ -178,6 +178,14 @@ function routedFetchMock(overrides?: { itens?: unknown[] }, gradeOverrides?: { g
     if (url.startsWith("/planejamento/valores/") && method === "DELETE") {
       return Promise.resolve(jsonResponse(null, 204));
     }
+    if (url.startsWith("/planejamento/valores-eventual/") && method === "PUT") {
+      return Promise.resolve(
+        jsonResponse({ id: 1, tipo: "debito", ano: 2026, mes: 9, valor: "250.00" })
+      );
+    }
+    if (url.startsWith("/planejamento/valores-eventual/") && method === "DELETE") {
+      return Promise.resolve(jsonResponse(null, 204));
+    }
     if (url.startsWith("/pluggy/transactions")) {
       return Promise.resolve(jsonResponse([TRANSACAO_CANDIDATA]));
     }
@@ -248,6 +256,75 @@ describe("PlanejamentoPage", () => {
 
     expect(screen.getByText("Eventual")).toBeInTheDocument();
     expect(screen.getByText("média histórica")).toBeInTheDocument();
+  });
+
+  it("keeps the Eventual row's current-month cell read-only but lets future months be edited", async () => {
+    const fixtureWithEventual = {
+      ...GRADE_FIXTURE,
+      eventuais: [{ tipo: "debito", celulas: buildCelulas() }],
+    };
+    const fetchMock = routedFetchMock(undefined, { grade: fixtureWithEventual });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container } = renderWithQueryClient(<PlanejamentoPage />);
+    await screen.findByText("Eventual");
+
+    const eventualRow = container.querySelector("tr.planejamento-eventual-row");
+    if (!eventualRow) throw new Error("eventual row not found");
+    const tds = eventualRow.querySelectorAll("td");
+    // tds[0] = nome; tds[1..3] = histórico; tds[4] = mês corrente (idx 3, JANELA_HISTORICO);
+    // tds[5..10] = futuros (idx 4..9).
+    expect(tds[4].querySelector("button")).toBeNull();
+    const futureButton = tds[5].querySelector("button");
+    expect(futureButton).not.toBeNull();
+
+    await userEvent.click(futureButton as HTMLButtonElement);
+    const input = screen.getByRole("spinbutton");
+    await userEvent.clear(input);
+    await userEvent.type(input, "250");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (c) =>
+          String(c[0]).startsWith("/planejamento/valores-eventual/debito") &&
+          (c[1] as RequestInit)?.method === "PUT"
+      );
+      expect(call).toBeDefined();
+    });
+  });
+
+  it("reverts a confirmed future Eventual value back to the suggestion", async () => {
+    const celulasComOverride = buildCelulas().map((c, idx) =>
+      idx === 4 ? { ...c, origem: "confirmado" } : c
+    );
+    const fixtureWithEventual = {
+      ...GRADE_FIXTURE,
+      eventuais: [{ tipo: "debito", celulas: celulasComOverride }],
+    };
+    const fetchMock = routedFetchMock(undefined, { grade: fixtureWithEventual });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container } = renderWithQueryClient(<PlanejamentoPage />);
+    await screen.findByText("Eventual");
+
+    const eventualRow = container.querySelector("tr.planejamento-eventual-row");
+    if (!eventualRow) throw new Error("eventual row not found");
+    const revertButton = eventualRow
+      .querySelectorAll("td")[5]
+      .querySelector("button[title='Voltar a usar a sugestão']");
+    expect(revertButton).not.toBeNull();
+
+    await userEvent.click(revertButton as HTMLButtonElement);
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (c) =>
+          String(c[0]).startsWith("/planejamento/valores-eventual/debito") &&
+          (c[1] as RequestInit)?.method === "DELETE"
+      );
+      expect(call).toBeDefined();
+    });
   });
 
   it("shows a propagation hint when editing a still-suggested cell, not when editing a confirmed one", async () => {

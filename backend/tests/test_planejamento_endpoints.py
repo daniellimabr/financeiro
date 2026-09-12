@@ -201,6 +201,62 @@ def test_confirmar_valor_subcategoria_inexistente_returns_404(client, db_session
     assert response.status_code == 404
 
 
+# --- PUT/DELETE /planejamento/valores-eventual/{tipo} --------------------------
+
+
+def test_confirmar_e_remover_valor_eventual(client, db_session):
+    user = _authenticate(client, db_session)
+    account = _account(db_session, user)
+    sub = _subcategory(db_session, user, nome="Viagem", natureza=Natureza.eventual)
+    _transaction(
+        db_session,
+        user,
+        account,
+        sub,
+        valor="-1000.00",
+        tipo=PluggyTransactionTipo.debito,
+        ano=2026,
+        mes=5,
+    )
+
+    # Mês corrente (idx 3, jun/2026) não é editável — só a partir do mês 4
+    # (idx 4, jul/2026) em diante.
+    put_response = client.put(
+        "/planejamento/valores-eventual/debito", json={"ano": 2026, "mes": 7, "valor": "999.00"}
+    )
+    assert put_response.status_code == 200
+    assert put_response.json()["valor"] == "999.00"
+    assert put_response.json()["tipo"] == "debito"
+
+    grade = client.get("/planejamento/grade", params={"ano_base": 2026, "mes_base": 6}).json()
+    eventual = next(e for e in grade["eventuais"] if e["tipo"] == "debito")
+    celula_atual = next(c for c in eventual["celulas"] if c["ano"] == 2026 and c["mes"] == 6)
+    celula_futura = next(c for c in eventual["celulas"] if c["ano"] == 2026 and c["mes"] == 7)
+    assert celula_atual["origem"] == "sugerido"
+    assert celula_futura["origem"] == "confirmado"
+    assert celula_futura["valor"] == "999.00"
+
+    delete_response = client.delete(
+        "/planejamento/valores-eventual/debito", params={"ano": 2026, "mes": 7}
+    )
+    assert delete_response.status_code == 204
+
+    grade2 = client.get("/planejamento/grade", params={"ano_base": 2026, "mes_base": 6}).json()
+    eventual2 = next(e for e in grade2["eventuais"] if e["tipo"] == "debito")
+    celula2 = next(c for c in eventual2["celulas"] if c["ano"] == 2026 and c["mes"] == 7)
+    assert celula2["origem"] == "sugerido"
+
+
+def test_remover_valor_eventual_inexistente_returns_404(client, db_session):
+    _authenticate(client, db_session)
+
+    response = client.delete(
+        "/planejamento/valores-eventual/debito", params={"ano": 2026, "mes": 7}
+    )
+
+    assert response.status_code == 404
+
+
 # --- CRUD /planejamento/itens ---------------------------------------------------
 
 

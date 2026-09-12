@@ -9,7 +9,7 @@ from app.categories.service import get_subcategory
 from app.dashboards.service import _apply_periodo, _base_query, _month_range, _to_decimal
 from app.exceptions import InvalidStateError, NotFoundError
 from app.models.category import CategoryGroup, Natureza, Subcategory
-from app.models.planejamento import ItemPlanejado, PlanejamentoValor
+from app.models.planejamento import ItemPlanejado, PlanejamentoValor, PlanejamentoValorEventual
 from app.models.pluggy import PluggyTransaction, PluggyTransactionTipo
 
 # Horizonte fixo desta sprint (decisão explícita do CEO) — 3 meses de
@@ -60,10 +60,12 @@ class LinhaEventualGrade:
     """Linha-lembrete agregando TODAS as subcategorias `eventual` de um tipo
     (débito ou crédito) num único número — eventual não entra na grade
     normal (sem natureza fixa/variavel), mas também tem média histórica e
-    não deve ser esquecido do planejamento futuro (decisão do CEO,
-    pós-deploy da Sprint 38). Só leitura: nunca vira "confirmado", sem
-    override persistido — recalcula a cada consulta como qualquer
-    sugestão."""
+    não deve ser esquecido do planejamento futuro (decisão do CEO). O mês
+    corrente é sempre a sugestão calculada pela média (só leitura, nunca
+    "confirmado" — não faz sentido editar um mês que já está em andamento);
+    os meses seguintes aceitam override editável, igual a qualquer linha de
+    subcategoria (correção pós-deploy da Sprint 38: a primeira versão travou
+    a linha inteira como só-leitura, o que não era a intenção)."""
 
     tipo: PluggyTransactionTipo
     celulas: list[CelulaGrade] = field(default_factory=list)
@@ -228,6 +230,20 @@ def _sugestao_eventual_media_3_meses(
     return media.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
+def _valores_confirmados_eventual(
+    db: Session, user_id: int, tipo: PluggyTransactionTipo
+) -> dict[tuple[int, int], Decimal]:
+    rows = (
+        db.query(PlanejamentoValorEventual)
+        .filter(
+            PlanejamentoValorEventual.user_id == user_id,
+            PlanejamentoValorEventual.tipo == tipo,
+        )
+        .all()
+    )
+    return {(v.ano, v.mes): v.valor for v in rows}
+
+
 def _linha_eventual(
     db: Session,
     user_id: int,
@@ -238,6 +254,7 @@ def _linha_eventual(
     periodo: list[tuple[int, int]],
 ) -> LinhaEventualGrade:
     sugestao = _sugestao_eventual_media_3_meses(db, user_id, tipo, ano_base, mes_base)
+    confirmados = _valores_confirmados_eventual(db, user_id, tipo)
 
     celulas: list[CelulaGrade] = []
     for idx, (y, m) in enumerate(periodo):
@@ -247,6 +264,8 @@ def _linha_eventual(
             continue
 
         if idx == JANELA_SUGESTAO:
+            # Mês corrente: sempre a sugestão, nunca override — mês já em
+            # andamento, sem sentido "prever" um valor diferente pra ele.
             realizado_parcial = _total_mes_eventual(db, user_id, tipo, y, m)
             status = _status_mes_corrente(tipo, sugestao, realizado_parcial)
             celulas.append(
@@ -260,7 +279,10 @@ def _linha_eventual(
                 )
             )
         else:
-            celulas.append(CelulaGrade(ano=y, mes=m, valor=sugestao, origem="sugerido"))
+            override = confirmados.get((y, m))
+            valor = override if override is not None else sugestao
+            origem = "confirmado" if override is not None else "sugerido"
+            celulas.append(CelulaGrade(ano=y, mes=m, valor=valor, origem=origem))
 
     return LinhaEventualGrade(tipo=tipo, celulas=celulas)
 
@@ -581,6 +603,61 @@ def remover_valor(db: Session, user_id: int, subcategory_id: int, *, ano: int, m
         raise NotFoundError(
             f"Nenhum valor confirmado para subcategoria {subcategory_id} em {mes}/{ano}"
         )
+    db.delete(existing)
+    db.commit()
+
+
+def _buscar_valor_eventual(
+    db: Session, user_id: int, tipo: PluggyTransactionTipo, ano: int, mes: int
+) -> PlanejamentoValorEventual | None:
+    return (
+        db.query(PlanejamentoValorEventual)
+        .filter(
+            PlanejamentoValorEventual.user_id == user_id,
+            PlanejamentoValorEventual.tipo == tipo,
+            PlanejamentoValorEventual.ano == ano,
+            PlanejamentoValorEventual.mes == mes,
+        )
+        .one_or_none()
+    )
+
+
+def confirmar_valor_eventual(
+    db: Session, user_id: int, tipo: PluggyTransactionTipo, *, ano: int, mes: int, valor: Decimal
+) -> PlanejamentoValorEventual:
+    """Espelha `confirmar_valor`: reeditar um mês já confirmado corrige só
+    aquele mês; confirmar um mês ainda sugerido propaga a nova baseline pro
+    mês clicado e os seguintes, cobrindo o horizonte futuro."""
+    existing = _buscar_valor_eventual(db, user_id, tipo, ano, mes)
+
+    if existing is not None:
+        existing.valor = valor
+        db.commit()
+        db.refresh(existing)
+        return existing
+
+    alvo: PlanejamentoValorEventual | None = None
+    for y, m in _months_forward(ano, mes, HORIZONTE_FUTURO):
+        row = _buscar_valor_eventual(db, user_id, tipo, y, m)
+        if row is not None:
+            row.valor = valor
+        else:
+            row = PlanejamentoValorEventual(user_id=user_id, tipo=tipo, ano=y, mes=m, valor=valor)
+            db.add(row)
+        if (y, m) == (ano, mes):
+            alvo = row
+    db.commit()
+    assert alvo is not None
+    db.refresh(alvo)
+    return alvo
+
+
+def remover_valor_eventual(
+    db: Session, user_id: int, tipo: PluggyTransactionTipo, *, ano: int, mes: int
+) -> None:
+    existing = _buscar_valor_eventual(db, user_id, tipo, ano, mes)
+    if existing is None:
+        raise NotFoundError(f"Nenhum valor confirmado para eventual/{tipo.value} em {mes}/{ano}")
     db.delete(existing)
     db.commit()
 

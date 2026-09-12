@@ -75,6 +75,22 @@ class PlanejamentoValorOut(BaseModel):
     valor: Decimal
 
 
+class PlanejamentoValorEventualIn(BaseModel):
+    ano: int
+    mes: int
+    valor: Decimal
+
+
+class PlanejamentoValorEventualOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    tipo: PluggyTransactionTipo
+    ano: int
+    mes: int
+    valor: Decimal
+
+
 class ItemPlanejadoIn(BaseModel):
     nome: str
     tipo: PluggyTransactionTipo

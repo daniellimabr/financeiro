@@ -72,6 +72,27 @@ export function removerPlanejamentoValor(
   });
 }
 
+export function confirmarPlanejamentoValorEventual(
+  tipo: TransacaoTipo,
+  input: { ano: number; mes: number; valor: string }
+): Promise<unknown> {
+  return apiFetch(`/planejamento/valores-eventual/${tipo}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function removerPlanejamentoValorEventual(
+  tipo: TransacaoTipo,
+  ano: number,
+  mes: number
+): Promise<void> {
+  return apiFetch<void>(`/planejamento/valores-eventual/${tipo}?ano=${ano}&mes=${mes}`, {
+    method: "DELETE",
+  });
+}
+
 export interface ItemPlanejado {
   id: number;
   nome: string;

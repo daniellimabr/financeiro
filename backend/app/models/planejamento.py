@@ -45,6 +45,34 @@ class PlanejamentoValor(Base):
     )
 
 
+class PlanejamentoValorEventual(Base):
+    """Valor confirmado (aceito da sugestão ou editado) de um mês futuro da
+    linha-lembrete Eventual, por tipo (débito/crédito) — não tem
+    subcategoria própria pois agrega várias. O mês corrente nunca tem
+    override: a UI só permite editar a partir do mês seguinte ao corrente
+    (correção pós-deploy da Sprint 38, decisão do CEO)."""
+
+    __tablename__ = "planejamento_valores_eventual"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "tipo", "ano", "mes", name="uq_planejamento_valor_eventual_user_tipo_ano_mes"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    tipo: Mapped[PluggyTransactionTipo] = mapped_column(
+        Enum(PluggyTransactionTipo, name="pluggy_transaction_tipo"), nullable=False
+    )
+    ano: Mapped[int] = mapped_column(nullable=False)
+    mes: Mapped[int] = mapped_column(nullable=False)
+    valor: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class ItemPlanejado(Base):
     """Lançamento planejado livre, sem subcategoria/histórico obrigatório —
     único (vale só no mês-alvo, `data_inicio`) ou recorrente (`data_inicio`
