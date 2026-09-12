@@ -163,6 +163,48 @@ def test_sugestao_respeita_exclusao_de_totais(db_session, user):
     assert sugestao == Decimal("0")
 
 
+# --- _arredondar_sugestao ------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("valor", "esperado"),
+    [
+        (Decimal("1281.89"), Decimal("1280.00")),
+        (Decimal("25437.45"), Decimal("25400.00")),
+        (Decimal("123456.78"), Decimal("123000.00")),
+        (Decimal("987.65"), Decimal("988.00")),  # até 3 dígitos: só arredonda o inteiro
+        (Decimal("42.30"), Decimal("42.00")),
+        (Decimal("0"), Decimal("0")),
+    ],
+)
+def test_arredondar_sugestao_mantem_3_primeiras_casas_significativas(valor, esperado):
+    assert service._arredondar_sugestao(valor) == esperado
+
+
+def test_sugestao_media_e_arredondada_para_3_casas_significativas(db_session, user):
+    account = _account(db_session, user)
+    sub = _subcategory(db_session, user, natureza=Natureza.variavel)
+    # média (3641.90 + 3670.20 + 3675.00) / 3 = 3662.366... -> 3ª casa
+    # significativa: dígitos=4, arredonda pro múltiplo de 10 mais próximo.
+    for mes, valor in ((2, "3641.90"), (3, "3670.20"), (4, "3675.00")):
+        _transaction(
+            db_session,
+            user,
+            account,
+            sub,
+            valor=f"-{valor}",
+            tipo=PluggyTransactionTipo.debito,
+            ano=2026,
+            mes=mes,
+        )
+
+    sugestao = service._sugestao_media_3_meses(
+        db_session, user.id, sub.id, PluggyTransactionTipo.debito, 2026, 5
+    )
+
+    assert sugestao == Decimal("3660.00")
+
+
 # --- get_grade — células sugeridas/confirmadas -------------------------------
 
 

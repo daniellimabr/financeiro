@@ -140,6 +140,21 @@ def _total_mes(
     return _to_decimal(total)
 
 
+def _arredondar_sugestao(valor: Decimal) -> Decimal:
+    """Arredonda uma média de custo recorrente mantendo só as 3 primeiras
+    casas significativas do inteiro — 1281.89 -> 1280, 25437.45 -> 25400,
+    123456.78 -> 123000 (decisão do CEO: a sugestão vira uma meta redonda,
+    mais fácil de planejar do que o centavo exato da média). Valores com até
+    3 dígitos inteiros não perdem precisão, só arredondam pro inteiro mais
+    próximo (987.65 -> 988)."""
+    if valor <= 0:
+        return valor
+    expoente = max(len(str(int(valor))) - 3, 0)
+    fator = Decimal(10) ** expoente
+    arredondado = (valor / fator).quantize(Decimal("1"), rounding=ROUND_HALF_UP) * fator
+    return arredondado.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
 def _sugestao_media_3_meses(
     db: Session,
     user_id: int,
@@ -152,7 +167,8 @@ def _sugestao_media_3_meses(
     só os meses com transação real entram no divisor (mês sem movimento não
     dilui a média); sem nenhum mês com transação, sugestão é 0. Valor
     constante, repetido em todo mês futuro sem override (mesma regra da
-    antiga Projeção, PRD-014) — recalcula a cada chamada, nunca persiste."""
+    antiga Projeção, PRD-014) — recalcula a cada chamada, nunca persiste.
+    Arredondada pra uma meta redonda (`_arredondar_sugestao`)."""
     meses_anteriores = _month_range(ano, mes, JANELA_SUGESTAO + 1)[:-1]
     totais = [
         total
@@ -162,7 +178,7 @@ def _sugestao_media_3_meses(
     if not totais:
         return Decimal("0")
     media = sum(totais) / len(totais)
-    return media.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return _arredondar_sugestao(media)
 
 
 def _valores_confirmados(
@@ -227,7 +243,7 @@ def _sugestao_eventual_media_3_meses(
     if not totais:
         return Decimal("0")
     media = sum(totais) / len(totais)
-    return media.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return _arredondar_sugestao(media)
 
 
 def _valores_confirmados_eventual(
