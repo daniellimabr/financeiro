@@ -22,14 +22,7 @@ def create_liability(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.create_liability(
-        db,
-        current_user.id,
-        nome=payload.nome,
-        tipo=payload.tipo,
-        valor_total=payload.valor_total,
-        saldo_devedor=payload.saldo_devedor,
-    )
+    return service.create_liability(db, current_user.id, payload)
 
 
 @router.get("/{liability_id}", response_model=LiabilityOut)
@@ -50,15 +43,7 @@ def update_liability(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        return service.update_liability(
-            db,
-            current_user.id,
-            liability_id,
-            nome=payload.nome,
-            tipo=payload.tipo,
-            valor_total=payload.valor_total,
-            saldo_devedor=payload.saldo_devedor,
-        )
+        return service.update_liability(db, current_user.id, liability_id, payload)
     except NotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 

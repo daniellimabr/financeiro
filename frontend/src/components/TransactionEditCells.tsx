@@ -1,8 +1,7 @@
-import { useState } from "react";
-
 import type { Asset } from "../api/assets";
 import type { CategoryGroup, Subcategory } from "../api/categories";
 import type { Investimento } from "../api/investimentos";
+import { useInlineEditCell } from "../hooks/useInlineEditCell";
 import { useSetCategory } from "../hooks/useSetCategory";
 import { useSetTransactionAsset } from "../hooks/useSetTransactionAsset";
 import { useSetTransactionInvestimento } from "../hooks/useSetTransactionInvestimento";
@@ -11,35 +10,53 @@ import { useUpdateDescription } from "../hooks/useUpdateDescription";
 import { descricaoExibida, type EditableTransaction } from "../utils/transactionEdit";
 import { CategoryCombobox } from "./CategoryCombobox";
 
-export function DescriptionCell({ transaction }: { transaction: EditableTransaction }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const updateDescription = useUpdateDescription();
-  const exibida = descricaoExibida(transaction);
-
-  function startEditing() {
-    setDraft(exibida);
-    setEditing(true);
-  }
-
-  function save() {
-    const value = draft.trim();
-    setEditing(false);
-    if (!value || value === exibida) return;
-    updateDescription.mutate({ transactionId: transaction.id, descricao: value });
-  }
-
-  return editing ? (
+function InlineEditInput({
+  type,
+  ariaLabel,
+  draft,
+  setDraft,
+  save,
+  cancel,
+}: {
+  type?: string;
+  ariaLabel: string;
+  draft: string;
+  setDraft: (value: string) => void;
+  save: () => void;
+  cancel: () => void;
+}) {
+  return (
     <input
-      aria-label={`Editar descrição de ${exibida}`}
+      type={type}
+      aria-label={ariaLabel}
       value={draft}
       autoFocus
       onChange={(event) => setDraft(event.target.value)}
       onBlur={save}
       onKeyDown={(event) => {
         if (event.key === "Enter") save();
-        if (event.key === "Escape") setEditing(false);
+        if (event.key === "Escape") cancel();
       }}
+    />
+  );
+}
+
+export function DescriptionCell({ transaction }: { transaction: EditableTransaction }) {
+  const updateDescription = useUpdateDescription();
+  const exibida = descricaoExibida(transaction);
+  const { editing, draft, setDraft, startEditing, save, cancel } = useInlineEditCell({
+    value: exibida,
+    onSave: (descricao) => updateDescription.mutate({ transactionId: transaction.id, descricao }),
+    normalize: (raw) => raw.trim(),
+  });
+
+  return editing ? (
+    <InlineEditInput
+      ariaLabel={`Editar descrição de ${exibida}`}
+      draft={draft}
+      setDraft={setDraft}
+      save={save}
+      cancel={cancel}
     />
   ) : (
     <button type="button" onClick={startEditing} title="Clique para editar a descrição">
@@ -49,35 +66,21 @@ export function DescriptionCell({ transaction }: { transaction: EditableTransact
 }
 
 export function DateCell({ transaction }: { transaction: EditableTransaction }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
   const updateDate = useUpdateDate();
   const exibida = descricaoExibida(transaction);
-
-  function startEditing() {
-    setDraft(transaction.data);
-    setEditing(true);
-  }
-
-  function save() {
-    const value = draft;
-    setEditing(false);
-    if (!value || value === transaction.data) return;
-    updateDate.mutate({ transactionId: transaction.id, data: value });
-  }
+  const { editing, draft, setDraft, startEditing, save, cancel } = useInlineEditCell({
+    value: transaction.data,
+    onSave: (data) => updateDate.mutate({ transactionId: transaction.id, data }),
+  });
 
   return editing ? (
-    <input
+    <InlineEditInput
       type="date"
-      aria-label={`Editar data de ${exibida}`}
-      value={draft}
-      autoFocus
-      onChange={(event) => setDraft(event.target.value)}
-      onBlur={save}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") save();
-        if (event.key === "Escape") setEditing(false);
-      }}
+      ariaLabel={`Editar data de ${exibida}`}
+      draft={draft}
+      setDraft={setDraft}
+      save={save}
+      cancel={cancel}
     />
   ) : (
     <button type="button" onClick={startEditing} title="Clique para editar a data">

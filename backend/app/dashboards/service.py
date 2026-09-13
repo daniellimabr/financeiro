@@ -1168,6 +1168,15 @@ def _salario_antecipado_por_conta_e_mes(
     return resultado
 
 
+def _salario_do_mes(
+    salario_por_conta_mes: dict[int, dict[tuple[int, int], Decimal]],
+    conta_id: int,
+    mes: tuple[int, int],
+) -> Decimal:
+    salario_conta = salario_por_conta_mes.get(conta_id, {})
+    return salario_conta.get(mes, Decimal("0"))
+
+
 def get_saldo_acumulado(
     db: Session, user_id: int, *, ano: int, mes: int, meses: int = 6
 ) -> list[PontoTendencia]:
@@ -1271,7 +1280,7 @@ def get_saldo_acumulado_conferencia(
     for conta in contas:
         saldo_por_mes = _saldo_real_por_conta_e_mes(db, conta, range_completo)
         receitas, despesas = _receita_despesa_bruta_mes(db, conta.id, ano, mes)
-        salario_recebido = salario_por_conta_mes.get(conta.id, {}).get(mes_atual, Decimal("0"))
+        salario_recebido = _salario_do_mes(salario_por_conta_mes, conta.id, mes_atual)
         saldo_inicio = saldo_por_mes[mes_ant]
         saldo_fim = saldo_por_mes[mes_atual]
         saldo_efetivo = saldo_fim - salario_recebido

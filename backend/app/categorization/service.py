@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import date
 
 from sqlalchemy import func
@@ -27,6 +28,17 @@ from app.models.user import User
 
 _SALARIO_SUBCATEGORY_NOME = "Salário"
 _SALARIO_GROUP_NOME = "Receitas"
+
+
+@dataclass
+class SuggestionSources:
+    rules_by_pattern: dict[str, CategorizationRule]
+    historico: list[engine.HistoricoTransacao]
+    asset_rules: dict[str, AssetCategorizationRule]
+    asset_historico: list[engine.HistoricoAtivo]
+    liabilities: list[tuple[int, str]]
+    investimento_rules: dict[str, InvestimentoCategorizationRule]
+    investimento_historico: list[engine.HistoricoInvestimento]
 
 
 def salario_subcategory_id(db: Session, user_id: int) -> int | None:
@@ -123,25 +135,17 @@ def list_transactions(
         if tx.categorizacao_status == PluggyTransactionCategorizacaoStatus.pendente
     ]
     if pendentes_da_pagina:
-        rules_by_pattern = engine.build_rules_index(db, user_id)
-        historico = engine.build_historico_index(db, user_id)
-        asset_rules = engine.build_asset_rules_index(db, user_id)
-        asset_historico = engine.build_asset_historico_index(db, user_id)
-        liabilities = engine.build_liabilities_index(db, user_id)
-        investimento_rules = engine.build_investimento_rules_index(db, user_id)
-        investimento_historico = engine.build_investimento_historico_index(db, user_id)
+        sources = SuggestionSources(
+            rules_by_pattern=engine.build_rules_index(db, user_id),
+            historico=engine.build_historico_index(db, user_id),
+            asset_rules=engine.build_asset_rules_index(db, user_id),
+            asset_historico=engine.build_asset_historico_index(db, user_id),
+            liabilities=engine.build_liabilities_index(db, user_id),
+            investimento_rules=engine.build_investimento_rules_index(db, user_id),
+            investimento_historico=engine.build_investimento_historico_index(db, user_id),
+        )
         for tx in pendentes_da_pagina:
-            _apply_suggestions(
-                db,
-                tx,
-                rules_by_pattern,
-                historico,
-                asset_rules,
-                asset_historico,
-                liabilities,
-                investimento_rules,
-                investimento_historico,
-            )
+            _apply_suggestions(db, tx, sources)
         db.commit()
         for tx in pendentes_da_pagina:
             db.refresh(tx)
@@ -149,21 +153,11 @@ def list_transactions(
     return items, total
 
 
-def _apply_suggestions(
-    db: Session,
-    tx: PluggyTransaction,
-    rules_by_pattern: dict[str, CategorizationRule],
-    historico: list[engine.HistoricoTransacao],
-    asset_rules: dict[str, AssetCategorizationRule],
-    asset_historico: list[engine.HistoricoAtivo],
-    liabilities: list[tuple[int, str]],
-    investimento_rules: dict[str, InvestimentoCategorizationRule],
-    investimento_historico: list[engine.HistoricoInvestimento],
-) -> None:
+def _apply_suggestions(db: Session, tx: PluggyTransaction, sources: SuggestionSources) -> None:
     normalizado = normalize_description(tx.descricao)
 
     category_suggestion = engine.suggest_category_from_index(
-        normalizado, rules_by_pattern, historico
+        normalizado, sources.rules_by_pattern, sources.historico
     )
     if category_suggestion is not None:
         tx.subcategoria_sugerida_id = category_suggestion.subcategory_id
@@ -180,7 +174,7 @@ def _apply_suggestions(
 
     if not tx.asset_confirmado_manualmente:
         asset_suggestion = engine.suggest_asset_from_index(
-            normalizado, asset_rules, asset_historico
+            normalizado, sources.asset_rules, sources.asset_historico
         )
         if asset_suggestion is not None:
             tx.asset_sugerido_id = asset_suggestion.asset_id
@@ -190,7 +184,7 @@ def _apply_suggestions(
             tx.asset_sugestao_confianca = None
 
     if not tx.liability_confirmado_manualmente:
-        liability_suggestion = engine.suggest_liability_from_index(normalizado, liabilities)
+        liability_suggestion = engine.suggest_liability_from_index(normalizado, sources.liabilities)
         if liability_suggestion is not None:
             tx.liability_sugerido_id = liability_suggestion.liability_id
             tx.liability_sugestao_confianca = liability_suggestion.confianca
@@ -200,7 +194,7 @@ def _apply_suggestions(
 
     if not tx.investimento_confirmado_manualmente:
         investimento_suggestion = engine.suggest_investimento_from_index(
-            normalizado, investimento_rules, investimento_historico
+            normalizado, sources.investimento_rules, sources.investimento_historico
         )
         if investimento_suggestion is not None:
             tx.investimento_sugerido_id = investimento_suggestion.investimento_id

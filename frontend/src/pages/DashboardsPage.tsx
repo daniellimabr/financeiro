@@ -297,6 +297,40 @@ export function DashboardsPage() {
 
   const receitaDelta = buildDelta("receita", true);
   const despesaDelta = buildDelta("despesa", false);
+
+  function renderFluxoKpiTile(
+    tipo: "receita" | "despesa",
+    label: string,
+    value: string,
+    delta: KpiDelta | undefined,
+    color: string
+  ) {
+    return (
+      <KpiTile
+        label={label}
+        value={value}
+        delta={delta}
+        onClick={() => abrirFunil(tipo)}
+        sparkline={
+          <TrendLineChart
+            variant="spark"
+            pontos={applyHiddenToTrend(
+              tendenciaQuery.data?.map((p) => ({
+                ano: p.ano,
+                mes: p.mes,
+                total: p[tipo],
+              })),
+              ano,
+              mes,
+              hiddenAplicaA === tipo ? hiddenSumTotal : 0
+            )}
+            color={color}
+            onSelecionarMes={selecionarMes}
+          />
+        }
+      />
+    );
+  }
   const saldoAcumuladoDelta: KpiDelta | undefined =
     saldoAcumuladoAtual && saldoAnterior
       ? {
@@ -352,52 +386,20 @@ export function DashboardsPage() {
               }
               onClick={clicarSaldoAnterior}
             />
-            <KpiTile
-              label="Receita"
-              value={formatCurrency(receitaAjustada)}
-              delta={receitaDelta}
-              onClick={() => abrirFunil("receita")}
-              sparkline={
-                <TrendLineChart
-                  variant="spark"
-                  pontos={applyHiddenToTrend(
-                    tendenciaQuery.data?.map((p) => ({
-                      ano: p.ano,
-                      mes: p.mes,
-                      total: p.receita,
-                    })),
-                    ano,
-                    mes,
-                    hiddenAplicaA === "receita" ? hiddenSumTotal : 0
-                  )}
-                  color="var(--ac-good)"
-                  onSelecionarMes={selecionarMes}
-                />
-              }
-            />
-            <KpiTile
-              label="Despesa"
-              value={formatCurrency(despesaAjustada)}
-              delta={despesaDelta}
-              onClick={() => abrirFunil("despesa")}
-              sparkline={
-                <TrendLineChart
-                  variant="spark"
-                  pontos={applyHiddenToTrend(
-                    tendenciaQuery.data?.map((p) => ({
-                      ano: p.ano,
-                      mes: p.mes,
-                      total: p.despesa,
-                    })),
-                    ano,
-                    mes,
-                    hiddenAplicaA === "despesa" ? hiddenSumTotal : 0
-                  )}
-                  color="var(--ac-bad)"
-                  onSelecionarMes={selecionarMes}
-                />
-              }
-            />
+            {renderFluxoKpiTile(
+              "receita",
+              "Receita",
+              formatCurrency(receitaAjustada),
+              receitaDelta,
+              "var(--ac-good)"
+            )}
+            {renderFluxoKpiTile(
+              "despesa",
+              "Despesa",
+              formatCurrency(despesaAjustada),
+              despesaDelta,
+              "var(--ac-bad)"
+            )}
             <KpiTile
               label="Saldo"
               value={formatCurrency(saldoAjustado)}

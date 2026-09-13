@@ -117,6 +117,29 @@ export function InvestimentosPage() {
     };
   }
 
+  function renderConsolidadoKpiTile(
+    label: string,
+    campo: keyof Pick<EvolucaoMensal, "saldo" | "rendimento" | "aportes" | "resgates">,
+    positiveIsGood: boolean,
+    color: string
+  ) {
+    return (
+      <KpiTile
+        label={label}
+        value={formatCurrency(consolidadoAtual?.[campo])}
+        delta={buildConsolidadoDelta(campo, positiveIsGood)}
+        sparkline={
+          <TrendLineChart
+            variant="spark"
+            pontos={evolucaoMensalParaPontos(janelaConsolidada, campo)}
+            color={color}
+            onSelecionarMes={selecionarMes}
+          />
+        }
+      />
+    );
+  }
+
   // Não memoizado: `investimentos`/`serieByInvestimento` já são recriados a
   // cada render (dados de useQuery/useQueries), então um useMemo aqui não
   // memoizaria de verdade — só complicaria o array de dependências.
@@ -254,58 +277,10 @@ export function InvestimentosPage() {
         <>
           <div className="ac-section-label">Consolidado</div>
           <div className="ac-kpi-row">
-            <KpiTile
-              label="Patrimônio Investido"
-              value={formatCurrency(consolidadoAtual?.saldo)}
-              delta={buildConsolidadoDelta("saldo", true)}
-              sparkline={
-                <TrendLineChart
-                  variant="spark"
-                  pontos={evolucaoMensalParaPontos(janelaConsolidada, "saldo")}
-                  color="var(--ac-blue)"
-                  onSelecionarMes={selecionarMes}
-                />
-              }
-            />
-            <KpiTile
-              label="Rendimento do Mês"
-              value={formatCurrency(consolidadoAtual?.rendimento)}
-              delta={buildConsolidadoDelta("rendimento", true)}
-              sparkline={
-                <TrendLineChart
-                  variant="spark"
-                  pontos={evolucaoMensalParaPontos(janelaConsolidada, "rendimento")}
-                  color="var(--ac-good)"
-                  onSelecionarMes={selecionarMes}
-                />
-              }
-            />
-            <KpiTile
-              label="Aportes"
-              value={formatCurrency(consolidadoAtual?.aportes)}
-              delta={buildConsolidadoDelta("aportes", true)}
-              sparkline={
-                <TrendLineChart
-                  variant="spark"
-                  pontos={evolucaoMensalParaPontos(janelaConsolidada, "aportes")}
-                  color="var(--ac-text-dim)"
-                  onSelecionarMes={selecionarMes}
-                />
-              }
-            />
-            <KpiTile
-              label="Resgates"
-              value={formatCurrency(consolidadoAtual?.resgates)}
-              delta={buildConsolidadoDelta("resgates", false)}
-              sparkline={
-                <TrendLineChart
-                  variant="spark"
-                  pontos={evolucaoMensalParaPontos(janelaConsolidada, "resgates")}
-                  color="var(--ac-text-dim)"
-                  onSelecionarMes={selecionarMes}
-                />
-              }
-            />
+            {renderConsolidadoKpiTile("Patrimônio Investido", "saldo", true, "var(--ac-blue)")}
+            {renderConsolidadoKpiTile("Rendimento do Mês", "rendimento", true, "var(--ac-good)")}
+            {renderConsolidadoKpiTile("Aportes", "aportes", true, "var(--ac-text-dim)")}
+            {renderConsolidadoKpiTile("Resgates", "resgates", false, "var(--ac-text-dim)")}
           </div>
 
           <div className="ac-two-col">

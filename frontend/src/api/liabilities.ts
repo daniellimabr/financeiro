@@ -26,16 +26,20 @@ export function fetchLiabilities(): Promise<Liability[]> {
   return apiFetch<Liability[]>("/liabilities");
 }
 
+function toLiabilityPayload(input: LiabilityInput) {
+  return {
+    nome: input.nome,
+    tipo: input.tipo,
+    valor_total: input.valorTotal,
+    saldo_devedor: input.saldoDevedor,
+  };
+}
+
 export function createLiability(input: LiabilityInput): Promise<Liability> {
   return apiFetch<Liability>("/liabilities", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      nome: input.nome,
-      tipo: input.tipo,
-      valor_total: input.valorTotal,
-      saldo_devedor: input.saldoDevedor,
-    }),
+    body: JSON.stringify(toLiabilityPayload(input)),
   });
 }
 
@@ -43,12 +47,7 @@ export function updateLiability(liabilityId: number, input: LiabilityInput): Pro
   return apiFetch<Liability>(`/liabilities/${liabilityId}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      nome: input.nome,
-      tipo: input.tipo,
-      valor_total: input.valorTotal,
-      saldo_devedor: input.saldoDevedor,
-    }),
+    body: JSON.stringify(toLiabilityPayload(input)),
   });
 }
 

@@ -32,16 +32,20 @@ export function fetchAssets(): Promise<Asset[]> {
   return apiFetch<Asset[]>("/assets");
 }
 
+function toAssetPayload(input: AssetInput) {
+  return {
+    nome: input.nome,
+    tipo: input.tipo,
+    valor_atual: input.valorAtual,
+    data_aquisicao: input.dataAquisicao,
+  };
+}
+
 export function createAsset(input: AssetInput): Promise<Asset> {
   return apiFetch<Asset>("/assets", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      nome: input.nome,
-      tipo: input.tipo,
-      valor_atual: input.valorAtual,
-      data_aquisicao: input.dataAquisicao,
-    }),
+    body: JSON.stringify(toAssetPayload(input)),
   });
 }
 
@@ -49,12 +53,7 @@ export function updateAsset(assetId: number, input: AssetInput): Promise<Asset> 
   return apiFetch<Asset>(`/assets/${assetId}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      nome: input.nome,
-      tipo: input.tipo,
-      valor_atual: input.valorAtual,
-      data_aquisicao: input.dataAquisicao,
-    }),
+    body: JSON.stringify(toAssetPayload(input)),
   });
 }
 

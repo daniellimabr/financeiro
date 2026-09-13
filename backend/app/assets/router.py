@@ -22,14 +22,7 @@ def create_asset(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.create_asset(
-        db,
-        current_user.id,
-        nome=payload.nome,
-        tipo=payload.tipo,
-        valor_atual=payload.valor_atual,
-        data_aquisicao=payload.data_aquisicao,
-    )
+    return service.create_asset(db, current_user.id, payload)
 
 
 @router.get("/{asset_id}", response_model=AssetOut)
@@ -50,15 +43,7 @@ def update_asset(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        return service.update_asset(
-            db,
-            current_user.id,
-            asset_id,
-            nome=payload.nome,
-            tipo=payload.tipo,
-            valor_atual=payload.valor_atual,
-            data_aquisicao=payload.data_aquisicao,
-        )
+        return service.update_asset(db, current_user.id, asset_id, payload)
     except NotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 

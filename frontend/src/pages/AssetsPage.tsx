@@ -52,6 +52,26 @@ function hoje(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function ExcluirAssetButton({
+  assetId,
+  nome,
+  onDelete,
+}: {
+  assetId: number;
+  nome: string;
+  onDelete: (assetId: number, nome: string) => void;
+}) {
+  return (
+    <button
+      className="ac-btn ac-btn-ghost ac-btn-danger"
+      type="button"
+      onClick={() => onDelete(assetId, nome)}
+    >
+      Excluir
+    </button>
+  );
+}
+
 export function AssetsPage() {
   const now = new Date();
   const [ano, setAno] = useState(now.getFullYear());
@@ -363,13 +383,7 @@ export function AssetsPage() {
             >
               Vender
             </button>
-            <button
-              className="ac-btn ac-btn-ghost ac-btn-danger"
-              type="button"
-              onClick={() => handleDelete(asset.id, asset.nome)}
-            >
-              Excluir
-            </button>
+            <ExcluirAssetButton assetId={asset.id} nome={asset.nome} onDelete={handleDelete} />
           </AcItemCard>
         ))}
       </div>
@@ -408,13 +422,7 @@ export function AssetsPage() {
               tag={`Vendido em ${asset.data_venda}`}
               secondary
             >
-              <button
-                className="ac-btn ac-btn-ghost ac-btn-danger"
-                type="button"
-                onClick={() => handleDelete(asset.id, asset.nome)}
-              >
-                Excluir
-              </button>
+              <ExcluirAssetButton assetId={asset.id} nome={asset.nome} onDelete={handleDelete} />
             </AcItemCard>
           ))}
         </div>

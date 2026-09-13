@@ -16,6 +16,7 @@ from app.models.pluggy import (
     PluggyTransactionTipo,
 )
 from app.models.user import User
+from app.schemas.liability import LiabilityIn
 
 
 @pytest.fixture()
@@ -31,10 +32,12 @@ def test_settle_liability_marks_status_quitado(db_session, user):
     liability = create_liability(
         db_session,
         user.id,
-        nome="Financiamento carro",
-        tipo=LiabilityTipo.financiamento,
-        valor_total=Decimal("60000.00"),
-        saldo_devedor=Decimal("30000.00"),
+        LiabilityIn(
+            nome="Financiamento carro",
+            tipo=LiabilityTipo.financiamento,
+            valor_total=Decimal("60000.00"),
+            saldo_devedor=Decimal("30000.00"),
+        ),
     )
 
     settled = settle_liability(db_session, user.id, liability.id)
@@ -47,10 +50,12 @@ def test_settle_liability_twice_raises_invalid_state(db_session, user):
     liability = create_liability(
         db_session,
         user.id,
-        nome="Financiamento carro",
-        tipo=LiabilityTipo.financiamento,
-        valor_total=Decimal("60000.00"),
-        saldo_devedor=Decimal("30000.00"),
+        LiabilityIn(
+            nome="Financiamento carro",
+            tipo=LiabilityTipo.financiamento,
+            valor_total=Decimal("60000.00"),
+            saldo_devedor=Decimal("30000.00"),
+        ),
     )
     settle_liability(db_session, user.id, liability.id)
 
@@ -62,10 +67,12 @@ def test_delete_liability_disassociates_transactions_without_deleting_them(db_se
     liability = create_liability(
         db_session,
         user.id,
-        nome="Financiamento carro",
-        tipo=LiabilityTipo.financiamento,
-        valor_total=Decimal("60000.00"),
-        saldo_devedor=Decimal("30000.00"),
+        LiabilityIn(
+            nome="Financiamento carro",
+            tipo=LiabilityTipo.financiamento,
+            valor_total=Decimal("60000.00"),
+            saldo_devedor=Decimal("30000.00"),
+        ),
     )
     item = PluggyItem(
         user_id=user.id,

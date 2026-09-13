@@ -115,6 +115,19 @@ export function CategorizationReviewPage() {
     "data",
     "desc"
   );
+
+  function renderSortHeader(label: string, key: CategorizationSortKey) {
+    return (
+      <SortableHeader
+        label={label}
+        sortKeyName={key}
+        currentKey={sortKey}
+        direction={direction}
+        onClick={() => toggleSort(key)}
+      />
+    );
+  }
+
   const pendentesDaPagina = useMemo(
     () => (items ?? []).filter((tx) => tx.categorizacao_status === "pendente"),
     [items]
@@ -319,48 +332,12 @@ export function CategorizationReviewPage() {
                 )}
               </th>
               <th>Status</th>
-              <SortableHeader
-                label="Data"
-                sortKeyName="data"
-                currentKey={sortKey}
-                direction={direction}
-                onClick={() => toggleSort("data")}
-              />
-              <SortableHeader
-                label="Descrição"
-                sortKeyName="descricao"
-                currentKey={sortKey}
-                direction={direction}
-                onClick={() => toggleSort("descricao")}
-              />
-              <SortableHeader
-                label="Categoria"
-                sortKeyName="categoria"
-                currentKey={sortKey}
-                direction={direction}
-                onClick={() => toggleSort("categoria")}
-              />
-              <SortableHeader
-                label="Ativo"
-                sortKeyName="ativo"
-                currentKey={sortKey}
-                direction={direction}
-                onClick={() => toggleSort("ativo")}
-              />
-              <SortableHeader
-                label="Investimento"
-                sortKeyName="investimento"
-                currentKey={sortKey}
-                direction={direction}
-                onClick={() => toggleSort("investimento")}
-              />
-              <SortableHeader
-                label="Valor"
-                sortKeyName="valor"
-                currentKey={sortKey}
-                direction={direction}
-                onClick={() => toggleSort("valor")}
-              />
+              {renderSortHeader("Data", "data")}
+              {renderSortHeader("Descrição", "descricao")}
+              {renderSortHeader("Categoria", "categoria")}
+              {renderSortHeader("Ativo", "ativo")}
+              {renderSortHeader("Investimento", "investimento")}
+              {renderSortHeader("Valor", "valor")}
               <th></th>
             </tr>
           </thead>

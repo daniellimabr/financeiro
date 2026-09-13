@@ -1,11 +1,11 @@
 from datetime import date
-from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
 from app.exceptions import InvalidStateError, NotFoundError
-from app.models.liability import Liability, LiabilityStatus, LiabilityTipo
+from app.models.liability import Liability, LiabilityStatus
 from app.models.pluggy import PluggyTransaction
+from app.schemas.liability import LiabilityIn
 
 
 def list_liabilities(db: Session, user_id: int) -> list[Liability]:
@@ -23,21 +23,13 @@ def get_liability(db: Session, user_id: int, liability_id: int) -> Liability:
     return liability
 
 
-def create_liability(
-    db: Session,
-    user_id: int,
-    *,
-    nome: str,
-    tipo: LiabilityTipo,
-    valor_total: Decimal,
-    saldo_devedor: Decimal,
-) -> Liability:
+def create_liability(db: Session, user_id: int, payload: LiabilityIn) -> Liability:
     liability = Liability(
         user_id=user_id,
-        nome=nome,
-        tipo=tipo,
-        valor_total=valor_total,
-        saldo_devedor=saldo_devedor,
+        nome=payload.nome,
+        tipo=payload.tipo,
+        valor_total=payload.valor_total,
+        saldo_devedor=payload.saldo_devedor,
     )
     db.add(liability)
     db.commit()
@@ -46,20 +38,13 @@ def create_liability(
 
 
 def update_liability(
-    db: Session,
-    user_id: int,
-    liability_id: int,
-    *,
-    nome: str,
-    tipo: LiabilityTipo,
-    valor_total: Decimal,
-    saldo_devedor: Decimal,
+    db: Session, user_id: int, liability_id: int, payload: LiabilityIn
 ) -> Liability:
     liability = get_liability(db, user_id, liability_id)
-    liability.nome = nome
-    liability.tipo = tipo
-    liability.valor_total = valor_total
-    liability.saldo_devedor = saldo_devedor
+    liability.nome = payload.nome
+    liability.tipo = payload.tipo
+    liability.valor_total = payload.valor_total
+    liability.saldo_devedor = payload.saldo_devedor
     db.commit()
     db.refresh(liability)
     return liability

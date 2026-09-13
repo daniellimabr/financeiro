@@ -30,6 +30,26 @@ const EMPTY_FORM: LiabilityInput = {
 
 const PERIODO_HISTORICO = 6;
 
+function ExcluirLiabilityButton({
+  liabilityId,
+  nome,
+  onDelete,
+}: {
+  liabilityId: number;
+  nome: string;
+  onDelete: (liabilityId: number, nome: string) => void;
+}) {
+  return (
+    <button
+      className="ac-btn ac-btn-ghost ac-btn-danger"
+      type="button"
+      onClick={() => onDelete(liabilityId, nome)}
+    >
+      Excluir
+    </button>
+  );
+}
+
 export function LiabilitiesPage() {
   const now = new Date();
   const [ano, setAno] = useState(now.getFullYear());
@@ -268,13 +288,11 @@ export function LiabilitiesPage() {
             >
               Quitar
             </button>
-            <button
-              className="ac-btn ac-btn-ghost ac-btn-danger"
-              type="button"
-              onClick={() => handleDelete(liability.id, liability.nome)}
-            >
-              Excluir
-            </button>
+            <ExcluirLiabilityButton
+              liabilityId={liability.id}
+              nome={liability.nome}
+              onDelete={handleDelete}
+            />
           </AcItemCard>
         ))}
       </div>
@@ -315,13 +333,11 @@ export function LiabilitiesPage() {
               tag={`Quitado em ${liability.data_quitacao}`}
               secondary
             >
-              <button
-                className="ac-btn ac-btn-ghost ac-btn-danger"
-                type="button"
-                onClick={() => handleDelete(liability.id, liability.nome)}
-              >
-                Excluir
-              </button>
+              <ExcluirLiabilityButton
+                liabilityId={liability.id}
+                nome={liability.nome}
+                onDelete={handleDelete}
+              />
             </AcItemCard>
           ))}
         </div>

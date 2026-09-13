@@ -16,6 +16,7 @@ from app.models.pluggy import (
     PluggyTransactionTipo,
 )
 from app.models.user import User
+from app.schemas.asset import AssetIn
 
 
 @pytest.fixture()
@@ -31,10 +32,12 @@ def test_sell_asset_marks_status_baixado(db_session, user):
     asset = create_asset(
         db_session,
         user.id,
-        nome="Carro",
-        tipo=AssetTipo.veiculo,
-        valor_atual=Decimal("50000.00"),
-        data_aquisicao=date(2024, 1, 1),
+        AssetIn(
+            nome="Carro",
+            tipo=AssetTipo.veiculo,
+            valor_atual=Decimal("50000.00"),
+            data_aquisicao=date(2024, 1, 1),
+        ),
     )
 
     sold = sell_asset(
@@ -50,10 +53,12 @@ def test_sell_asset_twice_raises_invalid_state(db_session, user):
     asset = create_asset(
         db_session,
         user.id,
-        nome="Carro",
-        tipo=AssetTipo.veiculo,
-        valor_atual=Decimal("50000.00"),
-        data_aquisicao=date(2024, 1, 1),
+        AssetIn(
+            nome="Carro",
+            tipo=AssetTipo.veiculo,
+            valor_atual=Decimal("50000.00"),
+            data_aquisicao=date(2024, 1, 1),
+        ),
     )
     sell_asset(
         db_session, user.id, asset.id, valor_venda=Decimal("45000.00"), data_venda=date(2026, 8, 1)
@@ -73,10 +78,12 @@ def test_delete_asset_disassociates_transactions_without_deleting_them(db_sessio
     asset = create_asset(
         db_session,
         user.id,
-        nome="Carro",
-        tipo=AssetTipo.veiculo,
-        valor_atual=Decimal("50000.00"),
-        data_aquisicao=date(2024, 1, 1),
+        AssetIn(
+            nome="Carro",
+            tipo=AssetTipo.veiculo,
+            valor_atual=Decimal("50000.00"),
+            data_aquisicao=date(2024, 1, 1),
+        ),
     )
     item = PluggyItem(
         user_id=user.id,

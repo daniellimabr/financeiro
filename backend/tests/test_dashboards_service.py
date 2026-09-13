@@ -2187,6 +2187,35 @@ def test_get_saldo_acumulado_conferencia_empty_without_contas(db_session, user):
     assert service.get_saldo_acumulado_conferencia(db_session, user.id, ano=2026, mes=1) == []
 
 
+def test_get_saldo_acumulado_conferencia_salario_recebido_zero_quando_mes_ausente_do_mapa(
+    db_session, user
+):
+    # Conta aparece no mapa de salário antecipado (tem antecipação em jan),
+    # mas o mês consultado (fev) não tem entrada nesse mapa — cobre o
+    # fallback de `_salario_do_mes` quando a conta existe mas o mês não.
+    account = _account(db_session, user, tipo=PluggyAccountTipo.corrente)
+    account.saldo_inicial = Decimal("1000.00")
+    salario = _salario_subcategory(db_session, user)
+    db_session.flush()
+    _transaction(
+        db_session,
+        user,
+        account,
+        valor="3000.00",
+        tipo=PluggyTransactionTipo.credito,
+        data=date(2026, 1, 27),
+        data_competencia=date(2026, 2, 1),
+        subcategory_id=salario.id,
+    )
+    db_session.commit()
+
+    linhas = service.get_saldo_acumulado_conferencia(db_session, user.id, ano=2026, mes=2)
+
+    assert len(linhas) == 2
+    _, linha = linhas
+    assert linha.salario_recebido == Decimal("0")
+
+
 # --- get_summary / get_por_categoria / etc. respeitando regime (Sprint 16) --
 
 

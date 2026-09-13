@@ -533,13 +533,15 @@ def _reconstruct_holding_snapshots(
                 db,
                 holding,
                 ano_mes,
-                saldo=saldo_acumulado,
-                valorizacao=valorizacao,
-                rendimento=rendimento,
-                dividendos=Decimal("0") if holding.tipo == "EQUITY" else None,
-                aportes=aportes,
-                resgates=resgates,
-                confianca="reconstruido",
+                SnapshotValores(
+                    saldo=saldo_acumulado,
+                    valorizacao=valorizacao,
+                    rendimento=rendimento,
+                    dividendos=Decimal("0") if holding.tipo == "EQUITY" else None,
+                    aportes=aportes,
+                    resgates=resgates,
+                    confianca="reconstruido",
+                ),
             )
         )
     return result
@@ -549,18 +551,22 @@ def _no_mes(data: date, ano: int, mes: int) -> bool:
     return data.year == ano and data.month == mes
 
 
+@dataclass
+class SnapshotValores:
+    saldo: Decimal
+    valorizacao: Decimal
+    rendimento: Decimal
+    dividendos: Decimal | None
+    aportes: Decimal
+    resgates: Decimal
+    confianca: str
+
+
 def _upsert_snapshot(
     db: Session,
     holding: PluggyInvestment,
     ano_mes: str,
-    *,
-    saldo: Decimal,
-    valorizacao: Decimal,
-    rendimento: Decimal,
-    dividendos: Decimal | None,
-    aportes: Decimal,
-    resgates: Decimal,
-    confianca: str,
+    valores: SnapshotValores,
 ) -> PluggyInvestmentSnapshot:
     snapshot = (
         db.query(PluggyInvestmentSnapshot)
@@ -575,13 +581,13 @@ def _upsert_snapshot(
             investment_id=holding.id, user_id=holding.user_id, ano_mes=ano_mes
         )
         db.add(snapshot)
-    snapshot.saldo = saldo
-    snapshot.valorizacao = valorizacao
-    snapshot.rendimento = rendimento
-    snapshot.dividendos = dividendos
-    snapshot.aportes = aportes
-    snapshot.resgates = resgates
-    snapshot.confianca = confianca
+    snapshot.saldo = valores.saldo
+    snapshot.valorizacao = valores.valorizacao
+    snapshot.rendimento = valores.rendimento
+    snapshot.dividendos = valores.dividendos
+    snapshot.aportes = valores.aportes
+    snapshot.resgates = valores.resgates
+    snapshot.confianca = valores.confianca
     db.flush()
     return snapshot
 
@@ -640,13 +646,15 @@ def snapshot_current_month(
         db,
         holding,
         ano_mes,
-        saldo=saldo_atual,
-        valorizacao=valorizacao,
-        rendimento=rendimento,
-        dividendos=dividendos,
-        aportes=aportes,
-        resgates=resgates,
-        confianca="real",
+        SnapshotValores(
+            saldo=saldo_atual,
+            valorizacao=valorizacao,
+            rendimento=rendimento,
+            dividendos=dividendos,
+            aportes=aportes,
+            resgates=resgates,
+            confianca="real",
+        ),
     )
     return snapshot
 

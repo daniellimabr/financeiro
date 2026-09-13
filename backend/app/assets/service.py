@@ -4,8 +4,9 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from app.exceptions import InvalidStateError, NotFoundError
-from app.models.asset import Asset, AssetStatus, AssetTipo
+from app.models.asset import Asset, AssetStatus
 from app.models.pluggy import PluggyTransaction
+from app.schemas.asset import AssetIn
 
 
 def list_assets(db: Session, user_id: int) -> list[Asset]:
@@ -19,21 +20,13 @@ def get_asset(db: Session, user_id: int, asset_id: int) -> Asset:
     return asset
 
 
-def create_asset(
-    db: Session,
-    user_id: int,
-    *,
-    nome: str,
-    tipo: AssetTipo,
-    valor_atual: Decimal,
-    data_aquisicao: date,
-) -> Asset:
+def create_asset(db: Session, user_id: int, payload: AssetIn) -> Asset:
     asset = Asset(
         user_id=user_id,
-        nome=nome,
-        tipo=tipo,
-        valor_atual=valor_atual,
-        data_aquisicao=data_aquisicao,
+        nome=payload.nome,
+        tipo=payload.tipo,
+        valor_atual=payload.valor_atual,
+        data_aquisicao=payload.data_aquisicao,
     )
     db.add(asset)
     db.commit()
@@ -41,21 +34,12 @@ def create_asset(
     return asset
 
 
-def update_asset(
-    db: Session,
-    user_id: int,
-    asset_id: int,
-    *,
-    nome: str,
-    tipo: AssetTipo,
-    valor_atual: Decimal,
-    data_aquisicao: date,
-) -> Asset:
+def update_asset(db: Session, user_id: int, asset_id: int, payload: AssetIn) -> Asset:
     asset = get_asset(db, user_id, asset_id)
-    asset.nome = nome
-    asset.tipo = tipo
-    asset.valor_atual = valor_atual
-    asset.data_aquisicao = data_aquisicao
+    asset.nome = payload.nome
+    asset.tipo = payload.tipo
+    asset.valor_atual = payload.valor_atual
+    asset.data_aquisicao = payload.data_aquisicao
     db.commit()
     db.refresh(asset)
     return asset
