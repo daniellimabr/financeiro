@@ -1262,7 +1262,61 @@ Planejamento de fluxo futuro em 5 fases (todas concluídas, código em `main`):
 
 PRD: [PRD-038-mesa-de-planejamento.md](prd/PRD-038-mesa-de-planejamento.md). Plano: [SPRINT-038-mesa-de-planejamento-plan.md](sprints/SPRINT-038-mesa-de-planejamento-plan.md). Relatório: [SPRINT-038-mesa-de-planejamento-report.md](sprints/SPRINT-038-mesa-de-planejamento-report.md).
 
+### ✅ Sprint 39 — Débito técnico do scan aislop (cross-epic, qualidade de código, sem épico prévio) concluída em 2026-09-13
+
+Sem sessão de `/plan` prévia com o CEO em separado — CEO rodou `npx aislop scan` (ferramenta externa)
+em 2026-09-11 e pediu avaliação dos achados. Triagem registrada em
+[docs/audits/aislop-scan-2026-09-11.md](audits/aislop-scan-2026-09-11.md): score bruto 66/100 era quase
+todo ruído do vendor `.claude/skills/impeccable`; excluindo esse caminho, projeto real em 92/100
+("Healthy"), 0 erros. Débito real e de baixo risco: 4 funções de backend com excesso de parâmetros, 11
+blocos de código duplicado no frontend (fora de `scripts/browser-check/`), 1 encadeamento
+`.get(...,{}).get(...)` em `dashboards/service.py`. Condição explícita do CEO: **zero mudança de
+comportamento**.
+
+**Fase 1 (backend):** `create_asset`/`update_asset` e `create_liability`/`update_liability` passam a
+receber `payload: AssetIn`/`LiabilityIn` direto (router repassa sem explodir campos); `_apply_suggestions`
+(categorization) e `_upsert_snapshot` (pluggy_integration) agrupam parâmetros soltos em dataclasses
+(`SuggestionSources`, `SnapshotValores`); `dashboards/service.py:1274` — o encadeamento
+`.get(x,{}).get(y,default)` virou helper `_salario_do_mes` em duas etapas (não apenas uma função
+wrapper — o scan aislop sinaliza a cadeia por expressão, não por localização, então mover o encadeamento
+pra dentro de uma função não bastava; achado real desta execução) — validado contra dado real da VM de
+dev (5 meses, contas com e sem salário antecipado no mapa) sem nenhuma divergência.
+
+**Fase 2 (frontend):** `toAssetPayload`/`toLiabilityPayload` eliminam duplicação entre create/update em
+`api/assets.ts`/`api/liabilities.ts`; hook `useInlineEditCell` + componente `InlineEditInput` extraídos de
+`DescriptionCell`/`DateCell` (a duplicação real remanescente era a marcação JSX do `<input>`, não coberta
+só pelo hook — achado real desta execução); botão "Excluir" duplicado em `AssetsPage`/`LiabilitiesPage`
+virou componente compartilhado (`ExcluirAssetButton`/`ExcluirLiabilityButton`); 4 KPI tiles consolidados
+de `InvestimentosPage` e 2 de `DashboardsPage` (Receita/Despesa) viraram helpers de render; 6
+`SortableHeader` repetidos em `CategorizationReviewPage` viraram um helper (`renderSortHeader`). Um
+achado (`InvestimentosPage`: colgroup/thead entre `extrato-unificado-table` e `posicao-historico-table`)
+foi investigado e descartado — coincidência estrutural (4 vs. 5 colunas, tipos de dado diferentes), sem
+lógica compartilhada real; forçar uma abstração genérica custaria mais do que vale.
+
+**Fase 3:** `scripts/browser-check/check-sprint39.mjs` (novo) validou Ativos/Passivos/Investimentos/
+Categorização/Dashboard contra a VM de dev logado como usuário demo — zero erro de console, zero mudança
+visual, edição inline (Enter/Escape/blur) intacta; interação completa de Categorização restrita ao
+desktop (tabela larga rolável horizontalmente se mostrou instável para clique automatizado em 390px,
+achado desta execução não relacionado ao refactor — mobile manteve screenshot + checagem de console).
+713 testes backend (99% cobertura) + 303 testes frontend, suíte 100% verde, lint/format limpos. Deploy
+na VM de dev (commits `11f80de`/`1a860f9`, CI verde confirmado antes do pull).
+
+PRD: [PRD-039-debito-tecnico-scan-aislop.md](prd/PRD-039-debito-tecnico-scan-aislop.md). Plano:
+[SPRINT-039-debito-tecnico-scan-aislop-plan.md](sprints/SPRINT-039-debito-tecnico-scan-aislop-plan.md).
+Relatório: [SPRINT-039-debito-tecnico-scan-aislop-report.md](sprints/SPRINT-039-debito-tecnico-scan-aislop-report.md).
+
 ## Registro de reavaliações futuras
+
+**Sprint 39 — Candidato novo:**
+- **Quebrar os arquivos grandes que excedem o limite do linter:** backend (limite 400 linhas)
+  `categorization/engine.py` (445), `categorization/service.py` (467), `dashboards/service.py` (1308),
+  `pluggy_integration/service.py` (1052); frontend (limite 600 linhas) `AccountManagementPage.tsx` (713),
+  `DashboardsPage.tsx` (1618), `InvestimentosPage.tsx` (841). Fora de escopo da Sprint 39 por decisão
+  explícita — risco desproporcional ao ganho pra uma sprint de arrumação (`dashboards/service.py` sozinho
+  sustenta praticamente todo dashboard do app). Candidato a sprint dedicada futura, com plano próprio de
+  fases incrementais (um arquivo por vez); os 3 achados de excesso de parâmetros em
+  `app/planejamento/service.py` (`_linha_subcategoria`, `confirmar_valor`, `confirmar_valor_eventual`) —
+  código ainda instável da Sprint 38 — também ficaram de fora, mesmo critério.
 
 **Sprint 38 — Candidatos sem sprint numerada aún:**
 - **Toggle Modo Projeção no Dashboard:** trazer o mecanismo de simulação efêmera de hipotéticas da tela Projeção (Sprint 14) para o Dashboard, fora de escopo do PRD-038.
