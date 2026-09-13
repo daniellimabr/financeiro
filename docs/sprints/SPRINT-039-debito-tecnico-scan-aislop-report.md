@@ -1,7 +1,11 @@
 # SPRINT-039: Débito técnico do scan aislop — Relatório
 
 - **Plano:** [SPRINT-039-debito-tecnico-scan-aislop-plan.md](./SPRINT-039-debito-tecnico-scan-aislop-plan.md)
+- **PRD:** [PRD-039-debito-tecnico-scan-aislop.md](../prd/PRD-039-debito-tecnico-scan-aislop.md)
 - **Data do relatório:** 2026-09-13
+- **Aprovada pelo CEO em 2026-09-13** — deploy na VM de dev e validação (QA visual + conferência de
+  saldo real) já feitos antes da aprovação formal, mesmo padrão das Sprints 34-38 (deploy como tarefa
+  da própria sprint, ambiente dev sob autonomia livre do CTO).
 
 ## Resumo
 

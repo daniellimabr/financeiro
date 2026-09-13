@@ -33,7 +33,7 @@ explícita do CEO a cada vez, nunca automática/agendada.
 
 | Última auditoria | Sprint de referência | Próxima checagem devida | Status |
 |---|---|---|---|
-| nenhuma ainda | — | Já devida (9/5) — checagem proposta ao CEO na próxima sessão de planejamento | 9/5 sprints completadas e aprovadas (Sprint 30, Sprint 31, Sprint 32, Sprint 33, Sprint 34, Sprint 35, Sprint 36, Sprint 37, Sprint 38); mecanismo criado na Sprint 29. **Checkpoint da Sprint 34 (2026-08-21):** CTO propôs rodar `structural-auditor` antes do redesign visual do E10 (ADR-003 cita troca de sistema de design como o cenário que a auditoria existe para pegar) — **CEO decidiu adiar**, não reabrir sem pedido explícito dele. Sprints 35 e 36 (mesmo dia, 2ª e 3ª/última sprint do redesign, épico E10 agora fechado) concluídas sem reabrir o pedido, conforme essa decisão — CTO só registra a contagem, não volta a propor a cada sprint. **Sprint 37 (2026-09-03, abre E11) aprovada pelo CEO em 2026-09-04** — contagem sobe para 8/5 sprints completadas. **Sprint 38 (2026-09-11, abre E12) aprovada pelo CEO em 2026-09-12** (após 4 rodadas de ajuste pós-deploy) — contagem sobe para 9/5 sprints completadas, cadência vencida; CTO sinaliza aqui, execução só com aprovação explícita do CEO. |
+| nenhuma ainda | — | Já devida (10/5) — checagem proposta ao CEO na próxima sessão de planejamento | 10/5 sprints completadas e aprovadas (Sprint 30, Sprint 31, Sprint 32, Sprint 33, Sprint 34, Sprint 35, Sprint 36, Sprint 37, Sprint 38, Sprint 39); mecanismo criado na Sprint 29. **Checkpoint da Sprint 34 (2026-08-21):** CTO propôs rodar `structural-auditor` antes do redesign visual do E10 (ADR-003 cita troca de sistema de design como o cenário que a auditoria existe para pegar) — **CEO decidiu adiar**, não reabrir sem pedido explícito dele. Sprints 35 e 36 (mesmo dia, 2ª e 3ª/última sprint do redesign, épico E10 agora fechado) concluídas sem reabrir o pedido, conforme essa decisão — CTO só registra a contagem, não volta a propor a cada sprint. **Sprint 37 (2026-09-03, abre E11) aprovada pelo CEO em 2026-09-04** — contagem sobe para 8/5 sprints completadas. **Sprint 38 (2026-09-11, abre E12) aprovada pelo CEO em 2026-09-12** (após 4 rodadas de ajuste pós-deploy) — contagem sobe para 9/5. **Sprint 39 (2026-09-13, débito técnico cross-epic) aprovada pelo CEO em 2026-09-13** — contagem sobe para 10/5 sprints completadas, cadência vencida (dobro do intervalo); CTO sinaliza aqui, execução só com aprovação explícita do CEO. |
 
 ## Sequência proposta (dependências)
 
@@ -1262,7 +1262,7 @@ Planejamento de fluxo futuro em 5 fases (todas concluídas, código em `main`):
 
 PRD: [PRD-038-mesa-de-planejamento.md](prd/PRD-038-mesa-de-planejamento.md). Plano: [SPRINT-038-mesa-de-planejamento-plan.md](sprints/SPRINT-038-mesa-de-planejamento-plan.md). Relatório: [SPRINT-038-mesa-de-planejamento-report.md](sprints/SPRINT-038-mesa-de-planejamento-report.md).
 
-### ✅ Sprint 39 — Débito técnico do scan aislop (cross-epic, qualidade de código, sem épico prévio) concluída em 2026-09-13
+### ✅ Sprint 39 — Débito técnico do scan aislop (cross-epic, qualidade de código, sem épico prévio) concluída em 2026-09-13, aprovada pelo CEO em 2026-09-13
 
 Sem sessão de `/plan` prévia com o CEO em separado — CEO rodou `npx aislop scan` (ferramenta externa)
 em 2026-09-11 e pediu avaliação dos achados. Triagem registrada em
